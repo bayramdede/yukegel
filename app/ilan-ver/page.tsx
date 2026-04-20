@@ -49,7 +49,7 @@ export default function IlanVer() {
 
   const durakEkle = () => {
     setDuraklar([...duraklar, {
-      sehir:'', ilce:'', arac_tipi:[], arac_adet:1,
+      sehir:'', ilce:'', arac_tipi:'', utsyapi:[], arac_adet:1,
       yuk_cinsi:'', ton:'', palet:'', notlar:''
     }]);
   };
