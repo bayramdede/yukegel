@@ -49,6 +49,7 @@ export default function Home() {
             vehicle_count, cargo_type, weight_ton, pallet_count
           )
         `)
+        .in('moderation_status', ['approved', 'auto_published'])
         .order('created_at', { ascending: false })
         .limit(50);
 
