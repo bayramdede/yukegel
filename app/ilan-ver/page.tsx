@@ -64,12 +64,6 @@ export default function IlanVer() {
     setDuraklar(duraklar.filter((_,idx) => idx !== i));
   };
 
-  const aracTipiToggle = (durakIdx: number, tip: string) => {
-    const mevcut = duraklar[durakIdx].arac_tipi;
-    const yeni = mevcut.includes(tip) ? mevcut.filter(t=>t!==tip) : [...mevcut, tip];
-    durakGuncelle(durakIdx, 'arac_tipi', yeni);
-  };
-
 const [yukleniyor, setYukleniyor] = useState(false);
 const [hata, setHata] = useState('');
 
