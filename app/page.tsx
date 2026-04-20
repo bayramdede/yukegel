@@ -167,8 +167,12 @@ export default function Home() {
               const kaynak = KAYNAK_ETIKET[ilan.kaynak] || KAYNAK_ETIKET.form;
               const isYuk = ilan.tip === 'yuk';
               return (
-                <div key={ilan.id}
-                  style={{background:'#161b22', border:'1px solid #30363d', borderRadius:8, padding:'14px 16px', cursor:'pointer', transition:'border-color 0.15s'}}
+                <a key={ilan.id}href={`/ilan/${ilan.id}`}
+                  style={{
+                    display:'block', background:'#161b22', border:'1px solid #30363d',
+                    borderRadius:8, padding:'14px 16px', cursor:'pointer',
+                    transition:'border-color 0.15s', textDecoration:'none'
+                  }}
                   onMouseEnter={e=>(e.currentTarget.style.borderColor='#22c55e')}
                   onMouseLeave={e=>(e.currentTarget.style.borderColor='#30363d')}>
                   <div style={{display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:16}}>
@@ -226,13 +230,13 @@ export default function Home() {
                           ₺{ilan.fiyat}
                         </div>
                       )}
-                      <a href={`tel:${ilan.tel}`}
-                        style={{display:'block', background:'#1a3a1a', color:'#4ade80', border:'1px solid #166534', borderRadius:6, padding:'6px 12px', fontSize:'0.8rem', fontWeight:700, textDecoration:'none', textAlign:'center'}}>
+                      <button onClick={e=>{e.preventDefault(); window.location.href=`tel:${ilan.tel}`;}}
+                        style={{display:'block', background:'#1a3a1a', color:'#4ade80', border:'1px solid #166534', borderRadius:6, padding:'6px 12px', fontSize:'0.8rem', fontWeight:700, cursor:'pointer', textDecoration:'none'}}>
                         📞 Ara
-                      </a>
+                      </button>
                     </div>
                   </div>
-                </div>
+                </a>
               );
             })}
 
