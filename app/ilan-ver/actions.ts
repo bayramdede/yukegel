@@ -19,7 +19,8 @@ export async function ilanKaydet(formData: {
   duraklar: Array<{
     sehir: string;
     ilce: string;
-    arac_tipi: string[];
+    arac_tipi: string;
+    utsyapi: string[];
     arac_adet: number;
     yuk_cinsi: string;
     ton: string;
