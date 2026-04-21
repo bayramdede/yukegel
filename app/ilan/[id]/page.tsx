@@ -1,6 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 import { notFound } from 'next/navigation';
 import Aksiyonlar from './Aksiyonlar';
+import { cookies } from 'next/headers';
+import { createServerClient } from '@supabase/ssr';
 
 
 const supabase = createClient(
@@ -26,6 +28,20 @@ export default async function IlanDetay({ params }: { params: Promise<{ id: stri
     .single();
 
   if (!ilan || ilan.moderation_status === 'rejected') return notFound();
+
+  // Kullanıcı giriş yapmış mı?
+  const cookieStore = await cookies();
+  const supabaseAuth = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() { return cookieStore.getAll() },
+        setAll() {},
+      },
+    }
+  );
+  const { data: { user } } = await supabaseAuth.auth.getUser();
 
   const stops = (ilan.listing_stops || []).sort((a: any, b: any) => a.stop_order - b.stop_order);
   const isYuk = ilan.listing_type === 'yuk';
@@ -174,15 +190,29 @@ export default async function IlanDetay({ params }: { params: Promise<{ id: stri
         {/* İletişim Kartı */}
         <div style={{ background: '#161b22', border: '1px solid #166534', borderRadius: 12, padding: 24 }}>
           <div style={{ fontSize: '0.72rem', color: '#8b949e', fontWeight: 700, letterSpacing: '0.08em', marginBottom: 16 }}>İLETİŞİM</div>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
-            <div style={{ color: '#e2e8f0', fontSize: '1.1rem', fontWeight: 700 }}>
-              📞 {ilan.contact_phone}
+          
+          {user ? (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+              <div style={{ color: '#e2e8f0', fontSize: '1.1rem', fontWeight: 700 }}>
+                📞 {ilan.contact_phone}
+              </div>
+              <a href={`tel:${ilan.contact_phone}`}
+                style={{ background: '#22c55e', color: '#000', fontWeight: 800, fontSize: '1rem', padding: '12px 32px', borderRadius: 8, textDecoration: 'none' }}>
+                Hemen Ara
+              </a>
             </div>
-            <a href={`tel:${ilan.contact_phone}`}
-              style={{ background: '#22c55e', color: '#000', fontWeight: 800, fontSize: '1rem', padding: '12px 32px', borderRadius: 8, textDecoration: 'none', display: 'inline-block' }}>
-              Hemen Ara
-            </a>
-          </div>
+          ) : (
+            <div style={{ textAlign: 'center', padding: '8px 0' }}>
+              <div style={{ color: '#8b949e', fontSize: '0.85rem', marginBottom: 12 }}>
+                Telefon numarasını görmek için giriş yapın.
+              </div>
+              <a href={`/giris?redirect=/ilan/${ilan.id}`}
+                style={{ display: 'inline-block', background: '#22c55e', color: '#000', fontWeight: 800, fontSize: '1rem', padding: '12px 32px', borderRadius: 8, textDecoration: 'none' }}>
+                🔐 Giriş Yap / Kaydol
+              </a>
+            </div>
+          )}
+          
           <div style={{ color: '#4b5563', fontSize: '0.75rem', marginTop: 12 }}>
             Telefon numarası ilan sahibine aittir. Yükegel aracılık yapmaz.
           </div>
