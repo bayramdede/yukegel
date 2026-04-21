@@ -24,7 +24,8 @@ export async function proxy(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
 
   if (
-    (request.nextUrl.pathname.startsWith('/moderator') ||
+    (request.nextUrl.pathname.startsWith('/moderator/') ||
+     request.nextUrl.pathname === '/moderator' ||
      request.nextUrl.pathname.startsWith('/panel')) &&
     !user
   ) {
@@ -35,5 +36,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/moderator/:path*', '/panel/:path*'],
+  matcher: ['/moderator', '/moderator/:path*', '/panel/:path*'],
 }

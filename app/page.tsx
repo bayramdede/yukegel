@@ -1,11 +1,8 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from '../lib/supabase';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+const supabase = createClient();
 
 const ILLER = [
   'Adana','Adıyaman','Afyonkarahisar','Ağrı','Amasya','Ankara','Antalya','Artvin',
@@ -20,13 +17,13 @@ const ILLER = [
   'Ardahan','Iğdır','Yalova','Karabük','Kilis','Osmaniye','Düzce'
 ];
 
-const ARAC_TIPLERI = ['Tümü','TIR','Kırkayak','Kamyon','Kamyonet','Panelvan','Lowbed','Damperli','Frigorifik'];
-
 const KAYNAK_ETIKET: Record<string,{label:string,bg:string,color:string}> = {
   form:     { label:'Yükegel',     bg:'#0d2b1a', color:'#22c55e' },
   whatsapp: { label:'📱 WhatsApp', bg:'#0d2b0d', color:'#4ade80' },
   facebook: { label:'👥 Facebook', bg:'#1e3a5f', color:'#60a5fa' },
 };
+
+export const dynamic = 'force-dynamic';
 
 export default function Home() {
   const [ilanlar, setIlanlar] = useState<any[]>([]);
@@ -34,10 +31,23 @@ export default function Home() {
   const [tip, setTip] = useState<'tumu'|'yuk'|'arac'>('tumu');
   const [kalkis, setKalkis] = useState('');
   const [varis, setVaris] = useState('');
-  const [aracTipi, setAracTipi] = useState('Tümü');
+  const [kullanici, setKullanici] = useState<any>(null);
 
   useEffect(() => {
-    async function getIlanlar() {
+    async function init() {
+      // Önce kullanıcıyı çek
+      const { data: { user } } = await supabase.auth.getUser();
+      //console.log('USER:', user?.email); // bunu görüyor musun?
+        if (user) {
+          const { data: profil } = await supabase
+            .from('users')
+            .select('display_name, username, email')
+            .eq('id', user.id)
+            .single();
+          setKullanici(profil || { email: user.email });    
+        }
+
+      // Sonra ilanları çek
       setYukleniyor(true);
       const { data } = await supabase
         .from('listings')
@@ -77,7 +87,24 @@ export default function Home() {
       setIlanlar(donusturulmus);
       setYukleniyor(false);
     }
-    getIlanlar();
+
+    init();
+
+    // Auth değişikliklerini dinle
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (session?.user) {
+        const { data: profil } = await supabase
+          .from('users')
+          .select('display_name, username, email')
+          .eq('id', session.user.id)
+          .single();
+        setKullanici(profil || { email: session.user.email || session.user.user_metadata?.email || 'Kullanıcı' });
+      } else {
+        setKullanici(null);
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   const filtered = ilanlar.filter(i => {
@@ -101,20 +128,30 @@ export default function Home() {
             </span>
             <span style={{background:'#1e3a5f', color:'#60a5fa', fontSize:'0.65rem', fontWeight:700, padding:'2px 6px', borderRadius:4}}>BETA</span>
           </div>
-          <div style={{display:'flex', alignItems:'center', gap:12}}>
-            <span style={{color:'#8b949e', fontSize:'0.85rem'}}>Ücretsiz</span>
-            <a href="/ilan-ver" style={{background:'#22c55e', color:'#000', fontWeight:700, fontSize:'0.85rem', padding:'6px 16px', borderRadius:6, textDecoration:'none'}}>
-              + İlan Ver
-            </a>
-          </div>
+
+          {kullanici ? (
+            <div style={{display:'flex', alignItems:'center', gap:12}}>
+              <a href="/panel" style={{color:'#e2e8f0', fontSize:'0.85rem', textDecoration:'none', fontWeight:600}}>
+                👤 {kullanici.display_name || kullanici.username || kullanici.email?.split('@')[0]}
+              </a>
+              <a href="/ilan-ver" style={{background:'#22c55e', color:'#000', fontWeight:700, fontSize:'0.85rem', padding:'6px 16px', borderRadius:6, textDecoration:'none'}}>
+                + İlan Ver
+              </a>
+            </div>
+          ) : (
+            <div style={{display:'flex', alignItems:'center', gap:12}}>
+              <a href="/giris" style={{color:'#8b949e', fontSize:'0.85rem', textDecoration:'none'}}>Giriş Yap</a>
+              <a href="/giris" style={{background:'#22c55e', color:'#000', fontWeight:700, fontSize:'0.85rem', padding:'6px 16px', borderRadius:6, textDecoration:'none'}}>
+                + İlan Ver
+              </a>
+            </div>
+          )}
         </div>
       </nav>
 
       {/* FİLTRELER */}
       <div style={{background:'#161b22', borderBottom:'1px solid #30363d', position:'sticky', top:56, zIndex:40}}>
         <div style={{maxWidth:1280, margin:'0 auto', padding:'10px 16px', display:'flex', flexWrap:'wrap', gap:8, alignItems:'center'}}>
-
-          {/* Tip toggle */}
           <div style={{background:'#0d1117', borderRadius:6, padding:2, border:'1px solid #30363d', display:'flex'}}>
             {(['tumu','yuk','arac'] as const).map(t => (
               <button key={t} onClick={()=>setTip(t)}
@@ -127,14 +164,12 @@ export default function Home() {
             ))}
           </div>
 
-          {/* Kalkış */}
           <select value={kalkis} onChange={e=>setKalkis(e.target.value)}
             style={{background:'#0d1117', color:'#e2e8f0', border:'1px solid #30363d', borderRadius:6, padding:'5px 10px', fontSize:'0.82rem', cursor:'pointer'}}>
             <option value=''>📍 Kalkış İli</option>
             {ILLER.map(il=><option key={il}>{il}</option>)}
           </select>
 
-          {/* Varış */}
           <select value={varis} onChange={e=>setVaris(e.target.value)}
             style={{background:'#0d1117', color:'#e2e8f0', border:'1px solid #30363d', borderRadius:6, padding:'5px 10px', fontSize:'0.82rem', cursor:'pointer'}}>
             <option value=''>🏁 Varış İli</option>
@@ -142,7 +177,7 @@ export default function Home() {
           </select>
 
           {(kalkis||varis||tip!=='tumu') && (
-            <button onClick={()=>{setTip('tumu');setKalkis('');setVaris('');setAracTipi('Tümü')}}
+            <button onClick={()=>{setTip('tumu');setKalkis('');setVaris('');}}
               style={{color:'#22c55e', background:'none', border:'none', cursor:'pointer', fontSize:'0.82rem', fontWeight:600}}>
               ✕ Temizle
             </button>
@@ -167,23 +202,15 @@ export default function Home() {
               const kaynak = KAYNAK_ETIKET[ilan.kaynak] || KAYNAK_ETIKET.form;
               const isYuk = ilan.tip === 'yuk';
               return (
-                <a key={ilan.id}href={`/ilan/${ilan.id}`}
-                  style={{
-                    display:'block', background:'#161b22', border:'1px solid #30363d',
-                    borderRadius:8, padding:'14px 16px', cursor:'pointer',
-                    transition:'border-color 0.15s', textDecoration:'none'
-                  }}
+                <a key={ilan.id} href={`/ilan/${ilan.id}`}
+                  style={{display:'block', background:'#161b22', border:'1px solid #30363d', borderRadius:8, padding:'14px 16px', cursor:'pointer', transition:'border-color 0.15s', textDecoration:'none'}}
                   onMouseEnter={e=>(e.currentTarget.style.borderColor='#22c55e')}
                   onMouseLeave={e=>(e.currentTarget.style.borderColor='#30363d')}>
                   <div style={{display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:16}}>
 
-                    {/* Sol */}
                     <div style={{flex:1, minWidth:0}}>
                       <div style={{display:'flex', alignItems:'center', gap:8, marginBottom:8, flexWrap:'wrap'}}>
-                        <span style={{
-                          background: isYuk ? '#7f1d1d' : '#14532d',
-                          color: isYuk ? '#fca5a5' : '#86efac',
-                          fontSize:'0.7rem', fontWeight:700, padding:'2px 8px', borderRadius:4}}>
+                        <span style={{background: isYuk ? '#7f1d1d' : '#14532d', color: isYuk ? '#fca5a5' : '#86efac', fontSize:'0.7rem', fontWeight:700, padding:'2px 8px', borderRadius:4}}>
                           {isYuk ? '🔴 YÜK' : '🟢 ARAÇ'}
                         </span>
                         <span style={{background:kaynak.bg, color:kaynak.color, fontSize:'0.7rem', fontWeight:600, padding:'2px 8px', borderRadius:4}}>
@@ -191,14 +218,12 @@ export default function Home() {
                         </span>
                       </div>
 
-                      {/* Kalkış */}
                       <div style={{display:'flex', alignItems:'center', gap:4, marginBottom:4}}>
                         <span style={{color:'#22c55e', fontSize:'0.7rem', fontWeight:700, minWidth:16}}>K</span>
                         <span style={{color:'#e2e8f0', fontWeight:700, fontSize:'0.95rem'}}>{ilan.kalkis}</span>
                         {ilan.kalkis_ilce && <span style={{color:'#8b949e', fontSize:'0.82rem'}}>/ {ilan.kalkis_ilce}</span>}
                       </div>
 
-                      {/* Varış noktaları */}
                       {ilan.duraklar.map((d: any, i: number) => (
                         <div key={i} style={{display:'flex', alignItems:'center', gap:4, marginBottom:4}}>
                           <span style={{color:'#f97316', fontSize:'0.7rem', fontWeight:700, minWidth:16}}>V</span>
@@ -208,32 +233,31 @@ export default function Home() {
                         </div>
                       ))}
 
-                      {/* Detaylar */}
                       <div style={{display:'flex', flexWrap:'wrap', gap:12, marginTop:8}}>
-                        {ilan.duraklar[0]?.ton && (
-                          <span style={{color:'#94a3b8', fontSize:'0.8rem'}}>⚖ {ilan.duraklar[0].ton} ton</span>
-                        )}
-                        {ilan.duraklar[0]?.palet && (
-                          <span style={{color:'#94a3b8', fontSize:'0.8rem'}}>📦 {ilan.duraklar[0].palet} palet</span>
-                        )}
-                        {ilan.duraklar[0]?.arac_tipi && (
-                          <span style={{color:'#94a3b8', fontSize:'0.8rem'}}>🚛 {ilan.duraklar[0].arac_tipi}</span>
-                        )}
+                        {ilan.duraklar[0]?.ton && <span style={{color:'#94a3b8', fontSize:'0.8rem'}}>⚖ {ilan.duraklar[0].ton} ton</span>}
+                        {ilan.duraklar[0]?.palet && <span style={{color:'#94a3b8', fontSize:'0.8rem'}}>📦 {ilan.duraklar[0].palet} palet</span>}
+                        {ilan.duraklar[0]?.arac_tipi && <span style={{color:'#94a3b8', fontSize:'0.8rem'}}>🚛 {ilan.duraklar[0].arac_tipi}</span>}
                         <span style={{color:'#4b5563', fontSize:'0.75rem', marginLeft:'auto'}}>{ilan.sure}</span>
                       </div>
                     </div>
 
-                    {/* Sağ */}
                     <div style={{textAlign:'right', flexShrink:0}}>
                       {ilan.fiyat && (
                         <div style={{color:'#22c55e', fontWeight:800, fontSize:'1.05rem', marginBottom:8}}>
                           ₺{ilan.fiyat}
                         </div>
                       )}
-                      <button onClick={e=>{e.preventDefault(); window.location.href=`tel:${ilan.tel}`;}}
-                        style={{display:'block', background:'#1a3a1a', color:'#4ade80', border:'1px solid #166534', borderRadius:6, padding:'6px 12px', fontSize:'0.8rem', fontWeight:700, cursor:'pointer', textDecoration:'none'}}>
-                        📞 Ara
-                      </button>
+                      {kullanici ? (
+                        <button onClick={e=>{e.preventDefault(); e.stopPropagation(); window.location.href=`tel:${ilan.tel}`;}}
+                          style={{display:'block', background:'#1a3a1a', color:'#4ade80', border:'1px solid #166534', borderRadius:6, padding:'6px 12px', fontSize:'0.8rem', fontWeight:700, cursor:'pointer'}}>
+                          📞 Ara
+                        </button>
+                      ) : (
+                        <button onClick={e=>{e.preventDefault(); e.stopPropagation(); window.location.href='/giris';}}
+                          style={{display:'block', background:'#1a2a3a', color:'#60a5fa', border:'1px solid #1e3a5f', borderRadius:6, padding:'6px 12px', fontSize:'0.8rem', fontWeight:700, cursor:'pointer', whiteSpace:'nowrap'}}>
+                          🔐 Ara
+                        </button>
+                      )}
                     </div>
                   </div>
                 </a>
@@ -251,7 +275,6 @@ export default function Home() {
         )}
       </main>
 
-      {/* FOOTER */}
       <footer style={{borderTop:'1px solid #30363d', marginTop:40, padding:'20px 0', textAlign:'center', color:'#4b5563', fontSize:'0.78rem'}}>
         © 2026 Yükegel · Türkiye'nin nakliye ilan platformu
       </footer>

@@ -59,7 +59,7 @@ export default function Giris() {
     if (error) {
       setHata('Kod hatalı veya süresi dolmuş.');
     } else {
-      router.push('/panel');
+      router.push('/');
     }
     setYukleniyor(false);
   }
