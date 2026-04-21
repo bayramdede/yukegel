@@ -187,7 +187,7 @@ export default async function IlanDetay({ params }: { params: Promise<{ id: stri
             Telefon numarası ilan sahibine aittir. Yükegel aracılık yapmaz.
           </div>
         </div>
-<Aksiyonlar ilanId={ilan.id} tel={ilan.contact_phone} />
+<Aksiyonlar ilanId={ilan.id} />
       </main>
     </div>
   );
