@@ -22,14 +22,18 @@ export default function Aksiyonlar({ ilanId }: { ilanId: string }) {
   const [gonderildi, setGonderildi] = useState(false);
   const [kopyalandi, setKopyalandi] = useState(false);
 
-  function paylas() {
+  async function paylas() {
     const url = window.location.href;
-    if (navigator.share) {
-      navigator.share({ title: 'Yükegel İlanı', url });
-    } else {
-      navigator.clipboard.writeText(url);
-      setKopyalandi(true);
-      setTimeout(() => setKopyalandi(false), 2000);
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: 'Yükegel İlanı', url });
+      } else {
+        await navigator.clipboard.writeText(url);
+        setKopyalandi(true);
+        setTimeout(() => setKopyalandi(false), 2000);
+      }
+    } catch (err) {
+      // Kullanıcı vazgeçti, sessizce geç
     }
   }
 

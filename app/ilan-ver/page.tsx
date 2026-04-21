@@ -1,6 +1,8 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ilanKaydet } from './actions';
+import { createClient } from '../../lib/supabase';
+const supabase = createClient();
 
 
 const ILLER = [
@@ -46,6 +48,17 @@ export default function IlanVer() {
     yuk_cinsi:'', ton:'', palet:'', notlar:''
   }]);
   const [gonderildi, setGonderildi] = useState(false);
+
+    useEffect(() => {
+      async function kontrolEt() {
+        const { data: { user } } = await supabase.auth.getUser();
+        console.log('ILAN-VER USER:', user?.email);
+        if (!user) {
+          window.location.href = '/giris?redirect=/ilan-ver';
+        }
+      }
+      kontrolEt();
+    }, []);
 
   const durakEkle = () => {
     setDuraklar([...duraklar, {
