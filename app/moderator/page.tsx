@@ -2,6 +2,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { createClient } from '../../lib/supabase';
 import { useRouter } from 'next/navigation';
+import WhatsappYukle from './WhatsappYukle';
+
 
 const supabase = createClient();
 
@@ -203,6 +205,8 @@ function siradakineGec(mevcutId: string) {
           </button>
         </div>
       </nav>
+      {/* WHATSAPP ZIP YÜKLE */}
+      <WhatsappYukle />
 
       {/* FİLTRELER */}
       <div style={{ background: '#161b22', borderBottom: '1px solid #30363d', position: 'sticky', top: 52, zIndex: 40 }}>
