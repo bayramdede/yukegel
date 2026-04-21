@@ -23,7 +23,6 @@ const KAYNAK_ETIKET: Record<string,{label:string,bg:string,color:string}> = {
   facebook: { label:'👥 Facebook', bg:'#1e3a5f', color:'#60a5fa' },
 };
 
-export const dynamic = 'force-dynamic';
 
 export default function Home() {
   const [ilanlar, setIlanlar] = useState<any[]>([]);
@@ -37,7 +36,6 @@ export default function Home() {
     async function init() {
       // Önce kullanıcıyı çek
       const { data: { user } } = await supabase.auth.getUser();
-      //console.log('USER:', user?.email); // bunu görüyor musun?
         if (user) {
           const { data: profil } = await supabase
             .from('users')
