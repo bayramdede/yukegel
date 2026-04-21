@@ -1,5 +1,7 @@
 'use server';
 import { createClient } from '@supabase/supabase-js';
+import { createServerClient } from '@supabase/ssr';
+import { cookies } from 'next/headers';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -28,6 +30,20 @@ export async function ilanKaydet(formData: {
     notlar: string;
   }>;
 }) {
+  // Kullanıcı oturumunu al
+  const cookieStore = await cookies();
+  const supabaseAuth = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() { return cookieStore.getAll() },
+        setAll() {},
+      },
+    }
+  );
+  const { data: { user } } = await supabaseAuth.auth.getUser();
+
   // 1. listings'e yaz
   const { data: listing, error } = await supabase
     .from('listings')
@@ -44,6 +60,7 @@ export async function ilanKaydet(formData: {
       source: 'form',
       moderation_status: 'pending',
       trust_level: 'unverified',
+      user_id: user?.id || null,
     })
     .select()
     .single();

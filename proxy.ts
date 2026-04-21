@@ -23,8 +23,11 @@ export async function proxy(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser()
 
-  // /moderator altındaki sayfalara girişsiz erişimi engelle
-  if (request.nextUrl.pathname.startsWith('/moderator') && !user) {
+  if (
+    (request.nextUrl.pathname.startsWith('/moderator') ||
+     request.nextUrl.pathname.startsWith('/panel')) &&
+    !user
+  ) {
     return NextResponse.redirect(new URL('/giris', request.url))
   }
 
@@ -32,5 +35,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/moderator/:path*'],
+  matcher: ['/moderator/:path*', '/panel/:path*'],
 }
