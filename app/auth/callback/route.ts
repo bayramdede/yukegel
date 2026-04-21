@@ -23,6 +23,20 @@ export async function GET(request: Request) {
       }
     )
     await supabase.auth.exchangeCodeForSession(code)
+
+    // Kullanıcı profili tamamlanmış mı kontrol et
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) {
+      const { data: profil } = await supabase
+        .from('users')
+        .select('username')
+        .eq('id', user.id)
+        .single()
+
+      if (!profil?.username) {
+        return NextResponse.redirect(`${origin}/profil-tamamla`)
+      }
+    }
   }
 
   return NextResponse.redirect(`${origin}/`)
