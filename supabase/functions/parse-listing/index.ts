@@ -127,12 +127,14 @@ interface Alias {
   alias: string
   normalized: string
   priority: number
+  district: string | null
 }
 
 interface PlaceHit {
   normalized: string
   priority: number
   matched: string
+  district: string | null
 }
 
 function findPlaces(text: string, aliases: Alias[]): PlaceHit[] {
@@ -150,7 +152,7 @@ function findPlaces(text: string, aliases: Alias[]): PlaceHit[] {
     for (const bg of [bigram, bigram2]) {
       const match = cityAliases.find(a => trNorm(a.alias) === bg)
       if (match && !seen.has(match.normalized)) {
-        hits.push({ normalized: match.normalized, priority: match.priority || 50, matched: bg })
+        hits.push({ normalized: match.normalized, priority: match.priority || 50, matched: bg, district: match.district || null })
         seen.add(match.normalized)
       }
     }
@@ -162,7 +164,7 @@ function findPlaces(text: string, aliases: Alias[]): PlaceHit[] {
     for (const cand of [token, stripped]) {
       const match = cityAliases.find(a => trNorm(a.alias) === cand)
       if (match && !seen.has(match.normalized)) {
-        hits.push({ normalized: match.normalized, priority: match.priority || 50, matched: cand })
+        hits.push({ normalized: match.normalized, priority: match.priority || 50, matched: cand, district: match.district || null })
         seen.add(match.normalized)
       }
     }
@@ -217,6 +219,7 @@ function extractPallet(text: string): number | null {
 // -------------------------
 interface Lane {
   from: string
+  fromDistrict: string | null
   to: string
   vehicle: string | null
   body_type: string | null
@@ -238,7 +241,41 @@ function parseMessage(message: string, aliases: Alias[]): {
 
   for (const line of lines) {
     const rel = splitByRelation(line)
-    if (!rel) continue
+    if (!rel) {
+      // İlişki yok ama + var mı? Çoklu varış satırı olabilir
+      if (line.includes('+')) {
+        const parts = line.split(/[+\/]/).map(p => p.trim()).filter(p => p.length > 2)
+        if (parts.length > 1) {
+          // Önceki satırlardan kalkış şehri bul
+          let fromCity: PlaceHit | null = null
+          for (const prevLine of lines) {
+            if (prevLine === line) break
+            const prevHits = findPlaces(prevLine, aliases)
+            if (prevHits.length > 0) { fromCity = prevHits[0]; break }
+          }
+          if (fromCity) {
+            for (const part of parts) {
+              const partHits = findPlaces(part, aliases)
+              const to = bestPlace(partHits)
+              if (to && to.normalized !== fromCity.normalized) {
+                lanes.push({
+                  from: fromCity.normalized,
+                  fromDistrict: fromCity.district || null,
+                  to: to.normalized,
+                  vehicle: findVehicle(line, aliases),
+                  body_type: findBodyType(line, aliases),
+                  weight_ton: extractWeight(message),
+                  pallet: extractPallet(message),
+                  raw_line: line
+                })
+              }
+            }
+            continue
+          }
+        }
+      }
+      continue
+    }
 
     const fromHits = findPlaces(rel.left, aliases)
     const toHits = findPlaces(rel.right, aliases)
@@ -257,6 +294,7 @@ function parseMessage(message: string, aliases: Alias[]): {
         if (to) {
           lanes.push({
             from: from.normalized,
+            fromDistrict: from.district || null,
             to: to.normalized,
             vehicle: findVehicle(line, aliases),
             body_type: findBodyType(line, aliases),
@@ -271,6 +309,7 @@ function parseMessage(message: string, aliases: Alias[]): {
       if (to) {
         lanes.push({
           from: from.normalized,
+          fromDistrict: from.district || null,
           to: to.normalized,
           vehicle: findVehicle(line, aliases),
           body_type: findBodyType(line, aliases),
@@ -290,6 +329,7 @@ function parseMessage(message: string, aliases: Alias[]): {
         if (hits[0].normalized !== hits[1].normalized) {
           lanes.push({
             from: hits[0].normalized,
+            fromDistrict: hits[0].district || null,
             to: hits[1].normalized,
             vehicle: findVehicle(line, aliases),
             body_type: findBodyType(line, aliases),
@@ -303,7 +343,16 @@ function parseMessage(message: string, aliases: Alias[]): {
     }
   }
 
-  return { phones, ad_type, lanes }
+  // Duplicate lane temizle (aynı from+to kombinasyonu)
+  const seen = new Set<string>()
+  const uniqueLanes = lanes.filter(l => {
+    const key = l.from + '|' + l.to
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+
+  return { phones, ad_type, lanes: uniqueLanes }
 }
 
 // -------------------------
@@ -334,32 +383,66 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ success: true, lanes: 0 }))
     }
 
-    // Her lane için listings + listing_stops oluştur
-    let created = 0
+    // Aynı kalkış şehrine ait lane'leri grupla
+    const laneGroups = new Map<string, Lane[]>()
     for (const lane of result.lanes) {
+      const key = lane.from + '|' + (lane.fromDistrict || '')
+      if (!laneGroups.has(key)) laneGroups.set(key, [])
+      laneGroups.get(key)!.push(lane)
+    }
+
+    // Her grup için tek listing, çoklu stop
+    let created = 0
+    for (const [, lanes] of laneGroups) {
+      const firstLane = lanes[0]
       const { data: listing } = await supabase.from('listings').insert({
         listing_type: result.ad_type,
-        origin_city: lane.from,
+        origin_city: firstLane.from,
+        origin_district: firstLane.fromDistrict || null,
         contact_phone: result.phones[0] || null,
         source: rawPost.source || 'whatsapp',
         moderation_status: 'pending',
         trust_level: 'social',
         raw_post_id: raw_post_id,
         raw_text: rawPost.raw_text,
-        notes: lane.raw_line,
-        vehicle_type: lane.vehicle ? [lane.vehicle] : null,
-        body_type: lane.body_type ? [lane.body_type] : null,
+        notes: (() => {
+          const routeLines = new Set(lanes.map((l: Lane) => l.raw_line))
+          const noteLines = rawPost.raw_text
+            .split('\n')
+            .map((l: string) => l.trim())
+            .filter((l: string) => {
+              if (!l || l.length < 5) return false
+              if (routeLines.has(l)) return false
+              // Telefon satırlarını atla (emoji'li dahil)
+              const stripped = l.replace(/[^\d]/g, '')
+              if (stripped.length >= 10 && stripped.length <= 13) return false
+              // Çizgi/eşitlik satırlarını atla
+              if (/^[-=─═]{3,}$/.test(l)) return false
+              // Sadece emoji olan satırları atla
+              if (/^[\u{1F000}-\u{1FFFF}\u{2600}-\u{27FF}\s]+$/u.test(l)) return false
+              // Firma adı satırlarını atla (rota içeren satırlar)
+              const hasCity = aliases?.some((a: any) => a.type === 'city' && trNorm(l).includes(trNorm(a.alias)))
+              if (hasCity) return false
+              return true
+            })
+            .slice(0, 3)
+          return noteLines.length > 0 ? noteLines.join(' | ') : ''
+        })(),
+        vehicle_type: firstLane.vehicle ? [firstLane.vehicle] : null,
+        body_type: firstLane.body_type ? [firstLane.body_type] : null,
       }).select().single()
 
       if (listing) {
-        await supabase.from('listing_stops').insert({
-          listing_id: listing.id,
-          stop_order: 1,
-          city: lane.to,
-          cargo_type: null,
-          weight_ton: lane.weight_ton,
-          pallet_count: lane.pallet,
-        })
+        for (let i = 0; i < lanes.length; i++) {
+          await supabase.from('listing_stops').insert({
+            listing_id: listing.id,
+            stop_order: i + 1,
+            city: lanes[i].to,
+            cargo_type: null,
+            weight_ton: lanes[i].weight_ton,
+            pallet_count: lanes[i].pallet,
+          })
+        }
         created++
       }
     }
