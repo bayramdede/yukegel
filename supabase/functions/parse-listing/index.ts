@@ -1,3 +1,5 @@
+/// <reference types="https://deno.land/types.d.ts" />
+
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const supabase = createClient(
@@ -9,9 +11,11 @@ const supabase = createClient(
 // Türkçe normalizasyon
 // -------------------------
 function trNorm(s: string): string {
-  return (s || '').toLowerCase()
+  return (s || '')
+    .replace(/İ/g, 'i').replace(/I/g, 'i')  // toLowerCase'den ÖNCE
+    .toLowerCase()
     .replace(/ç/g, 'c').replace(/ğ/g, 'g').replace(/ı/g, 'i')
-    .replace(/İ/g, 'i').replace(/ö/g, 'o').replace(/ş/g, 's')
+    .replace(/ö/g, 'o').replace(/ş/g, 's')
     .replace(/ü/g, 'u').replace(/â/g, 'a').replace(/î/g, 'i')
     .replace(/û/g, 'u').replace(/[^a-z0-9\s]/g, ' ')
     .replace(/\s+/g, ' ').trim()

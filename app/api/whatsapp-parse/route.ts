@@ -8,11 +8,13 @@ const supabase = createClient(
 
 // Türkçe karakter normalizasyonu
 function trNorm(s: string): string {
-  return (s || '').toLowerCase()
+  return (s || '')
+    .replace(/İ/g, 'i').replace(/I/g, 'i')
+    .toLowerCase()
     .replace(/ç/g, 'c').replace(/ğ/g, 'g').replace(/ı/g, 'i')
-    .replace(/İ/g, 'i').replace(/ö/g, 'o').replace(/ş/g, 's')
+    .replace(/ö/g, 'o').replace(/ş/g, 's')
     .replace(/ü/g, 'u').replace(/â/g, 'a').replace(/î/g, 'i')
-    .replace(/[^a-z0-9\s\.]/g, ' ').replace(/\s+/g, ' ').trim();
+    .replace(/û/g, 'u').replace(/[^a-z0-9\s\.]/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
 // Telefon numarası çıkarma
@@ -156,28 +158,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Dosya bulunamadı' }, { status: 400 });
     }
 
-    // Alias'ları yükle
-    const { data: aliases } = await supabase.from('aliases').select('*').eq('is_active', true);
-    console.log('ALIAS SAYISI:', aliases?.length);
-
-
-    let totalMessages = 0;
-    let passedGate = 0;
-    let savedToDb = 0;
+    // Dosyaları belleğe al (stream kapanmadan önce)
+    const fileContents: { name: string; content: string }[] = [];
     for (const file of files) {
       let content = '';
-
       if (file.name.endsWith('.zip')) {
-        // ZIP dosyasını işle
         const buffer = await file.arrayBuffer();
         const JSZip = (await import('jszip')).default;
         const zip = await JSZip.loadAsync(buffer);
-        
-        // _chat.txt dosyasını bul
-        const chatFile = Object.keys(zip.files).find(name => 
+        const chatFile = Object.keys(zip.files).find(name =>
           name.toLowerCase().includes('chat') && name.toLowerCase().endsWith('.txt')
         );
-        
         if (!chatFile) continue;
         content = await zip.files[chatFile].async('string');
       } else if (file.name.endsWith('.txt')) {
@@ -186,64 +177,79 @@ export async function POST(request: NextRequest) {
       } else {
         continue;
       }
+      fileContents.push({ name: file.name, content });
+    }
 
-      const messages = parseChatTxt(content);
+    // Toplam mesaj sayısını hızlıca hesapla (tahmini)
+    let totalMessages = 0;
+    for (const fc of fileContents) {
+      totalMessages += parseChatTxt(fc.content).length;
+    }
 
-        console.log('DOSYA:', file.name, '| İÇERİK BAŞLANGICI:', content.substring(0, 200));
-        console.log('MESAJ SAYISI:', messages.length);
-        totalMessages += messages.length;
+    // Hemen response dön — arka planda işlemeye devam et
+    const responsePromise = NextResponse.json({
+      success: true,
+      total_messages: totalMessages,
+      passed_gate: null,
+      saved_to_db: null,
+      info: 'Mesajlar arka planda işleniyor. Bekleyenler sekmesini yenileyin.',
+    });
 
+    // Arka planda asenkron işle
+    ;(async () => {
+      const { data: aliases } = await supabase.from('aliases').select('*').eq('is_active', true);
+      let passedGate = 0;
+      let savedToDb = 0;
 
-      totalMessages += messages.length;
-      
-      for (const msg of messages) {
-        console.log('MESAJ:', msg.timestamp, '|', msg.message.substring(0, 50));
-  // Tarih kontrolü
-        try {
+      for (const fc of fileContents) {
+        const messages = parseChatTxt(fc.content);
+
+        for (const msg of messages) {
+          // Tarih kontrolü
+          try {
             const [date, time] = msg.timestamp.split(' ');
             const [day, month, year] = date.split('.');
             const msgDate = new Date(`${year}-${month}-${day}T${time}`);
             if (msgDate < cutoff) continue;
-        } catch { /* devam */ }
+          } catch { /* devam */ }
 
-        const gate = await gatekeeper(msg.message, aliases || []);
+          const gate = await gatekeeper(msg.message, aliases || []);
+          if (!gate.isAd || gate.score < 30) continue;
+          passedGate++;
 
-        if (gate.score > 0) console.log('SKOR:', gate.score, 'TEL:', gate.phones, 'ŞEH:', gate.cities, 'ARAÇ:', gate.vehicles);
-
-        
-        if (!gate.isAd || gate.score < 30) continue;
-
-        passedGate++;
-
-        // raw_posts'a yaz
-        const { error } = await supabase.from('raw_posts').insert({
-          source: 'whatsapp',
-          source_group: groupName,
-          sender_name: msg.sender,
-          raw_text: msg.message,
-          message_timestamp: (() => {
-            try {
+          const { error } = await supabase.from('raw_posts').insert({
+            source: 'whatsapp',
+            source_group: groupName,
+            sender_name: msg.sender,
+            raw_text: msg.message,
+            message_timestamp: (() => {
+              try {
                 const [date, time] = msg.timestamp.split(' ');
                 const [day, month, year] = date.split('.');
                 return new Date(`${year}-${month}-${day}T${time}`).toISOString();
-            } catch { return new Date().toISOString(); }
+              } catch { return new Date().toISOString(); }
             })(),
-          quality_score: gate.score,
-          processing_status: 'pending',
-          detected_ad_count: 1,
-        });
+            quality_score: gate.score,
+            processing_status: 'pending',
+            detected_ad_count: 1,
+            message_date: (() => {
+              try {
+                const [date] = msg.timestamp.split(' ');
+                const [day, month, year] = date.split('.');
+                return `${year}-${month}-${day}`;
+              } catch { return new Date().toISOString().split('T')[0]; }
+            })(),
+          });
 
-        if (!error) savedToDb++;
+          // Duplicate ise sessizce atla (unique index ihlali)
+          if (!error || error.code === '23505') {
+            if (!error) savedToDb++;
+          }
+        }
       }
-    }
+    })();
 
-    return NextResponse.json({
-      success: true,
-      total_messages: totalMessages,
-      passed_gate: passedGate,
-      saved_to_db: savedToDb,
-      skipped: passedGate - savedToDb,
-    });
+    return responsePromise;
 
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
