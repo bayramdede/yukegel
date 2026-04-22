@@ -326,7 +326,7 @@ Deno.serve(async (req) => {
       const { data: listing } = await supabase.from('listings').insert({
         listing_type: result.ad_type,
         origin_city: lane.from,
-        contact_phone: result.phones[0] || rawPost.sender_name,
+        contact_phone: result.phones[0] || null,
         source: rawPost.source || 'whatsapp',
         moderation_status: 'pending',
         trust_level: 'social',
