@@ -7,6 +7,9 @@ import WhatsappYukle from './WhatsappYukle';
 
 const supabase = createClient();
 
+const ARAC_TIPLERI = ['Minivan', 'Panelvan', 'Kamyonet', 'Kamyon', 'Kırkayak', 'TIR'];
+const UST_YAPI = ['Açık Kasa', 'Kapalı Kasa', 'Tenteli', 'Damperli', 'Frigolu', 'Liftli', 'Sal Kasa', 'Lowbed'];
+
 const ILLER = [
   'Adana','Adıyaman','Afyonkarahisar','Ağrı','Amasya','Ankara','Antalya','Artvin',
   'Aydın','Balıkesir','Bilecik','Bingöl','Bitlis','Bolu','Burdur','Bursa','Çanakkale',
@@ -56,10 +59,10 @@ export default function Moderator() {
         id, listing_type, origin_city, origin_district,
         contact_phone, price_offer, source, created_at,
         moderation_status, status, notes, trust_level,
-        raw_text, raw_post_id,
+        raw_text, raw_post_id, vehicle_type, body_type,
         listing_stops (
           id, stop_order, city, district,
-          vehicle_count, cargo_type, weight_ton, pallet_count
+          vehicle_count, cargo_type, weight_ton, pallet_count, notes
         )
       `)
       .order('created_at', { ascending: false })
@@ -110,15 +113,18 @@ function siradakineGec(mevcutId: string) {
       listing_type: ilan.listing_type,
       origin_city: ilan.origin_city,
       origin_district: ilan.origin_district || '',
-      contact_phone: ilan.contact_phone,
+      contact_phone: ilan.contact_phone || '',
       price_offer: ilan.price_offer || '',
       notes: ilan.notes || '',
+      vehicle_type: ilan.vehicle_type || [],
+      body_type: ilan.body_type || [],
       stops: (ilan.listing_stops || [])
         .sort((a: any, b: any) => a.stop_order - b.stop_order)
         .map((s: any) => ({
           id: s.id, city: s.city, district: s.district || '',
           weight_ton: s.weight_ton || '', pallet_count: s.pallet_count || '',
           vehicle_count: s.vehicle_count || 1, cargo_type: s.cargo_type || '',
+          notes: s.notes || '',
         }))
     });
   }
@@ -133,6 +139,8 @@ function siradakineGec(mevcutId: string) {
       contact_phone: duzenleData.contact_phone,
       price_offer: duzenleData.price_offer || null,
       notes: duzenleData.notes,
+      vehicle_type: duzenleData.vehicle_type,
+      body_type: duzenleData.body_type,
     };
 
     if (mod === 'onayla') {
@@ -150,6 +158,7 @@ function siradakineGec(mevcutId: string) {
         pallet_count: stop.pallet_count || null,
         vehicle_count: stop.vehicle_count,
         cargo_type: stop.cargo_type,
+        notes: stop.notes || null,
       }).eq('id', stop.id);
     }
 
@@ -293,11 +302,11 @@ function siradakineGec(mevcutId: string) {
 
                     {/* Sol: Ham mesaj */}
                     {hasSosyal && (
-                      <div style={{ background: '#0d1117', borderRadius: 6, padding: 12, border: '1px solid #1f2937' }}>
+                      <div style={{ background: '#0d1117', borderRadius: 6, padding: 12, border: '1px solid #1f2937', overflow: 'hidden' }}>
                         <div style={{ color: '#8b949e', fontSize: '0.68rem', fontWeight: 700, marginBottom: 6, letterSpacing: '0.05em' }}>
                           {ilan.source === 'whatsapp' ? '📱 WHATSAPP HAM MESAJ' : '👥 FACEBOOK HAM MESAJ'}
                         </div>
-                        <div style={{ color: '#94a3b8', fontSize: '0.78rem', lineHeight: 1.6, whiteSpace: 'pre-wrap', maxHeight: 200, overflowY: 'auto' }}>
+                        <div style={{ color: '#94a3b8', fontSize: '0.78rem', lineHeight: 1.6, whiteSpace: 'pre-wrap', maxHeight: 300, overflowY: 'auto', overflowX: 'hidden', wordBreak: 'break-word' }}>
                           {ilan.raw_text}
                         </div>
                       </div>
@@ -335,6 +344,43 @@ function siradakineGec(mevcutId: string) {
                             </div>
                           </div>
 
+                          {/* Araç Tipi - tekli seçim */}
+                          <div style={{ marginBottom: 10 }}>
+                            <div style={{ color: '#8b949e', fontSize: '0.68rem', marginBottom: 4 }}>Araç Tipi</div>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                              {ARAC_TIPLERI.map(tip => {
+                                const secili = (duzenleData.vehicle_type || [])[0] === tip;
+                                return (
+                                  <button key={tip} onClick={() => {
+                                    setDuzenleData({ ...duzenleData, vehicle_type: secili ? [] : [tip] });
+                                  }}
+                                  style={{ padding: '3px 10px', borderRadius: 4, border: '1px solid', borderColor: secili ? '#22c55e' : '#374151', background: secili ? '#14532d' : '#0d1117', color: secili ? '#22c55e' : '#9ca3af', fontSize: '0.78rem', cursor: 'pointer' }}>
+                                    {tip}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+
+                          {/* Üstyapı */}
+                          <div style={{ marginBottom: 10 }}>
+                            <div style={{ color: '#8b949e', fontSize: '0.68rem', marginBottom: 4 }}>Üstyapı</div>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                              {UST_YAPI.map(tip => {
+                                const secili = (duzenleData.body_type || []).includes(tip);
+                                return (
+                                  <button key={tip} onClick={() => {
+                                    const mevcut = duzenleData.body_type || [];
+                                    setDuzenleData({ ...duzenleData, body_type: secili ? mevcut.filter((t: string) => t !== tip) : [...mevcut, tip] });
+                                  }}
+                                  style={{ padding: '3px 10px', borderRadius: 4, border: '1px solid', borderColor: secili ? '#60a5fa' : '#374151', background: secili ? '#1e3a5f' : '#0d1117', color: secili ? '#60a5fa' : '#9ca3af', fontSize: '0.78rem', cursor: 'pointer' }}>
+                                    {tip}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+
                           {duzenleData.stops?.map((stop: any, idx: number) => (
                             <div key={idx} style={{ background: '#0a0f1a', borderRadius: 6, padding: 10, marginBottom: 8 }}>
                               <div style={{ color: '#f97316', fontSize: '0.68rem', fontWeight: 700, marginBottom: 6 }}>Varış {idx + 1}</div>
@@ -361,6 +407,10 @@ function siradakineGec(mevcutId: string) {
                               <div style={{ marginTop: 6 }}>
                                 <div style={{ color: '#8b949e', fontSize: '0.65rem', marginBottom: 2 }}>Yük Cinsi</div>
                                 <input value={stop.cargo_type} onChange={e => stopGuncelle(idx, 'cargo_type', e.target.value)} style={inp} placeholder="Seramik, tekstil..." />
+                              </div>
+                              <div style={{ marginTop: 6 }}>
+                                <div style={{ color: '#8b949e', fontSize: '0.65rem', marginBottom: 2 }}>Satır Notu</div>
+                                <input value={stop.notes} onChange={e => stopGuncelle(idx, 'notes', e.target.value)} style={inp} placeholder="Varışa özel not..." />
                               </div>
                             </div>
                           ))}

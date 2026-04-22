@@ -187,6 +187,16 @@ function findVehicle(text: string, aliases: Alias[]): string | null {
   return null
 }
 
+// Üstyapı tespiti
+function findBodyType(text: string, aliases: Alias[]): string | null {
+  const norm = trNorm(text)
+  const bodyAliases = aliases.filter(a => a.type === 'body')
+  for (const ba of bodyAliases.sort((a, b) => (b.priority || 50) - (a.priority || 50))) {
+    if (norm.includes(trNorm(ba.alias))) return ba.normalized
+  }
+  return null
+}
+
 // -------------------------
 // Ton/Palet çıkarma
 // -------------------------
@@ -209,6 +219,7 @@ interface Lane {
   from: string
   to: string
   vehicle: string | null
+  body_type: string | null
   weight_ton: number | null
   pallet: number | null
   raw_line: string
@@ -234,8 +245,8 @@ function parseMessage(message: string, aliases: Alias[]): {
 
     const from = bestPlace(fromHits)
     
-    // + ile ayrılmış çoklu varış
-    const rightParts = rel.right.split('+').map(p => p.trim()).filter(p => p.length > 2)
+    // + veya / ile ayrılmış çoklu varış
+    const rightParts = rel.right.split(/[+\/]/).map(p => p.trim()).filter(p => p.length > 2)
 
     if (!from) continue
 
@@ -248,6 +259,7 @@ function parseMessage(message: string, aliases: Alias[]): {
             from: from.normalized,
             to: to.normalized,
             vehicle: findVehicle(line, aliases),
+            body_type: findBodyType(line, aliases),
             weight_ton: extractWeight(message),
             pallet: extractPallet(message),
             raw_line: line
@@ -261,6 +273,7 @@ function parseMessage(message: string, aliases: Alias[]): {
           from: from.normalized,
           to: to.normalized,
           vehicle: findVehicle(line, aliases),
+          body_type: findBodyType(line, aliases),
           weight_ton: extractWeight(message),
           pallet: extractPallet(message),
           raw_line: line
@@ -279,6 +292,7 @@ function parseMessage(message: string, aliases: Alias[]): {
             from: hits[0].normalized,
             to: hits[1].normalized,
             vehicle: findVehicle(line, aliases),
+            body_type: findBodyType(line, aliases),
             weight_ton: extractWeight(message),
             pallet: extractPallet(message),
             raw_line: line
@@ -333,6 +347,8 @@ Deno.serve(async (req) => {
         raw_post_id: raw_post_id,
         raw_text: rawPost.raw_text,
         notes: lane.raw_line,
+        vehicle_type: lane.vehicle ? [lane.vehicle] : null,
+        body_type: lane.body_type ? [lane.body_type] : null,
       }).select().single()
 
       if (listing) {
@@ -340,7 +356,7 @@ Deno.serve(async (req) => {
           listing_id: listing.id,
           stop_order: 1,
           city: lane.to,
-          cargo_type: lane.vehicle,
+          cargo_type: null,
           weight_ton: lane.weight_ton,
           pallet_count: lane.pallet,
         })
