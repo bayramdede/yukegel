@@ -151,15 +151,35 @@ function siradakineGec(mevcutId: string) {
 
     await supabase.from('listings').update(updateData).eq('id', id);
 
-    for (const stop of duzenleData.stops) {
-      await supabase.from('listing_stops').update({
-        city: stop.city, district: stop.district,
-        weight_ton: stop.weight_ton || null,
-        pallet_count: stop.pallet_count || null,
-        vehicle_count: stop.vehicle_count,
-        cargo_type: stop.cargo_type,
-        notes: stop.notes || null,
-      }).eq('id', stop.id);
+    // Stop'ları güncelle (yeni eklenenler insert, mevcutlar update)
+    for (let i = 0; i < duzenleData.stops.length; i++) {
+      const stop = duzenleData.stops[i];
+      if (stop.id) {
+        await supabase.from('listing_stops').update({
+          city: stop.city, district: stop.district,
+          weight_ton: stop.weight_ton || null,
+          pallet_count: stop.pallet_count || null,
+          vehicle_count: stop.vehicle_count,
+          cargo_type: stop.cargo_type,
+          notes: stop.notes || null,
+        }).eq('id', stop.id);
+      } else {
+        await supabase.from('listing_stops').insert({
+          listing_id: id,
+          stop_order: i + 1,
+          city: stop.city, district: stop.district || null,
+          weight_ton: stop.weight_ton || null,
+          pallet_count: stop.pallet_count || null,
+          vehicle_count: stop.vehicle_count || 1,
+          cargo_type: stop.cargo_type || null,
+          notes: stop.notes || null,
+        });
+      }
+    }
+
+    // Alias öğren (onayla modunda)
+    if (mod === 'onayla') {
+      await aliasOgren(duzenleData);
     }
 
     setDuzenleId('');
@@ -176,6 +196,85 @@ function siradakineGec(mevcutId: string) {
     }
 
     setTimeout(() => getIlanlar(), 300);
+  }
+
+  function stopEkle() {
+    setDuzenleData({
+      ...duzenleData,
+      stops: [...(duzenleData.stops || []), {
+        id: null, city: 'İstanbul', district: '',
+        weight_ton: '', pallet_count: '',
+        vehicle_count: 1, cargo_type: '', notes: ''
+      }]
+    });
+  }
+
+  function stopSil(idx: number) {
+    const yeni = duzenleData.stops.filter((_: any, i: number) => i !== idx);
+    setDuzenleData({ ...duzenleData, stops: yeni });
+  }
+
+  async function aliasOgren(data: any) {
+    // Kalkış ilçesi varsa alias ekle
+    if (data.origin_district && data.origin_city) {
+      const alias = data.origin_district.toLowerCase()
+        .replace(/ç/g,'c').replace(/ğ/g,'g').replace(/ı/g,'i')
+        .replace(/İ/g,'i').replace(/ö/g,'o').replace(/ş/g,'s').replace(/ü/g,'u');
+      await supabase.from('aliases').upsert({
+        alias, normalized: data.origin_city,
+        district: data.origin_district,
+        type: 'city', is_active: true, priority: 90
+      }, { onConflict: 'alias' });
+    }
+    // Varış ilçeleri için alias ekle
+    for (const stop of (data.stops || [])) {
+      if (stop.district && stop.city) {
+        const alias = stop.district.toLowerCase()
+          .replace(/ç/g,'c').replace(/ğ/g,'g').replace(/ı/g,'i')
+          .replace(/İ/g,'i').replace(/ö/g,'o').replace(/ş/g,'s').replace(/ü/g,'u');
+        await supabase.from('aliases').upsert({
+          alias, normalized: stop.city,
+          district: stop.district,
+          type: 'city', is_active: true, priority: 90
+        }, { onConflict: 'alias' });
+      }
+    }
+  }
+
+  async function llmSor(ilan: any) {
+    setIslem(ilan.id + '_llm');
+    try {
+      const res = await fetch('/api/llm-parse', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ raw_text: ilan.raw_text, notes: ilan.notes })
+      });
+      const data = await res.json();
+      console.log('LLM sonucu:', JSON.stringify(data, null, 2));
+      if (data.success) {
+        setDuzenleData((prev: any) => ({
+          ...prev,
+          ...data.result,
+          stops: data.result.stops?.map((s: any) => ({
+            id: null,
+            city: s.city || 'İstanbul',
+            district: s.district || '',
+            weight_ton: s.weight_ton || '',
+            pallet_count: s.pallet_count || '',
+            vehicle_count: 1,
+            cargo_type: s.cargo_type || '',
+            notes: ''
+          })) || prev.stops
+        }));
+        console.log('LLM formu doldurdu:', data.result);
+      } else {
+        alert('❌ Hata: ' + data.error);
+      }
+    } catch (e: any) {
+      alert('❌ Hata: ' + e.message);
+      console.error(e);
+    }
+    setIslem('');
   }
 
   function stopGuncelle(idx: number, alan: string, deger: any) {
@@ -383,7 +482,13 @@ function siradakineGec(mevcutId: string) {
 
                           {duzenleData.stops?.map((stop: any, idx: number) => (
                             <div key={idx} style={{ background: '#0a0f1a', borderRadius: 6, padding: 10, marginBottom: 8 }}>
-                              <div style={{ color: '#f97316', fontSize: '0.68rem', fontWeight: 700, marginBottom: 6 }}>Varış {idx + 1}</div>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                                <div style={{ color: '#f97316', fontSize: '0.68rem', fontWeight: 700 }}>Varış {idx + 1}</div>
+                                <button onClick={() => stopSil(idx)}
+                                  style={{ background: '#450a0a', border: 'none', color: '#f87171', borderRadius: 4, padding: '2px 8px', fontSize: '0.72rem', cursor: 'pointer' }}>
+                                  ✕ Sil
+                                </button>
+                              </div>
                               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 6 }}>
                                 <div>
                                   <div style={{ color: '#8b949e', fontSize: '0.65rem', marginBottom: 2 }}>İl</div>
@@ -419,6 +524,17 @@ function siradakineGec(mevcutId: string) {
                             <div style={{ color: '#8b949e', fontSize: '0.68rem', marginBottom: 2 }}>Not</div>
                             <textarea value={duzenleData.notes} onChange={e => setDuzenleData({ ...duzenleData, notes: e.target.value })}
                               rows={2} style={{ ...inp, resize: 'vertical' }} placeholder="Genel not" />
+                          </div>
+
+                          <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                            <button onClick={stopEkle}
+                              style={{ padding: '5px 12px', borderRadius: 4, border: '1px solid #374151', background: '#0d1117', color: '#22c55e', fontSize: '0.78rem', cursor: 'pointer' }}>
+                              + Varış Ekle
+                            </button>
+                            <button onClick={() => llmSor(ilan)} disabled={islem === ilan.id + '_llm'}
+                              style={{ padding: '5px 12px', borderRadius: 4, border: '1px solid #374151', background: '#0d1117', color: '#a78bfa', fontSize: '0.78rem', cursor: 'pointer', opacity: islem === ilan.id + '_llm' ? 0.5 : 1 }}>
+                              {islem === ilan.id + '_llm' ? '⏳ Sorgulanıyor...' : '🤖 LLM’e Sor'}
+                            </button>
                           </div>
                         </div>
                       ) : (
