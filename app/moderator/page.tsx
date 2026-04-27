@@ -40,7 +40,8 @@ const inp = {
 export default function Moderator() {
   const [ilanlar, setIlanlar] = useState<any[]>([]);
   const [yukleniyor, setYukleniyor] = useState(true);
-  const [filtre, setFiltre] = useState<'pending'|'approved'|'rejected'|'passive'|'hepsi'>('pending');
+  const [filtre, setFiltre] = useState<'pending'|'approved'|'rejected'|'passive'|'hepsi'|'no_lane'>('pending');
+  const [noLaneListesi, setNoLaneListesi] = useState<any[]>([]);
   const [islem, setIslem] = useState<string>('');
   const [duzenleId, setDuzenleId] = useState<string>('');
   const [duzenleData, setDuzenleData] = useState<any>({});
@@ -54,6 +55,19 @@ export default function Moderator() {
 
   async function getIlanlar() {
     setYukleniyor(true);
+
+    if (filtre === 'no_lane') {
+      const { data } = await supabase
+        .from('raw_posts')
+        .select('id, raw_text, sender_name, source, source_group, message_timestamp, quality_score')
+        .eq('processing_status', 'no_lane')
+        .order('message_timestamp', { ascending: false })
+        .limit(100);
+      setNoLaneListesi(data || []);
+      setIlanlar([]);
+      setYukleniyor(false);
+      return;
+    }
     let query = supabase
       .from('listings')
       .select(`
@@ -325,7 +339,7 @@ function siradakineGec(mevcutId: string) {
       {/* FİLTRELER */}
       <div style={{ background: '#161b22', borderBottom: '1px solid #30363d', position: 'sticky', top: 52, zIndex: 40 }}>
         <div style={{ maxWidth: 1400, margin: '0 auto', padding: '10px 16px', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-          {(['pending','approved','rejected','passive','hepsi'] as const).map(f => (
+          {(['pending','approved','rejected','passive','hepsi','no_lane'] as const).map(f => (
             <button key={f} onClick={() => { setFiltre(f); setSonraBak(new Set()); }}
               style={{
                 padding: '5px 14px', borderRadius: 6, border: '1px solid',
@@ -335,7 +349,8 @@ function siradakineGec(mevcutId: string) {
                 fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer'
               }}>
               {f === 'pending' ? '⏳ Bekleyenler' : f === 'approved' ? '✅ Onaylananlar' :
-               f === 'rejected' ? '❌ Reddedilenler' : f === 'passive' ? '💤 Pasifler' : '📋 Hepsi'}
+               f === 'rejected' ? '❌ Reddedilenler' : f === 'passive' ? '💤 Pasifler' : 
+               f === 'no_lane' ? '🔍 Çözümsüz' : '📋 Hepsi'}
             </button>
           ))}
 
@@ -358,7 +373,175 @@ function siradakineGec(mevcutId: string) {
 
       {/* İLAN LİSTESİ */}
       <main style={{ maxWidth: 1400, margin: '0 auto', padding: '16px' }}>
-        {yukleniyor ? (
+        {filtre === 'no_lane' ? (
+          <div style={{ display: 'grid', gap: 10 }}>
+            {noLaneListesi.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '60px 0', color: '#4b5563' }}>
+                <div style={{ fontSize: '2rem', marginBottom: 8 }}>✅</div>
+                <div>Çözümsüz mesaj yok</div>
+              </div>
+            ) : noLaneListesi.map(raw => (
+              <div key={raw.id} style={{ background: '#161b22', border: '1px solid #30363d', borderRadius: 8, padding: '14px 16px' }}>
+                <div style={{ display: 'flex', gap: 6, marginBottom: 10, alignItems: 'center' }}>
+                  <span style={{ background: '#1f2937', color: '#9ca3af', fontSize: '0.68rem', fontWeight: 700, padding: '2px 8px', borderRadius: 4 }}>
+                    🔍 Çözümsüz
+                  </span>
+                  <span style={{ color: '#4b5563', fontSize: '0.72rem' }}>
+                    {raw.source_group} · {raw.sender_name}
+                  </span>
+                  <span style={{ color: '#4b5563', fontSize: '0.68rem', marginLeft: 'auto', fontFamily: 'monospace' }}>
+                    #{raw.id.substring(0, 8)}
+                  </span>
+                </div>
+                <div style={{ background: '#0d1117', borderRadius: 6, padding: 12, border: '1px solid #1f2937', marginBottom: 10 }}>
+                  <div style={{ color: '#94a3b8', fontSize: '0.78rem', lineHeight: 1.6, whiteSpace: 'pre-wrap', maxHeight: 200, overflowY: 'auto', wordBreak: 'break-word' }}>
+                    {raw.raw_text}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button onClick={() => {
+                    // Manuel ilan oluştur — boş form aç
+                    setDuzenleData({
+                      listing_type: 'yuk',
+                      origin_city: 'İstanbul',
+                      origin_district: '',
+                      contact_phone: '',
+                      price_offer: '',
+                      notes: raw.raw_text.split('\n')[0],
+                      vehicle_type: [],
+                      body_type: [],
+                      raw_post_id: raw.id,
+                      raw_text: raw.raw_text,
+                      stops: [{ id: null, city: 'İstanbul', district: '', weight_ton: '', pallet_count: '', vehicle_count: 1, cargo_type: '', notes: '' }]
+                    });
+                    setDuzenleId('no_lane_' + raw.id);
+                  }}
+                  style={{ padding: '6px 14px', borderRadius: 6, border: '1px solid #1e3a5f', background: '#1e3a5f', color: '#60a5fa', fontWeight: 700, fontSize: '0.82rem', cursor: 'pointer' }}>
+                    ✏️ Manuel Gir
+                  </button>
+                  <button onClick={async () => {
+                    await supabase.from('raw_posts').update({ processing_status: 'rejected' }).eq('id', raw.id);
+                    setNoLaneListesi(prev => prev.filter(r => r.id !== raw.id));
+                  }}
+                  style={{ padding: '6px 14px', borderRadius: 6, border: 'none', background: '#450a0a', color: '#f87171', fontWeight: 700, fontSize: '0.82rem', cursor: 'pointer' }}>
+                    ❌ Reddet
+                  </button>
+                </div>
+
+                {/* Manuel giriş formu */}
+                {duzenleId === 'no_lane_' + raw.id && (
+                  <div style={{ marginTop: 12, borderTop: '1px solid #1f2937', paddingTop: 12 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
+                      <div>
+                        <div style={{ color: '#8b949e', fontSize: '0.68rem', marginBottom: 2 }}>İlan Tipi</div>
+                        <select value={duzenleData.listing_type} onChange={e => setDuzenleData({ ...duzenleData, listing_type: e.target.value })} style={inp}>
+                          <option value="yuk">Yük</option>
+                          <option value="arac">Araç</option>
+                        </select>
+                      </div>
+                      <div>
+                        <div style={{ color: '#8b949e', fontSize: '0.68rem', marginBottom: 2 }}>Telefon</div>
+                        <input value={duzenleData.contact_phone} onChange={e => setDuzenleData({ ...duzenleData, contact_phone: e.target.value })} style={inp} />
+                      </div>
+                      <div>
+                        <div style={{ color: '#8b949e', fontSize: '0.68rem', marginBottom: 2 }}>Kalkış İli</div>
+                        <select value={duzenleData.origin_city} onChange={e => setDuzenleData({ ...duzenleData, origin_city: e.target.value })} style={inp}>
+                          {ILLER.map(il => <option key={il}>{il}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <div style={{ color: '#8b949e', fontSize: '0.68rem', marginBottom: 2 }}>Kalkış İlçesi</div>
+                        <input value={duzenleData.origin_district} onChange={e => setDuzenleData({ ...duzenleData, origin_district: e.target.value })} style={inp} placeholder="İlçe" />
+                      </div>
+                    </div>
+
+                    {duzenleData.stops?.map((stop: any, idx: number) => (
+                      <div key={idx} style={{ background: '#0a0f1a', borderRadius: 6, padding: 10, marginBottom: 8 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                          <div style={{ color: '#f97316', fontSize: '0.68rem', fontWeight: 700 }}>Varış {idx + 1}</div>
+                          <button onClick={() => stopSil(idx)} style={{ background: '#450a0a', border: 'none', color: '#f87171', borderRadius: 4, padding: '2px 8px', fontSize: '0.72rem', cursor: 'pointer' }}>✕ Sil</button>
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 6 }}>
+                          <div>
+                            <div style={{ color: '#8b949e', fontSize: '0.65rem', marginBottom: 2 }}>İl</div>
+                            <select value={stop.city} onChange={e => stopGuncelle(idx, 'city', e.target.value)} style={inp}>
+                              {ILLER.map(il => <option key={il}>{il}</option>)}
+                            </select>
+                          </div>
+                          <div>
+                            <div style={{ color: '#8b949e', fontSize: '0.65rem', marginBottom: 2 }}>İlçe</div>
+                            <input value={stop.district} onChange={e => stopGuncelle(idx, 'district', e.target.value)} style={inp} placeholder="-" />
+                          </div>
+                          <div>
+                            <div style={{ color: '#8b949e', fontSize: '0.65rem', marginBottom: 2 }}>Ton</div>
+                            <input type="number" value={stop.weight_ton} onChange={e => stopGuncelle(idx, 'weight_ton', e.target.value)} style={inp} placeholder="-" />
+                          </div>
+                          <div>
+                            <div style={{ color: '#8b949e', fontSize: '0.65rem', marginBottom: 2 }}>Palet</div>
+                            <input type="number" value={stop.pallet_count} onChange={e => stopGuncelle(idx, 'pallet_count', e.target.value)} style={inp} placeholder="-" />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+
+                    <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+                      <button onClick={stopEkle} style={{ padding: '5px 12px', borderRadius: 4, border: '1px solid #374151', background: '#0d1117', color: '#22c55e', fontSize: '0.78rem', cursor: 'pointer' }}>+ Varış Ekle</button>
+                      <button onClick={() => llmSor({ raw_text: raw.raw_text, notes: raw.raw_text.split('\n')[0] })} disabled={llmYukleniyor}
+                        style={{ padding: '5px 12px', borderRadius: 4, border: '1px solid #374151', background: '#0d1117', color: '#a78bfa', fontSize: '0.78rem', cursor: 'pointer', opacity: llmYukleniyor ? 0.5 : 1 }}>
+                        {llmYukleniyor ? '⏳ Sorgulanıyor...' : '🤖 LLM’e Sor'}
+                      </button>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button onClick={async () => {
+                        // listings'e yaz
+                        const { data: listing } = await supabase.from('listings').insert({
+                          listing_type: duzenleData.listing_type,
+                          origin_city: duzenleData.origin_city,
+                          origin_district: duzenleData.origin_district || null,
+                          contact_phone: duzenleData.contact_phone || null,
+                          source: raw.source || 'whatsapp',
+                          moderation_status: 'approved',
+                          status: 'active',
+                          trust_level: 'social',
+                          raw_post_id: raw.id,
+                          raw_text: raw.raw_text,
+                          notes: duzenleData.notes,
+                          vehicle_type: duzenleData.vehicle_type,
+                          body_type: duzenleData.body_type,
+                          reviewed_at: new Date().toISOString(),
+                        }).select().single();
+
+                        if (listing) {
+                          for (let i = 0; i < duzenleData.stops.length; i++) {
+                            const s = duzenleData.stops[i];
+                            await supabase.from('listing_stops').insert({
+                              listing_id: listing.id, stop_order: i + 1,
+                              city: s.city, district: s.district || null,
+                              weight_ton: s.weight_ton || null, pallet_count: s.pallet_count || null,
+                              vehicle_count: s.vehicle_count || 1, cargo_type: s.cargo_type || null,
+                            });
+                          }
+                          await supabase.from('raw_posts').update({ processing_status: 'processed' }).eq('id', raw.id);
+                          await aliasOgren(duzenleData);
+                          setDuzenleId('');
+                          setNoLaneListesi(prev => prev.filter(r => r.id !== raw.id));
+                        }
+                      }}
+                      style={{ padding: '7px 16px', borderRadius: 6, border: 'none', background: '#22c55e', color: '#000', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer' }}>
+                        ✅ Kaydet ve Onayla
+                      </button>
+                      <button onClick={() => setDuzenleId('')}
+                        style={{ padding: '7px 16px', borderRadius: 6, border: '1px solid #374151', background: '#1f2937', color: '#9ca3af', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer' }}>
+                        ✕ İptal
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        ) : yukleniyor ? (
           <div style={{ textAlign: 'center', padding: '60px 0', color: '#4b5563' }}>⏳ Yükleniyor...</div>
         ) : gosterilenIlanlar.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '60px 0', color: '#4b5563' }}>
