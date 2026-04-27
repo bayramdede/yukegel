@@ -46,6 +46,7 @@ export default function Moderator() {
   const [duzenleData, setDuzenleData] = useState<any>({});
   const [sonraBak, setSonraBak] = useState<Set<string>>(new Set());
   const [sonraBakGoster, setSonraBakGoster] = useState(false);
+  const [llmYukleniyor, setLlmYukleniyor] = useState(false);
   const ilanRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const router = useRouter();
 
@@ -242,7 +243,7 @@ function siradakineGec(mevcutId: string) {
   }
 
   async function llmSor(ilan: any) {
-    setIslem(ilan.id + '_llm');
+    setLlmYukleniyor(true);
     try {
       const res = await fetch('/api/llm-parse', {
         method: 'POST',
@@ -254,7 +255,12 @@ function siradakineGec(mevcutId: string) {
       if (data.success) {
         setDuzenleData((prev: any) => ({
           ...prev,
-          ...data.result,
+          listing_type: data.result.listing_type || prev.listing_type,
+          origin_city: data.result.origin_city || prev.origin_city,
+          origin_district: data.result.origin_district || '',
+          contact_phone: data.result.contact_phone || prev.contact_phone || '',
+          vehicle_type: data.result.vehicle_type || prev.vehicle_type,
+          body_type: data.result.body_type || prev.body_type,
           stops: data.result.stops?.map((s: any) => ({
             id: null,
             city: s.city || 'İstanbul',
@@ -274,7 +280,7 @@ function siradakineGec(mevcutId: string) {
       alert('❌ Hata: ' + e.message);
       console.error(e);
     }
-    setIslem('');
+    setLlmYukleniyor(false);
   }
 
   function stopGuncelle(idx: number, alan: string, deger: any) {
@@ -531,9 +537,9 @@ function siradakineGec(mevcutId: string) {
                               style={{ padding: '5px 12px', borderRadius: 4, border: '1px solid #374151', background: '#0d1117', color: '#22c55e', fontSize: '0.78rem', cursor: 'pointer' }}>
                               + Varış Ekle
                             </button>
-                            <button onClick={() => llmSor(ilan)} disabled={islem === ilan.id + '_llm'}
-                              style={{ padding: '5px 12px', borderRadius: 4, border: '1px solid #374151', background: '#0d1117', color: '#a78bfa', fontSize: '0.78rem', cursor: 'pointer', opacity: islem === ilan.id + '_llm' ? 0.5 : 1 }}>
-                              {islem === ilan.id + '_llm' ? '⏳ Sorgulanıyor...' : '🤖 LLM’e Sor'}
+                            <button onClick={() => llmSor(ilan)} disabled={llmYukleniyor}
+                              style={{ padding: '5px 12px', borderRadius: 4, border: '1px solid #374151', background: '#0d1117', color: '#a78bfa', fontSize: '0.78rem', cursor: 'pointer', opacity: llmYukleniyor ? 0.5 : 1 }}>
+                              {llmYukleniyor ? '⏳ Sorgulanıyor...' : '🤖 LLM’e Sor'}
                             </button>
                           </div>
                         </div>
