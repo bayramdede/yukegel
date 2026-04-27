@@ -8,6 +8,49 @@ const supabase = createClient(
 )
 
 // -------------------------
+// Mesaj temizleme (LLM öncesi token tasarrufu)
+// -------------------------
+const BLACKLIST_PHRASES = [
+  'komisyon yok', 'komisyonsuz', 'kdv dahil', 'kdv haric',
+  'whatsapp uzerinden iletildi', 'chatbridge', 'toplu gonderildi',
+  'mesaj bekleniyor', 'goruntu dahil edilmedi', 'bu mesaj silindi',
+  'forwarded', 'arama yapildi',
+]
+
+function cleanMessage(text: string): string {
+  return text
+    .split('\n')
+    .map(line => {
+      // Emojileri sil
+      line = line.replace(/[\u{1F000}-\u{1FFFF}\u{2600}-\u{27FF}\u{2300}-\u{23FF}\u{2B00}-\u{2BFF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA9F}]/gu, '')
+      // WhatsApp format karakterlerini sil
+      line = line.replace(/[\u200e\u202a\u202c\u200f\u200b\u{FE0F}]/gu, '')
+      // Kalın/italic WhatsApp formatını sil (* ve _)
+      line = line.replace(/\*([^*]+)\*/g, '$1').replace(/_([^_]+)_/g, '$1')
+      // Telefon numaralarını sil
+      line = line.replace(/(?:\+?9?0?)?\s*5\d[\s\-\.]?\d{3}[\s\-\.]?\d{2}[\s\-\.]?\d{2}/g, '')
+      line = line.replace(/0\s*5\s*\d[\s\-\.]?\d{2}[\s\-\.]?\d{3}[\s\-\.]?\d{2}[\s\-\.]?\d{2}/g, '')
+      return line.trim()
+    })
+    .filter(line => {
+      if (!line || line.length < 3) return false
+      // Çizgi/eşitlik satırlarını sil
+      if (/^[-=\u2500\u2550\u2014\u2013*\.]{3,}$/.test(line)) return false
+      // Bilinen gereksiz ifadeleri sil
+      const norm = line.toLowerCase()
+        .replace(/[\u00e7]/g, 'c').replace(/[\u011f]/g, 'g').replace(/[\u0131\u0130]/g, 'i')
+        .replace(/[\u00f6]/g, 'o').replace(/[\u015f]/g, 's').replace(/[\u00fc]/g, 'u')
+      if (BLACKLIST_PHRASES.some(p => norm.includes(p))) return false
+      // Sadece rakam/noktalama kalan satırları sil
+      if (/^[\d\s\+\-\.\(\)\/,]+$/.test(line)) return false
+      return true
+    })
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+}
+
+// -------------------------
 // Türkçe normalizasyon
 // -------------------------
 function trNorm(s: string): string {
@@ -221,6 +264,7 @@ interface Lane {
   from: string
   fromDistrict: string | null
   to: string
+  toDistrict: string | null
   vehicle: string | null
   body_type: string | null
   weight_ton: number | null
@@ -262,6 +306,7 @@ function parseMessage(message: string, aliases: Alias[]): {
                   from: fromCity.normalized,
                   fromDistrict: fromCity.district || null,
                   to: to.normalized,
+                  toDistrict: to.district || null,
                   vehicle: findVehicle(line, aliases),
                   body_type: findBodyType(line, aliases),
                   weight_ton: extractWeight(message),
@@ -296,6 +341,7 @@ function parseMessage(message: string, aliases: Alias[]): {
             from: from.normalized,
             fromDistrict: from.district || null,
             to: to.normalized,
+            toDistrict: to.district || null,
             vehicle: findVehicle(line, aliases),
             body_type: findBodyType(line, aliases),
             weight_ton: extractWeight(message),
@@ -311,6 +357,7 @@ function parseMessage(message: string, aliases: Alias[]): {
           from: from.normalized,
           fromDistrict: from.district || null,
           to: to.normalized,
+          toDistrict: to.district || null,
           vehicle: findVehicle(line, aliases),
           body_type: findBodyType(line, aliases),
           weight_ton: extractWeight(message),
@@ -331,6 +378,7 @@ function parseMessage(message: string, aliases: Alias[]): {
             from: hits[0].normalized,
             fromDistrict: hits[0].district || null,
             to: hits[1].normalized,
+            toDistrict: hits[1].district || null,
             vehicle: findVehicle(line, aliases),
             body_type: findBodyType(line, aliases),
             weight_ton: extractWeight(message),
@@ -375,25 +423,34 @@ Deno.serve(async (req) => {
     // Alias'ları yükle
     const { data: aliases } = await supabase.from('aliases').select('*').eq('is_active', true)
 
-    // Parse et
-    const result = parseMessage(rawPost.raw_text, aliases || [])
+    // Telefonu ham metinden çıkar (cleanMessage telefon satırlarını siliyor)
+    const phonesFromRaw = extractPhones(rawPost.raw_text)
+
+    // Parse için mesajı temizle
+    const cleanedText = cleanMessage(rawPost.raw_text)
+    const result = parseMessage(cleanedText, aliases || [])
+
+    // Ham metinden bulunan telefonları ekle
+    if (phonesFromRaw.length > 0 && result.phones.length === 0) {
+      result.phones.push(...phonesFromRaw)
+    }
 
     if (result.lanes.length === 0) {
       await supabase.from('raw_posts').update({ processing_status: 'no_lane' }).eq('id', raw_post_id)
       return new Response(JSON.stringify({ success: true, lanes: 0 }))
     }
 
-    // Aynı kalkış şehrine ait lane'leri grupla
-    const laneGroups = new Map<string, Lane[]>()
+    // Aynı raw_line'dan gelen lane'leri grupla (tek ilan, çok stop)
+    // Farklı raw_line'lar → ayrı ilanlar
+    const lineGroups = new Map<string, Lane[]>()
     for (const lane of result.lanes) {
-      const key = lane.from + '|' + (lane.fromDistrict || '')
-      if (!laneGroups.has(key)) laneGroups.set(key, [])
-      laneGroups.get(key)!.push(lane)
+      const key = lane.raw_line
+      if (!lineGroups.has(key)) lineGroups.set(key, [])
+      lineGroups.get(key)!.push(lane)
     }
 
-    // Her grup için tek listing, çoklu stop
     let created = 0
-    for (const [, lanes] of laneGroups) {
+    for (const [, lanes] of lineGroups) {
       const firstLane = lanes[0]
       const { data: listing } = await supabase.from('listings').insert({
         listing_type: result.ad_type,
@@ -405,29 +462,7 @@ Deno.serve(async (req) => {
         trust_level: 'social',
         raw_post_id: raw_post_id,
         raw_text: rawPost.raw_text,
-        notes: (() => {
-          const routeLines = new Set(lanes.map((l: Lane) => l.raw_line))
-          const noteLines = rawPost.raw_text
-            .split('\n')
-            .map((l: string) => l.trim())
-            .filter((l: string) => {
-              if (!l || l.length < 5) return false
-              if (routeLines.has(l)) return false
-              // Telefon satırlarını atla (emoji'li dahil)
-              const stripped = l.replace(/[^\d]/g, '')
-              if (stripped.length >= 10 && stripped.length <= 13) return false
-              // Çizgi/eşitlik satırlarını atla
-              if (/^[-=─═]{3,}$/.test(l)) return false
-              // Sadece emoji olan satırları atla
-              if (/^[\u{1F000}-\u{1FFFF}\u{2600}-\u{27FF}\s]+$/u.test(l)) return false
-              // Firma adı satırlarını atla (rota içeren satırlar)
-              const hasCity = aliases?.some((a: any) => a.type === 'city' && trNorm(l).includes(trNorm(a.alias)))
-              if (hasCity) return false
-              return true
-            })
-            .slice(0, 3)
-          return noteLines.length > 0 ? noteLines.join(' | ') : ''
-        })(),
+        notes: firstLane.raw_line,
         vehicle_type: firstLane.vehicle ? [firstLane.vehicle] : null,
         body_type: firstLane.body_type ? [firstLane.body_type] : null,
       }).select().single()
@@ -438,6 +473,7 @@ Deno.serve(async (req) => {
             listing_id: listing.id,
             stop_order: i + 1,
             city: lanes[i].to,
+            district: lanes[i].toDistrict || null,
             cargo_type: null,
             weight_ton: lanes[i].weight_ton,
             pallet_count: lanes[i].pallet,
