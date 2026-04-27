@@ -29,13 +29,10 @@ JSON format:
     });
 
     const data = await response.json();
-    console.log('Anthropic status:', response.status);
-
     const text = data.content?.[0]?.text || '';
-    console.log('Anthropic text:', text.substring(0, 300));
 
     if (!text) {
-      return NextResponse.json({ success: false, error: `Anthropic boş yanıt (status: ${response.status}, error: ${JSON.stringify(data.error)})` }, { status: 500 });
+      return NextResponse.json({ success: false, error: `Anthropic boş yanıt (status: ${response.status})` }, { status: 500 });
     }
 
     const clean = text.replace(/```json|```/g, '').trim();
@@ -43,7 +40,6 @@ JSON format:
 
     return NextResponse.json({ success: true, result });
   } catch (error: any) {
-    console.error('LLM parse error:', error.message);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }

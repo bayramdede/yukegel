@@ -61,7 +61,7 @@ export default function Moderator() {
         .from('raw_posts')
         .select('id, raw_text, sender_name, source, source_group, message_timestamp, quality_score')
         .eq('processing_status', 'no_lane')
-        .order('message_timestamp', { ascending: false })
+        .order('created_at', { ascending: false })
         .limit(100);
       setNoLaneListesi(data || []);
       setIlanlar([]);
@@ -254,6 +254,30 @@ function siradakineGec(mevcutId: string) {
         }, { onConflict: 'alias' });
       }
     }
+    // Araç tipi varsa vehicle alias ekle
+    for (const vt of (data.vehicle_type || [])) {
+      if (vt) {
+        const alias = vt.toLowerCase()
+          .replace(/ç/g,'c').replace(/ğ/g,'g').replace(/ı/g,'i')
+          .replace(/İ/g,'i').replace(/ö/g,'o').replace(/ş/g,'s').replace(/ü/g,'u');
+        await supabase.from('aliases').upsert({
+          alias, normalized: vt,
+          type: 'vehicle', is_active: true, priority: 80
+        }, { onConflict: 'alias' });
+      }
+    }
+    // Üstyapı varsa body alias ekle
+    for (const bt of (data.body_type || [])) {
+      if (bt) {
+        const alias = bt.toLowerCase()
+          .replace(/ç/g,'c').replace(/ğ/g,'g').replace(/ı/g,'i')
+          .replace(/İ/g,'i').replace(/ö/g,'o').replace(/ş/g,'s').replace(/ü/g,'u');
+        await supabase.from('aliases').upsert({
+          alias, normalized: bt,
+          type: 'body', is_active: true, priority: 70
+        }, { onConflict: 'alias' });
+      }
+    }
   }
 
   async function llmSor(ilan: any) {
@@ -265,7 +289,6 @@ function siradakineGec(mevcutId: string) {
         body: JSON.stringify({ raw_text: ilan.raw_text, notes: ilan.notes })
       });
       const data = await res.json();
-      console.log('LLM sonucu:', JSON.stringify(data, null, 2));
       if (data.success) {
         setDuzenleData((prev: any) => ({
           ...prev,
@@ -286,7 +309,7 @@ function siradakineGec(mevcutId: string) {
             notes: ''
           })) || prev.stops
         }));
-        console.log('LLM formu doldurdu:', data.result);
+        // form dolduruldu
       } else {
         alert('❌ Hata: ' + data.error);
       }
