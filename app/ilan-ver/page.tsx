@@ -120,7 +120,7 @@ export default function IlanVer() {
         .eq('user_id', user.id)
         .eq('is_active', true)
         .order('created_at', { ascending: false });
-      const liste = data || [];
+      const liste = (data || []) as Vehicle[];
       setAraclar(liste);
       if (liste.length === 1) {
         setSecilenArac(liste[0]);
@@ -259,7 +259,6 @@ export default function IlanVer() {
         {/* ARAÇ SEÇİMİ */}
         {tip === 'arac' && (
           <div style={s.card}>
-            {/* Başlık + Araç Ekle butonu */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
               <div style={{ color: '#8b949e', fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.08em' }}>ARAÇ SEÇİMİ</div>
               <a href="/araclarim" target="_blank" rel="noreferrer"
@@ -277,7 +276,7 @@ export default function IlanVer() {
               </div>
             ) : araclar.length === 1 ? (
               <div style={{ background: '#0d1117', border: '2px solid #22c55e', borderRadius: 8, padding: '14px 16px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: secilenArac?.body_types?.length ? 8 : 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: (secilenArac?.body_types?.length ?? 0) > 0 ? 8 : 0 }}>
                   <span style={{ background: '#1a2535', color: '#60a5fa', fontWeight: 800, fontSize: '1rem', padding: '4px 12px', borderRadius: 6 }}>
                     {secilenArac?.plate}
                   </span>
@@ -286,9 +285,9 @@ export default function IlanVer() {
                   </span>
                   <span style={{ color: '#22c55e', fontSize: '0.75rem', marginLeft: 'auto' }}>✓ Seçildi</span>
                 </div>
-                {secilenArac?.body_types?.length > 0 && (
+                {(secilenArac?.body_types?.length ?? 0) > 0 && (
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-                    {secilenArac.body_types.map(u => (
+                    {(secilenArac?.body_types ?? []).map(u => (
                       <span key={u} style={{ background: '#1f2937', color: '#94a3b8', fontSize: '0.72rem', fontWeight: 600, padding: '2px 8px', borderRadius: 4 }}>{u}</span>
                     ))}
                   </div>
@@ -302,15 +301,15 @@ export default function IlanVer() {
                     <button key={arac.id} type="button"
                       onClick={() => { setSecilenArac(arac); setAracTipi(arac.vehicle_type); setUtsyapi(arac.body_types || []); }}
                       style={{ background: '#0d1117', border: `2px solid ${secili ? '#22c55e' : '#30363d'}`, borderRadius: 8, padding: '14px 16px', cursor: 'pointer', textAlign: 'left', transition: 'border-color 0.15s' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: arac.body_types?.length > 0 ? 8 : 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: (arac.body_types?.length ?? 0) > 0 ? 8 : 0 }}>
                         <span style={{ background: '#1a2535', color: '#60a5fa', fontWeight: 800, fontSize: '1rem', padding: '4px 12px', borderRadius: 6 }}>{arac.plate}</span>
                         <span style={{ background: '#14532d', color: '#86efac', fontWeight: 700, fontSize: '0.78rem', padding: '3px 10px', borderRadius: 5 }}>🚛 {arac.vehicle_type}</span>
                         {arac.brand && <span style={{ color: '#6b7280', fontSize: '0.8rem' }}>{arac.brand} {arac.model}</span>}
                         {secili && <span style={{ color: '#22c55e', fontSize: '0.75rem', marginLeft: 'auto' }}>✓ Seçildi</span>}
                       </div>
-                      {arac.body_types?.length > 0 && (
+                      {(arac.body_types?.length ?? 0) > 0 && (
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-                          {arac.body_types.map(u => (
+                          {(arac.body_types ?? []).map(u => (
                             <span key={u} style={{ background: '#1f2937', color: '#94a3b8', fontSize: '0.72rem', fontWeight: 600, padding: '2px 8px', borderRadius: 4 }}>{u}</span>
                           ))}
                         </div>
