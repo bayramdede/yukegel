@@ -80,7 +80,7 @@ export default function Home() {
         return;
       }
 
-      const userIds = [...new Set(data.map(i => i.user_id).filter(Boolean))];
+      const userIds = [...new Set((data as any[]).map((i: any) => i.user_id).filter(Boolean))];
       const kullaniciMap: Record<string, { phone_verified: boolean; created_at: string }> = {};
 
       if (userIds.length > 0) {
@@ -88,12 +88,12 @@ export default function Home() {
           .from('users')
           .select('id, phone_verified, created_at')
           .in('id', userIds);
-        for (const k of kullanicilar || []) {
+        for (const k of (kullanicilar || []) as any[]) {
           kullaniciMap[k.id] = { phone_verified: k.phone_verified, created_at: k.created_at };
         }
       }
 
-      const donusturulmus = data.map(ilan => {
+      const donusturulmus = (data as any[]).map((ilan: any) => {
         const kullaniciBilgi = ilan.user_id ? kullaniciMap[ilan.user_id] : null;
         const stops = (ilan.listing_stops || []).sort((a: any, b: any) => a.stop_order - b.stop_order);
         const aracTipiList: string[] = ilan.vehicle_type?.length
@@ -145,7 +145,7 @@ export default function Home() {
     return () => subscription.unsubscribe();
   }, []);
 
-  const filtered = ilanlar.filter(i => {
+  const filtered = ilanlar.filter((i: any) => {
     if (tip !== 'tumu' && i.tip !== tip) return false;
     if (kalkis && !i.kalkis.includes(kalkis)) return false;
     if (varis && !i.duraklar.some((d: any) => d.sehir.includes(varis))) return false;
@@ -155,7 +155,6 @@ export default function Home() {
   return (
     <div style={{ minHeight: '100vh', background: '#0d1117', fontFamily: "'IBM Plex Sans', system-ui, sans-serif" }}>
 
-      {/* NAVBAR */}
       <nav style={{ background: '#161b22', borderBottom: '1px solid #30363d', position: 'sticky', top: 0, zIndex: 50 }}>
         <div style={{ maxWidth: 1280, margin: '0 auto', padding: '0 16px', height: 56, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -186,7 +185,6 @@ export default function Home() {
         </div>
       </nav>
 
-      {/* HERO BANNER — sadece kayıtsız kullanıcıya */}
       {!kullanici && (
         <div style={{ borderBottom: '1px solid #1a3a2a' }}>
           <div style={{ maxWidth: 1280, margin: '0 auto', padding: '24px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 24, flexWrap: 'wrap' }}>
@@ -205,7 +203,6 @@ export default function Home() {
         </div>
       )}
 
-      {/* FİLTRELER */}
       <div style={{ background: '#161b22', borderBottom: '1px solid #30363d', position: 'sticky', top: 56, zIndex: 40 }}>
         <div style={{ maxWidth: 1280, margin: '0 auto', padding: '10px 16px', display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
           <div style={{ background: '#0d1117', borderRadius: 6, padding: 2, border: '1px solid #30363d', display: 'flex' }}>
@@ -238,7 +235,6 @@ export default function Home() {
         </div>
       </div>
 
-      {/* İLAN LİSTESİ */}
       <main style={{ maxWidth: 1280, margin: '0 auto', padding: '16px' }}>
         {yukleniyor ? (
           <div style={{ textAlign: 'center', padding: '80px 0', color: '#4b5563' }}>
@@ -247,12 +243,9 @@ export default function Home() {
           </div>
         ) : (
           <div style={{ display: 'grid', gap: 12 }}>
-
             {!kullanici && filtered.length > 0 ? (
               <>
                 <IlanKart ilan={filtered[0]} kullanici={kullanici} />
-
-                {/* ÜYE OL BANNER */}
                 <div style={{ background: '#161b22', border: '1px solid #1e3a5f', borderRadius: 8, padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
                   <div style={{ color: '#8b949e', fontSize: '0.82rem' }}>
                     🔐 <strong style={{ color: '#e2e8f0' }}>Telefon numaralarını görmek</strong> için üye olun. Ücretsiz.
@@ -262,11 +255,10 @@ export default function Home() {
                     <a href="/giris" style={{ background: '#22c55e', color: '#000', borderRadius: 6, padding: '7px 14px', fontSize: '0.82rem', fontWeight: 700, textDecoration: 'none' }}>Üye Ol →</a>
                   </div>
                 </div>
-
-                {filtered.slice(1).map(ilan => <IlanKart key={ilan.id} ilan={ilan} kullanici={kullanici} />)}
+                {filtered.slice(1).map((ilan: any) => <IlanKart key={ilan.id} ilan={ilan} kullanici={kullanici} />)}
               </>
             ) : (
-              filtered.map(ilan => <IlanKart key={ilan.id} ilan={ilan} kullanici={kullanici} />)
+              filtered.map((ilan: any) => <IlanKart key={ilan.id} ilan={ilan} kullanici={kullanici} />)
             )}
 
             {filtered.length === 0 && (
