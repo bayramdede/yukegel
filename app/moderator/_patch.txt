@@ -1,0 +1,25 @@
+  function siradakineGec(mevcutId: string, duzenlemeModu: boolean = false) {
+    const idx = filtrelenmis.findIndex(i => i.id === mevcutId);
+    const sonraki = filtrelenmis[idx + 1];
+    if (sonraki) {
+      setTimeout(() => {
+        ilanRefs.current[sonraki.id]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        if (duzenlemeModu) duzenleAc(sonraki);
+      }, 350);
+    }
+  }
+
+  async function aksiyon(id: string, yeniModerasyon: string, yeniStatus: string) {
+    setIslem(id);
+    await supabase.from('listings').update({
+      moderation_status: yeniModerasyon,
+      status: yeniStatus,
+      reviewed_at: new Date().toISOString(),
+    }).eq('id', id);
+    setIslem('');
+    siradakineGec(id, false); // Liste modunda kalır
+    setTimeout(() => { getIlanlar(); getIstatistik(); }, 300);
+  }
+
+  async function duzenleKaydet(id: string, mod: 'onayla' | 'sadece_kaydet') {
+    setIslem(id);

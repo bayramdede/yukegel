@@ -1,0 +1,116 @@
+  function siradakineGec(mevcutId: string, duzenlemeModu: boolean = false) {
+    const idx = filtrelenmis.findIndex(i => i.id === mevcutId);
+    const sonraki = filtrelenmis[idx + 1];
+    if (sonraki) {
+      setTimeout(() => {
+        ilanRefs.current[sonraki.id]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        if (duzenlemeModu) duzenleAc(sonraki);
+      }, 350);
+    }
+  }
+
+  async function aksiyon(id: string, yeniModerasyon: string, yeniStatus: string) {
+    setIslem(id);
+    await supabase.from('listings').update({
+      moderation_status: yeniModerasyon,
+      status: yeniStatus,
+      reviewed_at: new Date().toISOString(),
+    }).eq('id', id);
+    setIslem('');
+    siradakineGec(id, false); // Liste modunda kalır
+    setTimeout(() => { getIlanlar(); getIstatistik(); }, 300);
+  }
+
+  // Toplu yeşil onayla
+  async function topluOnaylaYesil() {
+    const yesiller = filtrelenmis.filter(i => skorRenk(i).badge === '🟢');
+    for (const ilan of yesiller) {
+      await supabase.from('listings').update({
+        moderation_status: 'approved',
+        status: 'active',
+        reviewed_at: new Date().toISOString(),
+      }).eq('id', ilan.id);
+    }
+    getIlanlar();
+    getIstatistik();
+  }
+
+  function sonraBakEkleVeGec(id: string) {
+    const yeni = new Set(sonraBak);
+    yeni.add(id);
+    setSonraBak(yeni);
+    siradakineGec(id, duzenleId === id); // Düzenleme modundaysa devam et
+  }
+
+  function duzenleAc(ilan: any) {
+    setDuzenleId(ilan.id);
+    setDuzenleData({
+      listing_type: ilan.listing_type,
+      origin_city: ilan.origin_city,
+      origin_district: ilan.origin_district || '',
+      contact_phone: ilan.contact_phone || '',
+      price_offer: ilan.price_offer || '',
+      notes: ilan.notes || '',
+      vehicle_type: ilan.vehicle_type || [],
+      body_type: ilan.body_type || [],
+      stops: (ilan.listing_stops || [])
+        .sort((a: any, b: any) => a.stop_order - b.stop_order)
+        .map((s: any) => ({
+          id: s.id, city: s.city, district: s.district || '',
+          weight_ton: s.weight_ton || '', pallet_count: s.pallet_count || '',
+          vehicle_count: s.vehicle_count || 1, cargo_type: s.cargo_type || '',
+          notes: s.notes || '',
+        }))
+    });
+  }
+
+  async function duzenleKaydet(id: string, mod: 'onayla' | 'sadece_kaydet') {
+    setIslem(id);
+    const updateData: any = {
+      listing_type: duzenleData.listing_type,
+      origin_city: duzenleData.origin_city,
+      origin_district: duzenleData.origin_district,
+      contact_phone: duzenleData.contact_phone,
+      price_offer: duzenleData.price_offer || null,
+      notes: duzenleData.notes,
+      vehicle_type: duzenleData.vehicle_type,
+      body_type: duzenleData.body_type,
+    };
+    if (mod === 'onayla') {
+      updateData.moderation_status = 'approved';
+      updateData.status = 'active';
+      updateData.reviewed_at = new Date().toISOString();
+    }
+    await supabase.from('listings').update(updateData).eq('id', id);
+    for (let i = 0; i < duzenleData.stops.length; i++) {
+      const stop = duzenleData.stops[i];
+      if (stop.id) {
+        await supabase.from('listing_stops').update({
+          city: stop.city, district: stop.district,
+          weight_ton: stop.weight_ton || null,
+          pallet_count: stop.pallet_count || null,
+          vehicle_count: stop.vehicle_count,
+          cargo_type: stop.cargo_type,
+          notes: stop.notes || null,
+        }).eq('id', stop.id);
+      } else {
+        await supabase.from('listing_stops').insert({
+          listing_id: id, stop_order: i + 1,
+          city: stop.city, district: stop.district || null,
+          weight_ton: stop.weight_ton || null, pallet_count: stop.pallet_count || null,
+          vehicle_count: stop.vehicle_count || 1, cargo_type: stop.cargo_type || null,
+          notes: stop.notes || null,
+        });
+      }
+    }
+    if (mod === 'onayla') await aliasOgren(duzenleData);
+    setDuzenleId('');
+    setIslem('');
+    if (mod === 'sadece_kaydet') {
+      const yeni = new Set(sonraBak); yeni.add(id); setSonraBak(yeni);
+      siradakineGec(id, true); // Düzenleme modunda devam
+    } else {
+      siradakineGec(id, true); // Düzenleme modunda devam
+    }
+    setTimeout(() => { getIlanlar(); getIstatistik(); }, 300);
+  }

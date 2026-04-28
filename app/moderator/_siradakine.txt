@@ -1,0 +1,10 @@
+  function siradakineGec(mevcutId: string, duzenlemeModu: boolean = false) {
+    const idx = filtrelenmis.findIndex(i => i.id === mevcutId);
+    const sonraki = filtrelenmis[idx + 1];
+    if (sonraki) {
+      setTimeout(() => {
+        ilanRefs.current[sonraki.id]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        if (duzenlemeModu) duzenleAc(sonraki);
+      }, 350);
+    }
+  }

@@ -5,16 +5,11 @@ import { redirect } from 'next/navigation';
 
 export default async function Panel() {
   const cookieStore = await cookies();
-  
+
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() { return cookieStore.getAll() },
-        setAll() {},
-      },
-    }
+    { cookies: { getAll() { return cookieStore.getAll(); }, setAll() {} } }
   );
 
   const { data: { user } } = await supabase.auth.getUser();
@@ -25,31 +20,37 @@ export default async function Panel() {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
 
-  const { data: ilanlar } = await supabaseAdmin
-    .from('listings')
-    .select(`
-      id, listing_type, origin_city, origin_district,
-      status, moderation_status, created_at, expires_at,
-      contact_phone, price_offer,
-      listing_stops ( stop_order, city, district )
-    `)
-    .eq('user_id', user.id)
-    .order('created_at', { ascending: false });
+  const [{ data: ilanlar }, { data: araclar }, { data: profil }] = await Promise.all([
+    supabaseAdmin
+      .from('listings')
+      .select(`id, listing_type, origin_city, origin_district, status, moderation_status, created_at, expires_at, contact_phone, price_offer, listing_stops ( stop_order, city, district )`)
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false }),
+    supabaseAdmin
+      .from('vehicles')
+      .select('id, plate, vehicle_type, body_types, is_active')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false }),
+    supabaseAdmin
+      .from('users')
+      .select('display_name, username, user_type')
+      .eq('id', user.id)
+      .single(),
+  ]);
 
   const aktif = (ilanlar || []).filter(i => i.status === 'active');
   const pasif = (ilanlar || []).filter(i => i.status !== 'active');
+  const isAracSahibi = profil?.user_type === 'arac_sahibi';
 
   return (
     <div style={{ minHeight: '100vh', background: '#0d1117', fontFamily: "'IBM Plex Sans', system-ui, sans-serif" }}>
 
-      {/* NAVBAR */}
       <nav style={{ background: '#161b22', borderBottom: '1px solid #30363d', position: 'sticky', top: 0, zIndex: 50 }}>
         <div style={{ maxWidth: 900, margin: '0 auto', padding: '0 16px', height: 56, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <a href="/" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 8 }}>
             <img src="/logo.svg" alt="Yükegel" style={{ width: 28, height: 28 }} />
             <span style={{ fontWeight: 800, fontSize: '1.1rem' }}>
-              <span style={{ color: '#22c55e' }}>YÜKE</span>
-              <span style={{ color: '#e2e8f0' }}>GEL</span>
+              <span style={{ color: '#22c55e' }}>YÜKE</span><span style={{ color: '#e2e8f0' }}>GEL</span>
             </span>
           </a>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -63,38 +64,59 @@ export default async function Panel() {
 
       <main style={{ maxWidth: 900, margin: '0 auto', padding: '24px 16px' }}>
 
-        {/* Hoş geldin */}
+        {/* Başlık */}
         <div style={{ marginBottom: 24 }}>
-          <h1 style={{ color: '#e2e8f0', fontWeight: 800, fontSize: '1.4rem', marginBottom: 4 }}>
-            Panelim
-          </h1>
+          <h1 style={{ color: '#e2e8f0', fontWeight: 800, fontSize: '1.4rem', marginBottom: 4 }}>Panelim</h1>
           <div style={{ color: '#8b949e', fontSize: '0.85rem' }}>
-            {user.email || user.phone || 'Hoş geldiniz'}
+            {profil?.display_name || user.email || user.phone}
           </div>
         </div>
 
-        {/* Özet */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 24 }}>
+        {/* Özet kartlar */}
+        <div style={{ display: 'grid', gridTemplateColumns: isAracSahibi ? '1fr 1fr 1fr 1fr' : '1fr 1fr 1fr', gap: 12, marginBottom: 24 }}>
           {[
-            { label: 'Toplam İlan', value: (ilanlar || []).length, color: '#e2e8f0' },
-            { label: 'Aktif', value: aktif.length, color: '#22c55e' },
-            { label: 'Pasif', value: pasif.length, color: '#8b949e' },
+            { label: 'Toplam İlan', value: (ilanlar || []).length, color: '#e2e8f0', href: null },
+            { label: 'Aktif', value: aktif.length, color: '#22c55e', href: null },
+            { label: 'Pasif', value: pasif.length, color: '#8b949e', href: null },
+            ...(isAracSahibi ? [{ label: 'Araçlarım', value: (araclar || []).length, color: '#60a5fa', href: '/araclarim' }] : []),
           ].map(k => (
-            <div key={k.label} style={{ background: '#161b22', border: '1px solid #30363d', borderRadius: 8, padding: '16px 20px' }}>
-              <div style={{ color: '#8b949e', fontSize: '0.75rem', marginBottom: 4 }}>{k.label}</div>
-              <div style={{ color: k.color, fontWeight: 800, fontSize: '1.5rem' }}>{k.value}</div>
-            </div>
+            k.href ? (
+              <a key={k.label} href={k.href} style={{ background: '#161b22', border: '1px solid #30363d', borderRadius: 8, padding: '16px 20px', textDecoration: 'none', display: 'block', transition: 'border-color 0.15s' }}
+                onMouseEnter={(e: any) => e.currentTarget.style.borderColor = '#60a5fa'}
+                onMouseLeave={(e: any) => e.currentTarget.style.borderColor = '#30363d'}>
+                <div style={{ color: '#8b949e', fontSize: '0.75rem', marginBottom: 4 }}>{k.label}</div>
+                <div style={{ color: k.color, fontWeight: 800, fontSize: '1.5rem' }}>{k.value}</div>
+                <div style={{ color: '#4b5563', fontSize: '0.72rem', marginTop: 4 }}>Yönet →</div>
+              </a>
+            ) : (
+              <div key={k.label} style={{ background: '#161b22', border: '1px solid #30363d', borderRadius: 8, padding: '16px 20px' }}>
+                <div style={{ color: '#8b949e', fontSize: '0.75rem', marginBottom: 4 }}>{k.label}</div>
+                <div style={{ color: k.color, fontWeight: 800, fontSize: '1.5rem' }}>{k.value}</div>
+              </div>
+            )
           ))}
         </div>
 
+        {/* Araç sahibi ama araç eklememişse uyarı */}
+        {isAracSahibi && (araclar || []).length === 0 && (
+          <div style={{ background: '#1a2535', border: '1px solid #1e3a5f', borderRadius: 10, padding: '16px 20px', marginBottom: 20, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+            <div>
+              <div style={{ color: '#60a5fa', fontWeight: 700, fontSize: '0.9rem', marginBottom: 4 }}>🚛 Araç eklenmemiş</div>
+              <div style={{ color: '#8b949e', fontSize: '0.82rem' }}>Araç ilanı verebilmek için önce aracınızı ekleyin.</div>
+            </div>
+            <a href="/araclarim" style={{ background: '#1e3a5f', color: '#60a5fa', fontWeight: 700, fontSize: '0.82rem', padding: '7px 16px', borderRadius: 6, textDecoration: 'none', whiteSpace: 'nowrap' }}>
+              Araç Ekle →
+            </a>
+          </div>
+        )}
+
         {/* İlan listesi */}
+        <div style={{ color: '#8b949e', fontSize: '0.78rem', fontWeight: 700, letterSpacing: '0.05em', marginBottom: 12 }}>İLANLARIM</div>
         {(ilanlar || []).length === 0 ? (
           <div style={{ textAlign: 'center', padding: '60px 0', color: '#4b5563' }}>
             <div style={{ fontSize: '2rem', marginBottom: 8 }}>📋</div>
             <div style={{ fontWeight: 600, marginBottom: 8 }}>Henüz ilanınız yok</div>
-            <a href="/ilan-ver" style={{ color: '#22c55e', textDecoration: 'none', fontWeight: 600 }}>
-              İlk ilanınızı verin →
-            </a>
+            <a href="/ilan-ver" style={{ color: '#22c55e', textDecoration: 'none', fontWeight: 600 }}>İlk ilanınızı verin →</a>
           </div>
         ) : (
           <div style={{ display: 'grid', gap: 10 }}>
@@ -107,26 +129,18 @@ export default async function Panel() {
               return (
                 <div key={ilan.id} style={{ background: '#161b22', border: '1px solid #30363d', borderRadius: 8, padding: '14px 16px' }}>
                   <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
-
-                    {/* Sol: Bilgiler */}
                     <div style={{ flex: 1 }}>
                       <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
                         <span style={{ background: isYuk ? '#7f1d1d' : '#14532d', color: isYuk ? '#fca5a5' : '#86efac', fontSize: '0.68rem', fontWeight: 700, padding: '2px 8px', borderRadius: 4 }}>
                           {isYuk ? '🔴 YÜK' : '🟢 ARAÇ'}
                         </span>
-                        <span style={{
-                          fontSize: '0.68rem', fontWeight: 700, padding: '2px 8px', borderRadius: 4,
-                          background: bekliyor ? '#451a03' : isAktif ? '#14532d' : '#1f2937',
-                          color: bekliyor ? '#fb923c' : isAktif ? '#22c55e' : '#9ca3af'
-                        }}>
+                        <span style={{ fontSize: '0.68rem', fontWeight: 700, padding: '2px 8px', borderRadius: 4, background: bekliyor ? '#451a03' : isAktif ? '#14532d' : '#1f2937', color: bekliyor ? '#fb923c' : isAktif ? '#22c55e' : '#9ca3af' }}>
                           {bekliyor ? '⏳ Onay Bekliyor' : isAktif ? '✅ Aktif' : '💤 Pasif'}
                         </span>
                         <span style={{ color: '#4b5563', fontSize: '0.72rem' }}>
                           {new Date(ilan.created_at).toLocaleDateString('tr-TR')}
                         </span>
                       </div>
-
-                      {/* Rota */}
                       <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4 }}>
                         <span style={{ color: '#22c55e', fontSize: '0.7rem', fontWeight: 700 }}>K</span>
                         <span style={{ color: '#e2e8f0', fontWeight: 700 }}>{ilan.origin_city}</span>
@@ -140,8 +154,6 @@ export default async function Panel() {
                         </div>
                       ))}
                     </div>
-
-                    {/* Sağ: Aksiyonlar */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0 }}>
                       <a href={`/ilan/${ilan.id}`}
                         style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid #30363d', background: '#0d1117', color: '#8b949e', fontSize: '0.78rem', fontWeight: 600, textDecoration: 'none', textAlign: 'center' }}>
@@ -150,8 +162,7 @@ export default async function Panel() {
                       {isAktif && (
                         <form action={`/api/ilan/pasif`} method="POST">
                           <input type="hidden" name="id" value={ilan.id} />
-                          <button type="submit"
-                            style={{ width: '100%', padding: '6px 12px', borderRadius: 6, border: '1px solid #374151', background: '#1f2937', color: '#9ca3af', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer' }}>
+                          <button type="submit" style={{ width: '100%', padding: '6px 12px', borderRadius: 6, border: '1px solid #374151', background: '#1f2937', color: '#9ca3af', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer' }}>
                             Pasife Al
                           </button>
                         </form>
