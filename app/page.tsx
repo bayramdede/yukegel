@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { createClient } from '../lib/supabase';
+import type { AuthChangeEvent, Session } from '@supabase/supabase-js';
 
 const supabase = createClient();
 
@@ -129,7 +130,7 @@ export default function Home() {
 
     init();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event: AuthChangeEvent, session: Session | null) => {
       if (session?.user) {
         const { data: profil } = await supabase
           .from('users')
@@ -351,7 +352,7 @@ function IlanKart({ ilan, kullanici }: { ilan: any; kullanici: any }) {
           )}
           {kullanici ? (
             <button onClick={e => { e.preventDefault(); e.stopPropagation(); window.location.href = `tel:${ilan.tel}`; }}
-              style={{ display: 'block', background: '#1a3a1a', color: '#4ade80', border: '1px solid #166534', borderRadius: 6, padding: '6px 12px', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}>
+              style={{ display: 'block', background: '#1a3a1a', color: '#4ade80', border: '1px solid #166634', borderRadius: 6, padding: '6px 12px', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}>
               📞 Ara
             </button>
           ) : (
