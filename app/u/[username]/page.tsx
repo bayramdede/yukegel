@@ -22,7 +22,6 @@ export default function PublicIlanListesi() {
   const [yukleniyor, setYukleniyor] = useState(true);
   const [bulunamadi, setBulunamadi] = useState(false);
 
-  // Filtreler
   const [kalkis, setKalkis] = useState('');
   const [varis, setVaris] = useState('');
   const [aracTipi, setAracTipi] = useState('');
@@ -31,7 +30,6 @@ export default function PublicIlanListesi() {
 
   useEffect(() => {
     async function getIlanlar() {
-      // Kullanıcıyı bul
       const { data: kullanici } = await supabase
         .from('users')
         .select('id, display_name, user_type')
@@ -41,7 +39,6 @@ export default function PublicIlanListesi() {
       if (!kullanici) { setBulunamadi(true); setYukleniyor(false); return; }
       setSahip(kullanici);
 
-      // 24 saatten yeni ve tamamlanmamış aktif ilanları getir
       const yirmidortSaatOnce = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
       const { data } = await supabase
@@ -59,11 +56,11 @@ export default function PublicIlanListesi() {
         .eq('user_id', userId)
         .in('moderation_status', ['approved', 'auto_published'])
         .eq('status', 'active')
-        .is('completed_at', null)  // tamamlanmayanlar
-        .gte('created_at', yirmidortSaatOnce)  // son 24 saat
+        .is('completed_at', null)
+        .gte('created_at', yirmidortSaatOnce)
         .order('created_at', { ascending: false });
 
-      const donusturulmus = (data || []).map(ilan => ({
+      const donusturulmus = (data || []).map((ilan: any) => ({
         id: ilan.id,
         tip: ilan.listing_type,
         kalkis: ilan.origin_city,
@@ -74,8 +71,8 @@ export default function PublicIlanListesi() {
         sure: new Date(ilan.created_at).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }),
         tel: ilan.contact_phone,
         fiyat: ilan.price_offer,
-        aracTipleri: ilan.vehicle_type || [],
-        ustyapilari: ilan.body_type || [],
+        aracTipleri: (ilan.vehicle_type || []) as string[],
+        ustyapilari: (ilan.body_type || []) as string[],
         notes: ilan.notes || '',
         carrierNote: ilan.carrier_note || '',
         tarih: ilan.available_date,
@@ -89,7 +86,7 @@ export default function PublicIlanListesi() {
     if (userId) getIlanlar();
   }, [userId]);
 
-  const filtered = ilanlar.filter(i => {
+  const filtered = ilanlar.filter((i: any) => {
     if (kalkis && i.kalkis !== kalkis) return false;
     if (varis && !i.duraklar.some((d: any) => d.sehir === varis)) return false;
     if (aracTipi && !i.aracTipleri.includes(aracTipi)) return false;
@@ -102,7 +99,7 @@ export default function PublicIlanListesi() {
     return true;
   });
 
-  const inp = { background: '#0d1117', color: '#e2e8f0', border: '1px solid #30363d', borderRadius: 6, padding: '5px 10px', fontSize: '0.82rem', cursor: 'pointer' };
+  const inp = { background: '#0d1117', color: '#e2e8f0', border: '1px solid #30363d', borderRadius: 6, padding: '5px 10px', fontSize: '0.82rem', cursor: 'pointer' } as React.CSSProperties;
 
   if (bulunamadi) return (
     <div style={{ minHeight: '100vh', background: '#0d1117', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'IBM Plex Sans', system-ui, sans-serif" }}>
@@ -115,8 +112,6 @@ export default function PublicIlanListesi() {
 
   return (
     <div style={{ minHeight: '100vh', background: '#0d1117', fontFamily: "'IBM Plex Sans', system-ui, sans-serif" }}>
-
-      {/* NAVBAR */}
       <nav style={{ background: '#161b22', borderBottom: '1px solid #30363d', position: 'sticky', top: 0, zIndex: 50 }}>
         <div style={{ maxWidth: 900, margin: '0 auto', padding: '0 16px', height: 52, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <a href="/" style={{ display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none' }}>
@@ -133,28 +128,22 @@ export default function PublicIlanListesi() {
         </div>
       </nav>
 
-      {/* FİLTRELER */}
       <div style={{ background: '#161b22', borderBottom: '1px solid #30363d', position: 'sticky', top: 52, zIndex: 40 }}>
         <div style={{ maxWidth: 900, margin: '0 auto', padding: '10px 16px', display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-          {/* Arama */}
           <input value={arama} onChange={e => setArama(e.target.value)} placeholder="🔍 Kelime ara..."
             style={{ ...inp, flex: 1, minWidth: 140 }} />
-          {/* Kalkış */}
           <select value={kalkis} onChange={e => setKalkis(e.target.value)} style={inp}>
             <option value=''>📍 Kalkış</option>
             {ILLER.map(il => <option key={il}>{il}</option>)}
           </select>
-          {/* Varış */}
           <select value={varis} onChange={e => setVaris(e.target.value)} style={inp}>
             <option value=''>🏁 Varış</option>
             {ILLER.map(il => <option key={il}>{il}</option>)}
           </select>
-          {/* Araç Tipi */}
           <select value={aracTipi} onChange={e => setAracTipi(e.target.value)} style={inp}>
             <option value=''>🚛 Araç</option>
             {ARAC_TIPLERI.map(t => <option key={t}>{t}</option>)}
           </select>
-          {/* Üst Yapı */}
           <select value={ustYapi} onChange={e => setUstYapi(e.target.value)} style={inp}>
             <option value=''>🏗 Üst Yapı</option>
             {UST_YAPI.map(u => <option key={u}>{u}</option>)}
@@ -169,7 +158,6 @@ export default function PublicIlanListesi() {
         </div>
       </div>
 
-      {/* LISTE */}
       <main style={{ maxWidth: 900, margin: '0 auto', padding: '16px' }}>
         {yukleniyor ? (
           <div style={{ textAlign: 'center', padding: '80px 0', color: '#4b5563' }}>⏳ Yükleniyor...</div>
@@ -181,13 +169,12 @@ export default function PublicIlanListesi() {
           </div>
         ) : (
           <div style={{ display: 'grid', gap: 10 }}>
-            {filtered.map(ilan => {
+            {filtered.map((ilan: any) => {
               const isYuk = ilan.tip === 'yuk';
               return (
                 <div key={ilan.id} style={{ background: '#161b22', border: '1px solid #30363d', borderRadius: 8, padding: '14px 16px' }}>
                   <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
                     <div style={{ flex: 1 }}>
-                      {/* Tip etiketi */}
                       <div style={{ display: 'flex', gap: 6, marginBottom: 8, flexWrap: 'wrap' }}>
                         <span style={{ background: isYuk ? '#7f1d1d' : '#14532d', color: isYuk ? '#fca5a5' : '#86efac', fontSize: '0.7rem', fontWeight: 700, padding: '2px 8px', borderRadius: 4 }}>
                           {isYuk ? '🔴 YÜK' : '🟢 ARAÇ'}
@@ -198,8 +185,6 @@ export default function PublicIlanListesi() {
                           </span>
                         )}
                       </div>
-
-                      {/* Rota */}
                       <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4 }}>
                         <span style={{ color: '#22c55e', fontSize: '0.7rem', fontWeight: 700, minWidth: 16 }}>K</span>
                         <span style={{ color: '#e2e8f0', fontWeight: 700, fontSize: '0.95rem' }}>{ilan.kalkis}</span>
@@ -214,23 +199,14 @@ export default function PublicIlanListesi() {
                           {d.palet && <span style={{ color: '#86efac', fontSize: '0.75rem', marginLeft: 4 }}>📦 {d.palet}p</span>}
                         </div>
                       ))}
-
-                      {/* Araç + üst yapı */}
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
                         {ilan.aracTipleri.map((t: string) => <Chip key={t} label={'🚛 ' + t} bg='#1a2535' color='#60a5fa' />)}
                         {ilan.ustyapilari.map((u: string) => <Chip key={u} label={u} bg='#1f2937' color='#94a3b8' />)}
                         {ilan.fiyat && <Chip label={'₺' + Number(ilan.fiyat).toLocaleString('tr-TR')} bg='#1a2a0d' color='#22c55e' />}
                       </div>
-
-                      {/* Not */}
-                      {ilan.notes && (
-                        <div style={{ color: '#8b949e', fontSize: '0.78rem', marginTop: 8 }}>📝 {ilan.notes}</div>
-                      )}
-
+                      {ilan.notes && <div style={{ color: '#8b949e', fontSize: '0.78rem', marginTop: 8 }}>📝 {ilan.notes}</div>}
                       <div style={{ color: '#4b5563', fontSize: '0.7rem', marginTop: 8 }}>{ilan.sure}</div>
                     </div>
-
-                    {/* Ara butonu */}
                     <a href={`tel:${ilan.tel}`}
                       style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#14532d', color: '#22c55e', border: '1px solid #166534', borderRadius: 7, padding: '8px 16px', fontSize: '0.85rem', fontWeight: 700, textDecoration: 'none', whiteSpace: 'nowrap', flexShrink: 0 }}>
                       📞 Ara
