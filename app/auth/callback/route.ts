@@ -24,16 +24,16 @@ export async function GET(request: Request) {
     )
     await supabase.auth.exchangeCodeForSession(code)
 
-    // Kullanıcı profili tamamlanmış mı kontrol et
     const { data: { user } } = await supabase.auth.getUser()
     if (user) {
       const { data: profil } = await supabase
         .from('users')
-        .select('username')
+        .select('user_type')
         .eq('id', user.id)
         .single()
 
-      if (!profil?.username) {
+      // user_type yoksa profil tamamlanmamış
+      if (!profil?.user_type) {
         return NextResponse.redirect(`${origin}/profil-tamamla`)
       }
     }

@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 import { createServerClient } from '@supabase/ssr';
 import { redirect } from 'next/navigation';
+import IlanYonetim from './IlanYonetim';
 
 export default async function Panel() {
   const cookieStore = await cookies();
@@ -23,8 +24,9 @@ export default async function Panel() {
   const [{ data: ilanlar }, { data: araclar }, { data: profil }] = await Promise.all([
     supabaseAdmin
       .from('listings')
-      .select(`id, listing_type, origin_city, origin_district, status, moderation_status, created_at, expires_at, contact_phone, price_offer, listing_stops ( stop_order, city, district )`)
+      .select(`id, listing_type, origin_city, origin_district, status, moderation_status, created_at, expires_at, contact_phone, price_offer, carrier_note, completed_at, listing_stops ( stop_order, city, district )`)
       .eq('user_id', user.id)
+      .in('moderation_status', ['approved', 'auto_published'])
       .order('created_at', { ascending: false }),
     supabaseAdmin
       .from('vehicles')
@@ -38,9 +40,9 @@ export default async function Panel() {
       .single(),
   ]);
 
-  const aktif = (ilanlar || []).filter(i => i.status === 'active');
-  const pasif = (ilanlar || []).filter(i => i.status !== 'active');
   const isAracSahibi = profil?.user_type === 'arac_sahibi';
+  const toplamIlan = (ilanlar || []).length;
+  const aktifIlan = (ilanlar || []).filter(i => i.status === 'active' && !i.completed_at).length;
 
   return (
     <div style={{ minHeight: '100vh', background: '#0d1117', fontFamily: "'IBM Plex Sans', system-ui, sans-serif" }}>
@@ -75,15 +77,12 @@ export default async function Panel() {
         {/* Özet kartlar */}
         <div style={{ display: 'grid', gridTemplateColumns: isAracSahibi ? '1fr 1fr 1fr 1fr' : '1fr 1fr 1fr', gap: 12, marginBottom: 24 }}>
           {[
-            { label: 'Toplam İlan', value: (ilanlar || []).length, color: '#e2e8f0', href: null },
-            { label: 'Aktif', value: aktif.length, color: '#22c55e', href: null },
-            { label: 'Pasif', value: pasif.length, color: '#8b949e', href: null },
-            ...(isAracSahibi ? [{ label: 'Araçlarım', value: (araclar || []).length, color: '#60a5fa', href: '/araclarim' }] : []),
-          ].map(k => (
+            { label: 'Toplam İlan', value: toplamIlan, color: '#e2e8f0' },
+            { label: 'Aktif', value: aktifIlan, color: '#22c55e' },
+            { label: 'Araçlarım', value: (araclar || []).length, color: '#60a5fa', href: isAracSahibi ? '/araclarim' : null },
+          ].filter(k => isAracSahibi || k.label !== 'Araçlarım').map(k => (
             k.href ? (
-              <a key={k.label} href={k.href} style={{ background: '#161b22', border: '1px solid #30363d', borderRadius: 8, padding: '16px 20px', textDecoration: 'none', display: 'block', transition: 'border-color 0.15s' }}
-                onMouseEnter={(e: any) => e.currentTarget.style.borderColor = '#60a5fa'}
-                onMouseLeave={(e: any) => e.currentTarget.style.borderColor = '#30363d'}>
+              <a key={k.label} href={k.href} style={{ background: '#161b22', border: '1px solid #30363d', borderRadius: 8, padding: '16px 20px', textDecoration: 'none', display: 'block' }}>
                 <div style={{ color: '#8b949e', fontSize: '0.75rem', marginBottom: 4 }}>{k.label}</div>
                 <div style={{ color: k.color, fontWeight: 800, fontSize: '1.5rem' }}>{k.value}</div>
                 <div style={{ color: '#4b5563', fontSize: '0.72rem', marginTop: 4 }}>Yönet →</div>
@@ -110,70 +109,9 @@ export default async function Panel() {
           </div>
         )}
 
-        {/* İlan listesi */}
-        <div style={{ color: '#8b949e', fontSize: '0.78rem', fontWeight: 700, letterSpacing: '0.05em', marginBottom: 12 }}>İLANLARIM</div>
-        {(ilanlar || []).length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '60px 0', color: '#4b5563' }}>
-            <div style={{ fontSize: '2rem', marginBottom: 8 }}>📋</div>
-            <div style={{ fontWeight: 600, marginBottom: 8 }}>Henüz ilanınız yok</div>
-            <a href="/ilan-ver" style={{ color: '#22c55e', textDecoration: 'none', fontWeight: 600 }}>İlk ilanınızı verin →</a>
-          </div>
-        ) : (
-          <div style={{ display: 'grid', gap: 10 }}>
-            {(ilanlar || []).map(ilan => {
-              const stops = (ilan.listing_stops || []).sort((a: any, b: any) => a.stop_order - b.stop_order);
-              const isYuk = ilan.listing_type === 'yuk';
-              const isAktif = ilan.status === 'active';
-              const bekliyor = ilan.moderation_status === 'pending';
+        {/* İlan yönetim — client component */}
+        <IlanYonetim ilanlar={ilanlar || []} userId={user.id} />
 
-              return (
-                <div key={ilan.id} style={{ background: '#161b22', border: '1px solid #30363d', borderRadius: 8, padding: '14px 16px' }}>
-                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
-                        <span style={{ background: isYuk ? '#7f1d1d' : '#14532d', color: isYuk ? '#fca5a5' : '#86efac', fontSize: '0.68rem', fontWeight: 700, padding: '2px 8px', borderRadius: 4 }}>
-                          {isYuk ? '🔴 YÜK' : '🟢 ARAÇ'}
-                        </span>
-                        <span style={{ fontSize: '0.68rem', fontWeight: 700, padding: '2px 8px', borderRadius: 4, background: bekliyor ? '#451a03' : isAktif ? '#14532d' : '#1f2937', color: bekliyor ? '#fb923c' : isAktif ? '#22c55e' : '#9ca3af' }}>
-                          {bekliyor ? '⏳ Onay Bekliyor' : isAktif ? '✅ Aktif' : '💤 Pasif'}
-                        </span>
-                        <span style={{ color: '#4b5563', fontSize: '0.72rem' }}>
-                          {new Date(ilan.created_at).toLocaleDateString('tr-TR')}
-                        </span>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4 }}>
-                        <span style={{ color: '#22c55e', fontSize: '0.7rem', fontWeight: 700 }}>K</span>
-                        <span style={{ color: '#e2e8f0', fontWeight: 700 }}>{ilan.origin_city}</span>
-                        {ilan.origin_district && <span style={{ color: '#8b949e', fontSize: '0.82rem' }}>/ {ilan.origin_district}</span>}
-                      </div>
-                      {stops.map((s: any, i: number) => (
-                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4 }}>
-                          <span style={{ color: '#f97316', fontSize: '0.7rem', fontWeight: 700 }}>V</span>
-                          <span style={{ color: '#e2e8f0', fontWeight: 700 }}>{s.city}</span>
-                          {s.district && <span style={{ color: '#8b949e', fontSize: '0.82rem' }}>/ {s.district}</span>}
-                        </div>
-                      ))}
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0 }}>
-                      <a href={`/ilan/${ilan.id}`}
-                        style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid #30363d', background: '#0d1117', color: '#8b949e', fontSize: '0.78rem', fontWeight: 600, textDecoration: 'none', textAlign: 'center' }}>
-                        Görüntüle
-                      </a>
-                      {isAktif && (
-                        <form action={`/api/ilan/pasif`} method="POST">
-                          <input type="hidden" name="id" value={ilan.id} />
-                          <button type="submit" style={{ width: '100%', padding: '6px 12px', borderRadius: 6, border: '1px solid #374151', background: '#1f2937', color: '#9ca3af', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer' }}>
-                            Pasife Al
-                          </button>
-                        </form>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
       </main>
     </div>
   );

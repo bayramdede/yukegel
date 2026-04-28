@@ -25,8 +25,7 @@ const KAYNAK_ETIKET: Record<string, { label: string; bg: string; color: string }
 
 function yeniUye(createdAt: string | null): boolean {
   if (!createdAt) return false;
-  const otuzGunOnce = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-  return new Date(createdAt) > otuzGunOnce;
+  return new Date(createdAt) > new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 }
 
 function Chip({ label, bg = '#1f2937', color = '#94a3b8' }: { label: string; bg?: string; color?: string }) {
@@ -187,6 +186,25 @@ export default function Home() {
         </div>
       </nav>
 
+      {/* HERO BANNER — sadece kayıtsız kullanıcıya */}
+      {!kullanici && (
+        <div style={{ borderBottom: '1px solid #1a3a2a' }}>
+          <div style={{ maxWidth: 1280, margin: '0 auto', padding: '24px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 24, flexWrap: 'wrap' }}>
+            <div>
+              <div style={{ color: '#e2e8f0', fontWeight: 800, fontSize: '1.4rem', marginBottom: 6, letterSpacing: '-0.02em' }}>
+                Teker boşa dönmesin.
+              </div>
+              <div style={{ color: '#8b949e', fontSize: '0.85rem' }}>
+                Yükler nakliyecilerle Yükegel'de buluşuyor.
+              </div>
+            </div>
+            <a href="/giris" style={{ background: '#22c55e', color: '#000', fontWeight: 700, fontSize: '0.9rem', padding: '10px 24px', borderRadius: 8, textDecoration: 'none', whiteSpace: 'nowrap' }}>
+              + İlan Ver
+            </a>
+          </div>
+        </div>
+      )}
+
       {/* FİLTRELER */}
       <div style={{ background: '#161b22', borderBottom: '1px solid #30363d', position: 'sticky', top: 56, zIndex: 40 }}>
         <div style={{ maxWidth: 1280, margin: '0 auto', padding: '10px 16px', display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
@@ -229,112 +247,29 @@ export default function Home() {
           </div>
         ) : (
           <div style={{ display: 'grid', gap: 12 }}>
-            {filtered.map(ilan => {
-              const kaynak = KAYNAK_ETIKET[ilan.kaynak] || KAYNAK_ETIKET.form;
-              const isYuk = ilan.tip === 'yuk';
-              return (
-                <a key={ilan.id} href={`/ilan/${ilan.id}`}
-                  style={{ display: 'block', background: '#161b22', border: '1px solid #30363d', borderRadius: 8, padding: '14px 16px', cursor: 'pointer', transition: 'border-color 0.15s', textDecoration: 'none' }}
-                  onMouseEnter={e => (e.currentTarget.style.borderColor = '#22c55e')}
-                  onMouseLeave={e => (e.currentTarget.style.borderColor = '#30363d')}>
-                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
 
-                      {/* ETİKETLER */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, flexWrap: 'wrap' }}>
-                        <span style={{ background: isYuk ? '#7f1d1d' : '#14532d', color: isYuk ? '#fca5a5' : '#86efac', fontSize: '0.7rem', fontWeight: 700, padding: '2px 8px', borderRadius: 4 }}>
-                          {isYuk ? '🔴 YÜK' : '🟢 ARAÇ'}
-                        </span>
-                        <span style={{ background: kaynak.bg, color: kaynak.color, fontSize: '0.7rem', fontWeight: 600, padding: '2px 8px', borderRadius: 4 }}>
-                          {kaynak.label}
-                        </span>
-                        {ilan.dogrulanmamis && (
-                          <span title="Bu ilan Yükegel üyesi olmayan birinden geliyor. İletişim bilgileri doğrulanmamıştır."
-                            style={{ background: '#292019', color: '#f59e0b', fontSize: '0.7rem', fontWeight: 700, padding: '2px 8px', borderRadius: 4, cursor: 'help' }}>
-                            ⚠️ Doğrulanmamış İlan
-                          </span>
-                        )}
-                        {ilan.telefonDogrulandi && (
-                          <span title="Bu kullanıcının telefon numarası doğrulanmıştır."
-                            style={{ background: '#0d2b1a', color: '#22c55e', fontSize: '0.7rem', fontWeight: 700, padding: '2px 8px', borderRadius: 4, cursor: 'help' }}>
-                            ✅ Telefon Doğrulandı
-                          </span>
-                        )}
-                        {ilan.yeniUye && !ilan.dogrulanmamis && (
-                          <span title="Bu kullanıcı son 30 gün içinde üye olmuştur."
-                            style={{ background: '#1e1b4b', color: '#a5b4fc', fontSize: '0.7rem', fontWeight: 700, padding: '2px 8px', borderRadius: 4, cursor: 'help' }}>
-                            🆕 Yeni Üye
-                          </span>
-                        )}
-                        {ilan.fiyat && (
-                          <span title="Fiyat bilgisi girilmiş detaylı ilan."
-                            style={{ background: '#1c1a0d', color: '#fbbf24', fontSize: '0.7rem', fontWeight: 700, padding: '2px 8px', borderRadius: 4, cursor: 'help' }}>
-                            ⭐ Detaylı İlan
-                          </span>
-                        )}
-                      </div>
+            {!kullanici && filtered.length > 0 ? (
+              <>
+                <IlanKart ilan={filtered[0]} kullanici={kullanici} />
 
-                      {/* ROTA */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4 }}>
-                        <span style={{ color: '#22c55e', fontSize: '0.7rem', fontWeight: 700, minWidth: 16 }}>K</span>
-                        <span style={{ color: '#e2e8f0', fontWeight: 700, fontSize: '0.95rem' }}>{ilan.kalkis}</span>
-                        {ilan.kalkis_ilce && <span style={{ color: '#8b949e', fontSize: '0.82rem' }}>/ {ilan.kalkis_ilce}</span>}
-                      </div>
-                      {ilan.duraklar.map((d: any, i: number) => (
-                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4 }}>
-                          <span style={{ color: '#f97316', fontSize: '0.7rem', fontWeight: 700, minWidth: 16 }}>V</span>
-                          <span style={{ color: '#e2e8f0', fontWeight: 700, fontSize: '0.95rem' }}>{d.sehir}</span>
-                          {d.ilce && <span style={{ color: '#8b949e', fontSize: '0.82rem' }}>/ {d.ilce}</span>}
-                          {d.arac_adet > 1 && <span style={{ color: '#60a5fa', fontSize: '0.78rem', marginLeft: 4 }}>{d.arac_adet} araç</span>}
-                        </div>
-                      ))}
-
-                      {/* ARAÇ + ÜSTYAPI + TON + PALET */}
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
-                        {ilan.aracTipleri.map((t: string) => (
-                          <Chip key={'arac-' + t} label={'🚛 ' + t} bg='#1a2535' color='#60a5fa' />
-                        ))}
-                        {ilan.ustyapilari.map((u: string) => (
-                          <Chip key={'us-' + u} label={u} bg='#1f2937' color='#94a3b8' />
-                        ))}
-                        {ilan.duraklar[0]?.ton && (
-                          <Chip key='ton' label={'⚖ ' + ilan.duraklar[0].ton + ' ton'} bg='#1a2a1a' color='#86efac' />
-                        )}
-                        {ilan.duraklar[0]?.palet && (
-                          <Chip key='palet' label={'📦 ' + ilan.duraklar[0].palet + ' palet'} bg='#1a2a1a' color='#86efac' />
-                        )}
-                        {ilan.tarih && (
-                          <Chip key='tarih' label={'📅 ' + new Date(ilan.tarih).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' }) + (ilan.tarihEsnek ? ' ±' : '')} bg='#1f2937' color='#94a3b8' />
-                        )}
-                        <span style={{ color: '#4b5563', fontSize: '0.72rem', marginLeft: 'auto', alignSelf: 'center' }}>{ilan.sure}</span>
-                      </div>
-                    </div>
-
-                    {/* SAĞ: FİYAT + ARA */}
-                    <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                      {ilan.fiyat && (
-                        <div style={{ color: '#22c55e', fontWeight: 800, fontSize: '1.05rem', marginBottom: 8 }}>
-                          ₺{Number(ilan.fiyat).toLocaleString('tr-TR')}
-                        </div>
-                      )}
-                      {kullanici ? (
-                        <button onClick={e => { e.preventDefault(); e.stopPropagation(); window.location.href = `tel:${ilan.tel}`; }}
-                          style={{ display: 'block', background: '#1a3a1a', color: '#4ade80', border: '1px solid #166534', borderRadius: 6, padding: '6px 12px', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}>
-                          📞 Ara
-                        </button>
-                      ) : (
-                        <button onClick={e => { e.preventDefault(); e.stopPropagation(); window.location.href = '/giris'; }}
-                          style={{ display: 'block', background: '#1a2a3a', color: '#60a5fa', border: '1px solid #1e3a5f', borderRadius: 6, padding: '6px 12px', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                          🔐 Ara
-                        </button>
-                      )}
-                    </div>
+                {/* ÜYE OL BANNER */}
+                <div style={{ background: '#161b22', border: '1px solid #1e3a5f', borderRadius: 8, padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+                  <div style={{ color: '#8b949e', fontSize: '0.82rem' }}>
+                    🔐 <strong style={{ color: '#e2e8f0' }}>Telefon numaralarını görmek</strong> için üye olun. Ücretsiz.
                   </div>
-                </a>
-              );
-            })}
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <a href="/giris" style={{ background: '#1e3a5f', color: '#60a5fa', borderRadius: 6, padding: '7px 14px', fontSize: '0.82rem', fontWeight: 600, textDecoration: 'none' }}>Giriş Yap</a>
+                    <a href="/giris" style={{ background: '#22c55e', color: '#000', borderRadius: 6, padding: '7px 14px', fontSize: '0.82rem', fontWeight: 700, textDecoration: 'none' }}>Üye Ol →</a>
+                  </div>
+                </div>
 
-            {filtered.length === 0 && !yukleniyor && (
+                {filtered.slice(1).map(ilan => <IlanKart key={ilan.id} ilan={ilan} kullanici={kullanici} />)}
+              </>
+            ) : (
+              filtered.map(ilan => <IlanKart key={ilan.id} ilan={ilan} kullanici={kullanici} />)
+            )}
+
+            {filtered.length === 0 && (
               <div style={{ textAlign: 'center', padding: '80px 0', color: '#4b5563' }}>
                 <div style={{ fontSize: '2rem', marginBottom: 8 }}>🔍</div>
                 <div style={{ fontWeight: 600 }}>Filtrelerle eşleşen ilan bulunamadı</div>
@@ -349,5 +284,92 @@ export default function Home() {
         © 2026 Yükegel · Türkiye'nin nakliye ilan platformu
       </footer>
     </div>
+  );
+}
+
+function IlanKart({ ilan, kullanici }: { ilan: any; kullanici: any }) {
+  const kaynak = KAYNAK_ETIKET[ilan.kaynak] || KAYNAK_ETIKET.form;
+  const isYuk = ilan.tip === 'yuk';
+  return (
+    <a href={`/ilan/${ilan.id}`}
+      style={{ display: 'block', background: '#161b22', border: '1px solid #30363d', borderRadius: 8, padding: '14px 16px', cursor: 'pointer', textDecoration: 'none' }}
+      onMouseEnter={e => (e.currentTarget.style.borderColor = '#22c55e')}
+      onMouseLeave={e => (e.currentTarget.style.borderColor = '#30363d')}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, flexWrap: 'wrap' }}>
+            <span style={{ background: isYuk ? '#7f1d1d' : '#14532d', color: isYuk ? '#fca5a5' : '#86efac', fontSize: '0.7rem', fontWeight: 700, padding: '2px 8px', borderRadius: 4 }}>
+              {isYuk ? '🔴 YÜK' : '🟢 ARAÇ'}
+            </span>
+            <span style={{ background: kaynak.bg, color: kaynak.color, fontSize: '0.7rem', fontWeight: 600, padding: '2px 8px', borderRadius: 4 }}>
+              {kaynak.label}
+            </span>
+            {ilan.dogrulanmamis && (
+              <span title="Bu ilan Yükegel üyesi olmayan birinden geliyor."
+                style={{ background: '#292019', color: '#f59e0b', fontSize: '0.7rem', fontWeight: 700, padding: '2px 8px', borderRadius: 4, cursor: 'help' }}>
+                ⚠️ Doğrulanmamış İlan
+              </span>
+            )}
+            {ilan.telefonDogrulandi && (
+              <span style={{ background: '#0d2b1a', color: '#22c55e', fontSize: '0.7rem', fontWeight: 700, padding: '2px 8px', borderRadius: 4 }}>
+                ✅ Telefon Doğrulandı
+              </span>
+            )}
+            {ilan.yeniUye && !ilan.dogrulanmamis && (
+              <span style={{ background: '#1e1b4b', color: '#a5b4fc', fontSize: '0.7rem', fontWeight: 700, padding: '2px 8px', borderRadius: 4 }}>
+                🆕 Yeni Üye
+              </span>
+            )}
+            {ilan.fiyat && (
+              <span style={{ background: '#1c1a0d', color: '#fbbf24', fontSize: '0.7rem', fontWeight: 700, padding: '2px 8px', borderRadius: 4 }}>
+                ⭐ Detaylı İlan
+              </span>
+            )}
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4 }}>
+            <span style={{ color: '#22c55e', fontSize: '0.7rem', fontWeight: 700, minWidth: 16 }}>K</span>
+            <span style={{ color: '#e2e8f0', fontWeight: 700, fontSize: '0.95rem' }}>{ilan.kalkis}</span>
+            {ilan.kalkis_ilce && <span style={{ color: '#8b949e', fontSize: '0.82rem' }}>/ {ilan.kalkis_ilce}</span>}
+          </div>
+          {ilan.duraklar.map((d: any, i: number) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4 }}>
+              <span style={{ color: '#f97316', fontSize: '0.7rem', fontWeight: 700, minWidth: 16 }}>V</span>
+              <span style={{ color: '#e2e8f0', fontWeight: 700, fontSize: '0.95rem' }}>{d.sehir}</span>
+              {d.ilce && <span style={{ color: '#8b949e', fontSize: '0.82rem' }}>/ {d.ilce}</span>}
+              {d.arac_adet > 1 && <span style={{ color: '#60a5fa', fontSize: '0.78rem', marginLeft: 4 }}>{d.arac_adet} araç</span>}
+            </div>
+          ))}
+
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
+            {ilan.aracTipleri.map((t: string) => <Chip key={'a-' + t} label={'🚛 ' + t} bg='#1a2535' color='#60a5fa' />)}
+            {ilan.ustyapilari.map((u: string) => <Chip key={'u-' + u} label={u} bg='#1f2937' color='#94a3b8' />)}
+            {ilan.duraklar[0]?.ton && <Chip label={'⚖ ' + ilan.duraklar[0].ton + ' ton'} bg='#1a2a1a' color='#86efac' />}
+            {ilan.duraklar[0]?.palet && <Chip label={'📦 ' + ilan.duraklar[0].palet + ' palet'} bg='#1a2a1a' color='#86efac' />}
+            {ilan.tarih && <Chip label={'📅 ' + new Date(ilan.tarih).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' }) + (ilan.tarihEsnek ? ' ±' : '')} bg='#1f2937' color='#94a3b8' />}
+            <span style={{ color: '#4b5563', fontSize: '0.72rem', marginLeft: 'auto', alignSelf: 'center' }}>{ilan.sure}</span>
+          </div>
+        </div>
+
+        <div style={{ textAlign: 'right', flexShrink: 0 }}>
+          {ilan.fiyat && (
+            <div style={{ color: '#22c55e', fontWeight: 800, fontSize: '1.05rem', marginBottom: 8 }}>
+              ₺{Number(ilan.fiyat).toLocaleString('tr-TR')}
+            </div>
+          )}
+          {kullanici ? (
+            <button onClick={e => { e.preventDefault(); e.stopPropagation(); window.location.href = `tel:${ilan.tel}`; }}
+              style={{ display: 'block', background: '#1a3a1a', color: '#4ade80', border: '1px solid #166534', borderRadius: 6, padding: '6px 12px', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}>
+              📞 Ara
+            </button>
+          ) : (
+            <button onClick={e => { e.preventDefault(); e.stopPropagation(); window.location.href = '/giris'; }}
+              style={{ display: 'block', background: '#1a2a3a', color: '#60a5fa', border: '1px solid #1e3a5f', borderRadius: 6, padding: '6px 12px', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+              🔐 Ara
+            </button>
+          )}
+        </div>
+      </div>
+    </a>
   );
 }
