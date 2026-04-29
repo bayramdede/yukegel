@@ -198,7 +198,7 @@ export default function IlanVer() {
         </div>
         {fiyat && (
           <div style={{ background: '#14532d', border: '1px solid #166534', borderRadius: 8, padding: '10px 20px', marginBottom: 24, display: 'inline-block' }}>
-            <span style={{ color: '#22c55e', fontWeight: 700, fontSize: '0.85rem' }}>⭐ Detaylı İlan rozeti kazandınız!</span>
+            <span style={{ color: '#22c55e', fontWeight: 700, fontSize: '0.85rem' }}>✓ Fiyat Belli rozeti kazandınız!</span>
           </div>
         )}
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
@@ -238,7 +238,7 @@ export default function IlanVer() {
 
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
           <h1 style={{ color: '#e2e8f0', fontWeight: 800, fontSize: '1.3rem', margin: 0 }}>Yeni İlan</h1>
-          {fiyat && <span style={{ background: '#14532d', color: '#22c55e', fontSize: '0.72rem', fontWeight: 700, padding: '4px 10px', borderRadius: 6 }}>⭐ Detaylı İlan</span>}
+          {fiyat && <span style={{ background: '#14532d', color: '#22c55e', fontSize: '0.72rem', fontWeight: 700, padding: '4px 10px', borderRadius: 6 }}>✓ Fiyat Belli</span>}
         </div>
 
         {/* İLAN TİPİ */}
@@ -396,9 +396,9 @@ export default function IlanVer() {
             <div>
               <label style={s.label}>
                 {tip === 'arac' ? 'Hedef Navlun (TL)' : 'Ücret Teklifi (TL)'}
-                {fiyat && <span style={{ marginLeft: 8, background: '#14532d', color: '#22c55e', fontSize: '0.65rem', fontWeight: 700, padding: '1px 6px', borderRadius: 4 }}>⭐ Detaylı İlan</span>}
+                {fiyat && <span style={{ marginLeft: 8, background: '#14532d', color: '#22c55e', fontSize: '0.65rem', fontWeight: 700, padding: '1px 6px', borderRadius: 4 }}>✓ Fiyat Belli</span>}
               </label>
-              <input type="number" value={fiyat} onChange={e => setFiyat(e.target.value)} placeholder="Girilirse 'Detaylı İlan' rozeti alırsınız" style={s.input} />
+              <input type="number" value={fiyat} onChange={e => setFiyat(e.target.value)} placeholder="Girilirse 'Fiyat Belli' rozeti alırsınız" style={s.input} />
               <label style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, cursor: 'pointer' }}>
                 <input type="checkbox" checked={fiyat_pazarlik} onChange={e => setFiyatPazarlik(e.target.checked)} />
                 <span style={{ color: '#8b949e', fontSize: '0.8rem' }}>Pazarlık payı var</span>

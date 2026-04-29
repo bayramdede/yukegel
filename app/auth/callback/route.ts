@@ -28,14 +28,19 @@ export async function GET(request: Request) {
     if (user) {
       const { data: profil } = await supabase
         .from('users')
-        .select('user_type')
+        .select('user_type, role')
         .eq('id', user.id)
         .single()
 
-      // user_type yoksa profil tamamlanmamış
-      if (!profil?.user_type) {
+      // user_type yoksa profil tamamlanmamış (sadece normal kullanıcılar için)
+      const role = (profil as any)?.role || 'user'
+      if (role === 'user' && !profil?.user_type) {
         return NextResponse.redirect(`${origin}/profil-tamamla`)
       }
+
+      // Role'e göre yönlendir
+      if (role === 'admin') return NextResponse.redirect(`${origin}/admin`)
+      if (role === 'moderator') return NextResponse.redirect(`${origin}/moderator`)
     }
   }
 

@@ -83,8 +83,25 @@ export default function Moderator() {
 
   const ilanRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const router = useRouter();
+  const [yetkiKontrol, setYetkiKontrol] = useState(true);
 
-  useEffect(() => { getIlanlar(); getIstatistik(); }, [filtre]);
+  // Rol kontrolü: sadece moderator ve admin
+  useEffect(() => {
+    async function kontrol() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { router.push('/giris?redirect=/moderator'); return; }
+      const { data: profil } = await supabase.from('users').select('role').eq('id', user.id).single();
+      const role = (profil as any)?.role;
+      if (role !== 'moderator' && role !== 'admin') {
+        router.push('/');
+        return;
+      }
+      setYetkiKontrol(false);
+    }
+    kontrol();
+  }, [router]);
+
+  useEffect(() => { if (!yetkiKontrol) { getIlanlar(); getIstatistik(); } }, [filtre, yetkiKontrol]);
 
   async function getIstatistik() {
     const bugun = new Date(); bugun.setHours(0, 0, 0, 0);

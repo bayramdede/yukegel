@@ -27,9 +27,24 @@ function GirisIci() {
   const [yukleniyor, setYukleniyor] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirect = searchParams.get('redirect') || '/';
+  const redirect = searchParams.get('redirect');
 
   function temizle() { setHata(''); }
+
+  // Başarılı giriş sonrası yönlendirme
+  // - Explicit redirect varsa oraya git
+  // - Yoksa role'e göre: admin -> /admin, moderator -> /moderator, diğerleri -> /
+  async function yonlendir() {
+    if (redirect) { router.push(redirect); return; }
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { router.push('/'); return; }
+    const { data: profil } = await supabase
+      .from('users').select('role').eq('id', user.id).single();
+    const role = (profil as any)?.role || 'user';
+    if (role === 'admin') router.push('/admin');
+    else if (role === 'moderator') router.push('/moderator');
+    else router.push('/');
+  }
 
   // ── Telefon akışı ───────────────────────────────────────────────
   async function otpGonder(e: React.FormEvent) {
@@ -48,7 +63,7 @@ function GirisIci() {
     const fmt = temiz.startsWith('90') ? `+${temiz}` : temiz.startsWith('0') ? `+9${temiz}` : `+90${temiz}`;
     const { error } = await supabase.auth.verifyOtp({ phone: fmt, token: otp, type: 'sms' });
     if (error) setHata('Kod hatalı veya süresi dolmuş.');
-    else router.push(redirect);
+    else await yonlendir();
     setYukleniyor(false);
   }
 
@@ -61,7 +76,7 @@ function GirisIci() {
       else if (error.message.includes('Email not confirmed')) setHata('E-posta adresinizi doğrulamadınız. Gelen kutunuzu kontrol edin.');
       else setHata(error.message);
     } else {
-      router.push(redirect);
+      await yonlendir();
     }
     setYukleniyor(false);
   }

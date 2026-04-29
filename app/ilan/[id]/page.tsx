@@ -147,9 +147,9 @@ export default async function IlanDetay({ params }: { params: Promise<{ id: stri
             </span>
           )}
           {ilan.price_offer && (
-            <span title="Fiyat bilgisi girilmiş detaylı ilan."
-              style={{ background: '#1c1a0d', color: '#fbbf24', fontSize: '0.78rem', fontWeight: 700, padding: '4px 12px', borderRadius: 6, cursor: 'help' }}>
-              ⭐ Detaylı İlan
+            <span title="Fiyat bilgisi girilmiş."
+              style={{ background: '#0d2b1a', color: '#22c55e', fontSize: '0.78rem', fontWeight: 700, padding: '4px 12px', borderRadius: 6, cursor: 'help' }}>
+              ✓ Fiyat Belli
             </span>
           )}
           <span style={{ color: '#4b5563', fontSize: '0.78rem', marginLeft: 'auto' }}>

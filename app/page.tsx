@@ -314,8 +314,8 @@ function IlanKart({ ilan, kullanici }: { ilan: any; kullanici: any }) {
               </span>
             )}
             {ilan.fiyat && (
-              <span style={{ background: '#1c1a0d', color: '#fbbf24', fontSize: '0.7rem', fontWeight: 700, padding: '2px 8px', borderRadius: 4 }}>
-                ⭐ Detaylı İlan
+              <span style={{ background: '#0d2b1a', color: '#22c55e', fontSize: '0.7rem', fontWeight: 700, padding: '2px 8px', borderRadius: 4 }}>
+                ✓ Fiyat Belli
               </span>
             )}
           </div>
