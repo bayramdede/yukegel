@@ -50,7 +50,9 @@ export default function ProfilTamamla() {
   const [aracPlaka, setAracPlaka] = useState('');
   const [aracTipi, setAracTipi] = useState('');
   const [aracUtsyapi, setAracUtsyapi] = useState<string[]>([]);
+  const [telefonKilitli, setTelefonKilitli] = useState(false);
   const [yukleniyor, setYukleniyor] = useState(false);
+  const [hata, setHata] = useState('');
   const router = useRouter();
 
   useEffect(() => {
@@ -59,8 +61,15 @@ export default function ProfilTamamla() {
       if (!user) { router.push('/giris'); return; }
       const fullName = user.user_metadata?.full_name || '';
       if (fullName) setDisplayName(fullName);
+      // Telefon OTP ile giriş yapıldıysa numarayı otomatik doldur ve kilitle
+      if (user.phone) {
+        // +90'lı formatı 0'lı yerel formata çevir
+        const yerel = user.phone.startsWith('+90') ? '0' + user.phone.slice(3) : user.phone;
+        setTelefon(yerel);
+        setTelefonKilitli(true);
+      }
       const { data: profil } = await supabase.from('users').select('user_type').eq('id', user.id).single();
-      if (profil?.user_type) router.push('/');
+      if (profil?.user_type) router.push('/panel');
     }
     init();
   }, []);
@@ -102,11 +111,12 @@ export default function ProfilTamamla() {
 
   const aracGecerli = userType !== 'arac_sahibi' || (aracPlaka.trim().length >= 4 && aracTipi !== '');
 
+  const telefonGecerli = telefonKilitli || (telefon.length === 11 && !telefonHata);
+
   const formGecerli =
     displayName.trim().length >= 2 &&
     userType !== '' &&
-    telefon.length === 11 &&
-    !telefonHata &&
+    telefonGecerli &&
     kimlikGecerli() &&
     aracGecerli;
 
@@ -115,16 +125,24 @@ export default function ProfilTamamla() {
     if (!formGecerli) return;
     setYukleniyor(true);
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    if (!user) { setYukleniyor(false); return; }
 
-    await supabase.from('users').update({
+    const { error } = await supabase.from('users').upsert({
+      id: user.id,
+      email: user.email,
       display_name: displayName.trim(),
       user_type: userType,
       phone: telefon,
       phone_verified: false,
       ...(tckn ? { tckn } : {}),
       ...(vkn ? { vkn } : {}),
-    }).eq('id', user.id);
+    }, { onConflict: 'id' });
+
+    if (error) {
+      setHata('Profil kaydedilemedi: ' + error.message);
+      setYukleniyor(false);
+      return;
+    }
 
     if (userType === 'arac_sahibi' && aracPlaka && aracTipi) {
       await supabase.from('vehicles').insert({
@@ -136,7 +154,7 @@ export default function ProfilTamamla() {
       });
     }
 
-    router.push('/');
+    router.push('/panel');
     setYukleniyor(false);
   }
 
@@ -177,13 +195,21 @@ export default function ProfilTamamla() {
 
             <div style={{ marginBottom: 16 }}>
               <label style={lbl}>Telefon *</label>
-              <input value={telefon}
-                onChange={e => {
-                  const val = e.target.value.replace(/\D/g, '').substring(0, 11);
-                  setTelefon(val);
-                  setTelefonHata(val.length > 0 && (val.length !== 11 || !val.startsWith('0')) ? '05xx ile başlayan 11 haneli numara girin' : '');
-                }}
-                placeholder="05xx xxx xx xx" style={inp} />
+              <div style={{ position: 'relative' }}>
+                <input value={telefon}
+                  disabled={telefonKilitli}
+                  onChange={e => {
+                    if (telefonKilitli) return;
+                    const val = e.target.value.replace(/\D/g, '').substring(0, 11);
+                    setTelefon(val);
+                    setTelefonHata(val.length > 0 && (val.length !== 11 || !val.startsWith('0')) ? '05xx ile başlayan 11 haneli numara girin' : '');
+                  }}
+                  placeholder="05xx xxx xx xx"
+                  style={{ ...inp, ...(telefonKilitli ? { background: '#0a0f17', color: '#4b5563', cursor: 'not-allowed', borderColor: '#1f2937' } : {}) }} />
+                {telefonKilitli && (
+                  <span style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', fontSize: '0.72rem', color: '#22c55e' }}>✓ Doğrulandı</span>
+                )}
+              </div>
               {telefonHata && <div style={hataStil}>⚠️ {telefonHata}</div>}
             </div>
 
@@ -255,6 +281,7 @@ export default function ProfilTamamla() {
               </div>
             )}
 
+            {hata && <div style={{ color: '#ef4444', fontSize: '0.82rem', marginBottom: 10 }}>⚠️ {hata}</div>}
             <button type="submit" disabled={yukleniyor || !formGecerli}
               style={{ width: '100%', padding: '12px', borderRadius: 8, border: 'none', background: formGecerli ? '#22c55e' : '#1f2937', color: formGecerli ? '#000' : '#6b7280', fontWeight: 800, fontSize: '1rem', cursor: formGecerli ? 'pointer' : 'not-allowed', marginTop: 8 }}>
               {yukleniyor ? 'Kaydediliyor...' : 'Devam Et →'}

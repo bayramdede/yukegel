@@ -118,21 +118,30 @@ export default async function IlanDetay({ params }: { params: Promise<{ id: stri
             {kaynak.label}
           </span>
 
-          {/* Doğrulanmamış İlan — üye için ek açıklama */}
-          {dogrulanmamis && (
-            <span
-              title={user
-                ? 'Bu ilan henüz doğrulanmamış. Aşağıdaki butonu kullanarak ilan sahibinden doğrulamasını isteyebilirsiniz.'
-                : 'Bu ilan Yükegel üyesi olmayan birinden geliyor. İletişim bilgileri doğrulanmamıştır.'}
-              style={{ background: '#292019', color: '#f59e0b', fontSize: '0.78rem', fontWeight: 700, padding: '4px 12px', borderRadius: 6, cursor: 'help' }}>
-              ⚠️ Doğrulanmamış İlan
-              {user && (
-                <span style={{ color: '#fbbf24', fontSize: '0.72rem', fontWeight: 600, borderLeft: '1px solid #78350f', marginLeft: 6, paddingLeft: 6 }}>
-                  Doğrulamasını İste ↓
+          {/* Doğrulanmamış İlan */}
+          {dogrulanmamis && (() => {
+            const telefon = ilan.contact_phone?.replace(/\D/g, '');
+            const waNumara = telefon ? (telefon.startsWith('90') ? telefon : `90${telefon.replace(/^0/, '')}`) : null;
+            const stops = (ilan.listing_stops as { stop_order: number; city: string }[] | null) ?? [];
+            const varis = stops.sort((a, b) => a.stop_order - b.stop_order).at(-1)?.city;
+            const ilanOzet = [ilan.origin_city, varis, ilan.vehicle_type].filter(Boolean).join('-');
+            const mesaj = encodeURIComponent(`Merhaba, "${ilanOzet || 'yük'}" ilanınızı Yükegel'de gördüm.\nYükegel'de sahiplenerek yönetebilirsiniz: ${process.env.NEXT_PUBLIC_SITE_URL || 'https://yukegel.com'}/ilan/${ilan.id}/sahiplen`);
+            return waNumara ? (
+              <a href={`https://wa.me/${waNumara}?text=${mesaj}`} target="_blank" rel="noopener noreferrer"
+                title="WhatsApp üzerinden ilan sahibinden doğrulamasını isteyin"
+                style={{ background: '#292019', color: '#f59e0b', fontSize: '0.78rem', fontWeight: 700, padding: '4px 12px', borderRadius: 6, cursor: 'pointer', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                ⚠️ Doğrulanmamış İlan
+                <span style={{ color: '#fbbf24', fontSize: '0.72rem', fontWeight: 600, borderLeft: '1px solid #78350f', paddingLeft: 6 }}>
+                  Doğrulamasını İste →
                 </span>
-              )}
-            </span>
-          )}
+              </a>
+            ) : (
+              <span title="Bu ilan Yükegel üyesi olmayan birinden geliyor."
+                style={{ background: '#292019', color: '#f59e0b', fontSize: '0.78rem', fontWeight: 700, padding: '4px 12px', borderRadius: 6, cursor: 'help' }}>
+                ⚠️ Doğrulanmamış İlan
+              </span>
+            );
+          })()}
 
           {telefonDogrulandi && (
             <span title="Bu kullanıcının telefon numarası doğrulanmıştır."

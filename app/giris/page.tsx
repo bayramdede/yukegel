@@ -230,12 +230,12 @@ function GirisIci() {
                 <div style={{ marginBottom: 16 }}>
                   <label style={lbl}>Doğrulama Kodu</label>
                   <div style={{ color: '#8b949e', fontSize: '0.82rem', marginBottom: 12 }}>📱 {telefon} numarasına SMS gönderdik.</div>
-                  <input type="text" value={otp} onChange={e => setOtp(e.target.value.replace(/\D/g, '').substring(0, 6))} placeholder="6 haneli kod" required maxLength={6}
+                  <input type="text" value={otp} onChange={e => setOtp(e.target.value.replace(/\D/g, '').substring(0, 4))} placeholder="4 haneli kod" required maxLength={4}
                     style={{ ...inp, fontSize: '1.5rem', textAlign: 'center', letterSpacing: '0.3em', fontWeight: 700 }} autoFocus />
                 </div>
                 {hata && <div style={{ color: '#ef4444', fontSize: '0.82rem', marginBottom: 12 }}>⚠️ {hata}</div>}
-                <button type="submit" disabled={yukleniyor || otp.length < 6}
-                  style={{ width: '100%', padding: '12px', borderRadius: 8, border: 'none', background: otp.length === 6 ? '#22c55e' : '#166534', color: '#000', fontWeight: 800, fontSize: '1rem', cursor: 'pointer', marginBottom: 10 }}>
+                <button type="submit" disabled={yukleniyor || otp.length < 4}
+                  style={{ width: '100%', padding: '12px', borderRadius: 8, border: 'none', background: otp.length === 4 ? '#22c55e' : '#166534', color: '#000', fontWeight: 800, fontSize: '1rem', cursor: 'pointer', marginBottom: 10 }}>
                   {yukleniyor ? 'Doğrulanıyor...' : 'Giriş Yap →'}
                 </button>
                 <button type="button" onClick={() => { setOtpAdim(false); setOtp(''); temizle(); }}

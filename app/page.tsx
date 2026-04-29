@@ -47,20 +47,21 @@ export default function Home() {
 
   useEffect(() => {
     async function init() {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data: profil } = await supabase
-          .from('users')
-          .select('display_name, username, email')
-          .eq('id', user.id)
-          .single();
-        setKullanici(profil || { email: user.email });
-      }
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: profil } = await supabase
+            .from('users')
+            .select('display_name, username, email')
+            .eq('id', user.id)
+            .single();
+          setKullanici(profil || { email: user.email });
+        }
 
-      setYukleniyor(true);
-      const { data } = await supabase
-        .from('listings')
-        .select(`
+        setYukleniyor(true);
+        const { data } = await supabase
+          .from('listings')
+          .select(`
           id, listing_type, origin_city, origin_district,
           contact_phone, price_offer, source, created_at,
           trust_level, user_id,
@@ -71,61 +72,65 @@ export default function Home() {
             vehicle_count, cargo_type, weight_ton, pallet_count
           )
         `)
-        .in('moderation_status', ['approved', 'auto_published'])
-        .order('created_at', { ascending: false })
-        .limit(50);
+          .in('moderation_status', ['approved', 'auto_published'])
+          .order('created_at', { ascending: false })
+          .limit(50);
 
-      if (!data || data.length === 0) {
-        setIlanlar([]);
-        setYukleniyor(false);
-        return;
-      }
-
-      const userIds = [...new Set((data as any[]).map((i: any) => i.user_id).filter(Boolean))];
-      const kullaniciMap: Record<string, { phone_verified: boolean; created_at: string }> = {};
-
-      if (userIds.length > 0) {
-        const { data: kullanicilar } = await supabase
-          .from('users')
-          .select('id, phone_verified, created_at')
-          .in('id', userIds);
-        for (const k of (kullanicilar || []) as any[]) {
-          kullaniciMap[k.id] = { phone_verified: k.phone_verified, created_at: k.created_at };
+        if (!data || data.length === 0) {
+          setIlanlar([]);
+          return;
         }
+
+        const userIds = [...new Set((data as any[]).map((i: any) => i.user_id).filter(Boolean))];
+        const kullaniciMap: Record<string, { phone_verified: boolean; created_at: string }> = {};
+
+        if (userIds.length > 0) {
+          const { data: kullanicilar } = await supabase
+            .from('users')
+            .select('id, phone_verified, created_at')
+            .in('id', userIds);
+          for (const k of (kullanicilar || []) as any[]) {
+            kullaniciMap[k.id] = { phone_verified: k.phone_verified, created_at: k.created_at };
+          }
+        }
+
+        const donusturulmus = (data as any[]).map((ilan: any) => {
+          const kullaniciBilgi = ilan.user_id ? kullaniciMap[ilan.user_id] : null;
+          const stops = (ilan.listing_stops || []).sort((a: any, b: any) => a.stop_order - b.stop_order);
+          const aracTipiList: string[] = ilan.vehicle_type?.length
+            ? ilan.vehicle_type
+            : [...new Set(stops.map((s: any) => s.cargo_type).filter(Boolean))] as string[];
+
+          return {
+            id: ilan.id,
+            tip: ilan.listing_type,
+            kalkis: ilan.origin_city,
+            kalkis_ilce: ilan.origin_district || '',
+            duraklar: stops.map((s: any) => ({
+              sehir: s.city, ilce: s.district || '',
+              ton: s.weight_ton, palet: s.pallet_count, arac_adet: s.vehicle_count,
+            })),
+            kaynak: ilan.source || 'form',
+            sure: new Date(ilan.created_at).toLocaleDateString('tr-TR'),
+            tel: ilan.contact_phone,
+            fiyat: ilan.price_offer ? ilan.price_offer.toString() : null,
+            tarih: ilan.available_date,
+            tarihEsnek: ilan.date_flexible,
+            aracTipleri: aracTipiList,
+            ustyapilari: (ilan.body_type || []) as string[],
+            dogrulanmamis: !ilan.user_id || ilan.trust_level === 'social',
+            telefonDogrulandi: kullaniciBilgi?.phone_verified === true,
+            yeniUye: kullaniciBilgi ? yeniUye(kullaniciBilgi.created_at) : false,
+          };
+        });
+
+        setIlanlar(donusturulmus);
+      } catch (err) {
+        console.error('Ana sayfa veri hatası:', err);
+        setIlanlar([]);
+      } finally {
+        setYukleniyor(false);
       }
-
-      const donusturulmus = (data as any[]).map((ilan: any) => {
-        const kullaniciBilgi = ilan.user_id ? kullaniciMap[ilan.user_id] : null;
-        const stops = (ilan.listing_stops || []).sort((a: any, b: any) => a.stop_order - b.stop_order);
-        const aracTipiList: string[] = ilan.vehicle_type?.length
-          ? ilan.vehicle_type
-          : [...new Set(stops.map((s: any) => s.cargo_type).filter(Boolean))] as string[];
-
-        return {
-          id: ilan.id,
-          tip: ilan.listing_type,
-          kalkis: ilan.origin_city,
-          kalkis_ilce: ilan.origin_district || '',
-          duraklar: stops.map((s: any) => ({
-            sehir: s.city, ilce: s.district || '',
-            ton: s.weight_ton, palet: s.pallet_count, arac_adet: s.vehicle_count,
-          })),
-          kaynak: ilan.source || 'form',
-          sure: new Date(ilan.created_at).toLocaleDateString('tr-TR'),
-          tel: ilan.contact_phone,
-          fiyat: ilan.price_offer ? ilan.price_offer.toString() : null,
-          tarih: ilan.available_date,
-          tarihEsnek: ilan.date_flexible,
-          aracTipleri: aracTipiList,
-          ustyapilari: (ilan.body_type || []) as string[],
-          dogrulanmamis: !ilan.user_id || ilan.trust_level === 'social',
-          telefonDogrulandi: kullaniciBilgi?.phone_verified === true,
-          yeniUye: kullaniciBilgi ? yeniUye(kullaniciBilgi.created_at) : false,
-        };
-      });
-
-      setIlanlar(donusturulmus);
-      setYukleniyor(false);
     }
 
     init();

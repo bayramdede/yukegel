@@ -24,7 +24,7 @@ export default async function Panel() {
   const [{ data: ilanlar }, { data: araclar }, { data: profil }] = await Promise.all([
     supabaseAdmin
       .from('listings')
-      .select(`id, listing_type, origin_city, origin_district, status, moderation_status, created_at, expires_at, contact_phone, price_offer, carrier_note, completed_at, listing_stops ( stop_order, city, district )`)
+      .select(`id, listing_type, origin_city, origin_district, status, moderation_status, created_at, expires_at, contact_phone, price_offer, price_negotiable, carrier_note, completed_at, vehicle_type, body_type, available_date, date_flexible, notes, listing_stops ( id, stop_order, city, district, cargo_type, weight_ton, pallet_count, vehicle_count )`)
       .eq('user_id', user.id)
       .in('moderation_status', ['approved', 'auto_published'])
       .order('created_at', { ascending: false }),
