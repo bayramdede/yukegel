@@ -13,6 +13,9 @@ const ACIK_ROTALAR = [
 
 const KORUNMALI = ['/panel', '/ilan-ver', '/araclarim', '/profil', '/moderator'];
 
+// Bu rotalarda user_type kontrolü yapma (admin/moderator sayfaları kendi requireAdmin/requireModerator'ını çağırır)
+const PROFIL_KONTROLSUZ = ['/admin', '/moderator'];
+
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -51,7 +54,8 @@ export async function proxy(request: NextRequest) {
   }
 
   // Giriş yapmış ama profil eksik → profil-tamamla'ya yönlendir
-  if (user) {
+  // Admin/moderator sayfalarında bu kontrolü atlıyoruz
+  if (user && !PROFIL_KONTROLSUZ.some(r => pathname.startsWith(r))) {
     const { data: profil } = await supabase
       .from('users')
       .select('user_type')

@@ -22,7 +22,7 @@ const KARTLAR = [
     ikon: '👥',
     baslik: 'Kullanıcılar',
     aciklama: 'Kullanıcı listesi, rol ve durum yönetimi.',
-    aktif: false,
+    aktif: true,
   },
   {
     yol: '/moderator',

@@ -6,7 +6,7 @@ import { Suspense } from 'react';
 
 const supabase = createClient();
 
-type Mod = 'giris' | 'kayit' | 'reset' | 'reset_tamam' | 'dogrulama_bekle';
+type Mod = 'giris' | 'kayit' | 'reset' | 'reset_tamam' | 'dogrulama_bekle' | 'merge_onay';
 type Sekme = 'telefon' | 'eposta';
 
 function GirisIci() {
@@ -17,6 +17,8 @@ function GirisIci() {
   const [telefon, setTelefon] = useState('');
   const [otp, setOtp] = useState('');
   const [otpAdim, setOtpAdim] = useState(false);
+  const [mergeHedef, setMergeHedef] = useState<{ id: string; email: string | null; display_name: string | null } | null>(null);
+  const [mergeYukleniyor, setMergeYukleniyor] = useState(false);
 
   // E-posta
   const [eposta, setEposta] = useState('');
@@ -27,6 +29,7 @@ function GirisIci() {
   const [yukleniyor, setYukleniyor] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [bilgi, setBilgi] = useState('');
   const redirect = searchParams.get('redirect');
 
   function temizle() { setHata(''); }
@@ -61,10 +64,103 @@ function GirisIci() {
     e.preventDefault(); setYukleniyor(true); temizle();
     const temiz = telefon.replace(/\D/g, '');
     const fmt = temiz.startsWith('90') ? `+${temiz}` : temiz.startsWith('0') ? `+9${temiz}` : `+90${temiz}`;
-    const { error } = await supabase.auth.verifyOtp({ phone: fmt, token: otp, type: 'sms' });
-    if (error) setHata('Kod hatalı veya süresi dolmuş.');
-    else await yonlendir();
+    const { data, error } = await supabase.auth.verifyOtp({ phone: fmt, token: otp, type: 'sms' });
+    if (error) { setHata('Kod hatalı veya süresi dolmuş.'); setYukleniyor(false); return; }
+
+    const mevcutUserId = data.user?.id;
+    if (!mevcutUserId) { setHata('Giriş yapılamadı, lütfen tekrar deneyin.'); setYukleniyor(false); return; }
+
+    // 1. Mevcut kullanıcının kendi profilini kontrol et
+    const { data: mevcutProfil } = await supabase
+      .from('users')
+      .select('merged_into, is_active, user_type')
+      .eq('id', mevcutUserId)
+      .maybeSingle();
+
+    // 2. Daha önce merge edilmiş — asıl hesaba magic link ile geç
+    if (mevcutProfil?.merged_into) {
+      const res = await fetch('/api/auth/switch-account', { method: 'POST' });
+      const json = await res.json();
+      if (json.redirectUrl) {
+        window.location.href = json.redirectUrl;
+      } else {
+        setHata('Giriş yapılamadı, lütfen tekrar deneyin.');
+        setYukleniyor(false);
+      }
+      return;
+    }
+
+    // 3. Aktif profil varsa direkt giriş
+    if (mevcutProfil?.is_active && mevcutProfil?.user_type) {
+      await yonlendir();
+      setYukleniyor(false);
+      return;
+    }
+
+    // 4. DB'de 05xx / 5xx formatında başka profil var mı? (ilk kez merge)
+    const telefonTemiz = fmt.startsWith('+90') ? '0' + fmt.slice(3) : fmt;
+    const telefonKisa  = fmt.startsWith('+90') ? fmt.slice(3) : fmt;
+
+    // Bu telefon başka bir users kaydında var mı?
+    const { data: eskiProfil } = await supabase
+      .from('users')
+      .select('id, email, display_name')
+      .or(`phone.eq.${telefonTemiz},phone.eq.${telefonKisa}`)
+      .eq('is_active', true)
+      .neq('id', mevcutUserId)
+      .maybeSingle();
+
+    if (eskiProfil) {
+      const res = await fetch('/api/auth/merge', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ keepUserId: eskiProfil.id, mergeUserId: mevcutUserId }),
+      });
+      if (!res.ok) {
+        setMergeHedef(eskiProfil);
+        setMod('merge_onay');
+        setYukleniyor(false);
+        return;
+      }
+      const json = await res.json();
+      window.location.href = json.redirectUrl || '/panel';
+      return;
+    }
+
+    // Profil var mı, tamamlanmış mı?
+    const { data: profil } = await supabase
+      .from('users')
+      .select('user_type')
+      .eq('id', mevcutUserId)
+      .maybeSingle();
+
+    if (!profil?.user_type) {
+      router.push('/profil-tamamla');
+    } else {
+      await yonlendir();
+    }
     setYukleniyor(false);
+  }
+
+  async function mergeOnayla() {
+    if (!mergeHedef) return;
+    setMergeYukleniyor(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { setMergeYukleniyor(false); return; }
+
+    const res = await fetch('/api/auth/merge', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ keepUserId: user.id, mergeUserId: mergeHedef.id }),
+    });
+
+    if (!res.ok) {
+      setHata('Hesap birleştirme başarısız oldu. Lütfen tekrar deneyin.');
+      setMod('giris'); setMergeHedef(null);
+    } else {
+      await yonlendir();
+    }
+    setMergeYukleniyor(false);
   }
 
   // ── E-posta giriş ───────────────────────────────────────────────
@@ -131,6 +227,31 @@ function GirisIci() {
         <span style={{ color: '#22c55e' }}>YÜKE</span><span style={{ color: '#e2e8f0' }}>GEL</span>
       </div>
     </div>
+  );
+
+  // Merge onay ekranı
+  if (mod === 'merge_onay' && mergeHedef) return (
+    <Wrap><Logo />
+      <div style={{ background: '#161b22', border: '1px solid #f59e0b', borderRadius: 12, padding: 24 }}>
+        <div style={{ fontSize: '2rem', textAlign: 'center', marginBottom: 12 }}>🔗</div>
+        <div style={{ color: '#e2e8f0', fontWeight: 700, fontSize: '1rem', marginBottom: 8, textAlign: 'center' }}>Bu telefon başka bir hesapla bağlantılı</div>
+        <div style={{ color: '#8b949e', fontSize: '0.85rem', marginBottom: 20, textAlign: 'center' }}>
+          <strong style={{ color: '#e2e8f0' }}>{mergeHedef.display_name || mergeHedef.email || 'Mevcut hesap'}</strong> adlı hesabın geçmişi (ilanlar, işler, puanlar) bu hesaba taşınacak.
+        </div>
+        <div style={{ background: '#0d1117', border: '1px solid #30363d', borderRadius: 8, padding: 12, marginBottom: 20, fontSize: '0.78rem', color: '#6b7280' }}>
+          ⚠️ Bu işlem geri alınamaz. Eski hesap pasife alınır.
+        </div>
+        {hata && <div style={{ color: '#ef4444', fontSize: '0.82rem', marginBottom: 12 }}>⚠️ {hata}</div>}
+        <button onClick={mergeOnayla} disabled={mergeYukleniyor}
+          style={{ width: '100%', padding: '12px', borderRadius: 8, border: 'none', background: '#f59e0b', color: '#000', fontWeight: 800, fontSize: '1rem', cursor: 'pointer', marginBottom: 10 }}>
+          {mergeYukleniyor ? 'Birleştiriliyor...' : 'Evet, hesapları birleştir'}
+        </button>
+        <button onClick={() => { setMod('giris'); setMergeHedef(null); temizle(); }}
+          style={{ width: '100%', padding: '10px', borderRadius: 8, border: '1px solid #30363d', background: 'none', color: '#8b949e', fontSize: '0.85rem', cursor: 'pointer' }}>
+          Hayır, ayrı tut
+        </button>
+      </div>
+    </Wrap>
   );
 
   // Doğrulama bekleniyor
@@ -219,6 +340,7 @@ function GirisIci() {
                   <input type="tel" value={telefon} onChange={e => setTelefon(e.target.value)} placeholder="05xx xxx xx xx" required style={inp} autoFocus />
                   <div style={{ color: '#4b5563', fontSize: '0.75rem', marginTop: 6 }}>SMS ile doğrulama kodu gönderilecek.</div>
                 </div>
+                {bilgi && <div style={{ color: '#22c55e', fontSize: '0.82rem', marginBottom: 12, background: '#0d2b1a', border: '1px solid #166534', borderRadius: 6, padding: '10px 12px' }}>✓ {bilgi}</div>}
                 {hata && <div style={{ color: '#ef4444', fontSize: '0.82rem', marginBottom: 12 }}>⚠️ {hata}</div>}
                 <button type="submit" disabled={yukleniyor}
                   style={{ width: '100%', padding: '12px', borderRadius: 8, border: 'none', background: yukleniyor ? '#166534' : '#22c55e', color: '#000', fontWeight: 800, fontSize: '1rem', cursor: 'pointer' }}>

@@ -28,19 +28,41 @@ export async function GET(request: Request) {
     if (user) {
       const { data: profil } = await supabase
         .from('users')
-        .select('user_type, role')
+        .select('user_type, role, email')
         .eq('id', user.id)
         .single()
 
-      // user_type yoksa profil tamamlanmamış (sadece normal kullanıcılar için)
       const role = (profil as any)?.role || 'user'
-      if (role === 'user' && !profil?.user_type) {
+
+      // Admin / moderator → direkt yönlendir
+      if (role === 'admin') return NextResponse.redirect(`${origin}/admin`)
+      if (role === 'moderator') return NextResponse.redirect(`${origin}/moderator`)
+
+      // Normal kullanıcı: profil tamamlanmamışsa tamamla sayfasına
+      if (!profil?.user_type) {
         return NextResponse.redirect(`${origin}/profil-tamamla`)
       }
 
-      // Role'e göre yönlendir
-      if (role === 'admin') return NextResponse.redirect(`${origin}/admin`)
-      if (role === 'moderator') return NextResponse.redirect(`${origin}/moderator`)
+      // Gmail ile giriş — bu email başka bir users kaydında telefon ile kayıtlı mı?
+      // (merge senaryosu: önce telefonla kayıt, sonra gmail ile giriş)
+      if (user.email) {
+        const { data: eskiProfil } = await supabase
+          .from('users')
+          .select('id, display_name, phone')
+          .eq('email', user.email)
+          .eq('is_active', true)
+          .neq('id', user.id)
+          .maybeSingle()
+
+        if (eskiProfil) {
+          // Merge gerekiyor — query param ile giris sayfasına yönlendir
+          const params = new URLSearchParams({
+            merge_user_id: eskiProfil.id,
+            merge_name: eskiProfil.display_name || '',
+          })
+          return NextResponse.redirect(`${origin}/giris/merge?${params}`)
+        }
+      }
     }
   }
 
