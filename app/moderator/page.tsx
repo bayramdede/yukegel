@@ -167,6 +167,14 @@ export default function Moderator() {
     setTimeout(() => { getIlanlar(); getIstatistik(); }, 300);
   }
 
+  async function topluReddet(badge: '🟡' | '🔴') {
+    const hedefler = filtrelenmis.filter(i => skorRenk(i).badge === badge);
+    for (const ilan of hedefler) {
+      await supabase.from('listings').update({ moderation_status: 'rejected', status: 'passive', reviewed_at: new Date().toISOString() }).eq('id', ilan.id);
+    }
+    getIlanlar(); getIstatistik();
+  }
+
   async function topluOnaylaYesil() {
     const yesiller = filtrelenmis.filter(i => skorRenk(i).badge === '🟢');
     for (const ilan of yesiller) {
@@ -284,6 +292,18 @@ export default function Moderator() {
                 {filtreSkor === 'yesil' && yesil > 0 && (
                   <button onClick={topluOnaylaYesil} style={{ background: '#14532d', border: '1px solid #166534', borderRadius: 6, padding: '4px 14px', cursor: 'pointer', color: '#22c55e', fontSize: '0.8rem', fontWeight: 700 }}>
                     ⚡ Tümünü Onayla ({yesil})
+                  </button>
+                )}
+                {filtreSkor === 'sari' && sari > 0 && (
+                  <button onClick={() => { if (confirm(`${sari} adet "Kontrol Et" ilanı toplu reddedilecek. Emin misin?`)) topluReddet('🟡'); }}
+                    style={{ background: '#2a0a0a', border: '1px solid #7f1d1d', borderRadius: 6, padding: '4px 14px', cursor: 'pointer', color: '#f87171', fontSize: '0.8rem', fontWeight: 700 }}>
+                    ❌ Tümünü Reddet ({sari})
+                  </button>
+                )}
+                {filtreSkor === 'kirmizi' && kirmizi > 0 && (
+                  <button onClick={() => { if (confirm(`${kirmizi} adet "Düzenleme Gerek" ilanı toplu reddedilecek. Emin misin?`)) topluReddet('🔴'); }}
+                    style={{ background: '#2a0a0a', border: '1px solid #7f1d1d', borderRadius: 6, padding: '4px 14px', cursor: 'pointer', color: '#f87171', fontSize: '0.8rem', fontWeight: 700 }}>
+                    ❌ Tümünü Reddet ({kirmizi})
                   </button>
                 )}
               </div>

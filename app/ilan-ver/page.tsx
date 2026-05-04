@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import { ilanKaydet, kullanicitelefon } from './actions';
 import { createClient } from '../../lib/supabase';
+import TopluYukle from './TopluYukle';
 const supabase = createClient();
 
 const ILLER = [
@@ -36,7 +37,7 @@ function SecimEkrani({ onSecim }: { onSecim: (y: Yontem) => void }) {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         {[
           { key: 'tekil', ikon: '📦', baslik: 'Tekil İlan', aciklama: 'Adım adım yeni bir ilan oluşturun.', yakin: false },
-          { key: 'toplu', ikon: '📄', baslik: 'Toplu Yükleme', aciklama: 'Excel şablonu ile birden fazla ilan yükleyin.', yakin: true },
+          { key: 'toplu', ikon: '📄', baslik: 'Toplu Yükleme', aciklama: 'Excel şablonu ile birden fazla ilan yükleyin.', yakin: false },
           { key: 'metin', ikon: '✍️', baslik: 'Metinden İlan', aciklama: 'WhatsApp mesajından yapay zeka ile ilan oluşturun.', yakin: true },
         ].map(item => (
           <button key={item.key} type="button" onClick={() => onSecim(item.key as Yontem)}
@@ -219,7 +220,7 @@ export default function IlanVer() {
   if (yontem === 'toplu') return (
     <div style={{ background: '#0d1117', minHeight: '100vh' }}>
       <Navbar geri={() => setYontem(null)} />
-      <YakindaEkrani baslik="Toplu İlan Yükleme" aciklama="Excel şablonu ile toplu ilan yükleme çok yakında geliyor." onGeri={() => setYontem(null)} />
+      <TopluYukle onGeri={() => setYontem(null)} />
     </div>
   );
 

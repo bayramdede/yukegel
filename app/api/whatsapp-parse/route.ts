@@ -169,87 +169,76 @@ export async function POST(request: NextRequest) {
     let totalMessages = 0;
     for (const fc of fileContents) totalMessages += parseChatTxt(fc.content).length;
 
-    const responsePromise = NextResponse.json({ success: true, total_messages: totalMessages, passed_gate: null, saved_to_db: null, info: 'Mesajlar arka planda işleniyor. Bekleyenler sekmesini yenileyin.' });
+    // ── Tüm işlemi response’dan ÖNCE yap (Vercel serverless’ta fire-and-forget çalışmıyor) ──
+    const { data: aliases } = await supabase.from('aliases').select('*').eq('is_active', true);
+    const { data: configRow } = await supabase.from('system_config').select('value').eq('key', 'spam_threshold').single();
+    const spamEsik: number = configRow?.value?.max_listings_per_hour ?? 3;
 
-    ;(async () => {
-      const { data: aliases } = await supabase.from('aliases').select('*').eq('is_active', true);
+    let savedToDb = 0, skipped = 0, reposted = 0, spamEngel = 0;
 
-      // system_config'den spam eşiğini al
-      const { data: configRow } = await supabase.from('system_config').select('value').eq('key', 'spam_threshold').single();
-      const spamEsik: number = configRow?.value?.max_listings_per_hour ?? 3;
+    for (const fc of fileContents) {
+      const messages = parseChatTxt(fc.content);
+      for (const msg of messages) {
+        let msgDate: string = new Date().toISOString().split('T')[0];
+        try {
+          const [date, time] = msg.timestamp.split(' ');
+          const [day, month, year] = date.split('.');
+          const d = new Date(`${year}-${month}-${day}T${time}`);
+          if (d < cutoff) continue;
+          msgDate = `${year}-${month}-${day}`;
+        } catch { /* devam */ }
 
-      let savedToDb = 0, skipped = 0, reposted = 0, spamEngel = 0;
+        const gate = await gatekeeper(msg.message, aliases || []);
+        if (!gate.isAd || gate.score < 30) continue;
 
-      for (const fc of fileContents) {
-        const messages = parseChatTxt(fc.content);
-        for (const msg of messages) {
-          let msgDate: string = new Date().toISOString().split('T')[0];
-          try {
-            const [date, time] = msg.timestamp.split(' ');
-            const [day, month, year] = date.split('.');
-            const d = new Date(`${year}-${month}-${day}T${time}`);
-            if (d < cutoff) continue;
-            msgDate = `${year}-${month}-${day}`;
-          } catch { /* devam */ }
+        const hash = await cleanHash(msg.message);
+        const phone = gate.phones[0] || null;
 
-          const gate = await gatekeeper(msg.message, aliases || []);
-          if (!gate.isAd || gate.score < 30) continue;
-
-          const hash = await cleanHash(msg.message);
-          const phone = gate.phones[0] || null;
-
-          // ── Spam kontrolü ──
-          if (phone) {
-            const isSpam = await spamKontrol(phone, spamEsik);
-            if (isSpam) {
-              console.log(`Spam engellendi: ${phone} (son 1 saatte ${spamEsik}+ mesaj)`);
-              spamEngel++;
-              continue;
-            }
-          }
-
-          // Duplicate kontrolü
-          if (phone) {
-            const { data: exactMatch } = await supabase.from('raw_posts').select('id').eq('clean_hash', hash).eq('contact_phone', phone).eq('message_date', msgDate).maybeSingle();
-            if (exactMatch) { skipped++; continue; }
-          }
-
-          // Repost kontrolü
-          let isRepost = false, sourceRawPostId: string | null = null;
-          if (phone) {
-            const { data: prevMatch } = await supabase.from('raw_posts').select('id, message_date').eq('clean_hash', hash).eq('contact_phone', phone).neq('message_date', msgDate).order('message_date', { ascending: false }).limit(1).maybeSingle();
-            if (prevMatch) { isRepost = true; sourceRawPostId = prevMatch.id; }
-          }
-
-          const firstLine = msg.message.split('\n').find(l => l.trim().length > 5) || '';
-
-          const { data: newPost, error } = await supabase.from('raw_posts').insert({
-            source: 'whatsapp',
-            source_group: groupName,
-            sender_name: msg.sender,
-            raw_text: msg.message,
-            clean_hash: hash,
-            contact_phone: phone,
-            is_repost: isRepost,
-            source_raw_post_id: sourceRawPostId,
-            message_timestamp: (() => { try { const [date, time] = msg.timestamp.split(' '); const [day, month, year] = date.split('.'); return new Date(`${year}-${month}-${day}T${time}`).toISOString(); } catch { return new Date().toISOString(); } })(),
-            quality_score: gate.score,
-            processing_status: isRepost ? 'repost' : 'pending',
-            detected_ad_count: 1,
-            message_date: msgDate,
-          }).select().single();
-
-          if (error) { if (error.code !== '23505') console.error('raw_posts insert hatası:', error.message); continue; }
-
-          savedToDb++;
-          if (isRepost && sourceRawPostId && newPost) { await repostListings(sourceRawPostId, newPost.id); reposted++; }
+        if (phone) {
+          const isSpam = await spamKontrol(phone, spamEsik);
+          if (isSpam) { spamEngel++; continue; }
         }
+
+        if (phone) {
+          const { data: exactMatch } = await supabase.from('raw_posts').select('id').eq('clean_hash', hash).eq('contact_phone', phone).eq('message_date', msgDate).maybeSingle();
+          if (exactMatch) { skipped++; continue; }
+        }
+
+        let isRepost = false, sourceRawPostId: string | null = null;
+        if (phone) {
+          const { data: prevMatch } = await supabase.from('raw_posts').select('id, message_date').eq('clean_hash', hash).eq('contact_phone', phone).neq('message_date', msgDate).order('message_date', { ascending: false }).limit(1).maybeSingle();
+          if (prevMatch) { isRepost = true; sourceRawPostId = prevMatch.id; }
+        }
+
+        const { data: newPost, error } = await supabase.from('raw_posts').insert({
+          source: 'whatsapp',
+          source_group: groupName,
+          sender_name: msg.sender,
+          raw_text: msg.message,
+          clean_hash: hash,
+          contact_phone: phone,
+          is_repost: isRepost,
+          source_raw_post_id: sourceRawPostId,
+          message_timestamp: (() => { try { const [date, time] = msg.timestamp.split(' '); const [day, month, year] = date.split('.'); return new Date(`${year}-${month}-${day}T${time}`).toISOString(); } catch { return new Date().toISOString(); } })(),
+          quality_score: gate.score,
+          processing_status: isRepost ? 'repost' : 'pending',
+          detected_ad_count: 1,
+          message_date: msgDate,
+        }).select().single();
+
+        if (error) { if (error.code !== '23505') console.error('raw_posts insert hatası:', error.message); continue; }
+
+        savedToDb++;
+        if (isRepost && sourceRawPostId && newPost) { await repostListings(sourceRawPostId, newPost.id); reposted++; }
       }
+    }
 
-      console.log(`Parse tamamlandı. Kaydedilen: ${savedToDb}, Atlanan: ${skipped}, Repost: ${reposted}, Spam: ${spamEngel}`);
-    })();
-
-    return responsePromise;
+    return NextResponse.json({
+      success: true,
+      total_messages: totalMessages,
+      passed_gate: savedToDb + skipped,
+      saved_to_db: savedToDb,
+    });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

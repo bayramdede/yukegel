@@ -46,3 +46,74 @@ Operatör Excel'i yüklediğinde, veriler doğrudan DB'ye gitmez; önce **"Previ
 ---
 
 **Sonuç:** Bu mimari, kullanıcıya "sınırsız durak" özgürlüğü verirken, yöneticiye tam denetim ve temiz veri sağlar[cite: 2, 10].
+
+
+Eyvallah! **Super Developer**, **UI/UX Uzmanı** ve **AI Gurusu** kimliğimle, **Paletli.com**'un geleceğini inşa edecek bu teknik dokümanı, yazılımcının doğrudan rehber alabileceği profesyonel bir formatta derledim[cite: 10]. Bu sistem, operasyonel hızı artırırken platformun ciddiyetini ve güvenliğini "Görünmez Denetçi" ile koruma altına alır[cite: 2, 4, 10].
+
+Aşağıdaki metni kopyalayıp bir `.md` veya `.doc` dosyası olarak kaydedebilirsin.
+
+---
+
+# 📑 TEKNİK TASARIM DOKÜMANI: "THE VOYAGE" (SEFER BAZLI SMART IMPORT)
+
+**Proje:** Paletli.com İlan ve Güvenlik Altyapısı[cite: 10]
+**Versiyon:** 1.0 (Nisan 2026)[cite: 10]
+**Kapsam:** Excel ile Çoklu Duraklı İlan Yükleme, Görünmez Denetim (Audit) ve Blokaj Mimarisi[cite: 10]
+
+---
+
+## 1. VERİ MODELİ VE EXCEL ŞABLONU (THE STRUCTURE)
+
+Sistem, "Sefer No" (Grup ID) üzerinden bir ilanın sınırsız sayıda durağa sahip olabileceği bir **Header-Detail** ilişkisi üzerine kuruludur[cite: 10].
+
+### A. Beklenen Excel Şablonu
+| Sefer No | Kalkış Şehri | Kalkış İlçe | Varış Şehri (Durak) | Varış İlçe | Telefon (Zorunlu) | Araç Tipi | Genel Notlar |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **SN-001** | Diyarbakır | Bağlar | **Şanlıurfa** | Merkez | 05323009470 | 10 Teker | Süt toplama seferi.[cite: 10] |
+| **SN-001** | | | **Afyon** | Dinar | 05323009470 | | (Aynı Sefer No: 2. Durak)[cite: 10] |
+| **SN-001** | | | **İzmir** | Bornova | 05323009470 | | (Aynı Sefer No: 3. Durak)[cite: 10] |
+
+### B. Veritabanı Eşleşmesi
+*   **Listings Tablosu**: Sefer No'su aynı olan grubun ilk satırı "Header" olarak kaydedilir[cite: 10].
+*   **Listing_Stops Tablosu**: Gruptaki her varış satırı, `stop_order` (1, 2, 3...) verilerek bu ilana bağlanır[cite: 10].
+
+---
+
+## 2. GÖRÜNMEZ MUHAFIZ (BACKEND LOGIC)
+
+İlanlar sisteme girerken kullanıcıyı yormayan, arka planda çalışan "Sentinel" mekanizması devreye girer[cite: 4, 10].
+
+### A. Visual Normalizer (De-obfuscation)
+Kullanıcının karakter hilelerini (Örn: `nyn$turucn`) bozmak için metin şu fonksiyonla temizlenir[cite: 5, 10]:
+*   **Karakter Eşleme**: `$ ➔ s`, `0 ➔ o`, `n ➔ u`, `3 ➔ e`[cite: 5, 10].
+*   **Sıfırlama**: Özel karakterler ve rakamlar atılarak "saf" kök kelime (`uyusturucu`) elde edilir[cite: 5, 6].
+
+### B. Audit & Strike Sistemi
+*   **Periyodik Denetim**: Her saat başı (`Cron Job`), yayındaki ilanlar tekrar taranır[cite: 4, 10].
+*   **Audit Log**: Yakalanan her ihlal (Telefon bypass, link, yasaklı kelime) `audit_logs` tablosuna `user_id` ve ihlal detayı ile kaydedilir[cite: 3, 6].
+*   **Automatic Block**: Kullanıcının `strike_count` değeri 3'e ulaştığında hesap otomatikman `is_blocked = true` yapılır[cite: 4, 10].
+
+---
+
+## 3. UI/UX TASARIMI (THE FRONTEND)
+
+### A. Excel Preview & Fix Screen
+*   **Grouping**: Excel yüklendiğinde ilanlar "Sefer No" bazlı **Accordion Kartlar** olarak gruplanır[cite: 10].
+*   **Inline Edit**: Hatalı şehirler veya telefonlar tablo üzerinde anında düzeltilebilir[cite: 10].
+*   **Visual Cues**: Denetçinin (Sentinel) yakaladığı şüpheli satırlar kırmızı bayrakla (🚩) vurgulanır[cite: 3, 10].
+
+### B. Shadow Ban Deneyimi
+*   **Optimistic UI**: Bloklanan veya şüpheli ilanlar kullanıcıya "Yayında" gibi görünür ancak ana sayfa ve arama sonuçlarından `is_visible: false` filtresiyle sessizce düşürülür[cite: 2, 4, 10].
+
+---
+
+## 4. YAZILIMCI İÇİN IMPLEMENTASYON REHBERİ (SRS)
+
+1.  **Frontend**: `xlsx` kütüphanesi ile Excel'i JSON'a çevir, `PreviewComponent` içinde Sefer No bazlı `Array.reduce` ile grupla[cite: 10].
+2.  **Normalization**: `app/ilan-ver/actions.ts` içerisinde metni temizlemeden veritabanına sorgu atma[cite: 10].
+3.  **Atomic Transaction**: `listings` ve `listing_stops` tablolarına kayıt atarken `db.transaction` kullan; veri tutarsızlığını engelle[cite: 10].
+4.  **Audit API**: `/api/cron/audit` endpoint'ini kur ve `CRON_SECRET` ile güvenliğe al[cite: 10].
+
+---
+
+**Sonuç**: Bu doküman, **Paletli.com**'un her saat başı kendini temizleyen, kullanıcıyı darlamayan ama platform dışı kaçışlara (bypass) ve illegaliteye izin vermeyen zeki ekosisteminin anayasasıdır[cite: 2, 10].
