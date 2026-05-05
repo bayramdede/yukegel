@@ -56,6 +56,7 @@ export default function PublicIlanListesi() {
         .eq('user_id', userId)
         .in('moderation_status', ['approved', 'auto_published'])
         .eq('status', 'active')
+        .eq('is_shadow_banned', false)   // ← Sprint 1: shadow ban filtresi
         .is('completed_at', null)
         .gte('created_at', yirmidortSaatOnce)
         .order('created_at', { ascending: false });
@@ -208,7 +209,7 @@ export default function PublicIlanListesi() {
                       <div style={{ color: '#4b5563', fontSize: '0.7rem', marginTop: 8 }}>{ilan.sure}</div>
                     </div>
                     <a href={`tel:${ilan.tel}`}
-                      style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#14532d', color: '#22c55e', border: '1px solid #166534', borderRadius: 7, padding: '8px 16px', fontSize: '0.85rem', fontWeight: 700, textDecoration: 'none', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                      style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#14532d', color: '#22c55e', border: '1px solid #166634', borderRadius: 7, padding: '8px 16px', fontSize: '0.85rem', fontWeight: 700, textDecoration: 'none', whiteSpace: 'nowrap', flexShrink: 0 }}>
                       📞 Ara
                     </a>
                   </div>

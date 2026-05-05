@@ -62,17 +62,18 @@ export default function Home() {
         const { data } = await supabase
           .from('listings')
           .select(`
-          id, listing_type, origin_city, origin_district,
-          contact_phone, price_offer, source, created_at,
-          trust_level, user_id,
-          vehicle_type, body_type,
-          available_date, date_flexible,
-          listing_stops (
-            stop_order, city, district,
-            vehicle_count, cargo_type, weight_ton, pallet_count
-          )
-        `)
+            id, listing_type, origin_city, origin_district,
+            contact_phone, price_offer, source, created_at,
+            trust_level, user_id,
+            vehicle_type, body_type,
+            available_date, date_flexible,
+            listing_stops (
+              stop_order, city, district,
+              vehicle_count, cargo_type, weight_ton, pallet_count
+            )
+          `)
           .in('moderation_status', ['approved', 'auto_published'])
+          .eq('is_shadow_banned', false)   // ← Sprint 1: shadow ban filtresi
           .order('created_at', { ascending: false })
           .limit(50);
 

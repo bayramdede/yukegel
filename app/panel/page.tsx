@@ -29,6 +29,7 @@ export default async function Panel() {
     svc.from('listings')
       .select(`id, listing_type, origin_city, origin_district, status, moderation_status, created_at,
         expires_at, price_offer, completed_at, vehicle_type, body_type, available_date, notes, contact_phone,
+        internal_audit_logs,
         listing_stops ( id, stop_order, city, district, cargo_type, weight_ton, pallet_count, vehicle_count )`)
       .eq('user_id', user.id)
       .order('created_at', { ascending: false }),

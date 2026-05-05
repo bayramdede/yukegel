@@ -11,11 +11,11 @@ const KARTLAR = [
     aktif: true,
   },
   {
-    yol: '/admin/blacklist',
-    ikon: '🚫',
-    baslik: 'Blacklist',
-    aciklama: 'Spam ve istenmeyen kelime listesi yönetimi.',
-    aktif: false,
+    yol: '/admin/guvenlik',
+    ikon: '🔒',
+    baslik: 'Güvenlik & Denetim',
+    aciklama: 'Audit Engine kuralları, kara liste ve sistem sağlığı.',
+    aktif: true,
   },
   {
     yol: '/admin/kullanicilar',

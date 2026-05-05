@@ -42,7 +42,7 @@ export default async function IlanDetay({ params }: { params: Promise<{ id: stri
       id, listing_type, origin_city, origin_district,
       contact_phone, price_offer, price_negotiable,
       available_date, date_flexible, notes, source,
-      created_at, moderation_status,
+      created_at, moderation_status, is_shadow_banned,
       trust_level, user_id,
       vehicle_type, body_type,
       listing_stops (
@@ -55,13 +55,7 @@ export default async function IlanDetay({ params }: { params: Promise<{ id: stri
 
   if (!ilan || ilan.moderation_status === 'rejected') return notFound();
 
-  let kullaniciBilgi: { phone_verified: boolean; created_at: string } | null = null;
-  if (ilan.user_id) {
-    const { data: kb } = await supabase
-      .from('users').select('phone_verified, created_at').eq('id', ilan.user_id).single();
-    kullaniciBilgi = kb;
-  }
-
+  // ── Auth: kullanıcıyı erken çek (shadow ban kontrolü için gerekli)
   const cookieStore = await cookies();
   const supabaseAuth = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -69,6 +63,28 @@ export default async function IlanDetay({ params }: { params: Promise<{ id: stri
     { cookies: { getAll() { return cookieStore.getAll(); }, setAll() {} } }
   );
   const { data: { user } } = await supabaseAuth.auth.getUser();
+
+  // ── Sprint 1: Shadow ban kontrolü
+  // Shadow banned ilan sadece ilan sahibi, moderatör ve admin tarafından görülebilir.
+  if (ilan.is_shadow_banned) {
+    if (!user) return notFound();
+    const { data: profil } = await supabase
+      .from('users')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+    const role = (profil as any)?.role;
+    const isOwner = ilan.user_id === user.id;
+    const isMod   = role === 'moderator' || role === 'admin';
+    if (!isOwner && !isMod) return notFound();
+  }
+
+  let kullaniciBilgi: { phone_verified: boolean; created_at: string } | null = null;
+  if (ilan.user_id) {
+    const { data: kb } = await supabase
+      .from('users').select('phone_verified, created_at').eq('id', ilan.user_id).single();
+    kullaniciBilgi = kb;
+  }
 
   const stops = (ilan.listing_stops || []).sort((a: any, b: any) => a.stop_order - b.stop_order);
   const isYuk = ilan.listing_type === 'yuk';
@@ -159,6 +175,12 @@ export default async function IlanDetay({ params }: { params: Promise<{ id: stri
             <span title="Fiyat bilgisi girilmiş."
               style={{ background: '#0d2b1a', color: '#22c55e', fontSize: '0.78rem', fontWeight: 700, padding: '4px 12px', borderRadius: 6, cursor: 'help' }}>
               ✓ Fiyat Belli
+            </span>
+          )}
+          {/* Sprint 1: Moderatör/admin için shadow ban uyarısı */}
+          {ilan.is_shadow_banned && (
+            <span style={{ background: '#450a0a', color: '#f87171', fontSize: '0.78rem', fontWeight: 700, padding: '4px 12px', borderRadius: 6 }}>
+              👁 Shadow Ban (Sadece Sen Görüyorsun)
             </span>
           )}
           <span style={{ color: '#4b5563', fontSize: '0.78rem', marginLeft: 'auto' }}>

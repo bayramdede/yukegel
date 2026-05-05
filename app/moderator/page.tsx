@@ -54,6 +54,13 @@ function skorRenk(ilan: any): { border: string; badge: string; label: string; pu
   return { border: '#7f1d1d', badge: '🔴', label: 'Düzenleme Gerek', puan: skor };
 }
 
+// Audit score badge rengi
+function auditRenk(score: number): { bg: string; color: string; label: string } {
+  if (score >= 71) return { bg: '#450a0a', color: '#f87171', label: `🔴 ${score} puan` };
+  if (score >= 31) return { bg: '#451a03', color: '#fbbf24', label: `🟡 ${score} puan` };
+  return { bg: '#0d2b1a', color: '#22c55e', label: `🟢 ${score} puan` };
+}
+
 function omnisearchTip(metin: string): 'phone' | 'email' | null {
   const t = metin.trim();
   if (!t || t.length < 6) return null;
@@ -67,8 +74,11 @@ const inp = {
   borderRadius: 4, padding: '4px 8px', fontSize: '0.85rem', width: '100%', outline: 'none',
 } as React.CSSProperties;
 
-// ── Kullanıcı Kart (Omnisearch sonucu)
-function KullaniciKart({ kullanici, onAskiya }: { kullanici: any; onAskiya: (id: string, ad: string) => void }) {
+function KullaniciKart({ kullanici, onAskiya, onFiltrele }: {
+  kullanici: any;
+  onAskiya: (id: string, ad: string) => void;
+  onFiltrele?: (id: string, ad: string) => void;
+}) {
   const ad = kullanici.display_name || kullanici.email || kullanici.phone || 'Adsız';
   return (
     <div style={{
@@ -94,6 +104,14 @@ function KullaniciKart({ kullanici, onAskiya }: { kullanici: any; onAskiya: (id:
           <span style={{ color: '#4b5563', fontSize: '0.72rem', fontFamily: 'monospace' }}>#{kullanici.id.substring(0, 8)}</span>
         </div>
       </div>
+      {onFiltrele && (
+        <button
+          onClick={() => onFiltrele(kullanici.id, ad)}
+          style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid #1e3a5f', background: '#1a2535', color: '#60a5fa', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}
+        >
+          🔍 İlanlarını Filtrele
+        </button>
+      )}
       {kullanici.is_active !== false && (
         <button
           onClick={() => onAskiya(kullanici.id, ad)}
@@ -106,11 +124,13 @@ function KullaniciKart({ kullanici, onAskiya }: { kullanici: any; onAskiya: (id:
   );
 }
 
+// Filtre tipi — 'riskli' Sprint 3 ile eklendi
+type FiltreTip = 'pending' | 'approved' | 'rejected' | 'passive' | 'hepsi' | 'no_lane' | 'arsiv' | 'riskli';
+
 export default function Moderator() {
-  // ── Mevcut state
   const [ilanlar, setIlanlar] = useState<any[]>([]);
   const [yukleniyor, setYukleniyor] = useState(true);
-  const [filtre, setFiltre] = useState<'pending' | 'approved' | 'rejected' | 'passive' | 'hepsi' | 'no_lane' | 'arsiv'>('pending');
+  const [filtre, setFiltre] = useState<FiltreTip>('pending');
   const [noLaneListesi, setNoLaneListesi] = useState<any[]>([]);
   const [islem, setIslem] = useState<string>('');
   const [duzenleId, setDuzenleId] = useState<string>('');
@@ -125,19 +145,24 @@ export default function Moderator() {
   const [filtreVaris, setFiltreVaris] = useState('');
   const [filtreAracTipi, setFiltreAracTipi] = useState('');
   const [filtreSkor, setFiltreSkor] = useState<'hepsi' | 'yesil' | 'sari' | 'kirmizi'>('hepsi');
-  const [filtreTonajMin, setFiltreTonajMin] = useState('');
-  const [filtreTonajMax, setFiltreTonajMax] = useState('');
+
   const [filtreTarihBaslangic, setFiltreTarihBaslangic] = useState('');
   const [filtreTarihBitis, setFiltreTarihBitis] = useState('');
 
-  // ── YENİ: Toplu seçim
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [lastClickedIdx, setLastClickedIdx] = useState<number | null>(null);
   const [bulkYukleniyor, setBulkYukleniyor] = useState(false);
 
-  // ── YENİ: Omnisearch kullanıcı
   const [kullaniciBulguList, setKullaniciBulguList] = useState<any[]>([]);
   const [kullaniciAramaYukleniyor, setKullaniciAramaYukleniyor] = useState(false);
+
+  // Kaynak ve kullanıcı filtreleri
+  const [filtreKaynak, setFiltreKaynak] = useState('');
+  const [filtreKullaniciId, setFiltreKullaniciId] = useState('');
+  const [filtreKullaniciAd, setFiltreKullaniciAd] = useState('');
+
+  // Düzenleme formundaki ilanın kullanıcı bilgisi
+  const [duzenleKullanici, setDuzenleKullanici] = useState<any>(null);
 
   const ilanRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const router = useRouter();
@@ -156,9 +181,9 @@ export default function Moderator() {
     kontrol();
   }, [router]);
 
-  useEffect(() => { if (!yetkiKontrol) { getIlanlar(); getIstatistik(); } }, [filtre, yetkiKontrol, filtreTarihBaslangic, filtreTarihBitis]);
+  useEffect(() => { if (!yetkiKontrol) { getIlanlar(); getIstatistik(); } }, [filtre, yetkiKontrol, filtreTarihBaslangic, filtreTarihBitis, filtreKaynak, filtreKullaniciId]);
 
-  // ── YENİ: Omnisearch — telefon veya email girilince kullanıcı ara
+  // ── Omnisearch
   useEffect(() => {
     const tip = omnisearchTip(aramaMetni);
     if (!tip) { setKullaniciBulguList([]); return; }
@@ -178,18 +203,19 @@ export default function Moderator() {
     return () => clearTimeout(timer);
   }, [aramaMetni]);
 
-  // ── Filtre/tab değişince seçimi temizle
   useEffect(() => { setSelectedIds(new Set()); setLastClickedIdx(null); }, [filtre]);
 
   async function getIstatistik() {
     const bugun = new Date(); bugun.setHours(0, 0, 0, 0);
-    const [{ count: pending }, { count: bugunGelen }, { count: bugunOnaylanan }, { count: cozumsuz }] = await Promise.all([
+    const [{ count: pending }, { count: bugunGelen }, { count: bugunOnaylanan }, { count: cozumsuz }, { count: riskli }] = await Promise.all([
       supabase.from('listings').select('*', { count: 'exact', head: true }).eq('moderation_status', 'pending'),
       supabase.from('listings').select('*', { count: 'exact', head: true }).gte('created_at', bugun.toISOString()),
       supabase.from('listings').select('*', { count: 'exact', head: true }).eq('moderation_status', 'approved').gte('reviewed_at', bugun.toISOString()),
       supabase.from('raw_posts').select('*', { count: 'exact', head: true }).eq('processing_status', 'no_lane'),
+      // Sprint 3: riskli ilan sayısı (audit_score > 30, archived değil)
+      supabase.from('listings').select('*', { count: 'exact', head: true }).gt('audit_score', 30).neq('moderation_status', 'archived'),
     ]);
-    setIstatistik({ pending, bugunGelen, bugunOnaylanan, cozumsuz });
+    setIstatistik({ pending, bugunGelen, bugunOnaylanan, cozumsuz, riskli });
   }
 
   async function getIlanlar() {
@@ -200,10 +226,13 @@ export default function Moderator() {
         .eq('processing_status', 'no_lane').order('created_at', { ascending: false }).limit(100);
       setNoLaneListesi(data || []); setIlanlar([]); setYukleniyor(false); return;
     }
+
+    // Sprint 3: audit_score ve is_shadow_banned select'e eklendi
     let query = supabase.from('listings').select(`
       id, listing_type, origin_city, origin_district, contact_phone, price_offer,
       source, created_at, moderation_status, status, notes, trust_level,
       raw_text, raw_post_id, vehicle_type, body_type,
+      audit_score, is_shadow_banned, internal_audit_logs,
       listing_stops ( id, stop_order, city, district, vehicle_count, cargo_type, weight_ton, pallet_count, notes )
     `).order('created_at', { ascending: false }).limit(200);
 
@@ -212,16 +241,26 @@ export default function Moderator() {
       query = query.eq('moderation_status', 'archived');
     } else if (filtre === 'hepsi') {
       query = (query as any).neq('moderation_status', 'archived');
+    } else if (filtre === 'riskli') {
+      // Sprint 3: audit_score > 30, archived hariç — shadow banned dahil
+      query = (query as any).gt('audit_score', 30).neq('moderation_status', 'archived');
     } else {
       query = query.eq('moderation_status', filtre);
     }
 
-    // Server-side tarih filtresi
     if (filtreTarihBaslangic) query = query.gte('created_at', filtreTarihBaslangic);
     if (filtreTarihBitis)    query = (query as any).lte('created_at', filtreTarihBitis + 'T23:59:59');
+    if (filtreKaynak)        query = query.eq('source', filtreKaynak);
+    if (filtreKullaniciId)   query = query.eq('user_id', filtreKullaniciId);
 
     const { data } = await query;
-    setIlanlar(data || []); setYukleniyor(false);
+
+    // Riskli tab'da yüksek puanlular üste gelsin
+    const sorted = filtre === 'riskli'
+      ? (data || []).sort((a: any, b: any) => (b.audit_score ?? 0) - (a.audit_score ?? 0))
+      : (data || []);
+
+    setIlanlar(sorted); setYukleniyor(false);
   }
 
   // ── Client-side filtre
@@ -237,14 +276,6 @@ export default function Moderator() {
     if (filtreKalkis && ilan.origin_city !== filtreKalkis) return false;
     if (filtreVaris && !stops.some((s: any) => s.city === filtreVaris)) return false;
     if (filtreAracTipi && !(ilan.vehicle_type || []).includes(filtreAracTipi)) return false;
-    if (filtreTonajMin) {
-      const maks = Math.max(0, ...stops.map((s: any) => parseFloat(s.weight_ton) || 0));
-      if (maks < parseFloat(filtreTonajMin)) return false;
-    }
-    if (filtreTonajMax) {
-      const maks = Math.max(0, ...stops.map((s: any) => parseFloat(s.weight_ton) || 0));
-      if (maks > parseFloat(filtreTonajMax)) return false;
-    }
     if (filtreSkor !== 'hepsi') {
       const r = skorRenk(ilan);
       if (filtreSkor === 'yesil' && r.badge !== '🟢') return false;
@@ -255,11 +286,11 @@ export default function Moderator() {
   });
 
   const sonraBakSayisi = ilanlar.filter(i => sonraBak.has(i.id)).length;
-  const yesil  = filtrelenmis.filter(i => skorRenk(i).badge === '🟢').length;
-  const sari   = filtrelenmis.filter(i => skorRenk(i).badge === '🟡').length;
+  const yesil   = filtrelenmis.filter(i => skorRenk(i).badge === '🟢').length;
+  const sari    = filtrelenmis.filter(i => skorRenk(i).badge === '🟡').length;
   const kirmizi = filtrelenmis.filter(i => skorRenk(i).badge === '🔴').length;
 
-  // ── YENİ: Checkbox (Shift+Click desteği)
+  // ── Checkbox
   function handleCheckbox(id: string, idx: number, e: React.MouseEvent) {
     e.stopPropagation();
     const yeni = new Set(selectedIds);
@@ -270,8 +301,7 @@ export default function Moderator() {
         if (filtrelenmis[i]) yeni.add(filtrelenmis[i].id);
       }
     } else {
-      if (yeni.has(id)) yeni.delete(id);
-      else yeni.add(id);
+      if (yeni.has(id)) yeni.delete(id); else yeni.add(id);
     }
     setSelectedIds(yeni);
     setLastClickedIdx(idx);
@@ -282,8 +312,8 @@ export default function Moderator() {
     else setSelectedIds(new Set(filtrelenmis.map(i => i.id)));
   }
 
-  // ── Tüm toplu işlemler service role API üzerinden
-  async function topluApi(ids: string[], action: 'approve' | 'reject' | 'passive' | 'archive' | 'unarchive') {
+  // ── Toplu işlem helper (service role API)
+  async function topluApi(ids: string[], action: 'approve' | 'reject' | 'passive' | 'archive' | 'unarchive' | 'shadow_ban_kaldir') {
     const res = await fetch('/api/moderator/toplu-islem', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -294,7 +324,6 @@ export default function Moderator() {
     return json;
   }
 
-  // ── Toplu işlem (floating bar)
   async function topluIslem(action: 'approve' | 'archive' | 'delete') {
     if (selectedIds.size === 0) return;
     const ids = Array.from(selectedIds);
@@ -305,52 +334,101 @@ export default function Moderator() {
       const apiAction = action === 'delete' ? 'reject' : action;
       await topluApi(ids, apiAction);
       setSelectedIds(new Set());
-    } catch (e: any) {
-      alert('Hata: ' + e.message);
-    }
+    } catch (e: any) { alert('Hata: ' + e.message); }
     setBulkYukleniyor(false);
     getIlanlar(); getIstatistik();
   }
 
-  // ── ⚡ Skor bazlı toplu onay
-  async function topluOnaylaYesil() {
-    const ids = filtrelenmis.filter(i => skorRenk(i).badge === '🟢').map(i => i.id);
-    if (!ids.length) return;
+  // ── Sprint 3: Toplu shadow ban kaldır
+  // Sprint 5+: Düzeltme İste modal
+  const [duzeltmeModal, setDuzeltmeModal] = useState<{ id: string; bulk?: string[] } | null>(null);
+  const [duzeltmeSebep, setDuzeltmeSebep] = useState('');
+  const [duzeltmeMesaj, setDuzeltmeMesaj] = useState('');
+
+  const DUZELTME_SEBEPLER = [
+    'İletişim bilgisi paylaşılmış',
+    'Yasaklı ifade veya kelime',
+    'Yanıltıcı / hatalı bilgi',
+    'Yasadışı içerik şüphesi',
+    'Diğer (aşağıda açıklayın)',
+  ];
+
+  async function duzeltmeIsteOnayla() {
+    if (!duzeltmeModal) return;
+    const ids = duzeltmeModal.bulk ?? [duzeltmeModal.id];
+    setIslem(duzeltmeModal.id);
     try {
-      await topluApi(ids, 'approve');
-      getIlanlar(); getIstatistik();
-    } catch (e: any) {
-      alert('Toplu onay hatası: ' + e.message);
-    }
+      await fetch('/api/moderator/toplu-islem', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ids,
+          action: 'correction_needed',
+          correction_reason:  duzeltmeSebep || null,
+          correction_message: duzeltmeMesaj || null,
+        }),
+      });
+    } catch (e: any) { alert('Hata: ' + e.message); }
+    setDuzeltmeModal(null); setDuzeltmeSebep(''); setDuzeltmeMesaj('');
+    setIslem('');
+    getIlanlar(); getIstatistik();
   }
 
-  // ── Skor bazlı toplu red
-  async function topluReddet(badge: '🟡' | '🔴') {
-    const ids = filtrelenmis.filter(i => skorRenk(i).badge === badge).map(i => i.id);
-    if (!ids.length) return;
-    try {
-      await topluApi(ids, 'reject');
-      getIlanlar(); getIstatistik();
-    } catch (e: any) {
-      alert('Toplu red hatası: ' + e.message);
-    }
-  }
-
-  // ── Tekil arşivle / arşivden çıkar
-  async function arsivIslem(id: string, geriAl = false) {
+  // Sprint 3+: Tekil shadow ban uygula
+  async function shadowBanla(id: string) {
     setIslem(id);
-    try {
-      await topluApi([id], geriAl ? 'unarchive' : 'archive');
-    } catch (e: any) {
-      alert('Arşiv hatası: ' + e.message);
-    }
+    try { await topluApi([id], 'shadow_ban'); }
+    catch (e: any) { alert('Hata: ' + e.message); }
     setIslem('');
     setTimeout(() => { getIlanlar(); getIstatistik(); }, 200);
   }
 
-  // ── YENİ: Global askıya al
+  async function topluShadowBanKaldir() {
+    const ids = Array.from(selectedIds);
+    if (!ids.length) return;
+    if (!confirm(`${ids.length} ilandan shadow ban kaldırılacak ve onaylanacak. Devam et?`)) return;
+    setBulkYukleniyor(true);
+    try {
+      await topluApi(ids, 'shadow_ban_kaldir');
+      setSelectedIds(new Set());
+    } catch (e: any) { alert('Hata: ' + e.message); }
+    setBulkYukleniyor(false);
+    getIlanlar(); getIstatistik();
+  }
+
+  async function topluOnaylaYesil() {
+    const ids = filtrelenmis.filter(i => skorRenk(i).badge === '🟢').map(i => i.id);
+    if (!ids.length) return;
+    try { await topluApi(ids, 'approve'); getIlanlar(); getIstatistik(); }
+    catch (e: any) { alert('Toplu onay hatası: ' + e.message); }
+  }
+
+  async function topluReddet(badge: '🟡' | '🔴') {
+    const ids = filtrelenmis.filter(i => skorRenk(i).badge === badge).map(i => i.id);
+    if (!ids.length) return;
+    try { await topluApi(ids, 'reject'); getIlanlar(); getIstatistik(); }
+    catch (e: any) { alert('Toplu red hatası: ' + e.message); }
+  }
+
+  async function arsivIslem(id: string, geriAl = false) {
+    setIslem(id);
+    try { await topluApi([id], geriAl ? 'unarchive' : 'archive'); }
+    catch (e: any) { alert('Arşiv hatası: ' + e.message); }
+    setIslem('');
+    setTimeout(() => { getIlanlar(); getIstatistik(); }, 200);
+  }
+
+  // ── Sprint 3: Tekil shadow ban kaldır
+  async function shadowBanKaldir(id: string) {
+    setIslem(id);
+    try { await topluApi([id], 'shadow_ban_kaldir'); }
+    catch (e: any) { alert('Hata: ' + e.message); }
+    setIslem('');
+    setTimeout(() => { getIlanlar(); getIstatistik(); }, 200);
+  }
+
   async function kullaniciAskiyaAl(userId: string, displayName: string) {
-    if (!confirm(`"${displayName}" hesabı askıya alınacak ve tüm ilanları kapatılacak. Devam et?`)) return;
+    if (!confirm(`"${displayName}" hesabı askıya alınacak. Devam et?`)) return;
     const res = await fetch('/api/moderator/kullanici-askiya', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ userId }),
@@ -358,9 +436,7 @@ export default function Moderator() {
     if (res.ok) {
       setKullaniciBulguList(prev => prev.map(u => u.id === userId ? { ...u, is_active: false } : u));
       getIlanlar(); getIstatistik();
-    } else {
-      alert('Hata oluştu');
-    }
+    } else { alert('Hata oluştu'); }
   }
 
   function siradakineGec(mevcutId: string, duzenlemeModu = false) {
@@ -405,6 +481,13 @@ export default function Moderator() {
         vehicle_count: s.vehicle_count || 1, cargo_type: s.cargo_type || '', notes: s.notes || '',
       }))
     });
+    // Kullanıcı bilgisini ayrı çek
+    setDuzenleKullanici(null);
+    if (ilan.user_id) {
+      supabase.from('users').select('id, display_name, phone, email, is_active, role, user_type')
+        .eq('id', ilan.user_id).single()
+        .then(({ data }) => setDuzenleKullanici(data));
+    }
   }
 
   async function duzenleKaydet(id: string, mod: 'onayla' | 'sadece_kaydet') {
@@ -415,7 +498,13 @@ export default function Moderator() {
       price_offer: duzenleData.price_offer || null, notes: duzenleData.notes,
       vehicle_type: duzenleData.vehicle_type, body_type: duzenleData.body_type,
     };
-    if (mod === 'onayla') { updateData.moderation_status = 'approved'; updateData.status = 'active'; updateData.reviewed_at = new Date().toISOString(); }
+    if (mod === 'onayla') {
+      updateData.moderation_status = 'approved';
+      updateData.status = 'active';
+      updateData.reviewed_at = new Date().toISOString();
+      // Moderatör onaylıyorsa shadow ban'ı da kaldır
+      updateData.is_shadow_banned = false;
+    }
     await supabase.from('listings').update(updateData).eq('id', id);
     for (let i = 0; i < duzenleData.stops.length; i++) {
       const stop = duzenleData.stops[i];
@@ -459,19 +548,33 @@ export default function Moderator() {
 
   function filtreTemizle() {
     setAramaMetni(''); setFiltreTelefon(''); setFiltreKalkis(''); setFiltreVaris('');
-    setFiltreAracTipi(''); setFiltreSkor('hepsi'); setFiltreTonajMin(''); setFiltreTonajMax('');
+    setFiltreAracTipi(''); setFiltreSkor('hepsi');
+    setFiltreKaynak(''); setFiltreKullaniciId(''); setFiltreKullaniciAd('');
     setFiltreTarihBaslangic(''); setFiltreTarihBitis('');
   }
-  const aktifFiltre = aramaMetni || filtreTelefon || filtreKalkis || filtreVaris || filtreAracTipi || filtreSkor !== 'hepsi' || filtreTonajMin || filtreTonajMax || filtreTarihBaslangic || filtreTarihBitis;
+  const aktifFiltre = aramaMetni || filtreTelefon || filtreKalkis || filtreVaris || filtreAracTipi || filtreSkor !== 'hepsi' || filtreKaynak || filtreKullaniciId || filtreTarihBaslangic || filtreTarihBitis;
 
   if (yetkiKontrol) return (
     <div style={{ minHeight: '100vh', background: '#0d1117', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#8b949e' }}>⏳</div>
   );
 
-  // ── Edit form (paylaşımlı)
   function EditForm({ rawForLlm }: { rawForLlm?: string }) {
     return (
       <div>
+        {/* Kullanıcı bilgisi */}
+        {duzenleKullanici && (
+          <div style={{ background: '#0a0f1a', border: '1px solid #1e3a5f', borderRadius: 6, padding: '8px 12px', marginBottom: 10, display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+            <span style={{ color: '#60a5fa', fontSize: '0.78rem', fontWeight: 700 }}>👤 {duzenleKullanici.display_name || 'Adsız'}</span>
+            {duzenleKullanici.phone && <span style={{ color: '#8b949e', fontSize: '0.75rem' }}>📞 {duzenleKullanici.phone}</span>}
+            {duzenleKullanici.email && <span style={{ color: '#8b949e', fontSize: '0.75rem' }}>✉️ {duzenleKullanici.email}</span>}
+            <span style={{
+              background: duzenleKullanici.is_active === false ? '#450a0a' : '#0d2b1a',
+              color: duzenleKullanici.is_active === false ? '#f87171' : '#22c55e',
+              fontSize: '0.65rem', fontWeight: 700, padding: '1px 6px', borderRadius: 4
+            }}>{duzenleKullanici.is_active === false ? '🚫 Askıda' : '✓ Aktif'}</span>
+            <span style={{ color: '#4b5563', fontSize: '0.68rem', fontFamily: 'monospace', marginLeft: 'auto' }}>#{duzenleKullanici.id.substring(0, 8)}</span>
+          </div>
+        )}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
           <div><div style={{ color: '#8b949e', fontSize: '0.68rem', marginBottom: 2 }}>İlan Tipi</div><select value={duzenleData.listing_type} onChange={e => setDuzenleData({ ...duzenleData, listing_type: e.target.value })} style={inp}><option value="yuk">Yük</option><option value="arac">Araç</option></select></div>
           <div><div style={{ color: '#8b949e', fontSize: '0.68rem', marginBottom: 2 }}>Telefon</div><input value={duzenleData.contact_phone} onChange={e => setDuzenleData({ ...duzenleData, contact_phone: e.target.value })} style={inp} /></div>
@@ -516,8 +619,97 @@ export default function Moderator() {
     );
   }
 
+  // ── Sprint 3: Fired rules özeti
+  function AuditBilgi({ ilan }: { ilan: any }) {
+    const score: number = ilan.audit_score ?? 0;
+    if (score === 0) return null;
+    const renk = auditRenk(score);
+    const logs = ilan.internal_audit_logs;
+    const firedRules: any[] = logs?.fired_rules || [];
+    return (
+      <div style={{ background: '#0a0a12', border: `1px solid ${score >= 71 ? '#450a0a' : '#451a03'}`, borderRadius: 6, padding: '10px 12px', marginBottom: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: firedRules.length > 0 ? 8 : 0 }}>
+          <span style={{ background: renk.bg, color: renk.color, fontSize: '0.72rem', fontWeight: 700, padding: '2px 8px', borderRadius: 4 }}>
+            {renk.label}
+          </span>
+          {ilan.is_shadow_banned && (
+            <span style={{ background: '#450a0a', color: '#f87171', fontSize: '0.7rem', fontWeight: 700, padding: '2px 8px', borderRadius: 4 }}>
+              👁 Shadow Banned
+            </span>
+          )}
+          {logs?.scanned_at && (
+            <span style={{ color: '#4b5563', fontSize: '0.68rem' }}>
+              Tarandı: {new Date(logs.scanned_at).toLocaleString('tr-TR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+            </span>
+          )}
+        </div>
+        {firedRules.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+            {firedRules.map((r: any, i: number) => (
+              <span key={i} style={{ background: '#1a0808', color: '#f87171', fontSize: '0.68rem', padding: '2px 7px', borderRadius: 4, border: '1px solid #450a0a' }}>
+                ⚠️ {r.description || r.rule_id} (+{r.weight})
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div style={{ minHeight: '100vh', background: '#0d1117', fontFamily: "'IBM Plex Sans', system-ui, sans-serif" }}>
+
+      {/* Düzeltme İste Modalı */}
+      {duzeltmeModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div style={{ background: '#161b22', border: '1px solid #854d0e', borderRadius: 12, padding: 24, width: '100%', maxWidth: 480 }}>
+            <div style={{ color: '#fbbf24', fontWeight: 800, fontSize: '1rem', marginBottom: 4 }}>
+              ✏️ Düzeltme İste
+            </div>
+            <div style={{ color: '#6b7280', fontSize: '0.78rem', marginBottom: 16 }}>
+              {duzeltmeModal.bulk ? `${duzeltmeModal.bulk.length} ilan` : '1 ilan'} için düzeltme talebi gönderilecek.
+            </div>
+
+            {/* Sebep seçimi */}
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ color: '#8b949e', fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 8 }}>Neden?</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {DUZELTME_SEBEPLER.map(sebep => (
+                  <label key={sebep} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', padding: '7px 10px', borderRadius: 6, background: duzeltmeSebep === sebep ? '#2a1d00' : 'transparent', border: `1px solid ${duzeltmeSebep === sebep ? '#854d0e' : '#30363d'}` }}>
+                    <input type="radio" name="sebep" value={sebep} checked={duzeltmeSebep === sebep}
+                      onChange={() => setDuzeltmeSebep(sebep)}
+                      style={{ accentColor: '#fbbf24', width: 14, height: 14, cursor: 'pointer' }} />
+                    <span style={{ color: duzeltmeSebep === sebep ? '#fbbf24' : '#e2e8f0', fontSize: '0.85rem' }}>{sebep}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Ek mesaj */}
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ color: '#8b949e', fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 6 }}>Ek Açıklama (opsiyonel)</div>
+              <textarea value={duzeltmeMesaj} onChange={e => setDuzeltmeMesaj(e.target.value)}
+                placeholder="Kullanıcıya görünecek ek not..."
+                rows={3}
+                style={{ width: '100%', background: '#0d1117', color: '#e2e8f0', border: '1px solid #374151', borderRadius: 6, padding: '8px 10px', fontSize: '0.85rem', outline: 'none', resize: 'vertical', boxSizing: 'border-box' }} />
+            </div>
+
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button
+                onClick={duzeltmeIsteOnayla}
+                disabled={!duzeltmeSebep}
+                style={{ flex: 1, background: duzeltmeSebep ? '#fbbf24' : '#1f2937', color: duzeltmeSebep ? '#000' : '#4b5563', border: 'none', borderRadius: 8, padding: '10px', fontWeight: 700, fontSize: '0.88rem', cursor: duzeltmeSebep ? 'pointer' : 'not-allowed' }}>
+                Gönder
+              </button>
+              <button
+                onClick={() => { setDuzeltmeModal(null); setDuzeltmeSebep(''); setDuzeltmeMesaj(''); }}
+                style={{ flex: 1, background: 'none', border: '1px solid #30363d', color: '#8b949e', borderRadius: 8, padding: '10px', fontWeight: 700, fontSize: '0.88rem', cursor: 'pointer' }}>
+                İptal
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* NAV */}
       <nav style={{ background: '#161b22', borderBottom: '1px solid #30363d', position: 'sticky', top: 0, zIndex: 50 }}>
@@ -537,10 +729,11 @@ export default function Moderator() {
           <div style={{ maxWidth: 1400, margin: '0 auto', padding: '10px 16px', display: 'flex', gap: 20, flexWrap: 'wrap', alignItems: 'center' }}>
             <div style={{ display: 'flex', gap: 16 }}>
               {[
-                { label: 'Bekleyen', val: istatistik.pending, color: '#fb923c' },
-                { label: 'Bugün Gelen', val: istatistik.bugunGelen, color: '#60a5fa' },
+                { label: 'Bekleyen',        val: istatistik.pending,        color: '#fb923c' },
+                { label: 'Bugün Gelen',     val: istatistik.bugunGelen,     color: '#60a5fa' },
                 { label: 'Bugün Onaylanan', val: istatistik.bugunOnaylanan, color: '#22c55e' },
-                { label: 'Çözümsüz', val: istatistik.cozumsuz, color: '#f87171' },
+                { label: 'Çözümsüz',        val: istatistik.cozumsuz,       color: '#f87171' },
+                { label: 'Riskli',          val: istatistik.riskli,         color: '#f87171' },  // Sprint 3
               ].map(k => (
                 <div key={k.label} style={{ textAlign: 'center' }}>
                   <div style={{ color: k.color, fontWeight: 800, fontSize: '1.4rem', lineHeight: 1 }}>{k.val ?? '—'}</div>
@@ -584,18 +777,9 @@ export default function Moderator() {
         <div style={{ maxWidth: 1400, margin: '0 auto', padding: '8px 16px' }}>
           {/* Tab satırı */}
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginBottom: 8 }}>
-            {/* YENİ: Master checkbox */}
             {filtre !== 'no_lane' && filtrelenmis.length > 0 && (
-              <div
-                onClick={masterToggle}
-                title="Tümünü seç / seçimi kaldır"
-                style={{
-                  width: 18, height: 18, border: '2px solid', borderRadius: 4, cursor: 'pointer', flexShrink: 0,
-                  borderColor: selectedIds.size > 0 ? '#3b82f6' : '#374151',
-                  background: selectedIds.size > 0 && selectedIds.size === filtrelenmis.length ? '#3b82f6' : selectedIds.size > 0 ? '#1e3a5f' : 'transparent',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}
-              >
+              <div onClick={masterToggle} title="Tümünü seç / seçimi kaldır"
+                style={{ width: 18, height: 18, border: '2px solid', borderRadius: 4, cursor: 'pointer', flexShrink: 0, borderColor: selectedIds.size > 0 ? '#3b82f6' : '#374151', background: selectedIds.size > 0 && selectedIds.size === filtrelenmis.length ? '#3b82f6' : selectedIds.size > 0 ? '#1e3a5f' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 {selectedIds.size > 0 && (
                   <span style={{ color: selectedIds.size === filtrelenmis.length ? '#fff' : '#60a5fa', fontSize: '0.65rem', fontWeight: 900 }}>
                     {selectedIds.size === filtrelenmis.length ? '✓' : '–'}
@@ -603,10 +787,24 @@ export default function Moderator() {
                 )}
               </div>
             )}
-            {(['pending', 'approved', 'rejected', 'passive', 'hepsi', 'no_lane', 'arsiv'] as const).map(f => (
+            {/* Tüm tab butonları — Sprint 3: riskli eklendi */}
+            {(['pending', 'approved', 'rejected', 'passive', 'hepsi', 'no_lane', 'arsiv', 'riskli'] as const).map(f => (
               <button key={f} onClick={() => { setFiltre(f); setSonraBak(new Set()); filtreTemizle(); }}
-                style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid', borderColor: filtre === f ? (f === 'arsiv' ? '#854d0e' : '#22c55e') : '#30363d', background: filtre === f ? (f === 'arsiv' ? '#2a1d00' : '#14532d') : '#0d1117', color: filtre === f ? (f === 'arsiv' ? '#fbbf24' : '#22c55e') : '#8b949e', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer' }}>
-                {f === 'pending' ? '⏳ Bekleyenler' : f === 'approved' ? '✅ Onaylananlar' : f === 'rejected' ? '❌ Reddedilenler' : f === 'passive' ? '💤 Pasifler' : f === 'no_lane' ? '🔍 Çözümsüz' : f === 'arsiv' ? '🗄️ Arşiv' : '📋 Hepsi'}
+                style={{
+                  padding: '5px 12px', borderRadius: 6, border: '1px solid',
+                  borderColor: filtre === f ? (f === 'arsiv' ? '#854d0e' : f === 'riskli' ? '#7f1d1d' : '#22c55e') : '#30363d',
+                  background: filtre === f ? (f === 'arsiv' ? '#2a1d00' : f === 'riskli' ? '#2a0d0d' : '#14532d') : '#0d1117',
+                  color: filtre === f ? (f === 'arsiv' ? '#fbbf24' : f === 'riskli' ? '#f87171' : '#22c55e') : '#8b949e',
+                  fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer',
+                }}>
+                {f === 'pending' ? '⏳ Bekleyenler'
+                  : f === 'approved' ? '✅ Onaylananlar'
+                  : f === 'rejected' ? '❌ Reddedilenler'
+                  : f === 'passive'  ? '💤 Pasifler'
+                  : f === 'no_lane'  ? '🔍 Çözümsüz'
+                  : f === 'arsiv'    ? '🗄️ Arşiv'
+                  : f === 'riskli'   ? `🔴 Riskli${istatistik?.riskli ? ` (${istatistik.riskli})` : ''}`
+                  : '📋 Hepsi'}
               </button>
             ))}
             {sonraBakSayisi > 0 && (
@@ -626,11 +824,9 @@ export default function Moderator() {
               <span style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', color: '#4b5563', fontSize: '0.85rem' }}>
                 {kullaniciAramaYukleniyor ? '⏳' : omnisearchTip(aramaMetni) ? '👤' : '🔍'}
               </span>
-              <input
-                value={aramaMetni} onChange={e => setAramaMetni(e.target.value)}
+              <input value={aramaMetni} onChange={e => setAramaMetni(e.target.value)}
                 placeholder="Ara: tel/email → kullanıcı; şehir, metin..."
-                style={{ ...inp, paddingLeft: 28, borderRadius: 6, borderColor: omnisearchTip(aramaMetni) ? '#3b82f6' : '#374151' }}
-              />
+                style={{ ...inp, paddingLeft: 28, borderRadius: 6, borderColor: omnisearchTip(aramaMetni) ? '#3b82f6' : '#374151' }} />
             </div>
             <input value={filtreTelefon} onChange={e => setFiltreTelefon(e.target.value)} placeholder="📞 Tel" style={{ ...inp, width: 110, borderRadius: 6 }} />
             <select value={filtreKalkis} onChange={e => setFiltreKalkis(e.target.value)} style={{ ...inp, width: 120, borderRadius: 6 }}>
@@ -642,23 +838,26 @@ export default function Moderator() {
             <select value={filtreAracTipi} onChange={e => setFiltreAracTipi(e.target.value)} style={{ ...inp, width: 110, borderRadius: 6 }}>
               <option value=''>🚛 Araç</option>{ARAC_TIPLERI.map(t => <option key={t}>{t}</option>)}
             </select>
+            {/* Kaynak filtresi */}
+            <select value={filtreKaynak} onChange={e => setFiltreKaynak(e.target.value)} style={{ ...inp, width: 120, borderRadius: 6 }}>
+              <option value=''>📡 Tüm Kaynaklar</option>
+              <option value='form'>Yükegel Form</option>
+              <option value='whatsapp'>📱 WhatsApp</option>
+              <option value='excel'>📄 Excel</option>
+              <option value='facebook'>👥 Facebook</option>
+            </select>
+            {/* Kullanıcı filtresi aktifse göster */}
+            {filtreKullaniciId && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#1a2535', border: '1px solid #1e3a5f', borderRadius: 6, padding: '4px 10px' }}>
+                <span style={{ color: '#60a5fa', fontSize: '0.78rem', fontWeight: 700 }}>👤 {filtreKullaniciAd}</span>
+                <button onClick={() => { setFiltreKullaniciId(''); setFiltreKullaniciAd(''); }}
+                  style={{ background: 'none', border: 'none', color: '#4b5563', cursor: 'pointer', fontSize: '0.85rem', lineHeight: 1 }}>✕</button>
+              </div>
+            )}
             <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <input value={filtreTonajMin} onChange={e => setFiltreTonajMin(e.target.value)} placeholder="⚖Min" style={{ ...inp, width: 68, borderRadius: 6 }} type="number" min="0" />
+              <input type="date" value={filtreTarihBaslangic} onChange={e => setFiltreTarihBaslangic(e.target.value)} style={{ ...inp, width: 130, borderRadius: 6, colorScheme: 'dark' }} />
               <span style={{ color: '#4b5563', fontSize: '0.75rem' }}>–</span>
-              <input value={filtreTonajMax} onChange={e => setFiltreTonajMax(e.target.value)} placeholder="Max t" style={{ ...inp, width: 68, borderRadius: 6 }} type="number" min="0" />
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <input
-                type="date" value={filtreTarihBaslangic} onChange={e => setFiltreTarihBaslangic(e.target.value)}
-                title="Başlangıç tarihi"
-                style={{ ...inp, width: 130, borderRadius: 6, colorScheme: 'dark' }}
-              />
-              <span style={{ color: '#4b5563', fontSize: '0.75rem' }}>–</span>
-              <input
-                type="date" value={filtreTarihBitis} onChange={e => setFiltreTarihBitis(e.target.value)}
-                title="Bitiş tarihi"
-                style={{ ...inp, width: 130, borderRadius: 6, colorScheme: 'dark' }}
-              />
+              <input type="date" value={filtreTarihBitis} onChange={e => setFiltreTarihBitis(e.target.value)} style={{ ...inp, width: 130, borderRadius: 6, colorScheme: 'dark' }} />
             </div>
             {aktifFiltre && (
               <button onClick={filtreTemizle} style={{ background: 'none', border: '1px solid #374151', color: '#6b7280', borderRadius: 6, padding: '4px 10px', fontSize: '0.78rem', cursor: 'pointer' }}>✕ Temizle</button>
@@ -669,14 +868,16 @@ export default function Moderator() {
 
       <main style={{ maxWidth: 1400, margin: '0 auto', padding: '16px', paddingBottom: selectedIds.size > 0 ? 100 : 16 }}>
 
-        {/* YENİ: Omnisearch kullanıcı sonuçları */}
+        {/* Omnisearch sonuçları */}
         {kullaniciBulguList.length > 0 && (
           <div style={{ marginBottom: 16 }}>
             <div style={{ color: '#3b82f6', fontSize: '0.72rem', fontWeight: 700, marginBottom: 8, letterSpacing: '0.06em' }}>
               👤 KULLANICI SONUÇLARI ({kullaniciBulguList.length})
             </div>
             {kullaniciBulguList.map(k => (
-              <KullaniciKart key={k.id} kullanici={k} onAskiya={kullaniciAskiyaAl} />
+              <KullaniciKart key={k.id} kullanici={k} onAskiya={kullaniciAskiyaAl}
+                onFiltrele={(id, ad) => { setFiltreKullaniciId(id); setFiltreKullaniciAd(ad); setKullaniciBulguList([]); setAramaMetni(''); }}
+              />
             ))}
             <div style={{ height: 1, background: '#1f2937', marginBottom: 16 }} />
           </div>
@@ -734,8 +935,8 @@ export default function Moderator() {
           <div style={{ textAlign: 'center', padding: '60px 0', color: '#4b5563' }}>⏳ Yükleniyor...</div>
         ) : filtrelenmis.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '60px 0', color: '#4b5563' }}>
-            <div style={{ fontSize: '2rem', marginBottom: 8 }}>🔍</div>
-            <div>Filtrelerle eşleşen ilan bulunamadı</div>
+            <div style={{ fontSize: '2rem', marginBottom: 8 }}>{filtre === 'riskli' ? '✅' : '🔍'}</div>
+            <div>{filtre === 'riskli' ? 'Riskli ilan yok, platform temiz!' : 'Filtrelerle eşleşen ilan bulunamadı'}</div>
             {sonraBakSayisi > 0 && <button onClick={() => setSonraBakGoster(true)} style={{ marginTop: 16, background: 'none', border: '1px solid #451a03', color: '#fb923c', borderRadius: 6, padding: '6px 16px', cursor: 'pointer', fontSize: '0.85rem' }}>⏸ Sonraya bırakılanları göster ({sonraBakSayisi})</button>}
           </div>
         ) : (
@@ -749,35 +950,42 @@ export default function Moderator() {
               const hasSosyal = (ilan.source === 'whatsapp' || ilan.source === 'facebook') && ilan.raw_text;
               const skor = skorRenk(ilan);
               const secili = selectedIds.has(ilan.id);
+              const auditScore: number = ilan.audit_score ?? 0;
+              const isShadowBanned: boolean = ilan.is_shadow_banned ?? false;
+
+              // Riskli tab'da kart kenarlığı audit score'a göre
+              const kartBorder = filtre === 'riskli'
+                ? (auditScore >= 71 ? '#7f1d1d' : '#854d0e')
+                : (duzenleniyor ? '#22c55e' : secili ? '#3b82f6' : skor.border);
 
               return (
                 <div key={ilan.id} ref={el => { ilanRefs.current[ilan.id] = el; }}
-                  style={{ background: '#161b22', border: `1px solid ${duzenleniyor ? '#22c55e' : secili ? '#3b82f6' : skor.border}`, borderRadius: 8, padding: '14px 16px', scrollMarginTop: 130 }}>
+                  style={{ background: '#161b22', border: `1px solid ${kartBorder}`, borderRadius: 8, padding: '14px 16px', scrollMarginTop: 130 }}>
 
                   {/* Başlık */}
                   <div style={{ display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-                    {/* YENİ: Checkbox */}
-                    <div
-                      onClick={(e) => handleCheckbox(ilan.id, idx, e)}
-                      title="Seç (Shift+Click: aralık seç)"
-                      style={{
-                        width: 18, height: 18, border: '2px solid', borderRadius: 4, cursor: 'pointer', flexShrink: 0,
-                        borderColor: secili ? '#3b82f6' : '#374151',
-                        background: secili ? '#3b82f6' : 'transparent',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      }}
-                    >
+                    <div onClick={(e) => handleCheckbox(ilan.id, idx, e)} title="Seç (Shift+Click: aralık seç)"
+                      style={{ width: 18, height: 18, border: '2px solid', borderRadius: 4, cursor: 'pointer', flexShrink: 0, borderColor: secili ? '#3b82f6' : '#374151', background: secili ? '#3b82f6' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       {secili && <span style={{ color: '#fff', fontSize: '0.65rem', fontWeight: 900 }}>✓</span>}
                     </div>
-
                     <span style={{ fontSize: '1rem' }} title={`${skor.label} (${skor.puan})`}>{skor.badge}</span>
                     <span style={{ background: '#1f2937', color: '#9ca3af', fontSize: '0.65rem', fontWeight: 700, padding: '1px 6px', borderRadius: 4 }}>{skor.label}</span>
                     <span style={{ background: isYuk ? '#7f1d1d' : '#14532d', color: isYuk ? '#fca5a5' : '#86efac', fontSize: '0.68rem', fontWeight: 700, padding: '2px 8px', borderRadius: 4 }}>{isYuk ? '🔴 YÜK' : '🟢 ARAÇ'}</span>
                     <span style={{ background: durum.bg, color: durum.color, fontSize: '0.68rem', fontWeight: 700, padding: '2px 8px', borderRadius: 4 }}>{ilan.moderation_status}</span>
+                    {/* Sprint 3: audit score badge — sadece score > 0 ise */}
+                    {auditScore > 0 && (() => {
+                      const ar = auditRenk(auditScore);
+                      return <span style={{ background: ar.bg, color: ar.color, fontSize: '0.68rem', fontWeight: 700, padding: '2px 8px', borderRadius: 4 }}>{ar.label}</span>;
+                    })()}
+                    {isShadowBanned && (
+                      <span style={{ background: '#450a0a', color: '#f87171', fontSize: '0.68rem', fontWeight: 700, padding: '2px 8px', borderRadius: 4 }}>👁 Shadow</span>
+                    )}
                     <span style={{ color: '#4b5563', fontSize: '0.72rem' }}>{ilan.source} · {new Date(ilan.created_at).toLocaleDateString('tr-TR')} {new Date(ilan.created_at).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}</span>
-                    {/* kullanıcı rozeti: listings.user_id FK tanımlı değil, şimdilik gizli */}
                     <span style={{ color: '#4b5563', fontSize: '0.68rem', marginLeft: 'auto', fontFamily: 'monospace' }}>#{ilan.id.substring(0, 8)}</span>
                   </div>
+
+                  {/* Sprint 3: Audit bilgi bloğu — riskli tab veya score > 0 olan her ilanda */}
+                  {(filtre === 'riskli' || auditScore > 0) && <AuditBilgi ilan={ilan} />}
 
                   {/* İçerik */}
                   <div style={{ display: 'grid', gridTemplateColumns: hasSosyal ? '1fr 1fr' : '1fr', gap: 16, marginBottom: 12 }}>
@@ -839,6 +1047,35 @@ export default function Moderator() {
                       </>
                     ) : (
                       <>
+                        {/* Düzeltme iste — correction_needed değilse ve arşiv/reddi değilse */}
+                        {ilan.moderation_status !== 'correction_needed'
+                          && ilan.moderation_status !== 'rejected'
+                          && ilan.moderation_status !== 'archived' && (
+                          <button onClick={() => { setDuzeltmeModal({ id: ilan.id }); setDuzeltmeSebep(''); setDuzeltmeMesaj(''); }} disabled={durumIslem}
+                            style={{ padding: '7px 16px', borderRadius: 6, border: '1px solid #854d0e', cursor: 'pointer', background: '#2a1d00', color: '#fbbf24', fontWeight: 700, fontSize: '0.85rem', opacity: durumIslem ? 0.5 : 1 }}>
+                            ✏️ Düzeltme İste
+                          </button>
+                        )}
+                        {/* Zaten düzeltme bekliyorsa badge göster */}
+                        {ilan.moderation_status === 'correction_needed' && (
+                          <span style={{ padding: '7px 14px', borderRadius: 6, border: '1px solid #854d0e', background: '#2a1d00', color: '#fbbf24', fontSize: '0.82rem', fontWeight: 700 }}>
+                            ⏳ Düzeltme Bekleniyor
+                          </span>
+                        )}
+                        {/* Shadow ban kaldır — shadow banned ise önce göster */}
+                        {isShadowBanned && (
+                          <button onClick={() => shadowBanKaldir(ilan.id)} disabled={durumIslem}
+                            style={{ padding: '7px 16px', borderRadius: 6, border: '1px solid #166534', cursor: 'pointer', background: '#0d2b1a', color: '#22c55e', fontWeight: 700, fontSize: '0.85rem', opacity: durumIslem ? 0.5 : 1 }}>
+                            {durumIslem ? '⏳...' : '👁 Shadow Ban Kaldır'}
+                          </button>
+                        )}
+                        {/* Shadow ban uygula — onaylı ve henüz banned değilse */}
+                        {!isShadowBanned && ilan.moderation_status === 'approved' && (
+                          <button onClick={() => shadowBanla(ilan.id)} disabled={durumIslem}
+                            style={{ padding: '7px 16px', borderRadius: 6, border: '1px solid #7f1d1d', cursor: 'pointer', background: '#2a0d0d', color: '#f87171', fontWeight: 700, fontSize: '0.85rem', opacity: durumIslem ? 0.5 : 1 }}>
+                            {durumIslem ? '⏳...' : '👁 Shadow Banla'}
+                          </button>
+                        )}
                         {ilan.moderation_status !== 'approved' && (
                           <button onClick={() => aksiyon(ilan.id, 'approved', 'active')} disabled={durumIslem} style={{ padding: '7px 16px', borderRadius: 6, border: 'none', cursor: 'pointer', background: '#22c55e', color: '#000', fontWeight: 700, fontSize: '0.85rem', opacity: durumIslem ? 0.5 : 1 }}>✅ Onayla</button>
                         )}
@@ -867,6 +1104,8 @@ export default function Moderator() {
         const tumunuOnayli  = seciliIlanlar.every(i => i.moderation_status === 'approved');
         const tumunuReddi   = seciliIlanlar.every(i => i.moderation_status === 'rejected');
         const arsivTabinda  = filtre === 'arsiv';
+        // Sprint 3: seçili ilanlardan shadow banned olanlar var mı?
+        const hasShadowBanned = seciliIlanlar.some(i => i.is_shadow_banned);
         return (
           <div style={{
             position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)',
@@ -877,6 +1116,40 @@ export default function Moderator() {
             <span style={{ color: '#3b82f6', fontWeight: 700, fontSize: '0.9rem', marginRight: 4 }}>
               ☑ {selectedIds.size} seçili
             </span>
+            {/* Toplu düzeltme iste — seçililer arasında uygun olanlar varsa */}
+            {seciliIlanlar.some(i => i.moderation_status !== 'correction_needed' && i.moderation_status !== 'rejected' && i.moderation_status !== 'archived') && (
+              <button onClick={() => {
+                const ids = seciliIlanlar
+                  .filter(i => i.moderation_status !== 'correction_needed' && i.moderation_status !== 'rejected' && i.moderation_status !== 'archived')
+                  .map(i => i.id);
+                setDuzeltmeModal({ id: ids[0], bulk: ids });
+                setDuzeltmeSebep(''); setDuzeltmeMesaj('');
+              }} disabled={bulkYukleniyor}
+                style={{ padding: '7px 16px', borderRadius: 8, border: '1px solid #854d0e', background: '#2a1d00', color: '#fbbf24', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer', opacity: bulkYukleniyor ? 0.5 : 1 }}>
+                ✏️ Düzeltme İste
+              </button>
+            )}
+            {/* Toplu shadow ban kaldır */}
+            {hasShadowBanned && (
+              <button onClick={topluShadowBanKaldir} disabled={bulkYukleniyor}
+                style={{ padding: '7px 16px', borderRadius: 8, border: '1px solid #166534', background: '#0d2b1a', color: '#22c55e', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer', opacity: bulkYukleniyor ? 0.5 : 1 }}>
+                👁 Shadow Ban Kaldır
+              </button>
+            )}
+            {/* Toplu shadow ban uygula — seçililer arasında approved+not-banned varsa */}
+            {seciliIlanlar.some(i => !i.is_shadow_banned && i.moderation_status === 'approved') && (
+              <button onClick={async () => {
+                const ids = seciliIlanlar.filter(i => !i.is_shadow_banned && i.moderation_status === 'approved').map(i => i.id);
+                if (!confirm(`${ids.length} ilan shadow ban'a alınacak. Devam et?`)) return;
+                setBulkYukleniyor(true);
+                try { await topluApi(ids, 'shadow_ban'); setSelectedIds(new Set()); }
+                catch (e: any) { alert('Hata: ' + e.message); }
+                setBulkYukleniyor(false); getIlanlar(); getIstatistik();
+              }} disabled={bulkYukleniyor}
+                style={{ padding: '7px 16px', borderRadius: 8, border: '1px solid #7f1d1d', background: '#2a0d0d', color: '#f87171', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer', opacity: bulkYukleniyor ? 0.5 : 1 }}>
+                👁 Shadow Banla
+              </button>
+            )}
             {!arsivTabinda && !tumunuOnayli && (
               <button onClick={() => topluIslem('approve')} disabled={bulkYukleniyor}
                 style={{ padding: '7px 16px', borderRadius: 8, border: 'none', background: '#14532d', color: '#22c55e', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer', opacity: bulkYukleniyor ? 0.5 : 1 }}>

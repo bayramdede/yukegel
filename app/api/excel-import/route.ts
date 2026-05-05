@@ -159,6 +159,14 @@ export async function POST(req: NextRequest) {
 
       const supabase = getSupabase();
 
+      // Kullanıcının telefon numarasını çek → contact_phone olarak kullan
+      const { data: userData } = await supabase
+        .from('users')
+        .select('phone')
+        .eq('id', userId)
+        .single();
+      const contactPhone = userData?.phone || null;
+
       // Sefer No'ya göre grupla
       const groups = new Map<string, PreviewRow[]>();
       rows.forEach((row, i) => {
@@ -187,8 +195,8 @@ export async function POST(req: NextRequest) {
               origin_district: first.kalkisIlce || null,
               source: 'excel',
               moderation_status: 'pending',
-              trust_level: 'registered',
               user_id: userId,
+              contact_phone: contactPhone,
               vehicle_type: first.aracTipiNorm
                 ? [first.aracTipiNorm]
                 : first.aracTipi ? [first.aracTipi] : null,

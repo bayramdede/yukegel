@@ -1,5 +1,5 @@
 'use client';
-import { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { createClient } from '../../lib/supabase';
 
 const supabase = createClient();
@@ -130,7 +130,7 @@ export default function PanelClient({ userId, userEmail, profil, ilanlar, aracla
 // ═══════════════════════════════════════════════════════════════════
 // İLANLAR SEKMESİ
 // ═══════════════════════════════════════════════════════════════════
-type StatusFiltre = 'hepsi' | 'active' | 'passive' | 'completed' | 'pending' | 'rejected';
+type StatusFiltre = 'hepsi' | 'active' | 'passive' | 'completed' | 'pending' | 'rejected' | 'correction_needed';
 
 function IlanlarSekmesi({ ilanlar: ilk, userId }: { ilanlar: any[]; userId: string }) {
   const [ilanlar, setIlanlar] = useState(ilk);
@@ -139,6 +139,14 @@ function IlanlarSekmesi({ ilanlar: ilk, userId }: { ilanlar: any[]; userId: stri
   const [statusFiltre, setStatusFiltre] = useState<StatusFiltre>('hepsi');
   const [kopyalandi, setKopyalandi] = useState(false);
   const [publicUrl, setPublicUrl] = useState('');
+
+  // Düzeltme formu state'leri
+  const [duzeltId, setDuzeltId] = useState('');
+  const [duzeltNotes, setDuzeltNotes] = useState('');
+  const [duzeltVehicle, setDuzeltVehicle] = useState<string[]>([]);
+  const [duzeltBody, setDuzeltBody] = useState<string[]>([]);
+  const [duzeltYukleniyor, setDuzeltYukleniyor] = useState(false);
+  const [duzeltSonuc, setDuzeltSonuc] = useState<{ ok: boolean; mesaj: string; firedRules?: any[] } | null>(null);
 
   // Arama/filtre state'leri
   const [aramaKalkis, setAramaKalkis] = useState('');
@@ -178,9 +186,17 @@ function IlanlarSekmesi({ ilanlar: ilk, userId }: { ilanlar: any[]; userId: stri
 
   async function sil(id: string) {
     setYukleniyor(id + '_sil');
-    await supabase.from('listing_stops').delete().eq('listing_id', id);
-    await supabase.from('listings').delete().eq('id', id);
-    setIlanlar(prev => prev.filter(i => i.id !== id));
+    const res = await fetch('/api/ilan/sil', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    });
+    if (res.ok) {
+      setIlanlar(prev => prev.filter(i => i.id !== id));
+    } else {
+      const d = await res.json();
+      alert('Silinemedi: ' + (d.error || 'Bilinmeyen hata'));
+    }
     setSilOnay(null);
     setYukleniyor(null);
   }
@@ -196,7 +212,8 @@ function IlanlarSekmesi({ ilanlar: ilk, userId }: { ilanlar: any[]; userId: stri
     if (i.completed_at) return 'completed';
     if (i.moderation_status === 'pending') return 'pending';
     if (i.moderation_status === 'rejected') return 'rejected';
-    return i.status; // active | passive | expired
+    if (i.moderation_status === 'correction_needed') return 'correction_needed';
+    return i.status;
   }
 
   const sayilar: Record<StatusFiltre, number> = useMemo(() => ({
@@ -206,6 +223,7 @@ function IlanlarSekmesi({ ilanlar: ilk, userId }: { ilanlar: any[]; userId: stri
     completed: ilanlar.filter(i => durumHesapla(i) === 'completed').length,
     pending: ilanlar.filter(i => durumHesapla(i) === 'pending').length,
     rejected: ilanlar.filter(i => durumHesapla(i) === 'rejected').length,
+    correction_needed: ilanlar.filter(i => durumHesapla(i) === 'correction_needed').length,
   }), [ilanlar]);
 
   const filtreli = useMemo(() => {
@@ -235,7 +253,7 @@ function IlanlarSekmesi({ ilanlar: ilk, userId }: { ilanlar: any[]; userId: stri
   const th: React.CSSProperties = { padding: '10px 12px', textAlign: 'left', color: C.muted, fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', borderBottom: `1px solid ${C.border}`, whiteSpace: 'nowrap' };
   const td: React.CSSProperties = { padding: '12px', borderBottom: `1px solid #21262d`, verticalAlign: 'middle', fontSize: '0.85rem' };
 
-  const statusSirasi: StatusFiltre[] = ['hepsi', 'active', 'pending', 'passive', 'completed', 'rejected'];
+  const statusSirasi: StatusFiltre[] = ['hepsi', 'correction_needed', 'active', 'pending', 'passive', 'completed', 'rejected'];
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -348,7 +366,8 @@ function IlanlarSekmesi({ ilanlar: ilk, userId }: { ilanlar: any[]; userId: stri
                   const isEditable = !isPending && !isRejected;
 
                   return (
-                    <tr key={ilan.id} style={{ opacity: ['passive', 'rejected'].includes(durum) ? 0.6 : 1 }}>
+                    <React.Fragment key={ilan.id}>
+                    <tr style={{ opacity: ['passive', 'rejected', 'correction_needed'].includes(durum) ? 0.75 : 1, background: durum === 'correction_needed' ? '#12100a' : undefined }}>
                       <td style={td}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                           <span style={{ background: isYuk ? C.redBg : C.greenBg, color: isYuk ? '#fca5a5' : '#86efac', fontSize: '0.65rem', fontWeight: 700, padding: '2px 6px', borderRadius: 3, flexShrink: 0 }}>
@@ -378,6 +397,18 @@ function IlanlarSekmesi({ ilanlar: ilk, userId }: { ilanlar: any[]; userId: stri
                         <DurumBadge durum={durum} />
                         {isRejected && <div style={{ color: C.dim, fontSize: '0.7rem', marginTop: 3 }}>Mod. reddetti</div>}
                         {isPending && <div style={{ color: C.dim, fontSize: '0.7rem', marginTop: 3 }}>İnceleniyor</div>}
+                        {durum === 'correction_needed' && (() => {
+                          const logs = ilan.internal_audit_logs;
+                          const sebep   = logs?.correction_reason;
+                          const mesaj   = logs?.correction_message;
+                          return (
+                            <div style={{ marginTop: 4 }}>
+                              {sebep && <div style={{ color: '#fbbf24', fontSize: '0.72rem', fontWeight: 600 }}>📌 {sebep}</div>}
+                              {mesaj && <div style={{ color: '#94a3b8', fontSize: '0.7rem', marginTop: 2 }}>{mesaj}</div>}
+                              {!sebep && !mesaj && <div style={{ color: '#fbbf24', fontSize: '0.7rem' }}>Moderator düzeltme istedi</div>}
+                            </div>
+                          );
+                        })()}
                       </td>
                       <td style={{ ...td, textAlign: 'right' as const }}>
                         <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
@@ -385,6 +416,19 @@ function IlanlarSekmesi({ ilanlar: ilk, userId }: { ilanlar: any[]; userId: stri
                             style={{ padding: '5px 10px', borderRadius: 5, border: `1px solid ${C.border}`, color: C.muted, fontSize: '0.78rem', textDecoration: 'none', fontWeight: 500 }}>
                             Detay
                           </a>
+                          {/* Düzeltme gerekiyorsa "İlanı Düzelt" butonu önce göster */}
+                          {durum === 'correction_needed' && (
+                            <button onClick={() => {
+                              setDuzeltId(ilan.id);
+                              setDuzeltNotes(ilan.notes || '');
+                              setDuzeltVehicle(ilan.vehicle_type || []);
+                              setDuzeltBody(ilan.body_type || []);
+                              setDuzeltSonuc(null);
+                            }}
+                              style={{ padding: '5px 10px', borderRadius: 5, border: '1px solid #854d0e', background: '#2a1d00', color: '#fbbf24', fontSize: '0.78rem', cursor: 'pointer', fontWeight: 700 }}>
+                              ✏️ İlanı Düzelt
+                            </button>
+                          )}
                           {isEditable && !tamamlandi && (
                             isAktif ? (
                               <button onClick={() => pasifYap(ilan.id)} disabled={!!yukleniyor}
@@ -424,6 +468,127 @@ function IlanlarSekmesi({ ilanlar: ilk, userId }: { ilanlar: any[]; userId: stri
                         </div>
                       </td>
                     </tr>
+                    {/* Düzeltme formu — correction_needed ve bu ilan seçiliyse */}
+                    {duzeltId === ilan.id && (
+                      <tr>
+                        <td colSpan={6} style={{ padding: '0 12px 16px', background: '#0a0d11' }}>
+                          <div style={{ border: '1px solid #854d0e', borderRadius: 8, padding: 16, background: '#12100a' }}>
+                            <div style={{ color: '#fbbf24', fontWeight: 700, fontSize: '0.85rem', marginBottom: 12 }}>
+                              ✏️ İlanı Düzelt — {ilan.origin_city} → {(ilan.listing_stops||[])[0]?.city}
+                            </div>
+                            {/* Modératör mesajı */}
+                            {(() => {
+                              const logs = ilan.internal_audit_logs;
+                              const reason  = logs?.correction_reason;
+                              const message = logs?.correction_message;
+                              return (reason || message) ? (
+                                <div style={{ background: '#2a1d00', border: '1px solid #854d0e', borderRadius: 6, padding: '10px 14px', marginBottom: 12 }}>
+                                  <div style={{ color: '#fbbf24', fontSize: '0.72rem', fontWeight: 700, marginBottom: 4 }}>MOD. NOTU</div>
+                                  {reason  && <div style={{ color: '#e2e8f0', fontSize: '0.82rem', marginBottom: message ? 4 : 0 }}>📌 {reason}</div>}
+                                  {message && <div style={{ color: '#94a3b8', fontSize: '0.8rem' }}>{message}</div>}
+                                </div>
+                              ) : null;
+                            })()}
+                            {/* İhlal edilen kurallar */}
+                            {(() => {
+                              const logs = ilan.internal_audit_logs;
+                              const fired: any[] = logs?.fired_rules || [];
+                              return fired.length > 0 ? (
+                                <div style={{ marginBottom: 12 }}>
+                                  <div style={{ color: C.muted, fontSize: '0.72rem', marginBottom: 6 }}>Tespit edilen sorunlar:</div>
+                                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                                    {fired.map((r: any, i: number) => (
+                                      <span key={i} style={{ background: '#1a0808', color: '#f87171', fontSize: '0.72rem', padding: '2px 8px', borderRadius: 4, border: '1px solid #450a0a' }}>
+                                        ⚠️ {r.description || 'Kural ihlali'}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              ) : null;
+                            })()}
+                            {/* Not alanı */}
+                            <div style={{ marginBottom: 10 }}>
+                              <label style={lbl}>Not / Açıklama</label>
+                              <textarea value={duzeltNotes} onChange={e => setDuzeltNotes(e.target.value)}
+                                rows={3} placeholder="Sorunlu ifadeleri kaldırın..."
+                                style={{ ...inp, resize: 'vertical' as const }} />
+                            </div>
+                            {/* Araç tipi */}
+                            <div style={{ marginBottom: 10 }}>
+                              <label style={lbl}>Araç Tipi</label>
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                                {ARAC_TIPLERI.map(t => (
+                                  <button key={t} type="button"
+                                    onClick={() => setDuzeltVehicle(prev => prev.includes(t) ? prev.filter(x => x !== t) : [...prev, t])}
+                                    style={{ padding: '4px 12px', borderRadius: 6, border: `1px solid ${duzeltVehicle.includes(t) ? C.green : C.border}`, background: duzeltVehicle.includes(t) ? C.greenDark : C.bg, color: duzeltVehicle.includes(t) ? C.green : C.muted, fontSize: '0.8rem', cursor: 'pointer' }}>
+                                    {t}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                            {/* Üst yapı */}
+                            <div style={{ marginBottom: 14 }}>
+                              <label style={lbl}>Üst Yapı</label>
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                                {UTSYAPI.map(u => (
+                                  <button key={u} type="button"
+                                    onClick={() => setDuzeltBody(prev => prev.includes(u) ? prev.filter(x => x !== u) : [...prev, u])}
+                                    style={{ padding: '4px 12px', borderRadius: 6, border: `1px solid ${duzeltBody.includes(u) ? C.blue : C.border}`, background: duzeltBody.includes(u) ? C.blueBg : C.bg, color: duzeltBody.includes(u) ? C.blue : C.muted, fontSize: '0.8rem', cursor: 'pointer' }}>
+                                    {u}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                            {/* Sonuc mesajı */}
+                            {duzeltSonuc && (
+                              <div style={{ background: duzeltSonuc.ok ? C.greenDark : '#2a1d00', border: `1px solid ${duzeltSonuc.ok ? C.greenBg : '#854d0e'}`, borderRadius: 6, padding: '8px 14px', marginBottom: 12, color: duzeltSonuc.ok ? C.green : '#fbbf24', fontSize: '0.82rem', fontWeight: 600 }}>
+                                {duzeltSonuc.ok ? '✅' : '⚠️'} {duzeltSonuc.mesaj}
+                                {!duzeltSonuc.ok && duzeltSonuc.firedRules && duzeltSonuc.firedRules.length > 0 && (
+                                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
+                                    {duzeltSonuc.firedRules.map((r: any, i: number) => (
+                                      <span key={i} style={{ background: '#1a0808', color: '#f87171', fontSize: '0.7rem', padding: '1px 6px', borderRadius: 4 }}>
+                                        {r.description}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                            <div style={{ display: 'flex', gap: 8 }}>
+                              <button disabled={duzeltYukleniyor} onClick={async () => {
+                                setDuzeltYukleniyor(true); setDuzeltSonuc(null);
+                                try {
+                                  const res = await fetch('/api/ilan/duzelt', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ id: ilan.id, notes: duzeltNotes, vehicle_type: duzeltVehicle, body_type: duzeltBody }),
+                                  });
+                                  const d = await res.json();
+                                  if (res.ok) {
+                                    setDuzeltSonuc({ ok: d.moderation_status === 'approved', mesaj: d.mesaj, firedRules: d.fired_rules });
+                                    ilanGuncelle(ilan.id, { moderation_status: d.moderation_status, status: d.status, is_shadow_banned: d.is_shadow_banned, notes: duzeltNotes });
+                                    if (d.moderation_status === 'approved') { setTimeout(() => setDuzeltId(''), 2000); }
+                                  } else {
+                                    setDuzeltSonuc({ ok: false, mesaj: d.error || 'Hata oluştu' });
+                                  }
+                                } catch (e: any) {
+                                  setDuzeltSonuc({ ok: false, mesaj: e.message });
+                                }
+                                setDuzeltYukleniyor(false);
+                              }}
+                                style={{ background: C.green, color: '#000', border: 'none', borderRadius: 6, padding: '7px 18px', fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer', opacity: duzeltYukleniyor ? 0.6 : 1 }}>
+                                {duzeltYukleniyor ? '⏳ Gönderiliyor...' : '✓ Kaydedip Gönder'}
+                              </button>
+                              <button onClick={() => { setDuzeltId(''); setDuzeltSonuc(null); }}
+                                style={{ background: 'none', border: `1px solid ${C.border}`, color: C.muted, borderRadius: 6, padding: '7px 14px', fontSize: '0.85rem', cursor: 'pointer' }}>
+                                İptal
+                              </button>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                    </React.Fragment>
                   );
                 })}
               </tbody>
@@ -436,18 +601,22 @@ function IlanlarSekmesi({ ilanlar: ilk, userId }: { ilanlar: any[]; userId: stri
 }
 
 function durumLabel(s: string): string {
-  const map: Record<string, string> = { hepsi: 'Tümü', active: 'Aktif', passive: 'Pasif', completed: 'Tamamlanan', pending: 'Onay Bekleyen', rejected: 'Reddedilen' };
+  const map: Record<string, string> = {
+    hepsi: 'Tümü', active: 'Aktif', passive: 'Pasif', completed: 'Tamamlanan',
+    pending: 'Onay Bekleyen', rejected: 'Reddedilen', correction_needed: '⚠️ Düzeltme Gerekiyor',
+  };
   return map[s] || s;
 }
 
 function durumRenk(s: string): { bg: string; color: string } {
   const map: Record<string, { bg: string; color: string }> = {
-    active:    { bg: '#0d2b1a', color: C.green },
-    passive:   { bg: '#1f2937', color: C.muted },
-    completed: { bg: C.greenBg, color: '#86efac' },
-    pending:   { bg: '#2d1a00', color: C.amber },
-    rejected:  { bg: '#2d0a0a', color: C.red },
-    hepsi:     { bg: C.surface, color: C.muted },
+    active:             { bg: '#0d2b1a', color: C.green },
+    passive:            { bg: '#1f2937', color: C.muted },
+    completed:          { bg: C.greenBg, color: '#86efac' },
+    pending:            { bg: '#2d1a00', color: C.amber },
+    rejected:           { bg: '#2d0a0a', color: C.red },
+    correction_needed:  { bg: '#2d1a00', color: '#fbbf24' },
+    hepsi:              { bg: C.surface, color: C.muted },
   };
   return map[s] || { bg: C.surface, color: C.muted };
 }
