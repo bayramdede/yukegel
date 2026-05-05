@@ -313,7 +313,7 @@ export default function Moderator() {
   }
 
   // ── Toplu işlem helper (service role API)
-  async function topluApi(ids: string[], action: 'approve' | 'reject' | 'passive' | 'archive' | 'unarchive' | 'shadow_ban_kaldir') {
+  async function topluApi(ids: string[], action: 'approve' | 'reject' | 'passive' | 'archive' | 'unarchive' | 'shadow_ban_kaldir' | 'shadow_ban') {
     const res = await fetch('/api/moderator/toplu-islem', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
