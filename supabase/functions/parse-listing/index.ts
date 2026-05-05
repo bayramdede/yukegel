@@ -309,8 +309,8 @@ function parseMessage(message: string, aliases: Alias[]): {
                   toDistrict: to.district || null,
                   vehicle: findVehicle(line, aliases),
                   body_type: findBodyType(line, aliases),
-                  weight_ton: extractWeight(message),
-                  pallet: extractPallet(message),
+                  weight_ton: extractWeight(line),
+                  pallet: extractPallet(line),
                   raw_line: line
                 })
               }
@@ -344,8 +344,8 @@ function parseMessage(message: string, aliases: Alias[]): {
             toDistrict: to.district || null,
             vehicle: findVehicle(line, aliases),
             body_type: findBodyType(line, aliases),
-            weight_ton: extractWeight(message),
-            pallet: extractPallet(message),
+            weight_ton: extractWeight(line),
+            pallet: extractPallet(line),
             raw_line: line
           })
         }
@@ -360,8 +360,8 @@ function parseMessage(message: string, aliases: Alias[]): {
           toDistrict: to.district || null,
           vehicle: findVehicle(line, aliases),
           body_type: findBodyType(line, aliases),
-          weight_ton: extractWeight(message),
-          pallet: extractPallet(message),
+          weight_ton: extractWeight(line),
+          pallet: extractPallet(line),
           raw_line: line
         })
       }
@@ -381,8 +381,8 @@ function parseMessage(message: string, aliases: Alias[]): {
             toDistrict: hits[1].district || null,
             vehicle: findVehicle(line, aliases),
             body_type: findBodyType(line, aliases),
-            weight_ton: extractWeight(message),
-            pallet: extractPallet(message),
+            weight_ton: extractWeight(line),
+            pallet: extractPallet(line),
             raw_line: line
           })
           break

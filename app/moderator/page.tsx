@@ -475,6 +475,7 @@ export default function Moderator() {
       notes: ilan.notes || '',
       vehicle_type: ilan.vehicle_type || [],
       body_type: ilan.body_type || [],
+      raw_text: ilan.raw_text || '',
       stops: (ilan.listing_stops || []).sort((a: any, b: any) => a.stop_order - b.stop_order).map((s: any) => ({
         id: s.id, city: s.city, district: s.district || '',
         weight_ton: s.weight_ton || '', pallet_count: s.pallet_count || '',

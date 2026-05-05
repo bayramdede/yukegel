@@ -4,6 +4,10 @@ export async function POST(request: NextRequest) {
   try {
     const { raw_text, notes } = await request.json();
 
+    if (!raw_text) {
+      return NextResponse.json({ success: false, error: 'raw_text boş, LLM çağrısı yapılamadı' }, { status: 400 });
+    }
+
     const prompt = `Türk nakliye ilanı ayrıştır. Sadece JSON döndür.
 
 İLAN SATIRI: ${notes || raw_text.split('\n')[0]}
