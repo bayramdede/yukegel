@@ -487,7 +487,7 @@ export default function Moderator() {
     if (ilan.user_id) {
       supabase.from('users').select('id, display_name, phone, email, is_active, role, user_type')
         .eq('id', ilan.user_id).single()
-        .then(({ data }) => setDuzenleKullanici(data));
+        .then(({ data }: { data: any }) => setDuzenleKullanici(data));
     }
   }
 
