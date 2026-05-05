@@ -87,7 +87,11 @@ export default function WhatsappYukle() {
               <div style={{ background: sonuc.success ? '#0d2b1a' : '#2a0d0d', border: `1px solid ${sonuc.success ? '#166534' : '#7f1d1d'}`, borderRadius: 6, padding: '8px 14px', fontSize: '0.82rem' }}>
                 {sonuc.success ? (
                   <span style={{ color: '#22c55e' }}>
-                    ✅ {sonuc.total_messages} mesaj tarandı — {sonuc.info || `${sonuc.passed_gate} ilan tespit edildi, ${sonuc.saved_to_db} kaydedildi`}
+                    ✅ {sonuc.total_messages} mesaj tarandı — {sonuc.saved_to_db} kaydedildi
+                    {sonuc.skipped > 0 && ` · ${sonuc.skipped} tekrar`}
+                    {sonuc.spam_blocked > 0 && ` · ${sonuc.spam_blocked} spam`}
+                    {sonuc.reposted > 0 && ` · ${sonuc.reposted} repost`}
+                    {sonuc.total_messages === 0 && ' ⚠️ Mesaj parse edilemedi — format kontrol et'}
                   </span>
                 ) : (
                   <span style={{ color: '#ef4444' }}>⚠️ {sonuc.error}</span>

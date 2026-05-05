@@ -59,13 +59,22 @@ function extractPhones(text: string): string[] {
 function parseChatTxt(content: string): Array<{ sender: string; timestamp: string; message: string }> {
   const lines = content.split('\n');
   const messages: Array<{ sender: string; timestamp: string; message: string }> = [];
-  const pattern = /^\[(\d{1,2}\.\d{1,2}\.\d{4}\s\d{1,2}:\d{1,2}:\d{1,2})\]\s(.+?):\s(.*)$/;
+
+  // Format 1 (Android TR): [DD.MM.YYYY HH:MM:SS] Gönderen: mesaj
+  const patternAndroid = /^\[(\d{1,2}\.\d{1,2}\.\d{4}[,\s]\d{1,2}:\d{1,2}(?::\d{1,2})?)\]\s(.+?):\s(.*)$/;
+  // Format 2 (iOS TR):   DD.MM.YYYY, HH:MM - Gönderen: mesaj
+  const patternIOS    = /^(\d{1,2}\.\d{1,2}\.\d{4}[,\s]\d{1,2}:\d{1,2})\s?-\s(.+?):\s(.*)$/;
+
   let current: { sender: string; timestamp: string; lines: string[] } | null = null;
-  const SISTEM = ['katıldı', 'ekledi', 'çıkardı', 'ayrıldı', 'silindi', 'şifreli', 'güvenlik kodu', 'değiştirdi', 'e-fatura', 'gider fişi', 'medya dahil edilmedi', 'bu mesaj silindi', 'süreli mesajlar', 'uçtan uca'];
+  const SISTEM = ['katıldı', 'ekledi', 'çıkardı', 'ayrıldı', 'silindi', 'şifreli', 'güvenlik kodu',
+    'değiştirdi', 'e-fatura', 'gider fişi', 'medya dahil edilmedi', 'bu mesaj silindi',
+    'süreli mesajlar', 'uçtan uca', 'missed voice call', 'missed video call', 'this message was deleted'];
+
   for (const line of lines) {
-    const trimmed = line.replace(/[\u200e\u202a\u202c]/g, '').trim();
+    const trimmed = line.replace(/[\u200e\u202a\u202c\u200f\u200b]/g, '').trim();
     if (!trimmed) continue;
-    const match = pattern.exec(trimmed);
+
+    const match = patternAndroid.exec(trimmed) || patternIOS.exec(trimmed);
     if (match) {
       if (current && current.lines.length > 0) {
         const msg = current.lines.join('\n').trim();
@@ -157,7 +166,12 @@ export async function POST(request: NextRequest) {
         const buffer = await file.arrayBuffer();
         const JSZip = (await import('jszip')).default;
         const zip = await JSZip.loadAsync(buffer);
-        const chatFile = Object.keys(zip.files).find(name => name.toLowerCase().includes('chat') && name.toLowerCase().endsWith('.txt'));
+        // _chat.txt (EN), sohbet ile başlayanlar (TR), veya tek .txt varsa onu al
+        const allTxts = Object.keys(zip.files).filter(name => !zip.files[name].dir && name.toLowerCase().endsWith('.txt'));
+        const chatFile = allTxts.find(n => n.toLowerCase().includes('_chat')) ||
+                         allTxts.find(n => n.toLowerCase().includes('chat')) ||
+                         allTxts.find(n => n.toLowerCase().includes('sohbet')) ||
+                         (allTxts.length === 1 ? allTxts[0] : null);
         if (!chatFile) continue;
         content = await zip.files[chatFile].async('string');
       } else if (file.name.endsWith('.txt')) {
@@ -238,6 +252,9 @@ export async function POST(request: NextRequest) {
       total_messages: totalMessages,
       passed_gate: savedToDb + skipped,
       saved_to_db: savedToDb,
+      skipped,
+      spam_blocked: spamEngel,
+      reposted,
     });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });

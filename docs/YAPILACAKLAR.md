@@ -1,6 +1,6 @@
 # Yükegel — Yapılacaklar Listesi
 
-> Son güncelleme: 29 Nisan 2026 (kod taraması ile güncellendi)  
+> Son güncelleme: 5 Mayıs 2026 (kod taraması ile güncellendi)  
 > Bu dosya tüm geçmiş sohbetler taranarak oluşturulmuştur.
 
 ---
@@ -20,13 +20,15 @@
 - [x] `pg_cron` expire job (her gece 02:00, süresi dolmuş ilanlar pasife alınır)
 - [x] `users.role` kolonu (`user` / `moderator` / `admin`)
 
-### Auth — UI Katmanı (Kısmen)
+### Auth — UI Katmanı
 - [x] `/giris` sayfası UI — Telefon + OTP sekmesi tasarımı
 - [x] `/giris` sayfası UI — E-posta + Şifre sekmesi (giriş, kayıt, şifremi unuttum)
 - [x] `/auth/reset` — Şifre sıfırlama sayfası
 - [x] `/auth/callback` — E-posta doğrulama sonrası rol bazlı yönlendirme
 - [x] `lib/auth.ts` — `requireAdmin()`, `requireModerator()`, `getCurrentUser()`, `landingForRole()`
 - [x] `/moderator` sayfası — Rol koruması (sadece moderatör + admin)
+- [x] Telefon OTP sonrası `user_type` yoksa `/profil-tamamla`'ya yönlendirme (`otpDogrula` içinde)
+- [x] `/profil-tamamla` sayfası — user_type seçimi, Ad Soyad, Telefon, TCKN/VKN, araç bilgileri (arac_sahibi için)
 
 ### Admin Paneli
 - [x] `/admin` — Yönetim paneli ana ekranı (kart düzeni)
@@ -37,6 +39,8 @@
 - [x] "Yeni üye" etiketi (kayıt tarihine göre)
 - [x] 3 seçenekli ilan oluşturma karşılama ekranı (`/ilan-olustur`) — Tekil aktif, Excel + Metinden "Yakında"
 - [x] Tekil yük ilanı formu (`/ilan-ver`) — 4 adımlı wizard, `listings` + `listing_stops` tablosuna yazar
+- [x] Excel toplu yükleme (`TopluYukle.tsx`) — şablon parse + satır bazlı validasyon + onay ekranı + Supabase'e yazma
+- [x] "Sahiplen" akışı — `/ilan/[id]/sahiplen` — OTP doğrulama ile doğrulanmamış ilanı sahiplenme
 - [x] "Doğrulanmamış İlan" etiketi + tooltip (parse kaynaklı sahipsiz ilanlar)
 - [x] "✓ Fiyat Belli" rozeti (yeşil, ana sayfa kartı + detay sayfası)
 
@@ -44,25 +48,11 @@
 
 ## ⏳ Kalan Görevler — Faz 1
 
-### 🔐 Auth & Üyelik Akışı ← ÖNCE BUNLAR
+### 🔐 Auth & Üyelik Akışı
 
-- [ ] **Telefon OTP → profil tamamlama bağlantısı**
-  - `yonlendir()` fonksiyonuna `user_type` kontrolü eklenecek
-  - OTP ile ilk girişte `/profil-tamamla`'ya yönlendirilecek (şu an yok, direkt ana sayfaya düşüyor)
-
-- [ ] **E-posta kayıt → profil tamamlama bağlantısı**
-  - `/auth/callback` `user_type` kontrolü var ama test edilmedi
-  - Doğrulama maili → link → callback → profil-tamamla akışı uçtan uca test edilecek
-
-- [ ] **`/profil-tamamla` sayfası tamamlanacak**
-  - Kullanıcı türü seçimi (Yük Sahibi / Nakliyeci)
-  - Ad Soyad, Telefon, TCKN/VKN alanları
-  - Kayıt sonrası `users` tablosunda `user_type` set edilecek
-  - Nakliyeciye opsiyonel araç bilgileri adımı
-
-- [ ] **Kayıt sonrası `users` tablosuna kayıt**
-  - Supabase Auth kullanıcı oluştuğunda `users` tablosuna da satır yazılıyor mu? (trigger veya `/profil-tamamla` submit'te olmalı)
-  - `user_type`, `display_name`, `phone`, `tckn`/`vkn` doğru yazılıyor mu?
+- [ ] **E-posta kayıt → profil tamamlama uçtan uca testi**
+  - `/auth/callback` `user_type` kontrolü var ama production'da test edilmedi
+  - Doğrulama maili → link → callback → profil-tamamla akışı doğrulanacak
 
 - [ ] **İlan verirken profil kontrolü**
   - `/ilan-ver`'e gidildiğinde `user_type` yoksa `/profil-tamamla`'ya yönlendir
@@ -75,14 +65,12 @@
 
 ### 📄 İlan Oluşturma
 
-- [ ] **Excel toplu yükleme** — Şablon indirme + yükleme + validasyon akışı (`/ilan-olustur/toplu`)
-- [ ] **Metinden ilan girme** — LLM parse + önizleme + onay akışı (`/ilan-olustur/metin`)
+- [ ] **Metinden ilan girme** — LLM parse + önizleme + onay akışı (`/ilan-ver` → metin seçeneği, şu an YAKINDA)
 - [ ] **Araç ilanı formu** — Nakliyecinin araç/kapasite ilanı vermesi (tekil, ayrı form)
 
 ### 🔄 İş Akışları
 
 - [ ] **"Bu işi aldım" butonu** — Nakliyeci tıklar → müşteriye bildirim → onay/ret → ilan pasife alınır
-- [ ] **"Sahiplen" akışı** — Doğrulanmamış ilanlarda "İlan Sahibine Bildir" → WhatsApp + claim linki → OTP doğrulama → ilan sahiplenilir → "Doğrulanmamış" etiketi kalkar
 
 ### 📋 Panel Geliştirme
 
@@ -138,4 +126,4 @@
 
 
 ## ⚠️ BUGLAR
-- WhatsApp Import yukegel.com üzerinde çalışmadı. localhost'ta çalıştı
+- WhatsApp Import yukegel.com üzerinde çalışmıyor. localhost'ta çalışıyor (production ortamı farkı — muhtemelen Edge Function env var veya Supabase webhook URL sorunu)
