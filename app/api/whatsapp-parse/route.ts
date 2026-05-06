@@ -42,17 +42,24 @@ function trNorm(s: string): string {
 
 function extractPhones(text: string): string[] {
   const phones: string[] = [];
-  const matches1 = text.match(/0\s*5\s*\d[\s\.\-]?\d{2}[\s\.\-]?\d{3}[\s\.\-]?\d{2}[\s\.\-]?\d{2}/g) || [];
-  const matches2 = text.match(/\+?\s*9\s*0\s*5\s*\d[\s\.\-]?\d{2}[\s\.\-]?\d{3}[\s\.\-]?\d{2}[\s\.\-]?\d{2}/g) || [];
-  const matches3 = text.match(/5\d{9}/g) || [];
-  const all = [...matches1, ...matches2, ...matches3];
-  for (const m of all) {
-    const d = m.replace(/\D/g, '');
-    let norm = d;
-    if (norm.startsWith('90') && norm.length >= 12) norm = norm.slice(2);
-    if (norm.startsWith('0') && norm.length === 11) norm = norm.slice(1);
-    if (norm.length === 10 && norm.startsWith('5')) phones.push('0' + norm);
+
+  // +90 / +9 0 gibi prefix'leri 0'a çevir, parantezleri boşluğa dönüştür
+  const t = text
+    .replace(/\+\s*9\s*0\s*/g, '0')
+    .replace(/[()]/g, ' ');
+
+  // 05 ile başlayan, rakamlar arasında isteğe bağlı boşluk/ayraç olan
+  // toplamda 11 haneli numaraları yakala
+  // Örnek formatlar: 0537 914 91 90 / 0547 051 3951 / 05379149190
+  const re = /0\s*5(?:\s*\d){9}/g;
+  let m;
+  while ((m = re.exec(t)) !== null) {
+    const digits = m[0].replace(/\D/g, '');
+    if (digits.length === 11 && digits.startsWith('05')) {
+      phones.push(digits);
+    }
   }
+
   return [...new Set(phones)];
 }
 
@@ -189,20 +196,31 @@ export async function POST(request: NextRequest) {
     const spamEsik: number = configRow?.value?.max_listings_per_hour ?? 3;
 
     let savedToDb = 0, skipped = 0, reposted = 0, spamEngel = 0;
+    const debugLog: string[] = [];
 
     for (const fc of fileContents) {
       const messages = parseChatTxt(fc.content);
       for (const msg of messages) {
         let msgDate: string = new Date().toISOString().split('T')[0];
+        let passedTimeFilter = false;
         try {
-          const [date, time] = msg.timestamp.split(' ');
-          const [day, month, year] = date.split('.');
-          const d = new Date(`${year}-${month}-${day}T${time}`);
-          if (d < cutoff) continue;
-          msgDate = `${year}-${month}-${day}`;
-        } catch { /* devam */ }
+          const tsClean = msg.timestamp.replace(',', '').replace(/\s+/g, ' ').trim();
+          const tsParts = tsClean.split(' ');
+          if (tsParts.length < 2) { debugLog.push(`SKIP ts_split: ${msg.timestamp}`); continue; }
+          const [datePart, timePart] = tsParts;
+          const dateSplit = datePart.split('.');
+          if (dateSplit.length < 3) { debugLog.push(`SKIP date_split: ${datePart}`); continue; }
+          const [day, month, year] = dateSplit;
+          const isoDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+          const d = new Date(`${isoDate}T${timePart}`);
+          if (isNaN(d.getTime())) { debugLog.push(`SKIP invalid_date: ${isoDate}T${timePart}`); continue; }
+          if (d < cutoff) { debugLog.push(`SKIP cutoff: ${isoDate}T${timePart} < ${cutoff.toISOString()}`); continue; }
+          msgDate = isoDate;
+          passedTimeFilter = true;
+        } catch (e: any) { debugLog.push(`SKIP ts_error: ${e.message}`); continue; }
 
         const gate = await gatekeeper(msg.message, aliases || []);
+        debugLog.push(`MSG ${msgDate} | isAd=${gate.isAd} score=${gate.score} phones=${gate.phones.length} cities=${gate.cities.join(',')} vehicles=${gate.vehicles.join(',')} | ${msg.message.slice(0, 60).replace(/\n/g, ' ')}`);
         if (!gate.isAd || gate.score < 30) continue;
 
         const hash = await cleanHash(msg.message);
@@ -213,9 +231,20 @@ export async function POST(request: NextRequest) {
           if (isSpam) { spamEngel++; continue; }
         }
 
-        if (phone) {
-          const { data: exactMatch } = await supabase.from('raw_posts').select('id').eq('clean_hash', hash).eq('contact_phone', phone).eq('message_date', msgDate).maybeSingle();
-          if (exactMatch) { skipped++; continue; }
+        // Aynı gün aynı mesaj zaten var mı? (clean_hash + date — telefon fark etmeksizin)
+        const { data: exactMatch } = await supabase.from('raw_posts')
+          .select('id, contact_phone')
+          .eq('clean_hash', hash)
+          .eq('message_date', msgDate)
+          .maybeSingle();
+        if (exactMatch) {
+          // Eski kayıtta telefon yoksa şimdi güncelle
+          if (!exactMatch.contact_phone && phone) {
+            await supabase.from('raw_posts').update({ contact_phone: phone }).eq('id', exactMatch.id);
+            await supabase.from('listings').update({ contact_phone: phone }).eq('raw_post_id', exactMatch.id);
+            debugLog.push(`PHONE_UPDATE: ${exactMatch.id} → ${phone}`);
+          }
+          skipped++; continue;
         }
 
         let isRepost = false, sourceRawPostId: string | null = null;
@@ -255,6 +284,9 @@ export async function POST(request: NextRequest) {
       skipped,
       spam_blocked: spamEngel,
       reposted,
+      cutoff: cutoff.toISOString(),
+      saat_filtre: saatFiltre,
+      debug: debugLog,
     });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });

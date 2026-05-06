@@ -18,12 +18,10 @@ export async function ilanKaydet(formData: {
   tarih: string;
   tarih_esnek: boolean;
   genel_not: string;
-  // Ortak araç bilgileri
   arac_tipi: string;
   utsyapi: string[];
   arac_adet: number;
   yuk_cinsi: string;
-  // Varış noktaları
   duraklar: Array<{
     sehir: string;
     ilce: string;
@@ -45,24 +43,22 @@ export async function ilanKaydet(formData: {
   );
   const { data: { user } } = await supabaseAuth.auth.getUser();
 
-  // 1. listings'e yaz
   const { data: listing, error } = await supabase
     .from('listings')
     .insert({
       listing_type: formData.tip,
       origin_city: formData.kalkis,
       origin_district: formData.kalkis_ilce || null,
-      contact_phone: formData.tel,
+      contact_phone: formData.tel || null,
       price_offer: formData.fiyat ? parseFloat(formData.fiyat) : null,
       price_negotiable: formData.fiyat_pazarlik,
       available_date: formData.tarih || null,
       date_flexible: formData.tarih_esnek,
       notes: formData.genel_not || null,
       source: 'form',
-      moderation_status: 'auto_published', // Form ilanları direkt yayına
+      moderation_status: 'auto_published',
       trust_level: 'verified',
       user_id: user?.id || null,
-      // Ortak araç bilgileri listings seviyesinde
       vehicle_type: formData.arac_tipi ? [formData.arac_tipi] : null,
       body_type: formData.utsyapi.length > 0 ? formData.utsyapi : null,
     })
@@ -71,7 +67,6 @@ export async function ilanKaydet(formData: {
 
   if (error) throw new Error(error.message);
 
-  // 2. listing_stops'a yaz — araç bilgileri her durağa ortak yazılır
   const stops = formData.duraklar.map((d, i) => ({
     listing_id: listing.id,
     stop_order: i + 1,
@@ -93,7 +88,6 @@ export async function ilanKaydet(formData: {
   return { success: true, id: listing.id };
 }
 
-// Kullanıcının telefon numarasını getir
 export async function kullanicitelefon(): Promise<string | null> {
   const cookieStore = await cookies();
   const supabaseAuth = createServerClient(
@@ -109,11 +103,12 @@ export async function kullanicitelefon(): Promise<string | null> {
   const { data: { user } } = await supabaseAuth.auth.getUser();
   if (!user) return null;
 
+  // maybeSingle() — admin veya yeni kullanıcıda users satırı olmayabilir
   const { data } = await supabase
     .from('users')
     .select('phone')
     .eq('id', user.id)
-    .single();
+    .maybeSingle();
 
   return data?.phone || null;
 }

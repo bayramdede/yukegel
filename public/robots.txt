@@ -1,0 +1,27 @@
+# Yükegel - robots.txt
+# AI crawler izinleri (GPTBot, ClaudeBot, vb.)
+
+User-agent: GPTBot
+Allow: /ilan/
+Allow: /u/
+Disallow: /admin/
+Disallow: /moderator/
+Disallow: /moderator-giris/
+Disallow: /panel/
+Disallow: /api/
+
+User-agent: ClaudeBot
+Allow: /ilan/
+Allow: /u/
+Disallow: /admin/
+Disallow: /moderator/
+Disallow: /panel/
+Disallow: /api/
+
+User-agent: GoogleBot
+Allow: /
+
+User-agent: *
+Allow: /
+
+Sitemap: https://yukegel.com/sitemap.xml

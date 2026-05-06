@@ -93,17 +93,15 @@ function stripSuffix(token: string): string {
 // -------------------------
 function extractPhones(text: string): string[] {
   const phones: string[] = []
-  const matches = text.match(/0\s*5\s*\d[\s\.\-]?\d{2}[\s\.\-]?\d{3}[\s\.\-]?\d{2}[\s\.\-]?\d{2}/g) || []
-  const matches2 = text.match(/\+?\s*9\s*0\s*5\s*\d[\s\.\-]?\d{2}[\s\.\-]?\d{3}[\s\.\-]?\d{2}[\s\.\-]?\d{2}/g) || []
-  const matches3 = text.match(/5\d{9}/g) || []
-
-  for (const m of [...matches, ...matches2, ...matches3]) {
-    const d = m.replace(/\D/g, '')
-    let norm = d
-    if (norm.startsWith('90') && norm.length >= 12) norm = norm.slice(2)
-    if (norm.startsWith('0') && norm.length === 11) norm = norm.slice(1)
-    if (norm.length === 10 && norm.startsWith('5') && !phones.includes('0' + norm)) {
-      phones.push('0' + norm)
+  // +90 prefix normalize et, parantezleri kaldır
+  const t = text.replace(/\+\s*9\s*0\s*/g, '0').replace(/[()]/g, ' ')
+  // 05 ile başlayan, aralarında isteğe bağlı boşluk olan 11 haneli numaraları yakala
+  const re = /0\s*5(?:\s*\d){9}/g
+  let m
+  while ((m = re.exec(t)) !== null) {
+    const digits = m[0].replace(/\D/g, '')
+    if (digits.length === 11 && digits.startsWith('05') && !phones.includes(digits)) {
+      phones.push(digits)
     }
   }
   return phones
@@ -139,13 +137,24 @@ function splitByRelation(line: string): { left: string, right: string, rel: stri
     }
   }
 
-  // Tire
+  // Tire (boşluklu: "A - B")
   if (DASH_RE.test(line)) {
     const parts = line.split(DASH_RE)
     if (parts.length >= 2) {
       const left = parts[0].trim()
       const right = parts.slice(1).join(' - ').trim()
       if (left && right) return { left, right, rel: 'dash' }
+    }
+  }
+
+  // Tire (boşluksuz: "CEYHAN-ANKARA") — tek tire içeren satır
+  const noSpaceDash = line.match(/^(.+?)[-–—](.+)$/)
+  if (noSpaceDash) {
+    const left = noSpaceDash[1].trim()
+    const right = noSpaceDash[2].trim()
+    // Her iki taraf da en az 3 karakter olmalı, sadece rakam/sembol değil
+    if (left.length >= 3 && right.length >= 3 && /[a-zA-ZÀ-ÿ\u00C0-\u024F\u011E\u011F\u0130\u0131\u015E\u015F\u00C7\u00E7\u00D6\u00F6\u00DC\u00FC\u011E\u011F]/u.test(left) && /[a-zA-ZÀ-ÿ\u00C0-\u024F]/u.test(right)) {
+      return { left, right, rel: 'dash_nospace' }
     }
   }
 
@@ -368,12 +377,63 @@ function parseMessage(message: string, aliases: Alias[]): {
     }
   }
 
-  // Fallback: 2 şehir aynı satırda
+  // ── Pass 2: YÜKLEMELİ blok yapısı ──────────────────────────────
+  // Her zaman çalışır (lanes.length bağımsız)
+  {
+    let blockOrigin: PlaceHit | null = null
+    let blockVehicle: string | null = null
+    let blockBody: string | null = null
+    const blockSeen = new Set<string>()
+
+    for (const line of lines) {
+      const normLine = trNorm(line)
+      const isYuklemeli = normLine.includes('yuklemeli') || normLine.includes('yuklemesi') || normLine.includes('yuklenecek')
+
+      if (isYuklemeli) {
+        blockOrigin = bestPlace(findPlaces(line, aliases))
+        blockVehicle = findVehicle(line, aliases)
+        blockBody = findBodyType(line, aliases)
+        continue
+      }
+
+      // Ok veya tire içeren satır yeni bir blok/hat başlangıcı — reset
+      if (blockOrigin && (ARROW_RE.test(line) || DASH_RE.test(line) || /[-–—]/.test(line))) {
+        blockOrigin = null
+        continue
+      }
+
+      if (blockOrigin) {
+        const hits = findPlaces(line, aliases)
+        if (hits.length > 0 && hits[0].normalized !== blockOrigin.normalized) {
+          const key = `${blockOrigin.normalized}|${blockOrigin.district ?? ''}|${hits[0].normalized}|${hits[0].district ?? ''}`
+          if (!blockSeen.has(key)) {
+            lanes.push({
+              from: blockOrigin.normalized,
+              fromDistrict: blockOrigin.district || null,
+              to: hits[0].normalized,
+              toDistrict: hits[0].district || null,
+              vehicle: blockVehicle,
+              body_type: blockBody,
+              weight_ton: extractWeight(line),
+              pallet: extractPallet(line),
+              raw_line: line
+            })
+            blockSeen.add(key)
+          }
+        }
+      }
+    }
+  }
+
+  // Fallback: 2 şehir aynı satırda — TÜM eşleşen satırları tara (break yok)
   if (lanes.length === 0) {
     for (const line of lines) {
       const hits = findPlaces(line, aliases)
       if (hits.length >= 2 && hits[0].priority >= 50 && hits[1].priority >= 50) {
-        if (hits[0].normalized !== hits[1].normalized) {
+        // Aynı şehir: sadece ilçeler farklıysa kabul et
+          const sameCity = hits[0].normalized === hits[1].normalized
+          const diffDist = hits[0].district !== hits[1].district
+          if (!sameCity || (sameCity && hits[0].district && hits[1].district && diffDist)) {
           lanes.push({
             from: hits[0].normalized,
             fromDistrict: hits[0].district || null,
@@ -385,16 +445,16 @@ function parseMessage(message: string, aliases: Alias[]): {
             pallet: extractPallet(line),
             raw_line: line
           })
-          break
+          // break kaldırıldı — tüm satırları tara
         }
       }
     }
   }
 
-  // Duplicate lane temizle (aynı from+to kombinasyonu)
+  // Duplicate lane temizle (from+fromDistrict+to+toDistrict kombinasyonu)
   const seen = new Set<string>()
   const uniqueLanes = lanes.filter(l => {
-    const key = l.from + '|' + l.to
+    const key = `${l.from}|${l.fromDistrict ?? ''}|${l.to}|${l.toDistrict ?? ''}`
     if (seen.has(key)) return false
     seen.add(key)
     return true

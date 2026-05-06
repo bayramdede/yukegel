@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { notFound } from 'next/navigation';
+import { Metadata } from 'next';
 import Aksiyonlar from './Aksiyonlar';
 import { cookies } from 'next/headers';
 import { createServerClient } from '@supabase/ssr';
@@ -8,6 +9,78 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
+
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://yukegel.com';
+
+// ── Ortak veri çekici (generateMetadata + page paylaşır)
+async function fetchIlanTemel(id: string) {
+  const { data } = await supabase
+    .from('listings')
+    .select(`
+      id, listing_type, origin_city, origin_district,
+      vehicle_type, body_type, price_offer, available_date,
+      notes, audit_score, moderation_status, is_shadow_banned, status,
+      listing_stops ( stop_order, city, district, weight_ton, cargo_type )
+    `)
+    .eq('id', id)
+    .single();
+  return data;
+}
+
+// ── Adım 1: Dinamik Metadata
+export async function generateMetadata(
+  { params }: { params: Promise<{ id: string }> }
+): Promise<Metadata> {
+  const { id } = await params;
+  const ilan = await fetchIlanTemel(id);
+  if (!ilan || ilan.moderation_status === 'rejected' || ilan.is_shadow_banned) {
+    return { title: 'İlan Bulunamadı | Yükegel' };
+  }
+
+  const stops = (ilan.listing_stops || []).sort((a: any, b: any) => a.stop_order - b.stop_order);
+  const varis = stops.at(-1)?.city ?? '';
+  const aracTip = (ilan.vehicle_type as string[] | null)?.[0] ?? '';
+  const isYuk = ilan.listing_type === 'yuk';
+
+  const baslik = [
+    ilan.origin_city,
+    varis && `→ ${varis}`,
+    aracTip,
+    isYuk ? 'Yük İlanı' : 'Araç İlanı',
+    '| Yükegel',
+  ].filter(Boolean).join(' ');
+
+  const agirlik = stops.find((s: any) => s.weight_ton)?.weight_ton;
+  const kargoTip = stops.find((s: any) => s.cargo_type)?.cargo_type;
+
+  const description = [
+    `${ilan.origin_city}${ilan.origin_district ? ` (${ilan.origin_district})` : ''}`,
+    varis ? `→ ${varis}` : null,
+    kargoTip ? `${kargoTip} yükü` : null,
+    agirlik ? `${agirlik} ton` : null,
+    aracTip ? `${aracTip} aranıyor` : null,
+    ilan.audit_score ? `Kalite Skoru: ${ilan.audit_score}/100` : null,
+  ].filter(Boolean).join(', ') + '. Yükegel\'de nakliye ilanları.';
+
+  const url = `${SITE_URL}/ilan/${id}`;
+
+  return {
+    title: baslik,
+    description,
+    openGraph: {
+      title: baslik,
+      description,
+      url,
+      siteName: 'Yükegel',
+      locale: 'tr_TR',
+      type: 'website',
+    },
+    alternates: { canonical: url },
+    robots: ilan.status === 'passive'
+      ? { index: false, follow: false }
+      : { index: true, follow: true },
+  };
+}
 
 function yeniUye(createdAt: string | null): boolean {
   if (!createdAt) return false;
@@ -43,7 +116,7 @@ export default async function IlanDetay({ params }: { params: Promise<{ id: stri
       contact_phone, price_offer, price_negotiable,
       available_date, date_flexible, notes, source,
       created_at, moderation_status, is_shadow_banned,
-      trust_level, user_id,
+      trust_level, user_id, audit_score,
       vehicle_type, body_type,
       listing_stops (
         stop_order, city, district,
@@ -107,8 +180,35 @@ export default async function IlanDetay({ params }: { params: Promise<{ id: stri
   };
   const kaynak = KAYNAK_ETIKET[ilan.source] || KAYNAK_ETIKET.form;
 
+  // ── Adım 2: JSON-LD (Structured Data)
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'Service',
+    name: isYuk ? 'Karayolu Yük Nakliye İlanı' : 'Nakliye Aracı İlanı',
+    description: `${ilan.origin_city} - ${stops.at(-1)?.city ?? ''} arası nakliye`,
+    provider: { '@type': 'Organization', name: 'Yükegel', url: SITE_URL },
+    areaServed: [
+      { '@type': 'City', name: ilan.origin_city },
+      ...stops.map((s: any) => ({ '@type': 'City', name: s.city })),
+    ],
+    datePosted: ilan.created_at,
+    ...(ilan.available_date && { availabilityStarts: ilan.available_date }),
+    additionalProperty: [
+      { '@type': 'PropertyValue', name: 'vehicle_type', value: (ilan.vehicle_type as string[] | null)?.join(', ') ?? '' },
+      { '@type': 'PropertyValue', name: 'body_type', value: (ilan.body_type as string[] | null)?.join(', ') ?? '' },
+      { '@type': 'PropertyValue', name: 'stops_count', value: stops.length },
+      { '@type': 'PropertyValue', name: 'quality_score', value: ilan.audit_score ?? null },
+      { '@type': 'PropertyValue', name: 'source', value: ilan.source },
+    ].filter(p => p.value !== '' && p.value !== null),
+  };
+
   return (
     <div style={{ minHeight: '100vh', background: '#0d1117', fontFamily: "'IBM Plex Sans', system-ui, sans-serif" }}>
+      {/* Adım 2: JSON-LD Script */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
 
       <nav style={{ background: '#161b22', borderBottom: '1px solid #30363d', position: 'sticky', top: 0, zIndex: 50 }}>
         <div style={{ maxWidth: 800, margin: '0 auto', padding: '0 16px', height: 56, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -188,7 +288,16 @@ export default async function IlanDetay({ params }: { params: Promise<{ id: stri
           </span>
         </div>
 
-        {/* Rota */}
+        {/* Adım 3: Semantik article + Rota */}
+        <article
+          itemScope
+          itemType="https://schema.org/Service"
+          data-ai-label="listing"
+          data-listing-id={ilan.id}
+          data-listing-type={ilan.listing_type}
+          data-quality-score={ilan.audit_score ?? undefined}
+          data-verified={!dogrulanmamis ? 'true' : 'false'}
+        >
         <div style={{ background: '#161b22', border: '1px solid #30363d', borderRadius: 12, padding: 24, marginBottom: 16 }}>
           <div style={{ fontSize: '0.72rem', color: '#8b949e', fontWeight: 700, letterSpacing: '0.08em', marginBottom: 16 }}>ROTA</div>
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 16 }}>
@@ -202,8 +311,10 @@ export default async function IlanDetay({ params }: { params: Promise<{ id: stri
               {ilan.origin_district && <div style={{ color: '#8b949e', fontSize: '0.85rem' }}>{ilan.origin_district}</div>}
             </div>
           </div>
+          {/* Adım 3: Duraklar ol listesi olarak (semantik) */}
+          <ol style={{ listStyle: 'none', padding: 0, margin: 0 }} aria-label="Rota durakları">
           {stops.map((s: any, i: number) => (
-            <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: i < stops.length - 1 ? 16 : 0 }}>
+            <li key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: i < stops.length - 1 ? 16 : 0 }} data-ai-label="stop" data-stop-order={s.stop_order} data-city={s.city}>
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 4 }}>
                 <div style={{ width: 12, height: 12, borderRadius: '50%', background: '#f97316', flexShrink: 0 }} />
                 {i < stops.length - 1 && <div style={{ width: 2, background: '#30363d', flex: 1, minHeight: 24, marginTop: 4 }} />}
@@ -212,17 +323,19 @@ export default async function IlanDetay({ params }: { params: Promise<{ id: stri
                 <div style={{ color: '#8b949e', fontSize: '0.72rem', marginBottom: 2 }}>
                   {stops.length > 1 ? `VARIŞ ${i + 1}` : 'VARIŞ'}
                 </div>
-                <div style={{ color: '#e2e8f0', fontWeight: 800, fontSize: '1.2rem' }}>{s.city}</div>
-                {s.district && <div style={{ color: '#8b949e', fontSize: '0.85rem' }}>{s.district}</div>}
+                <div style={{ color: '#e2e8f0', fontWeight: 800, fontSize: '1.2rem' }} data-ai-label="city">{s.city}</div>
+                {s.district && <div style={{ color: '#8b949e', fontSize: '0.85rem' }} data-ai-label="district">{s.district}</div>}
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
-                  {s.vehicle_count > 1 && <span key="adet" style={chipStyle('#1e3a5f', '#60a5fa')}>🚛 {s.vehicle_count} araç</span>}
-                  {s.weight_ton && <span key="ton" style={chipStyle('#1a2a1a', '#86efac')}>⚖ {s.weight_ton} ton</span>}
-                  {s.pallet_count && <span key="palet" style={chipStyle('#1a2a1a', '#86efac')}>📦 {s.pallet_count} palet</span>}
+                  {s.vehicle_count > 1 && <span key="adet" style={chipStyle('#1e3a5f', '#60a5fa')} data-ai-label="vehicle_count">🚛 {s.vehicle_count} araç</span>}
+                  {s.weight_ton && <span key="ton" style={chipStyle('#1a2a1a', '#86efac')} data-ai-label="weight">{`⚖ ${s.weight_ton} ton`}</span>}
+                  {s.pallet_count && <span key="palet" style={chipStyle('#1a2a1a', '#86efac')} data-ai-label="pallet_count">{`📦 ${s.pallet_count} palet`}</span>}
                 </div>
                 {s.notes && <div style={{ color: '#6b7280', fontSize: '0.78rem', marginTop: 6 }}>📝 {s.notes}</div>}
               </div>
             </div>
+            </li>
           ))}
+          </ol>
         </div>
 
         {/* Araç Bilgileri */}
@@ -264,7 +377,7 @@ export default async function IlanDetay({ params }: { params: Promise<{ id: stri
             {ilan.price_offer && (
               <div>
                 <div style={{ color: '#6b7280', fontSize: '0.75rem', marginBottom: 4 }}>Ücret</div>
-                <div style={{ color: '#22c55e', fontWeight: 700, fontSize: '1.1rem' }}>
+                <div style={{ color: '#22c55e', fontWeight: 700, fontSize: '1.1rem' }} data-ai-label="price">
                   ₺{Number(ilan.price_offer).toLocaleString('tr-TR')}
                   {ilan.price_negotiable && <span style={{ color: '#8b949e', fontSize: '0.78rem', marginLeft: 6 }}>(pazarlık)</span>}
                 </div>
@@ -306,12 +419,25 @@ export default async function IlanDetay({ params }: { params: Promise<{ id: stri
           </div>
         </div>
 
+        {/* Adım 6: Kalite skoru — görsel (insanlar için) */}
+        {(ilan.audit_score ?? 0) >= 70 && (
+          <div
+            style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', background: '#0d2b1a', border: '1px solid #166534', borderRadius: 8, marginTop: 12 }}
+            data-ai-label="quality_badge"
+            title={`Bu ilan ${ilan.audit_score}/100 kalite skoru ile moderasyondan geçmiştir.`}
+          >
+            <span style={{ color: '#22c55e', fontSize: '0.78rem', fontWeight: 700 }}>✓ Doğrulanmış Veri</span>
+            <span style={{ color: '#4b5563', fontSize: '0.72rem' }}>Kalite Skoru: {ilan.audit_score}/100</span>
+          </div>
+        )}
+
         <Aksiyonlar
           ilanId={ilan.id}
           dogrulanmamis={dogrulanmamis}
           contactPhone={ilan.contact_phone}
           uyeGiris={!!user}
         />
+        </article>
       </main>
     </div>
   );

@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { createClient } from '../../lib/supabase';
 import { useRouter } from 'next/navigation';
 
@@ -15,7 +15,6 @@ const KULLANICI_TIPLERI = [
 const ARAC_TIPLERI = ['TIR', 'Kırkayak', 'Kamyon', 'Kamyonet', 'Panelvan'];
 const UTSYAPI = ['Tenteli', 'Açık Kasa', 'Kapalı Kasa', 'Frigorifik', 'Damperli', 'Lowbed', 'Liftli'];
 
-// TCKN checksum doğrulama
 function tcknGecerli(tckn: string): boolean {
   if (!/^\d{11}$/.test(tckn) || tckn[0] === '0') return false;
   const d = tckn.split('').map(Number);
@@ -25,7 +24,6 @@ function tcknGecerli(tckn: string): boolean {
   return t2 % 10 === d[10];
 }
 
-// VKN checksum doğrulama (Gemini algoritması)
 function vknGecerli(vkn: string): boolean {
   if (!/^\d{10}$/.test(vkn)) return false;
   const d = vkn.split('').map(Number);
@@ -34,54 +32,115 @@ function vknGecerli(vkn: string): boolean {
     const tmp = (d[i] + 10 - (i + 1)) % 10;
     toplam += tmp === 9 ? 9 : (tmp * Math.pow(2, 10 - (i + 1))) % 9;
   }
-  const sonHane = (10 - (toplam % 10)) % 10;
-  return d[9] === sonHane;
+  return d[9] === (10 - (toplam % 10)) % 10;
+}
+
+async function tekilKontrol(
+  alan: 'telefon' | 'tckn' | 'vkn',
+  deger: string,
+  mevcutId: string,
+): Promise<boolean> {
+  try {
+    const res = await fetch('/api/auth/tekil-kontrol', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ alan, deger, mevcutId }),
+    });
+    const json = await res.json();
+    return json.mevcut === true;
+  } catch {
+    return false;
+  }
 }
 
 export default function ProfilTamamla() {
+  const [mevcutId, setMevcutId] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [userType, setUserType] = useState('');
   const [telefon, setTelefon] = useState('');
   const [tckn, setTckn] = useState('');
   const [vkn, setVkn] = useState('');
-  const [telefonHata, setTelefonHata] = useState('');
-  const [tcknHata, setTcknHata] = useState('');
-  const [vknHata, setVknHata] = useState('');
+  const [sirketAdi, setSirketAdi] = useState('');
+  const [telefonKilitli, setTelefonKilitli] = useState(false);
   const [aracPlaka, setAracPlaka] = useState('');
   const [aracTipi, setAracTipi] = useState('');
   const [aracUtsyapi, setAracUtsyapi] = useState<string[]>([]);
-  const [telefonKilitli, setTelefonKilitli] = useState(false);
   const [yukleniyor, setYukleniyor] = useState(false);
   const [hata, setHata] = useState('');
+
+  // Alan hataları
+  const [telefonHata, setTelefonHata] = useState('');
+  const [tcknHata, setTcknHata] = useState('');
+  const [vknHata, setVknHata] = useState('');
+
+  // Tekillik kontrol durumları
+  const [telefonMevcut, setTelefonMevcut] = useState(false);
+  const [tcknMevcut, setTcknMevcut] = useState(false);
+  const [vknMevcut, setVknMevcut] = useState(false);
+  const [telefonKontrolYukleniyor, setTelefonKontrolYukleniyor] = useState(false);
+  const [tcknKontrolYukleniyor, setTcknKontrolYukleniyor] = useState(false);
+  const [vknKontrolYukleniyor, setVknKontrolYukleniyor] = useState(false);
+
   const router = useRouter();
 
   useEffect(() => {
     async function init() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.push('/giris'); return; }
+      setMevcutId(user.id);
       const fullName = user.user_metadata?.full_name || '';
       if (fullName) setDisplayName(fullName);
-      // Telefon OTP ile giriş yapıldıysa numarayı otomatik doldur ve kilitle
       if (user.phone) {
-        // +90'lı formatı 0'lı yerel formata çevir
         const yerel = user.phone.startsWith('+90') ? '0' + user.phone.slice(3) : user.phone;
         setTelefon(yerel);
         setTelefonKilitli(true);
       }
-      const { data: profil } = await supabase.from('users').select('user_type').eq('id', user.id).single();
+      const { data: profil } = await supabase.from('users').select('user_type').eq('id', user.id).maybeSingle();
       if (profil?.user_type) router.push('/panel');
     }
     init();
   }, []);
 
+  // userType değişince kimlik alanlarını temizle
   useEffect(() => {
     setTckn(''); setVkn(''); setTcknHata(''); setVknHata('');
+    setTcknMevcut(false); setVknMevcut(false);
     setAracPlaka(''); setAracTipi(''); setAracUtsyapi([]);
+    setSirketAdi('');
   }, [userType]);
+
+  // ── Tekillik kontrol: Telefon (onBlur) ──────────────────────────
+  const handleTelefonBlur = useCallback(async () => {
+    if (telefonKilitli || !mevcutId) return;
+    if (telefon.length !== 11 || telefonHata) return;
+    setTelefonKontrolYukleniyor(true);
+    const mevcut = await tekilKontrol('telefon', telefon, mevcutId);
+    setTelefonMevcut(mevcut);
+    setTelefonKontrolYukleniyor(false);
+  }, [telefon, telefonHata, telefonKilitli, mevcutId]);
+
+  // ── Tekillik kontrol: TCKN (onBlur) ─────────────────────────────
+  const handleTcknBlur = useCallback(async () => {
+    if (!mevcutId || tckn.length !== 11 || tcknHata) return;
+    setTcknKontrolYukleniyor(true);
+    const mevcut = await tekilKontrol('tckn', tckn, mevcutId);
+    setTcknMevcut(mevcut);
+    setTcknKontrolYukleniyor(false);
+  }, [tckn, tcknHata, mevcutId]);
+
+  // ── Tekillik kontrol: VKN (onBlur) ──────────────────────────────
+  const handleVknBlur = useCallback(async () => {
+    if (!mevcutId || vkn.length !== 10 || vknHata) return;
+    setVknKontrolYukleniyor(true);
+    const mevcut = await tekilKontrol('vkn', vkn, mevcutId);
+    setVknMevcut(mevcut);
+    setVknKontrolYukleniyor(false);
+  }, [vkn, vknHata, mevcutId]);
 
   function handleTckn(val: string) {
     const temiz = val.replace(/\D/g, '').substring(0, 11);
     setTckn(temiz);
+    setTcknMevcut(false);
     if (!temiz) { setTcknHata(''); return; }
     if (temiz.length < 11) { setTcknHata('TCKN 11 haneli olmalıdır'); return; }
     if (!tcknGecerli(temiz)) { setTcknHata('Geçersiz TCKN'); return; }
@@ -91,6 +150,7 @@ export default function ProfilTamamla() {
   function handleVkn(val: string) {
     const temiz = val.replace(/\D/g, '').substring(0, 10);
     setVkn(temiz);
+    setVknMevcut(false);
     if (!temiz) { setVknHata(''); return; }
     if (temiz.length < 10) { setVknHata('VKN 10 haneli olmalıdır'); return; }
     if (!vknGecerli(temiz)) { setVknHata('Geçersiz VKN'); return; }
@@ -102,6 +162,7 @@ export default function ProfilTamamla() {
   }
 
   const kimlikGecerli = () => {
+    if (tcknMevcut || vknMevcut) return false;
     if (userType === 'arac_sahibi') return tckn.length === 11 && !tcknHata;
     if (userType === 'sirket') return vkn.length === 10 && !vknHata;
     if (tckn.length > 0 && tcknHata) return false;
@@ -109,15 +170,20 @@ export default function ProfilTamamla() {
     return true;
   };
 
-  const aracGecerli = userType !== 'arac_sahibi' || (aracPlaka.trim().length >= 4 && aracTipi !== '');
+  const sirketAdiGecerli = () => {
+    if (userType === 'sirket') return sirketAdi.trim().length >= 2;
+    return true; // broker ve diğerleri için opsiyonel
+  };
 
-  const telefonGecerli = telefonKilitli || (telefon.length === 11 && !telefonHata);
+  const aracGecerli = userType !== 'arac_sahibi' || (aracPlaka.trim().length >= 4 && aracTipi !== '');
+  const telefonGecerli = telefonKilitli || (telefon.length === 11 && !telefonHata && !telefonMevcut);
 
   const formGecerli =
     displayName.trim().length >= 2 &&
     userType !== '' &&
     telefonGecerli &&
     kimlikGecerli() &&
+    sirketAdiGecerli() &&
     aracGecerli;
 
   async function handleSubmit(e: React.FormEvent) {
@@ -133,9 +199,10 @@ export default function ProfilTamamla() {
       display_name: displayName.trim(),
       user_type: userType,
       phone: telefon,
-      phone_verified: false,
+      phone_verified: telefonKilitli,
       ...(tckn ? { tckn } : {}),
       ...(vkn ? { vkn } : {}),
+      ...(sirketAdi.trim() ? { company_name: sirketAdi.trim() } : {}),
     }, { onConflict: 'id' });
 
     if (error) {
@@ -158,6 +225,7 @@ export default function ProfilTamamla() {
     setYukleniyor(false);
   }
 
+  // ── Styles ───────────────────────────────────────────────────────
   const inp = {
     width: '100%', background: '#0d1117', color: '#e2e8f0',
     border: '1px solid #30363d', borderRadius: 6,
@@ -171,6 +239,18 @@ export default function ProfilTamamla() {
   };
   const hataStil = { color: '#ef4444', fontSize: '0.78rem', marginTop: 4 };
   const ipucu = { color: '#4b5563', fontSize: '0.75rem', marginTop: 4 };
+  const mevcutStil = { color: '#f59e0b', fontSize: '0.78rem', marginTop: 4 };
+
+  const MevcutUyari = ({ alan }: { alan: string }) => (
+    <div style={mevcutStil}>
+      ⚠️ Bu {alan} ile zaten bir hesap var.{' '}
+      <a href="/giris" style={{ color: '#60a5fa', textDecoration: 'underline' }}>Giriş yap</a>
+    </div>
+  );
+
+  const KontrolYukleniyor = () => (
+    <div style={{ color: '#4b5563', fontSize: '0.75rem', marginTop: 4 }}>Kontrol ediliyor...</div>
+  );
 
   return (
     <div style={{ minHeight: '100vh', background: '#0d1117', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'IBM Plex Sans', system-ui, sans-serif", padding: '24px 0' }}>
@@ -188,31 +268,51 @@ export default function ProfilTamamla() {
         <div style={{ background: '#161b22', border: '1px solid #30363d', borderRadius: 12, padding: 24 }}>
           <form onSubmit={handleSubmit}>
 
+            {/* Ad Soyad */}
             <div style={{ marginBottom: 16 }}>
               <label style={lbl}>Ad Soyad *</label>
               <input value={displayName} onChange={e => setDisplayName(e.target.value)} placeholder="Ad Soyad" required style={inp} autoFocus />
             </div>
 
+            {/* Telefon */}
             <div style={{ marginBottom: 16 }}>
               <label style={lbl}>Telefon *</label>
               <div style={{ position: 'relative' }}>
-                <input value={telefon}
+                <input
+                  value={telefon}
                   disabled={telefonKilitli}
                   onChange={e => {
                     if (telefonKilitli) return;
                     const val = e.target.value.replace(/\D/g, '').substring(0, 11);
                     setTelefon(val);
-                    setTelefonHata(val.length > 0 && (val.length !== 11 || !val.startsWith('0')) ? '05xx ile başlayan 11 haneli numara girin' : '');
+                    setTelefonMevcut(false);
+                    setTelefonHata(
+                      val.length > 0 && (val.length !== 11 || !val.startsWith('0'))
+                        ? '05xx ile başlayan 11 haneli numara girin'
+                        : ''
+                    );
                   }}
+                  onBlur={handleTelefonBlur}
                   placeholder="05xx xxx xx xx"
-                  style={{ ...inp, ...(telefonKilitli ? { background: '#0a0f17', color: '#4b5563', cursor: 'not-allowed', borderColor: '#1f2937' } : {}) }} />
+                  style={{
+                    ...inp,
+                    ...(telefonKilitli
+                      ? { background: '#0a0f17', color: '#4b5563', cursor: 'not-allowed', borderColor: '#1f2937' }
+                      : telefonMevcut
+                      ? { borderColor: '#f59e0b' }
+                      : {}),
+                  }}
+                />
                 {telefonKilitli && (
                   <span style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', fontSize: '0.72rem', color: '#22c55e' }}>✓ Doğrulandı</span>
                 )}
               </div>
               {telefonHata && <div style={hataStil}>⚠️ {telefonHata}</div>}
+              {telefonKontrolYukleniyor && <KontrolYukleniyor />}
+              {!telefonKontrolYukleniyor && telefonMevcut && <MevcutUyari alan="telefon numarasıyla" />}
             </div>
 
+            {/* Kullanıcı Tipi */}
             <div style={{ marginBottom: 16 }}>
               <label style={lbl}>Ben bir... *</label>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
@@ -226,6 +326,24 @@ export default function ProfilTamamla() {
               </div>
             </div>
 
+            {/* Şirket / Firma Adı — sirket zorunlu, broker opsiyonel */}
+            {(userType === 'sirket' || userType === 'broker') && (
+              <div style={{ marginBottom: 16 }}>
+                <label style={lbl}>
+                  {userType === 'sirket' ? 'Şirket / Firma Adı *' : 'Şirket / Firma Adı'}
+                  {userType === 'broker' && <span style={{ color: '#4b5563', fontWeight: 400 }}> (opsiyonel)</span>}
+                </label>
+                <input
+                  value={sirketAdi}
+                  onChange={e => setSirketAdi(e.target.value)}
+                  placeholder={userType === 'sirket' ? 'ABC Lojistik Ltd. Şti.' : 'ABC Nakliyat'}
+                  required={userType === 'sirket'}
+                  style={inp}
+                />
+              </div>
+            )}
+
+            {/* Araç sahibi alanları */}
             {userType === 'arac_sahibi' && (
               <div style={{ background: '#0d1117', border: '1px solid #166534', borderRadius: 10, padding: 16, marginBottom: 16 }}>
                 <div style={{ color: '#22c55e', fontWeight: 700, fontSize: '0.82rem', marginBottom: 14 }}>🚛 Aracınızı ekleyin</div>
@@ -235,7 +353,7 @@ export default function ProfilTamamla() {
                 </div>
                 <div style={{ marginBottom: 12 }}>
                   <label style={lbl}>Araç Tipi *</label>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: 6 }}>
                     {ARAC_TIPLERI.map(t => (
                       <button key={t} type="button" onClick={() => setAracTipi(aracTipi === t ? '' : t)}
                         style={{ padding: '5px 14px', borderRadius: 6, border: '1px solid', fontSize: '0.82rem', cursor: 'pointer', fontWeight: aracTipi === t ? 700 : 400, borderColor: aracTipi === t ? '#22c55e' : '#30363d', background: aracTipi === t ? '#14532d' : '#0d1117', color: aracTipi === t ? '#22c55e' : '#8b949e' }}>
@@ -246,7 +364,7 @@ export default function ProfilTamamla() {
                 </div>
                 <div>
                   <label style={lbl}>Üst Yapı <span style={{ color: '#4b5563', fontWeight: 400 }}>(opsiyonel)</span></label>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: 6 }}>
                     {UTSYAPI.map(u => (
                       <button key={u} type="button" onClick={() => toggleUtsyapi(u)}
                         style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid', fontSize: '0.78rem', cursor: 'pointer', fontWeight: aracUtsyapi.includes(u) ? 700 : 400, borderColor: aracUtsyapi.includes(u) ? '#60a5fa' : '#30363d', background: aracUtsyapi.includes(u) ? '#1e3a5f' : '#0d1117', color: aracUtsyapi.includes(u) ? '#60a5fa' : '#8b949e' }}>
@@ -258,31 +376,80 @@ export default function ProfilTamamla() {
               </div>
             )}
 
+            {/* TCKN — arac_sahibi zorunlu, diğerleri (sirket ve broker hariç) opsiyonel */}
             {userType && userType !== 'sirket' && (
               <div style={{ marginBottom: 16 }}>
-                <label style={lbl}>TC Kimlik No {userType === 'arac_sahibi' ? '*' : <span style={{ color: '#4b5563', fontWeight: 400 }}> (opsiyonel)</span>}</label>
-                <input value={tckn} onChange={e => handleTckn(e.target.value)} placeholder="xxxxxxxxxxx"
+                <label style={lbl}>
+                  TC Kimlik No{' '}
+                  {userType === 'arac_sahibi'
+                    ? '*'
+                    : <span style={{ color: '#4b5563', fontWeight: 400 }}>(opsiyonel)</span>}
+                </label>
+                <input
+                  value={tckn}
+                  onChange={e => handleTckn(e.target.value)}
+                  onBlur={handleTcknBlur}
+                  placeholder="xxxxxxxxxxx"
                   required={userType === 'arac_sahibi'}
-                  style={{ ...inp, borderColor: tcknHata ? '#ef4444' : tckn.length === 11 && !tcknHata ? '#22c55e' : '#30363d' }} />
+                  style={{
+                    ...inp,
+                    borderColor: tcknHata || tcknMevcut
+                      ? '#ef4444'
+                      : tckn.length === 11 && !tcknHata && !tcknMevcut
+                      ? '#22c55e'
+                      : '#30363d',
+                  }}
+                />
                 {tcknHata && <div style={hataStil}>⚠️ {tcknHata}</div>}
-                {!tcknHata && tckn.length === 11 && <div style={{ color: '#22c55e', fontSize: '0.78rem', marginTop: 4 }}>✓ Geçerli TCKN</div>}
-                {userType !== 'arac_sahibi' && !tckn && <div style={ipucu}>Kimlik bilgisi profil güvenilirliğinizi artırır.</div>}
+                {tcknKontrolYukleniyor && <KontrolYukleniyor />}
+                {!tcknKontrolYukleniyor && tcknMevcut && <MevcutUyari alan="TCKN ile" />}
+                {!tcknHata && !tcknMevcut && tckn.length === 11 && (
+                  <div style={{ color: '#22c55e', fontSize: '0.78rem', marginTop: 4 }}>✓ Geçerli TCKN</div>
+                )}
+                {userType !== 'arac_sahibi' && !tckn && (
+                  <div style={ipucu}>Kimlik bilgisi profil güvenilirliğinizi artırır.</div>
+                )}
               </div>
             )}
 
+            {/* VKN — sirket zorunlu, broker opsiyonel */}
             {(userType === 'sirket' || userType === 'broker') && (
               <div style={{ marginBottom: 16 }}>
-                <label style={lbl}>Vergi Kimlik No {userType === 'sirket' ? '*' : <span style={{ color: '#4b5563', fontWeight: 400 }}> (opsiyonel)</span>}</label>
-                <input value={vkn} onChange={e => handleVkn(e.target.value)} placeholder="xxxxxxxxxx"
+                <label style={lbl}>
+                  Vergi Kimlik No{' '}
+                  {userType === 'sirket'
+                    ? '*'
+                    : <span style={{ color: '#4b5563', fontWeight: 400 }}>(opsiyonel)</span>}
+                </label>
+                <input
+                  value={vkn}
+                  onChange={e => handleVkn(e.target.value)}
+                  onBlur={handleVknBlur}
+                  placeholder="xxxxxxxxxx"
                   required={userType === 'sirket'}
-                  style={{ ...inp, borderColor: vknHata ? '#ef4444' : vkn.length === 10 && !vknHata ? '#22c55e' : '#30363d' }} />
+                  style={{
+                    ...inp,
+                    borderColor: vknHata || vknMevcut
+                      ? '#ef4444'
+                      : vkn.length === 10 && !vknHata && !vknMevcut
+                      ? '#22c55e'
+                      : '#30363d',
+                  }}
+                />
                 {vknHata && <div style={hataStil}>⚠️ {vknHata}</div>}
-                {!vknHata && vkn.length === 10 && <div style={{ color: '#22c55e', fontSize: '0.78rem', marginTop: 4 }}>✓ Geçerli VKN</div>}
+                {vknKontrolYukleniyor && <KontrolYukleniyor />}
+                {!vknKontrolYukleniyor && vknMevcut && <MevcutUyari alan="VKN ile" />}
+                {!vknHata && !vknMevcut && vkn.length === 10 && (
+                  <div style={{ color: '#22c55e', fontSize: '0.78rem', marginTop: 4 }}>✓ Geçerli VKN</div>
+                )}
               </div>
             )}
 
             {hata && <div style={{ color: '#ef4444', fontSize: '0.82rem', marginBottom: 10 }}>⚠️ {hata}</div>}
-            <button type="submit" disabled={yukleniyor || !formGecerli}
+
+            <button
+              type="submit"
+              disabled={yukleniyor || !formGecerli}
               style={{ width: '100%', padding: '12px', borderRadius: 8, border: 'none', background: formGecerli ? '#22c55e' : '#1f2937', color: formGecerli ? '#000' : '#6b7280', fontWeight: 800, fontSize: '1rem', cursor: formGecerli ? 'pointer' : 'not-allowed', marginTop: 8 }}>
               {yukleniyor ? 'Kaydediliyor...' : 'Devam Et →'}
             </button>

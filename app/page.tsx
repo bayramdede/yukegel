@@ -19,9 +19,9 @@ const ILLER = [
 ];
 
 const KAYNAK_ETIKET: Record<string, { label: string; bg: string; color: string }> = {
-  form:     { label: 'Yükegel',      bg: '#0d2b1a', color: '#22c55e' },
-  whatsapp: { label: '📱 WhatsApp',  bg: '#0d2b0d', color: '#4ade80' },
-  facebook: { label: '👥 Facebook',  bg: '#1e3a5f', color: '#60a5fa' },
+  form:     { label: 'Yükegel',     bg: '#0d2b1a', color: '#22c55e' },
+  whatsapp: { label: '📱 WhatsApp', bg: '#0d2b0d', color: '#4ade80' },
+  facebook: { label: '👥 Facebook', bg: '#1e3a5f', color: '#60a5fa' },
 };
 
 function yeniUye(createdAt: string | null): boolean {
@@ -37,25 +37,122 @@ function Chip({ label, bg = '#1f2937', color = '#94a3b8' }: { label: string; bg?
   );
 }
 
+function HeroKayitsiz() {
+  return (
+    <div style={{ borderBottom: '1px solid #1a3a2a', background: 'linear-gradient(180deg, #0d1f0f 0%, #0d1117 100%)' }}>
+      <div style={{ maxWidth: 1280, margin: '0 auto', padding: '48px 16px 40px' }}>
+        <div style={{ maxWidth: 600 }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#0d2b1a', border: '1px solid #166534', borderRadius: 20, padding: '4px 12px', marginBottom: 20 }}>
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#22c55e', display: 'inline-block' }} />
+            <span style={{ color: '#22c55e', fontSize: '0.75rem', fontWeight: 700 }}>Türkiye'nin Nakliye Platformu</span>
+          </div>
+          <h1 style={{ color: '#e2e8f0', fontWeight: 800, fontSize: 'clamp(1.6rem, 4vw, 2.4rem)', lineHeight: 1.2, margin: '0 0 12px', letterSpacing: '-0.03em' }}>
+            Teker boşa<br /><span style={{ color: '#22c55e' }}>dönmesin.</span>
+          </h1>
+          <p style={{ color: '#8b949e', fontSize: '1rem', margin: '0 0 28px', lineHeight: 1.6 }}>
+            Yükünüzü taşıtın veya boş kapasitenizi değerlendirin.<br />
+            Binlerce nakliyeci ve yük sahibi Yükegel'de.
+          </p>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 28 }}>
+            <a href="/ilan-ver" style={{ background: '#22c55e', color: '#000', fontWeight: 800, fontSize: '0.95rem', padding: '12px 24px', borderRadius: 8, textDecoration: 'none' }}>
+              📦 Yük Taşıtmak İstiyorum
+            </a>
+            <a href="/giris" style={{ background: '#161b22', color: '#e2e8f0', fontWeight: 700, fontSize: '0.95rem', padding: '12px 24px', borderRadius: 8, textDecoration: 'none', border: '1px solid #30363d' }}>
+              🚛 Yük Taşımak İstiyorum
+            </a>
+          </div>
+          <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
+            {[{ ikon: '⚡', text: 'Anında İlan' }, { ikon: '🔒', text: 'Güvenli Platform' }, { ikon: '🆓', text: 'Ücretsiz' }, { ikon: '📱', text: 'WhatsApp Entegrasyonu' }].map(item => (
+              <div key={item.text} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ fontSize: '0.9rem' }}>{item.ikon}</span>
+                <span style={{ color: '#6b7280', fontSize: '0.8rem', fontWeight: 600 }}>{item.text}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function HeroMusteri({ ad }: { ad: string }) {
+  return (
+    <div style={{ background: '#0d1117', borderBottom: '1px solid #30363d' }}>
+      <div style={{ maxWidth: 1280, margin: '0 auto', padding: '20px 16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+          <div>
+            <div style={{ color: '#8b949e', fontSize: '0.8rem', marginBottom: 2 }}>Hoş geldiniz,</div>
+            <div style={{ color: '#e2e8f0', fontWeight: 800, fontSize: '1.15rem' }}>{ad} 👋</div>
+          </div>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <a href="/ilan-ver" style={{ background: '#22c55e', color: '#000', fontWeight: 800, fontSize: '0.85rem', padding: '9px 18px', borderRadius: 7, textDecoration: 'none' }}>+ Yeni İlan Oluştur</a>
+            <a href="/panel" style={{ background: '#161b22', color: '#e2e8f0', fontWeight: 600, fontSize: '0.85rem', padding: '9px 18px', borderRadius: 7, textDecoration: 'none', border: '1px solid #30363d' }}>📋 İlanlarım</a>
+            <a href="/panel?tab=profil" style={{ background: '#161b22', color: '#8b949e', fontWeight: 600, fontSize: '0.85rem', padding: '9px 18px', borderRadius: 7, textDecoration: 'none', border: '1px solid #30363d' }}>👤 Profil</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function HeroNakliyeci({ ad }: { ad: string }) {
+  return (
+    <div style={{ background: '#0d1117', borderBottom: '1px solid #30363d' }}>
+      <div style={{ maxWidth: 1280, margin: '0 auto', padding: '20px 16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+          <div>
+            <div style={{ color: '#8b949e', fontSize: '0.8rem', marginBottom: 2 }}>Hoş geldiniz,</div>
+            <div style={{ color: '#e2e8f0', fontWeight: 800, fontSize: '1.15rem' }}>{ad} 👋</div>
+            <div style={{ color: '#6b7280', fontSize: '0.78rem', marginTop: 3 }}>Bölgenizdeki yeni işleri keşfedin.</div>
+          </div>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <a href="/ilan-ver?tip=arac" style={{ background: '#1e3a5f', color: '#60a5fa', fontWeight: 800, fontSize: '0.85rem', padding: '9px 18px', borderRadius: 7, textDecoration: 'none', border: '1px solid #1e3a5f' }}>🚛 Aracım Boşta</a>
+            <a href="/panel" style={{ background: '#161b22', color: '#e2e8f0', fontWeight: 600, fontSize: '0.85rem', padding: '9px 18px', borderRadius: 7, textDecoration: 'none', border: '1px solid #30363d' }}>📋 Panelim</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function UyeBanner() {
+  return (
+    <div style={{ background: '#161b22', border: '1px solid #1e3a5f', borderRadius: 8, padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+      <div style={{ color: '#8b949e', fontSize: '0.82rem' }}>
+        🔐 <strong style={{ color: '#e2e8f0' }}>Telefon numaralarını görmek</strong> ve ilan sahiplerine ulaşmak için üye olun. Ücretsiz.
+      </div>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <a href="/giris" style={{ background: '#1e3a5f', color: '#60a5fa', borderRadius: 6, padding: '7px 14px', fontSize: '0.82rem', fontWeight: 600, textDecoration: 'none' }}>Giriş Yap</a>
+        <a href="/giris" style={{ background: '#22c55e', color: '#000', borderRadius: 6, padding: '7px 14px', fontSize: '0.82rem', fontWeight: 700, textDecoration: 'none' }}>Üye Ol →</a>
+      </div>
+    </div>
+  );
+}
+
 export default function Home() {
   const [ilanlar, setIlanlar] = useState<any[]>([]);
   const [yukleniyor, setYukleniyor] = useState(true);
   const [tip, setTip] = useState<'tumu' | 'yuk' | 'arac'>('tumu');
   const [kalkis, setKalkis] = useState('');
   const [varis, setVaris] = useState('');
-  const [kullanici, setKullanici] = useState<any>(null);
+  const [kullanici, setKullanici] = useState<{ display_name: string | null; email: string | null; user_type: string | null } | null>(null);
+
+  async function profilCek(userId: string) {
+    const { data: profil } = await supabase
+      .from('users')
+      .select('display_name, email, user_type')
+      .eq('id', userId)
+      .maybeSingle();
+    return profil;
+  }
 
   useEffect(() => {
     async function init() {
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
-          const { data: profil } = await supabase
-            .from('users')
-            .select('display_name, username, email')
-            .eq('id', user.id)
-            .single();
-          setKullanici(profil || { email: user.email });
+          const profil = await profilCek(user.id);
+          setKullanici(profil || { display_name: null, email: user.email ?? null, user_type: null });
         }
 
         setYukleniyor(true);
@@ -64,8 +161,7 @@ export default function Home() {
           .select(`
             id, listing_type, origin_city, origin_district,
             contact_phone, price_offer, source, created_at,
-            trust_level, user_id,
-            vehicle_type, body_type,
+            trust_level, user_id, vehicle_type, body_type,
             available_date, date_flexible,
             listing_stops (
               stop_order, city, district,
@@ -73,58 +169,39 @@ export default function Home() {
             )
           `)
           .in('moderation_status', ['approved', 'auto_published'])
-          .eq('is_shadow_banned', false)   // ← Sprint 1: shadow ban filtresi
+          .eq('is_shadow_banned', false)
           .order('created_at', { ascending: false })
           .limit(50);
 
-        if (!data || data.length === 0) {
-          setIlanlar([]);
-          return;
-        }
+        if (!data || data.length === 0) { setIlanlar([]); return; }
 
         const userIds = [...new Set((data as any[]).map((i: any) => i.user_id).filter(Boolean))];
         const kullaniciMap: Record<string, { phone_verified: boolean; created_at: string }> = {};
-
         if (userIds.length > 0) {
-          const { data: kullanicilar } = await supabase
-            .from('users')
-            .select('id, phone_verified, created_at')
-            .in('id', userIds);
-          for (const k of (kullanicilar || []) as any[]) {
-            kullaniciMap[k.id] = { phone_verified: k.phone_verified, created_at: k.created_at };
-          }
+          const { data: ks } = await supabase.from('users').select('id, phone_verified, created_at').in('id', userIds);
+          for (const k of (ks || []) as any[]) kullaniciMap[k.id] = k;
         }
 
         const donusturulmus = (data as any[]).map((ilan: any) => {
-          const kullaniciBilgi = ilan.user_id ? kullaniciMap[ilan.user_id] : null;
+          const kb = ilan.user_id ? kullaniciMap[ilan.user_id] : null;
           const stops = (ilan.listing_stops || []).sort((a: any, b: any) => a.stop_order - b.stop_order);
           const aracTipiList: string[] = ilan.vehicle_type?.length
             ? ilan.vehicle_type
             : [...new Set(stops.map((s: any) => s.cargo_type).filter(Boolean))] as string[];
-
           return {
-            id: ilan.id,
-            tip: ilan.listing_type,
-            kalkis: ilan.origin_city,
-            kalkis_ilce: ilan.origin_district || '',
-            duraklar: stops.map((s: any) => ({
-              sehir: s.city, ilce: s.district || '',
-              ton: s.weight_ton, palet: s.pallet_count, arac_adet: s.vehicle_count,
-            })),
+            id: ilan.id, tip: ilan.listing_type,
+            kalkis: ilan.origin_city, kalkis_ilce: ilan.origin_district || '',
+            duraklar: stops.map((s: any) => ({ sehir: s.city, ilce: s.district || '', ton: s.weight_ton, palet: s.pallet_count, arac_adet: s.vehicle_count })),
             kaynak: ilan.source || 'form',
             sure: new Date(ilan.created_at).toLocaleDateString('tr-TR'),
-            tel: ilan.contact_phone,
-            fiyat: ilan.price_offer ? ilan.price_offer.toString() : null,
-            tarih: ilan.available_date,
-            tarihEsnek: ilan.date_flexible,
-            aracTipleri: aracTipiList,
-            ustyapilari: (ilan.body_type || []) as string[],
+            tel: ilan.contact_phone, fiyat: ilan.price_offer?.toString() ?? null,
+            tarih: ilan.available_date, tarihEsnek: ilan.date_flexible,
+            aracTipleri: aracTipiList, ustyapilari: (ilan.body_type || []) as string[],
             dogrulanmamis: !ilan.user_id || ilan.trust_level === 'social',
-            telefonDogrulandi: kullaniciBilgi?.phone_verified === true,
-            yeniUye: kullaniciBilgi ? yeniUye(kullaniciBilgi.created_at) : false,
+            telefonDogrulandi: kb?.phone_verified === true,
+            yeniUye: kb ? yeniUye(kb.created_at) : false,
           };
         });
-
         setIlanlar(donusturulmus);
       } catch (err) {
         console.error('Ana sayfa veri hatası:', err);
@@ -138,17 +215,12 @@ export default function Home() {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event: AuthChangeEvent, session: Session | null) => {
       if (session?.user) {
-        const { data: profil } = await supabase
-          .from('users')
-          .select('display_name, username, email')
-          .eq('id', session.user.id)
-          .single();
-        setKullanici(profil || { email: session.user.email || session.user.user_metadata?.email || 'Kullanıcı' });
+        const profil = await profilCek(session.user.id);
+        setKullanici(profil || { display_name: null, email: session.user.email ?? null, user_type: null });
       } else {
         setKullanici(null);
       }
     });
-
     return () => subscription.unsubscribe();
   }, []);
 
@@ -159,57 +231,49 @@ export default function Home() {
     return true;
   });
 
+  const ad = kullanici?.display_name || kullanici?.email?.split('@')[0] || 'Kullanıcı';
+  const isNakliyeci = kullanici?.user_type === 'arac_sahibi';
+  const isMusteri = kullanici && !isNakliyeci;
+
   return (
     <div style={{ minHeight: '100vh', background: '#0d1117', fontFamily: "'IBM Plex Sans', system-ui, sans-serif" }}>
 
+      {/* NAVBAR */}
       <nav style={{ background: '#161b22', borderBottom: '1px solid #30363d', position: 'sticky', top: 0, zIndex: 50 }}>
         <div style={{ maxWidth: 1280, margin: '0 auto', padding: '0 16px', height: 56, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <img src="/logo.svg" alt="Yükegel" style={{ width: 28, height: 28 }} />
-            <span style={{ fontWeight: 800, fontSize: '1.25rem', letterSpacing: '-0.03em' }}>
-              <span style={{ color: '#22c55e' }}>YÜKE</span>
-              <span style={{ color: '#e2e8f0' }}>GEL</span>
-            </span>
-            <span style={{ background: '#1e3a5f', color: '#60a5fa', fontSize: '0.65rem', fontWeight: 700, padding: '2px 6px', borderRadius: 4 }}>BETA</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            <a href="/" style={{ display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none' }}>
+              <img src="/logo.svg" alt="Yükegel" style={{ width: 28, height: 28 }} />
+              <span style={{ fontWeight: 800, fontSize: '1.25rem', letterSpacing: '-0.03em' }}>
+                <span style={{ color: '#22c55e' }}>YÜKE</span><span style={{ color: '#e2e8f0' }}>GEL</span>
+              </span>
+              <span style={{ background: '#1e3a5f', color: '#60a5fa', fontSize: '0.65rem', fontWeight: 700, padding: '2px 6px', borderRadius: 4 }}>BETA</span>
+            </a>
+            <div style={{ display: 'flex', gap: 4 }}>
+              <a href="/nasil-calisir" style={{ color: '#8b949e', fontSize: '0.82rem', textDecoration: 'none', padding: '4px 8px', borderRadius: 5 }}>Nasıl Çalışır?</a>
+              <a href="/hakkimizda" style={{ color: '#8b949e', fontSize: '0.82rem', textDecoration: 'none', padding: '4px 8px', borderRadius: 5 }}>Hakkımızda</a>
+            </div>
           </div>
           {kullanici ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <a href="/panel" style={{ color: '#e2e8f0', fontSize: '0.85rem', textDecoration: 'none', fontWeight: 600 }}>
-                👤 {kullanici.display_name || kullanici.username || kullanici.email?.split('@')[0]}
-              </a>
-              <a href="/ilan-ver" style={{ background: '#22c55e', color: '#000', fontWeight: 700, fontSize: '0.85rem', padding: '6px 16px', borderRadius: 6, textDecoration: 'none' }}>
-                + İlan Ver
-              </a>
+              <a href="/panel" style={{ color: '#e2e8f0', fontSize: '0.85rem', textDecoration: 'none', fontWeight: 600 }}>👤 {ad}</a>
+              <a href="/ilan-ver" style={{ background: '#22c55e', color: '#000', fontWeight: 700, fontSize: '0.85rem', padding: '6px 16px', borderRadius: 6, textDecoration: 'none' }}>+ İlan Ver</a>
             </div>
           ) : (
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <a href="/giris" style={{ color: '#8b949e', fontSize: '0.85rem', textDecoration: 'none' }}>Giriş Yap</a>
-              <a href="/giris" style={{ background: '#22c55e', color: '#000', fontWeight: 700, fontSize: '0.85rem', padding: '6px 16px', borderRadius: 6, textDecoration: 'none' }}>
-                + İlan Ver
-              </a>
+              <a href="/giris" style={{ background: '#22c55e', color: '#000', fontWeight: 700, fontSize: '0.85rem', padding: '6px 16px', borderRadius: 6, textDecoration: 'none' }}>Üye Ol</a>
             </div>
           )}
         </div>
       </nav>
 
-      {!kullanici && (
-        <div style={{ borderBottom: '1px solid #1a3a2a' }}>
-          <div style={{ maxWidth: 1280, margin: '0 auto', padding: '24px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 24, flexWrap: 'wrap' }}>
-            <div>
-              <div style={{ color: '#e2e8f0', fontWeight: 800, fontSize: '1.4rem', marginBottom: 6, letterSpacing: '-0.02em' }}>
-                Teker boşa dönmesin.
-              </div>
-              <div style={{ color: '#8b949e', fontSize: '0.85rem' }}>
-                Yükler nakliyecilerle Yükegel'de buluşuyor.
-              </div>
-            </div>
-            <a href="/giris" style={{ background: '#22c55e', color: '#000', fontWeight: 700, fontSize: '0.9rem', padding: '10px 24px', borderRadius: 8, textDecoration: 'none', whiteSpace: 'nowrap' }}>
-              + İlan Ver
-            </a>
-          </div>
-        </div>
-      )}
+      {/* HERO */}
+      {!kullanici && <HeroKayitsiz />}
+      {isMusteri && <HeroMusteri ad={ad} />}
+      {isNakliyeci && <HeroNakliyeci ad={ad} />}
 
+      {/* FİLTRE BARI */}
       <div style={{ background: '#161b22', borderBottom: '1px solid #30363d', position: 'sticky', top: 56, zIndex: 40 }}>
         <div style={{ maxWidth: 1280, margin: '0 auto', padding: '10px 16px', display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
           <div style={{ background: '#0d1117', borderRadius: 6, padding: 2, border: '1px solid #30363d', display: 'flex' }}>
@@ -242,6 +306,7 @@ export default function Home() {
         </div>
       </div>
 
+      {/* İLAN LİSTESİ */}
       <main style={{ maxWidth: 1280, margin: '0 auto', padding: '16px' }}>
         {yukleniyor ? (
           <div style={{ textAlign: 'center', padding: '80px 0', color: '#4b5563' }}>
@@ -253,21 +318,12 @@ export default function Home() {
             {!kullanici && filtered.length > 0 ? (
               <>
                 <IlanKart ilan={filtered[0]} kullanici={kullanici} />
-                <div style={{ background: '#161b22', border: '1px solid #1e3a5f', borderRadius: 8, padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
-                  <div style={{ color: '#8b949e', fontSize: '0.82rem' }}>
-                    🔐 <strong style={{ color: '#e2e8f0' }}>Telefon numaralarını görmek</strong> için üye olun. Ücretsiz.
-                  </div>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <a href="/giris" style={{ background: '#1e3a5f', color: '#60a5fa', borderRadius: 6, padding: '7px 14px', fontSize: '0.82rem', fontWeight: 600, textDecoration: 'none' }}>Giriş Yap</a>
-                    <a href="/giris" style={{ background: '#22c55e', color: '#000', borderRadius: 6, padding: '7px 14px', fontSize: '0.82rem', fontWeight: 700, textDecoration: 'none' }}>Üye Ol →</a>
-                  </div>
-                </div>
+                <UyeBanner />
                 {filtered.slice(1).map((ilan: any) => <IlanKart key={ilan.id} ilan={ilan} kullanici={kullanici} />)}
               </>
             ) : (
               filtered.map((ilan: any) => <IlanKart key={ilan.id} ilan={ilan} kullanici={kullanici} />)
             )}
-
             {filtered.length === 0 && (
               <div style={{ textAlign: 'center', padding: '80px 0', color: '#4b5563' }}>
                 <div style={{ fontSize: '2rem', marginBottom: 8 }}>🔍</div>
@@ -279,8 +335,44 @@ export default function Home() {
         )}
       </main>
 
-      <footer style={{ borderTop: '1px solid #30363d', marginTop: 40, padding: '20px 0', textAlign: 'center', color: '#4b5563', fontSize: '0.78rem' }}>
-        © 2026 Yükegel · Türkiye'nin nakliye ilan platformu
+      {/* FOOTER */}
+      <footer style={{ borderTop: '1px solid #30363d', marginTop: 48, padding: '32px 16px' }}>
+        <div style={{ maxWidth: 1280, margin: '0 auto', display: 'flex', flexWrap: 'wrap', gap: 32, justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <div>
+            <div style={{ fontWeight: 800, fontSize: '1rem', marginBottom: 8 }}>
+              <span style={{ color: '#22c55e' }}>YÜKE</span><span style={{ color: '#e2e8f0' }}>GEL</span>
+            </div>
+            <div style={{ color: '#4b5563', fontSize: '0.78rem' }}>Türkiye'nin nakliye ilan platformu</div>
+          </div>
+          <div style={{ display: 'flex', gap: 32, flexWrap: 'wrap' }}>
+            <div>
+              <div style={{ color: '#6b7280', fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' as const, marginBottom: 10 }}>Platform</div>
+              <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 8 }}>
+                <a href="/nasil-calisir" style={{ color: '#8b949e', fontSize: '0.82rem', textDecoration: 'none' }}>Nasıl Çalışır?</a>
+                <a href="/hakkimizda" style={{ color: '#8b949e', fontSize: '0.82rem', textDecoration: 'none' }}>Hakkımızda</a>
+                <a href="/ilan-ver" style={{ color: '#8b949e', fontSize: '0.82rem', textDecoration: 'none' }}>İlan Ver</a>
+              </div>
+            </div>
+            <div>
+              <div style={{ color: '#6b7280', fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' as const, marginBottom: 10 }}>Hesap</div>
+              <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 8 }}>
+                <a href="/giris" style={{ color: '#8b949e', fontSize: '0.82rem', textDecoration: 'none' }}>Giriş Yap</a>
+                <a href="/giris" style={{ color: '#8b949e', fontSize: '0.82rem', textDecoration: 'none' }}>Kayıt Ol</a>
+                <a href="/panel" style={{ color: '#8b949e', fontSize: '0.82rem', textDecoration: 'none' }}>Panelim</a>
+              </div>
+            </div>
+            <div>
+              <div style={{ color: '#6b7280', fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' as const, marginBottom: 10 }}>Yasal</div>
+              <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 8 }}>
+                <a href="/kvkk" style={{ color: '#8b949e', fontSize: '0.82rem', textDecoration: 'none' }}>KVKK</a>
+                <a href="/kullanim-kosullari" style={{ color: '#8b949e', fontSize: '0.82rem', textDecoration: 'none' }}>Kullanım Koşulları</a>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div style={{ maxWidth: 1280, margin: '24px auto 0', paddingTop: 20, borderTop: '1px solid #21262d', textAlign: 'center', color: '#4b5563', fontSize: '0.75rem' }}>
+          © 2026 Yükegel Teknoloji A.Ş. · Tüm hakları saklıdır.
+        </div>
       </footer>
     </div>
   );
@@ -300,32 +392,12 @@ function IlanKart({ ilan, kullanici }: { ilan: any; kullanici: any }) {
             <span style={{ background: isYuk ? '#7f1d1d' : '#14532d', color: isYuk ? '#fca5a5' : '#86efac', fontSize: '0.7rem', fontWeight: 700, padding: '2px 8px', borderRadius: 4 }}>
               {isYuk ? '🔴 YÜK' : '🟢 ARAÇ'}
             </span>
-            <span style={{ background: kaynak.bg, color: kaynak.color, fontSize: '0.7rem', fontWeight: 600, padding: '2px 8px', borderRadius: 4 }}>
-              {kaynak.label}
-            </span>
-            {ilan.dogrulanmamis && (
-              <span title="Bu ilan Yükegel üyesi olmayan birinden geliyor."
-                style={{ background: '#292019', color: '#f59e0b', fontSize: '0.7rem', fontWeight: 700, padding: '2px 8px', borderRadius: 4, cursor: 'help' }}>
-                ⚠️ Doğrulanmamış İlan
-              </span>
-            )}
-            {ilan.telefonDogrulandi && (
-              <span style={{ background: '#0d2b1a', color: '#22c55e', fontSize: '0.7rem', fontWeight: 700, padding: '2px 8px', borderRadius: 4 }}>
-                ✅ Telefon Doğrulandı
-              </span>
-            )}
-            {ilan.yeniUye && !ilan.dogrulanmamis && (
-              <span style={{ background: '#1e1b4b', color: '#a5b4fc', fontSize: '0.7rem', fontWeight: 700, padding: '2px 8px', borderRadius: 4 }}>
-                🆕 Yeni Üye
-              </span>
-            )}
-            {ilan.fiyat && (
-              <span style={{ background: '#0d2b1a', color: '#22c55e', fontSize: '0.7rem', fontWeight: 700, padding: '2px 8px', borderRadius: 4 }}>
-                ✓ Fiyat Belli
-              </span>
-            )}
+            <span style={{ background: kaynak.bg, color: kaynak.color, fontSize: '0.7rem', fontWeight: 600, padding: '2px 8px', borderRadius: 4 }}>{kaynak.label}</span>
+            {ilan.dogrulanmamis && <span style={{ background: '#292019', color: '#f59e0b', fontSize: '0.7rem', fontWeight: 700, padding: '2px 8px', borderRadius: 4 }}>⚠️ Doğrulanmamış</span>}
+            {ilan.telefonDogrulandi && <span style={{ background: '#0d2b1a', color: '#22c55e', fontSize: '0.7rem', fontWeight: 700, padding: '2px 8px', borderRadius: 4 }}>✅ Tel Doğrulandı</span>}
+            {ilan.yeniUye && !ilan.dogrulanmamis && <span style={{ background: '#1e1b4b', color: '#a5b4fc', fontSize: '0.7rem', fontWeight: 700, padding: '2px 8px', borderRadius: 4 }}>🆕 Yeni Üye</span>}
+            {ilan.fiyat && <span style={{ background: '#0d2b1a', color: '#22c55e', fontSize: '0.7rem', fontWeight: 700, padding: '2px 8px', borderRadius: 4 }}>✓ Fiyat Belli</span>}
           </div>
-
           <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4 }}>
             <span style={{ color: '#22c55e', fontSize: '0.7rem', fontWeight: 700, minWidth: 16 }}>K</span>
             <span style={{ color: '#e2e8f0', fontWeight: 700, fontSize: '0.95rem' }}>{ilan.kalkis}</span>
@@ -339,23 +411,17 @@ function IlanKart({ ilan, kullanici }: { ilan: any; kullanici: any }) {
               {d.arac_adet > 1 && <span style={{ color: '#60a5fa', fontSize: '0.78rem', marginLeft: 4 }}>{d.arac_adet} araç</span>}
             </div>
           ))}
-
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
             {ilan.aracTipleri.map((t: string) => <Chip key={'a-' + t} label={'🚛 ' + t} bg='#1a2535' color='#60a5fa' />)}
-            {ilan.ustyapilari.map((u: string) => <Chip key={'u-' + u} label={u} bg='#1f2937' color='#94a3b8' />)}
+            {ilan.ustyapilari.map((u: string) => <Chip key={'u-' + u} label={u} />)}
             {ilan.duraklar[0]?.ton && <Chip label={'⚖ ' + ilan.duraklar[0].ton + ' ton'} bg='#1a2a1a' color='#86efac' />}
             {ilan.duraklar[0]?.palet && <Chip label={'📦 ' + ilan.duraklar[0].palet + ' palet'} bg='#1a2a1a' color='#86efac' />}
-            {ilan.tarih && <Chip label={'📅 ' + new Date(ilan.tarih).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' }) + (ilan.tarihEsnek ? ' ±' : '')} bg='#1f2937' color='#94a3b8' />}
+            {ilan.tarih && <Chip label={'📅 ' + new Date(ilan.tarih).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' }) + (ilan.tarihEsnek ? ' ±' : '')} />}
             <span style={{ color: '#4b5563', fontSize: '0.72rem', marginLeft: 'auto', alignSelf: 'center' }}>{ilan.sure}</span>
           </div>
         </div>
-
         <div style={{ textAlign: 'right', flexShrink: 0 }}>
-          {ilan.fiyat && (
-            <div style={{ color: '#22c55e', fontWeight: 800, fontSize: '1.05rem', marginBottom: 8 }}>
-              ₺{Number(ilan.fiyat).toLocaleString('tr-TR')}
-            </div>
-          )}
+          {ilan.fiyat && <div style={{ color: '#22c55e', fontWeight: 800, fontSize: '1.05rem', marginBottom: 8 }}>₺{Number(ilan.fiyat).toLocaleString('tr-TR')}</div>}
           {kullanici ? (
             <button onClick={e => { e.preventDefault(); e.stopPropagation(); window.location.href = `tel:${ilan.tel}`; }}
               style={{ display: 'block', background: '#1a3a1a', color: '#4ade80', border: '1px solid #166634', borderRadius: 6, padding: '6px 12px', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}>

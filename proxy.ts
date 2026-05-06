@@ -9,17 +9,17 @@ const ACIK_ROTALAR = [
   '/api/',
   '/favicon',
   '/logo',
+  '/nasil-calisir',
+  '/hakkimizda',
+  '/kvkk',
+  '/kullanim-kosullari',
 ];
 
 const KORUNMALI = ['/panel', '/ilan-ver', '/araclarim', '/profil', '/moderator'];
 
-// Bu rotalarda user_type kontrolü yapma (admin/moderator sayfaları kendi requireAdmin/requireModerator'ını çağırır)
-const PROFIL_KONTROLSUZ = ['/admin', '/moderator'];
-
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Statik ve açık rotalar — direkt geç
   if (
     ACIK_ROTALAR.some(r => pathname.startsWith(r)) ||
     pathname.match(/\.(svg|png|jpg|ico|css|js|woff|woff2)$/)
@@ -48,19 +48,20 @@ export async function proxy(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser();
 
-  // Giriş yapmamış → korumalı sayfalara girmeye çalışırsa /giris'e yönlendir
   if (!user && KORUNMALI.some(r => pathname.startsWith(r))) {
     return NextResponse.redirect(new URL(`/giris?redirect=${pathname}`, request.url));
   }
 
-  // Giriş yapmış ama profil eksik → profil-tamamla'ya yönlendir
-  // Admin/moderator sayfalarında bu kontrolü atlıyoruz
-  if (user && !PROFIL_KONTROLSUZ.some(r => pathname.startsWith(r))) {
+  if (user) {
     const { data: profil } = await supabase
       .from('users')
-      .select('user_type')
+      .select('user_type, role')
       .eq('id', user.id)
-      .single();
+      .maybeSingle();
+
+    if (profil?.role === 'admin' || profil?.role === 'moderator') {
+      return supabaseResponse;
+    }
 
     if (!profil?.user_type) {
       return NextResponse.redirect(new URL('/profil-tamamla', request.url));
