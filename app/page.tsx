@@ -136,6 +136,7 @@ export default function Home() {
   const [kalkis, setKalkis] = useState('');
   const [varis, setVaris] = useState('');
   const [kullanici, setKullanici] = useState<{ display_name: string | null; email: string | null; user_type: string | null } | null>(null);
+  const [authHazir, setAuthHazir] = useState(false);
 
   async function profilCek(userId: string) {
     const { data: profil } = await supabase
@@ -154,6 +155,7 @@ export default function Home() {
           const profil = await profilCek(user.id);
           setKullanici(profil || { display_name: null, email: user.email ?? null, user_type: null });
         }
+        setAuthHazir(true);
 
         setYukleniyor(true);
         const { data } = await supabase
@@ -259,19 +261,19 @@ export default function Home() {
               <a href="/panel" style={{ color: '#e2e8f0', fontSize: '0.85rem', textDecoration: 'none', fontWeight: 600 }}>👤 {ad}</a>
               <a href="/ilan-ver" style={{ background: '#22c55e', color: '#000', fontWeight: 700, fontSize: '0.85rem', padding: '6px 16px', borderRadius: 6, textDecoration: 'none' }}>+ İlan Ver</a>
             </div>
-          ) : (
+          ) : authHazir ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <a href="/giris" style={{ color: '#8b949e', fontSize: '0.85rem', textDecoration: 'none' }}>Giriş Yap</a>
               <a href="/giris" style={{ background: '#22c55e', color: '#000', fontWeight: 700, fontSize: '0.85rem', padding: '6px 16px', borderRadius: 6, textDecoration: 'none' }}>Üye Ol</a>
             </div>
-          )}
+          ) : null}
         </div>
       </nav>
 
       {/* HERO */}
-      {!kullanici && <HeroKayitsiz />}
-      {isMusteri && <HeroMusteri ad={ad} />}
-      {isNakliyeci && <HeroNakliyeci ad={ad} />}
+      {authHazir && !kullanici && <HeroKayitsiz />}
+      {authHazir && isMusteri && <HeroMusteri ad={ad} />}
+      {authHazir && isNakliyeci && <HeroNakliyeci ad={ad} />}
 
       {/* FİLTRE BARI */}
       <div style={{ background: '#161b22', borderBottom: '1px solid #30363d', position: 'sticky', top: 56, zIndex: 40 }}>
