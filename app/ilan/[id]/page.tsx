@@ -332,7 +332,6 @@ export default async function IlanDetay({ params }: { params: Promise<{ id: stri
                 </div>
                 {s.notes && <div style={{ color: '#6b7280', fontSize: '0.78rem', marginTop: 6 }}>📝 {s.notes}</div>}
               </div>
-            </div>
             </li>
           ))}
           </ol>

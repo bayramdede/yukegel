@@ -15,7 +15,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     .select('id, created_at, available_date')
     .eq('status', 'active')
     .eq('is_shadow_banned', false)
-    .in('moderation_status', ['approved', 'auto_published'])
+    .in('moderation_status', ['approved', 'auto_published'] as string[])
     .order('created_at', { ascending: false })
     .limit(5000);
 
