@@ -1,6 +1,6 @@
 # Yükegel — Proje Haritası
 > **Kullanım:** Her sohbet başında sadece bu dosyayı oku. Kaynak dosyaları sadece o dosyada değişiklik yapacaksan oku.  
-> Son güncelleme: 6 Mayıs 2026 — AI-Readiness (SEO + JSON-LD + robots.txt + Public API) ✅
+> Son güncelleme: 8 Mayıs 2026 — Audit eşikleri konfigüre edilebilir + AI ilan limiti per-user ✅
 
 ---
 
@@ -35,7 +35,7 @@ yukegel/
 │   ├── profil-tamamla/page.tsx
 │   ├── panel/ (page + PanelClient + IlanYonetim)
 │   ├── ilan/[id]/ (page + Aksiyonlar + sahiplen)
-│   ├── ilan-ver/ (page + actions + TopluYukle)
+│   ├── ilan-ver/ (page + actions + TopluYukle + MetindenIlan)
 │   ├── araclarim/page.tsx
 │   ├── moderator/ + moderator-giris/
 │   ├── admin/ (page + kullanicilar + sistem-ayarlari + guvenlik)
@@ -49,6 +49,7 @@ yukegel/
 │   ├── ilan/pasif/ + duzelt/
 │   ├── llm-parse/
 │   ├── moderator/kullanici-askiya/ + toplu-islem/
+│   ├── parse-text/                       # ✍️ Metinden ilan: LLM (Haiku) ile JSON çıkarımı ✅
 │   └── whatsapp-parse/
 │
 ├── lib/auth.ts + supabase.ts
@@ -71,8 +72,9 @@ is_shadow_banned, audit_score, internal_audit_logs (JSONB)
 user_id (nullable), source: 'form'|'whatsapp'|'excel'
 ```
 
-### `users` — `role`, `is_active`, `user_type`, `phone_verified`, `company_name`
-### `raw_posts`, `aliases`, `system_config`, `vehicles`
+### `users` — `role`, `is_active`, `user_type`, `phone_verified`, `company_name`, `ai_listing_quota_daily` (NULL = sistem default)
+### `raw_posts`, `aliases`, `vehicles`
+### `system_config` — `parse.auto_publish_score_max`, `parse.reject_score_min`, `llm.ai_listing_quota_default` ve diğerleri
 ### `safety_rules`, `blacklist`
 
 ---
@@ -87,11 +89,14 @@ Toplu işlemler: `approve | reject | passive | archive | unarchive | shadow_ban 
 
 ## 5. GÜVENLİK & DENETİM (Audit Engine V3)
 
+Eşikler `system_config.parse.*` anahtarlarından okunur (DB trigger + `/api/ilan/duzelt` aynı helper'ı kullanır: `lib/auditLimits.ts`).
+Varsayılan: `auto_publish_score_max=31`, `reject_score_min=71`.
+
 | Puan | INSERT | /api/ilan/duzelt |
 |---|---|---|
-| 0–30 | Yayında | Otomatik approved+active |
-| 31–70 | Mod kuyruğu | pending+passive |
-| 71–100 | shadow_ban=true | correction_needed kalır |
+| < auto_publish_score_max | Yayında | Otomatik approved+active |
+| auto..reject arası | Mod kuyruğu | pending+passive |
+| ≥ reject_score_min | shadow_ban + archived | correction_needed kalır |
 
 Sprintler 1–5: ✅
 
@@ -114,6 +119,8 @@ ZIP/TXT → raw_posts → DB trigger → parse-listing Edge Fn → listings → 
 | `/api/admin/guvenlik` | safety_rules + blacklist CRUD |
 | `/api/excel-import` | Excel toplu yükleme (auto_published) |
 | `/api/auth/tekil-kontrol` | telefon/tckn/vkn tekillik (service role) |
+| `/api/parse-text` | Tekil kullanıcı metnini Haiku ile JSON'a çevirir + per-user günlük quota kontrolü (429) |
+| `/api/admin/kullanici` | role / is_active / moderator_sources / **ai_listing_quota_daily** PATCH |
 
 ---
 
@@ -143,6 +150,7 @@ Açık rotalar: /giris, /auth/, /profil-tamamla, /nasil-calisir, /hakkimizda,
 - Vercel env → dashboard; `.next` cache → `rm -rf .next`
 - Supabase → Redirect URLs'e production URL eklenmeli
 - **`write_file` tüm dosyayı ezer** — küçük değişiklikler için `str_replace` kullan
+- **İnline component anti-pattern**: Parent fonksiyonu içinde tanımlanan component'leri JSX olarak çağırmak (`<EditForm />`) her render'da yeni component tipi yaratır → input focus kaybolur, cursor başa döner. Çözüm: fonksiyon çağrısı (`{EditForm({})}`) veya parent dışına taşı.
 
 ---
 
@@ -160,6 +168,7 @@ Açık rotalar: /giris, /auth/, /profil-tamamla, /nasil-calisir, /hakkimizda,
 | Panel | `/panel` | ✅ |
 | İlan detay | `/ilan/[id]` | ✅ kısmi |
 | Tekil ilan formu | `/ilan-ver` | ✅ |
+| Metinden ilan (LLM) | `/ilan-ver` (yöntem=metin) | ✅ |
 | Toplu yükleme | `/ilan-ver` | ✅ kısmi |
 | Atanan işlerim | `/panel/is/[id]` | 🔮 Faz 2 |
 | Puanlama | modal | 🔮 Faz 2 |
@@ -191,7 +200,11 @@ Açık rotalar: /giris, /auth/, /profil-tamamla, /nasil-calisir, /hakkimizda,
 - Panel (İlanlarım / Araçlarım / Profilim)
 - Güvenlik Sprint 1–5
 - Tekil ilan formu (yük + araç)
+- **Metinden İlan akışı** (8 May 2026): kullanıcı WhatsApp/serbest metni yapıştırır → `/api/parse-text` Haiku LLM ile JSON çıkarır → mevcut tekil form prefilled olarak açılır → kullanıcı düzeltir + yayınlar. `listings.raw_text` doldurulur (source: 'form' korundu, CHECK karıştırmamak için).
+- **Audit eşikleri konfigüre edilebilir** (8 May 2026): `system_config.parse.auto_publish_score_max` (default 31) ve `parse.reject_score_min` (default 71). Hem DB trigger (`audit_listing_fn`) hem `/api/ilan/duzelt` `lib/auditLimits.ts` helper'ını kullanır. Reject seviyesi artık shadow_ban + `moderation_status='archived'` set ediyor ("hiç dikkate alınmasın"). Migration: `docs/20260508_audit_thresholds_and_ai_quota.sql`.
+- **Per-user AI ilan limiti** (8 May 2026): `users.ai_listing_quota_daily` (NULL=default), `system_config.llm.ai_listing_quota_default` (default 5/gün). `/api/parse-text` parse öncesi son 24s'lik AI ilan sayısını (`raw_text IS NOT NULL`) kontrol eder, dolduysa 429. Admin UI: `/admin/kullanicilar` tablosunda **AI Limit / Gün** sütunu — tıklanıp düzenlenebilir, boş = default, 0 = AI kapalı.
 - Landing page (3 senaryo)
+- Landing performans: getSession (network'üz), paralel auth+listings, progressive rozet zenginleştirme, limit 30, cancel guard
 - Nasıl Çalışır, Hakkımızda, KVKK, Kullanım Koşulları
 
 ### ⏳ Faz 1 — Kalanlar
@@ -220,3 +233,4 @@ Açık rotalar: /giris, /auth/, /profil-tamamla, /nasil-calisir, /hakkimizda,
 | 3 | Browser client toplu işlem RLS | ✅ |
 | 4 | E-posta kayıt profil-tamamla | ✅ |
 | 5 | Admin/Gmail /ilan-ver erişim | ✅ |
+| 6 | Moderatör düzenleme: ilçe/input her tuşta focus kaybı (inline component) | ✅ 8 May 2026 |

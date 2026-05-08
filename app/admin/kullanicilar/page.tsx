@@ -9,8 +9,17 @@ export default async function KullanicilarPage() {
 
   const { data: kullanicilar } = await service
     .from('users')
-    .select('id, display_name, email, phone, role, is_active, user_type, moderator_sources, created_at, auth_providers')
+    .select('id, display_name, email, phone, role, is_active, user_type, moderator_sources, ai_listing_quota_daily, created_at, auth_providers')
     .order('created_at', { ascending: false });
+
+  // Sistem default'unu admin tablosunda "— (default: N)" gösterebilmek için oku
+  const { data: cfg } = await service
+    .from('system_config')
+    .select('value')
+    .eq('category', 'llm')
+    .eq('key', 'ai_listing_quota_default')
+    .maybeSingle();
+  const aiQuotaDefault = Number(cfg?.value ?? 5) || 5;
 
   return (
     <div style={{ minHeight: '100vh', background: '#0d1117', fontFamily: "'IBM Plex Sans', system-ui, sans-serif" }}>
@@ -33,7 +42,7 @@ export default async function KullanicilarPage() {
           </div>
         </div>
 
-        <KullaniciTablosu kullanicilar={kullanicilar || []} />
+        <KullaniciTablosu kullanicilar={kullanicilar || []} aiQuotaDefault={aiQuotaDefault} />
       </main>
     </div>
   );

@@ -29,6 +29,8 @@ export async function ilanKaydet(formData: {
     palet: string;
     notlar: string;
   }>;
+  raw_text?: string;
+  ai_parsed?: boolean;
 }) {
   const cookieStore = await cookies();
   const supabaseAuth = createServerClient(
@@ -55,6 +57,7 @@ export async function ilanKaydet(formData: {
       available_date: formData.tarih || null,
       date_flexible: formData.tarih_esnek,
       notes: formData.genel_not || null,
+      raw_text: formData.raw_text || null,
       source: 'form',
       moderation_status: 'auto_published',
       trust_level: 'verified',

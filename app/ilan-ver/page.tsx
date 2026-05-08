@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { ilanKaydet, kullanicitelefon } from './actions';
 import { createClient } from '../../lib/supabase';
 import TopluYukle from './TopluYukle';
+import MetindenIlan, { ParsedListingResult } from './MetindenIlan';
 const supabase = createClient();
 
 const ILLER = [
@@ -36,19 +37,20 @@ function SecimEkrani({ onSecim }: { onSecim: (y: Yontem) => void }) {
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         {[
-          { key: 'tekil', ikon: '📦', baslik: 'Tekil İlan', aciklama: 'Adım adım yeni bir ilan oluşturun.', yakin: false },
-          { key: 'toplu', ikon: '📄', baslik: 'Toplu Yükleme', aciklama: 'Excel şablonu ile birden fazla ilan yükleyin.', yakin: false },
-          { key: 'metin', ikon: '✍️', baslik: 'Metinden İlan', aciklama: 'WhatsApp mesajından yapay zeka ile ilan oluşturun.', yakin: true },
+          { key: 'tekil', ikon: '📦', baslik: 'Tekil İlan', aciklama: 'Adım adım yeni bir ilan oluşturun.', yakin: false, yeni: false },
+          { key: 'toplu', ikon: '📄', baslik: 'Toplu Yükleme', aciklama: 'Excel şablonu ile birden fazla ilan yükleyin.', yakin: false, yeni: false },
+          { key: 'metin', ikon: '✍️', baslik: 'Metinden İlan', aciklama: 'Mesajı yapıştır, yapay zeka senin için ayrıştırsın.', yakin: false, yeni: true },
         ].map(item => (
           <button key={item.key} type="button" onClick={() => onSecim(item.key as Yontem)}
-            style={{ background: '#161b22', border: '2px solid #30363d', borderRadius: 12, padding: 20, cursor: 'pointer', textAlign: 'left', transition: 'border-color 0.15s' }}
+            style={{ background: '#161b22', border: '2px solid #30363d', borderRadius: 12, padding: 20, cursor: 'pointer', textAlign: 'left', transition: 'border-color 0.15s', position: 'relative' }}
             onMouseEnter={e => (e.currentTarget.style.borderColor = '#22c55e')}
             onMouseLeave={e => (e.currentTarget.style.borderColor = '#30363d')}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
               <span style={{ fontSize: '1.8rem' }}>{item.ikon}</span>
               <div style={{ flex: 1 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
                   <span style={{ color: '#e2e8f0', fontWeight: 700, fontSize: '1rem' }}>{item.baslik}</span>
+                  {item.yeni && <span style={{ background: '#14532d', color: '#22c55e', fontSize: '0.62rem', fontWeight: 800, padding: '2px 7px', borderRadius: 4, letterSpacing: '0.05em' }}>YENİ</span>}
                   {item.yakin && <span style={{ background: '#1e3a5f', color: '#60a5fa', fontSize: '0.65rem', fontWeight: 700, padding: '1px 6px', borderRadius: 4 }}>YAKINDA</span>}
                 </div>
                 <div style={{ color: '#8b949e', fontSize: '0.82rem' }}>{item.aciklama}</div>
@@ -78,6 +80,7 @@ function YakindaEkrani({ baslik, aciklama, onGeri }: { baslik: string; aciklama:
 
 export default function IlanVer() {
   const [yontem, setYontem] = useState<Yontem>(null);
+  const [aiHamMetin, setAiHamMetin] = useState<string>('');
   const [tip, setTip] = useState<'yuk' | 'arac'>('yuk');
   const [arac_tipi, setAracTipi] = useState('');
   const [utsyapi, setUtsyapi] = useState<string[]>([]);
@@ -156,13 +159,71 @@ export default function IlanVer() {
     if (bariyer) { setHata(bariyer); return; }
     setYukleniyor(true); setHata('');
     try {
-      await ilanKaydet({ tip, kalkis, kalkis_ilce, tel, fiyat, fiyat_pazarlik, tarih, tarih_esnek, genel_not, arac_tipi, utsyapi, arac_adet, yuk_cinsi, duraklar });
+      await ilanKaydet({ tip, kalkis, kalkis_ilce, tel, fiyat, fiyat_pazarlik, tarih, tarih_esnek, genel_not, arac_tipi, utsyapi, arac_adet, yuk_cinsi, duraklar, raw_text: aiHamMetin || undefined });
       setGonderildi(true);
     } catch (err: any) {
       setHata(err.message || 'Bir hata oluştu.');
     } finally {
       setYukleniyor(false);
     }
+  };
+
+  // Metinden ilan ayrıştırma sonucunu form state'ine doldur
+  const aiCiktisiniUygula = (r: ParsedListingResult, hamMetin: string) => {
+    setAiHamMetin(hamMetin);
+
+    // Tip
+    if (r.listing_type === 'arac' || r.listing_type === 'yuk') setTip(r.listing_type);
+
+    // Kalkış
+    if (r.origin_city) {
+      const eslen = ILLER.find(il => il.toLocaleLowerCase('tr') === String(r.origin_city).toLocaleLowerCase('tr'));
+      setKalkis(eslen || String(r.origin_city));
+    }
+    if (r.origin_district) setKalkisIlce(String(r.origin_district));
+
+    // İletişim (kullanıcının profil tel'i öncelikli, ama AI bulduysa ve profil boşsa AI'ninıkini kullan)
+    if (r.contact_phone && !tel) setTel(String(r.contact_phone));
+
+    // Araç
+    if (r.vehicle_type && ARAC_TIPLERI.includes(String(r.vehicle_type))) setAracTipi(String(r.vehicle_type));
+    if (Array.isArray(r.body_type)) {
+      const geçerli = r.body_type.filter((b): b is string => typeof b === 'string' && UTSYAPI.includes(b));
+      setUtsyapi(geçerli);
+    }
+
+    // Fiyat & tarih
+    if (typeof r.price === 'number' && r.price > 0) setFiyat(String(r.price));
+    if (r.available_date && /^\d{4}-\d{2}-\d{2}$/.test(r.available_date)) setTarih(r.available_date);
+    if (typeof r.date_flexible === 'boolean') setTarihEsnek(r.date_flexible);
+
+    // Notlar
+    if (r.notes) setGenelNot(String(r.notes));
+
+    // Duraklar
+    if (Array.isArray(r.stops) && r.stops.length > 0) {
+      const yeni = r.stops
+        .filter(s => s && s.city)
+        .map(s => {
+          const eslen = ILLER.find(il => il.toLocaleLowerCase('tr') === String(s.city).toLocaleLowerCase('tr'));
+          return {
+            sehir: eslen || String(s.city),
+            ilce: s.district ? String(s.district) : '',
+            ton: typeof s.weight_ton === 'number' && s.weight_ton > 0 ? String(s.weight_ton) : '',
+            palet: typeof s.pallet_count === 'number' && s.pallet_count > 0 ? String(s.pallet_count) : '',
+            notlar: s.cargo_type ? String(s.cargo_type) : '',
+          };
+        });
+      // Yuk cinsi: ilk durak cargo_type çözümü
+      const ilkCargo = r.stops.find(s => s?.cargo_type)?.cargo_type;
+      if (ilkCargo) setYukCinsi(String(ilkCargo));
+      if (yeni.length > 0) setDuraklar(yeni);
+    }
+
+    setHata('');
+    // Tekil form moduna geç
+    setYontem('tekil');
+    if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const s = {
@@ -217,25 +278,58 @@ export default function IlanVer() {
     </div>
   );
 
+  // Geri dönerken state'i tertemiz sıfırla (eski AI metni / form değerleri taşınmasın)
+  const geriYontemSec = () => {
+    setYontem(null);
+    setAiHamMetin('');
+    setHata('');
+    // Form alanlarını başlangıç değerine döndür— böylece kullanıcı başka yöntem seçerse temiz form görür
+    setTip('yuk');
+    setKalkis(''); setKalkisIlce('');
+    setAracTipi(''); setUtsyapi([]); setAracAdet(1); setYukCinsi('');
+    setTarih(bugun()); setTarihEsnek(false);
+    setGenelNot(''); setFiyat(''); setFiyatPazarlik(false);
+    setDuraklar([{ sehir: '', ilce: '', ton: '', palet: '', notlar: '' }]);
+  };
+
   if (yontem === 'toplu') return (
     <div style={{ background: '#0d1117', minHeight: '100vh' }}>
-      <Navbar geri={() => setYontem(null)} />
-      <TopluYukle onGeri={() => setYontem(null)} />
+      <Navbar geri={geriYontemSec} />
+      <TopluYukle onGeri={geriYontemSec} />
     </div>
   );
 
   if (yontem === 'metin') return (
     <div style={{ background: '#0d1117', minHeight: '100vh' }}>
-      <Navbar geri={() => setYontem(null)} />
-      <YakindaEkrani baslik="Metinden İlan" aciklama="WhatsApp mesajından yapay zeka ile ilan oluşturma çok yakında geliyor." onGeri={() => setYontem(null)} />
+      <Navbar geri={geriYontemSec} />
+      <MetindenIlan onParsed={aiCiktisiniUygula} />
     </div>
   );
 
   return (
     <div style={{ background: '#0d1117', minHeight: '100vh' }}>
-      <Navbar geri={() => setYontem(null)} />
+      <Navbar geri={geriYontemSec} />
 
       <form onSubmit={handleSubmit} style={{ maxWidth: 720, margin: '0 auto', padding: '24px 16px 48px' }}>
+
+        {aiHamMetin && (
+          <div style={{ background: '#0d1f1a', border: '1px solid #14532d', borderRadius: 10, padding: '12px 16px', marginBottom: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ background: '#14532d', color: '#22c55e', fontSize: '0.62rem', fontWeight: 800, padding: '3px 8px', borderRadius: 4, letterSpacing: '0.05em' }}>✨ AI ÖNİZLEME</span>
+                <span style={{ color: '#86efac', fontSize: '0.85rem', fontWeight: 600 }}>Metniniz ayrıştırıldı. Kontrol edin, gerekirse düzeltin.</span>
+              </div>
+              <button type="button" onClick={() => { setAiHamMetin(''); setYontem('metin'); }}
+                style={{ background: 'none', border: '1px solid #14532d', color: '#22c55e', borderRadius: 5, padding: '4px 10px', fontSize: '0.75rem', cursor: 'pointer', fontWeight: 600 }}>
+                ✍️ Metni düzenle
+              </button>
+            </div>
+            <details style={{ marginTop: 8 }}>
+              <summary style={{ color: '#6b7280', fontSize: '0.75rem', cursor: 'pointer', userSelect: 'none' }}>Orijinal metni gör</summary>
+              <pre style={{ background: '#0d1117', border: '1px solid #14532d', borderRadius: 6, padding: 10, marginTop: 8, color: '#9ca3af', fontSize: '0.78rem', whiteSpace: 'pre-wrap', maxHeight: 160, overflow: 'auto', fontFamily: 'inherit' }}>{aiHamMetin}</pre>
+            </details>
+          </div>
+        )}
 
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
           <h1 style={{ color: '#e2e8f0', fontWeight: 800, fontSize: '1.3rem', margin: 0 }}>Yeni İlan</h1>

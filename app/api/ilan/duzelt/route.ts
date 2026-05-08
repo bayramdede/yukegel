@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSupabase, getServiceSupabase } from '../../../../lib/auth';
+import { getAuditThresholds } from '../../../../lib/auditLimits';
 
 export async function POST(req: NextRequest) {
   try {
@@ -51,19 +52,22 @@ export async function POST(req: NextRequest) {
     }
     score = Math.min(score, 100);
 
+    // ── Eşikleri DB'den oku (admin'in /admin/sistem-ayarlari'ndan değiştirebildiği değerler)
+    const { autoPublishScoreMax, rejectScoreMin } = await getAuditThresholds();
+
     // ── Sonuca göre güncelle
     let yeniModerasyon: string;
     let yeniStatus: string;
     let yeniShadow: boolean;
     let mesaj: string;
 
-    if (score < 31) {
+    if (score < autoPublishScoreMax) {
       // Temiz → otomatik yayına al
       yeniModerasyon = 'approved';
       yeniStatus     = 'active';
       yeniShadow     = false;
       mesaj = 'İlanınız güncellendi ve yayına alındı.';
-    } else if (score < 71) {
+    } else if (score < rejectScoreMin) {
       // Orta risk → moderatör kuyruğuna geri gönder
       yeniModerasyon = 'pending';
       yeniStatus     = 'passive';

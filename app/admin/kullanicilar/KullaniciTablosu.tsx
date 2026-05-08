@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 type Kullanici = {
   id: string;
@@ -10,6 +10,7 @@ type Kullanici = {
   is_active: boolean;
   user_type: string | null;
   moderator_sources: string[] | null;
+  ai_listing_quota_daily: number | null;
   created_at: string;
   auth_providers: string[] | null;
 };
@@ -23,7 +24,7 @@ async function guncelle(id: string, alan: string, deger: unknown) {
   if (!res.ok) throw new Error('Güncelleme başarısız');
 }
 
-export default function KullaniciTablosu({ kullanicilar: ilk }: { kullanicilar: Kullanici[] }) {
+export default function KullaniciTablosu({ kullanicilar: ilk, aiQuotaDefault }: { kullanicilar: Kullanici[]; aiQuotaDefault: number }) {
   const [liste, setListe] = useState<Kullanici[]>(ilk);
   const [yukleniyor, setYukleniyor] = useState<Record<string, boolean>>({});
   const [hata, setHata] = useState<Record<string, string>>({});
@@ -104,6 +105,7 @@ export default function KullaniciTablosu({ kullanicilar: ilk }: { kullanicilar: 
               <th style={th}>Giriş Yöntemi</th>
               <th style={th}>Rol</th>
               <th style={th}>Mod. Kaynağı</th>
+              <th style={th} title={`Boş = sistem default (${aiQuotaDefault}/gün). 0 = AI özelliği kapalı.`}>AI Limit / Gün</th>
               <th style={th}>Aktif</th>
             </tr>
           </thead>
@@ -201,6 +203,16 @@ export default function KullaniciTablosu({ kullanicilar: ilk }: { kullanicilar: 
                   </td>
 
                   <td style={td}>
+                    <AiQuotaCell
+                      kullaniciId={u.id}
+                      mevcutDeger={u.ai_listing_quota_daily}
+                      sistemDefault={aiQuotaDefault}
+                      onKaydet={(yeni) => kaydet(u.id, 'ai_listing_quota_daily', yeni)}
+                      yukleniyor={!!yukleniyor[`${u.id}_ai_listing_quota_daily`]}
+                    />
+                  </td>
+
+                  <td style={td}>
                     <button
                       disabled={aktifYukleniyor}
                       onClick={() => kaydet(u.id, 'is_active', !u.is_active)}
@@ -233,5 +245,113 @@ export default function KullaniciTablosu({ kullanicilar: ilk }: { kullanicilar: 
         )}
       </div>
     </div>
+  );
+}
+
+// ---------------------------------------------------------------
+// AI günlük ilan limiti hücresi
+// - null  → "Default (N)" rozeti gösterir
+// - sayı  → number input + onClick dışına çıkınca veya Enter ile kaydeder
+// - 0    → "Kapalı" rozeti (kırmızımsı)
+// - "" girilip kaydedilirse null olur (sistem default'una döner)
+// ---------------------------------------------------------------
+function AiQuotaCell({
+  kullaniciId, mevcutDeger, sistemDefault, onKaydet, yukleniyor,
+}: {
+  kullaniciId: string;
+  mevcutDeger: number | null;
+  sistemDefault: number;
+  onKaydet: (yeniDeger: number | null) => void;
+  yukleniyor: boolean;
+}) {
+  const [duzenleniyor, setDuzenleniyor] = useState(false);
+  const [taslak, setTaslak] = useState<string>(mevcutDeger === null ? '' : String(mevcutDeger));
+
+  // mevcutDeger dışardan güncellenirse (kaydet sonrası) taslakı senkronla
+  useEffect(() => {
+    if (!duzenleniyor) {
+      setTaslak(mevcutDeger === null ? '' : String(mevcutDeger));
+    }
+  }, [mevcutDeger, duzenleniyor]);
+
+  const onaylaVeKaydet = () => {
+    setDuzenleniyor(false);
+    const trimli = taslak.trim();
+    if (trimli === '') {
+      if (mevcutDeger !== null) onKaydet(null);
+      return;
+    }
+    const n = Number(trimli);
+    if (!Number.isFinite(n) || n < 0 || !Number.isInteger(n)) {
+      // Geçersiz → eski değeri restore et
+      setTaslak(mevcutDeger === null ? '' : String(mevcutDeger));
+      return;
+    }
+    if (n !== mevcutDeger) onKaydet(n);
+  };
+
+  if (duzenleniyor) {
+    return (
+      <input
+        autoFocus
+        type="number"
+        min={0}
+        step={1}
+        value={taslak}
+        onChange={e => setTaslak(e.target.value)}
+        onBlur={onaylaVeKaydet}
+        onKeyDown={e => {
+          if (e.key === 'Enter') (e.currentTarget as HTMLInputElement).blur();
+          if (e.key === 'Escape') {
+            setTaslak(mevcutDeger === null ? '' : String(mevcutDeger));
+            setDuzenleniyor(false);
+          }
+        }}
+        placeholder={`Default: ${sistemDefault}`}
+        disabled={yukleniyor}
+        style={{
+          width: 80, background: '#0d1117', color: '#e2e8f0',
+          border: '1px solid #30363d', borderRadius: 6,
+          padding: '5px 8px', fontSize: '0.8rem', outline: 'none',
+        }}
+      />
+    );
+  }
+
+  // Görünüm modu
+  let rozet: React.ReactNode;
+  if (mevcutDeger === null) {
+    rozet = (
+      <span style={{ color: '#6b7280', fontSize: '0.78rem', fontStyle: 'italic' }}>
+        — <span style={{ color: '#4b5563', fontSize: '0.72rem' }}>(default: {sistemDefault})</span>
+      </span>
+    );
+  } else if (mevcutDeger === 0) {
+    rozet = (
+      <span style={{ background: '#3b1010', color: '#fca5a5', fontSize: '0.7rem', fontWeight: 700, padding: '2px 8px', borderRadius: 4 }}>
+        Kapalı
+      </span>
+    );
+  } else {
+    rozet = (
+      <span style={{ background: '#1c2d1e', color: '#86efac', fontSize: '0.78rem', fontWeight: 700, padding: '2px 8px', borderRadius: 4 }}>
+        {mevcutDeger}/gün
+      </span>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => setDuzenleniyor(true)}
+      disabled={yukleniyor}
+      title="Düzenlemek için tıkla. Boş bırakırsan sistem default'una döner."
+      style={{
+        background: 'none', border: 'none', cursor: yukleniyor ? 'wait' : 'pointer',
+        padding: '2px 4px', borderRadius: 4, opacity: yukleniyor ? 0.5 : 1,
+      }}
+    >
+      {rozet}
+    </button>
   );
 }

@@ -909,7 +909,7 @@ export default function Moderator() {
                 </div>
                 {duzenleId === 'no_lane_' + raw.id && (
                   <div style={{ marginTop: 12, borderTop: '1px solid #1f2937', paddingTop: 12 }}>
-                    <EditForm rawForLlm={raw.raw_text} />
+                    {EditForm({ rawForLlm: raw.raw_text })}
                     <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
                       <button onClick={async () => {
                         const { data: listing } = await supabase.from('listings').insert({ listing_type: duzenleData.listing_type, origin_city: duzenleData.origin_city, origin_district: duzenleData.origin_district || null, contact_phone: duzenleData.contact_phone || null, source: raw.source || 'whatsapp', moderation_status: 'approved', status: 'active', trust_level: 'social', raw_post_id: raw.id, raw_text: raw.raw_text, notes: duzenleData.notes, vehicle_type: duzenleData.vehicle_type, body_type: duzenleData.body_type, reviewed_at: new Date().toISOString() }).select().single();
@@ -986,7 +986,7 @@ export default function Moderator() {
                   </div>
 
                   {/* Sprint 3: Audit bilgi bloğu — riskli tab veya score > 0 olan her ilanda */}
-                  {(filtre === 'riskli' || auditScore > 0) && <AuditBilgi ilan={ilan} />}
+                  {(filtre === 'riskli' || auditScore > 0) && AuditBilgi({ ilan })}
 
                   {/* İçerik */}
                   <div style={{ display: 'grid', gridTemplateColumns: hasSosyal ? '1fr 1fr' : '1fr', gap: 16, marginBottom: 12 }}>
@@ -998,7 +998,7 @@ export default function Moderator() {
                     )}
                     <div>
                       {duzenleniyor ? (
-                        <EditForm />
+                        EditForm({})
                       ) : (
                         <div>
                           <div style={{ marginBottom: 10 }}>

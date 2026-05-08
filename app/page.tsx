@@ -148,16 +148,26 @@ export default function Home() {
   }
 
   useEffect(() => {
-    async function init() {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          const profil = await profilCek(user.id);
-          setKullanici(profil || { display_name: null, email: user.email ?? null, user_type: null });
-        }
-        setAuthHazir(true);
+    let cancelled = false;
 
-        setYukleniyor(true);
+    // 1) Auth — getSession() local'den okur, ağ çağrısı yok
+    (async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (cancelled) return;
+        if (session?.user) {
+          const profil = await profilCek(session.user.id);
+          if (cancelled) return;
+          setKullanici(profil || { display_name: null, email: session.user.email ?? null, user_type: null });
+        }
+      } finally {
+        if (!cancelled) setAuthHazir(true);
+      }
+    })();
+
+    // 2) Listings — auth ile paralel başlar
+    (async () => {
+      try {
         const { data } = await supabase
           .from('listings')
           .select(`
@@ -173,19 +183,13 @@ export default function Home() {
           .in('moderation_status', ['approved', 'auto_published'])
           .eq('is_shadow_banned', false)
           .order('created_at', { ascending: false })
-          .limit(50);
+          .limit(30);
 
-        if (!data || data.length === 0) { setIlanlar([]); return; }
+        if (cancelled) return;
+        if (!data || data.length === 0) { setIlanlar([]); setYukleniyor(false); return; }
 
-        const userIds = [...new Set((data as any[]).map((i: any) => i.user_id).filter(Boolean))];
-        const kullaniciMap: Record<string, { phone_verified: boolean; created_at: string }> = {};
-        if (userIds.length > 0) {
-          const { data: ks } = await supabase.from('users').select('id, phone_verified, created_at').in('id', userIds);
-          for (const k of (ks || []) as any[]) kullaniciMap[k.id] = k;
-        }
-
-        const donusturulmus = (data as any[]).map((ilan: any) => {
-          const kb = ilan.user_id ? kullaniciMap[ilan.user_id] : null;
+        // ÖNCE rozetsiz hızlı render → progressive enhancement
+        const baseList = (data as any[]).map((ilan: any) => {
           const stops = (ilan.listing_stops || []).sort((a: any, b: any) => a.stop_order - b.stop_order);
           const aracTipiList: string[] = ilan.vehicle_type?.length
             ? ilan.vehicle_type
@@ -200,30 +204,48 @@ export default function Home() {
             tarih: ilan.available_date, tarihEsnek: ilan.date_flexible,
             aracTipleri: aracTipiList, ustyapilari: (ilan.body_type || []) as string[],
             dogrulanmamis: !ilan.user_id || ilan.trust_level === 'social',
-            telefonDogrulandi: kb?.phone_verified === true,
-            yeniUye: kb ? yeniUye(kb.created_at) : false,
+            telefonDogrulandi: false,
+            yeniUye: false,
+            user_id: ilan.user_id,
           };
         });
-        setIlanlar(donusturulmus);
+        setIlanlar(baseList);
+        setYukleniyor(false);
+
+        // Users zenginleştirmesi → arka planda, render'ı bloklamıyor
+        const userIds = [...new Set(baseList.map(i => i.user_id).filter(Boolean))];
+        if (userIds.length > 0) {
+          const { data: ks } = await supabase.from('users').select('id, phone_verified, created_at').in('id', userIds);
+          if (cancelled) return;
+          const kullaniciMap: Record<string, { phone_verified: boolean; created_at: string }> = {};
+          for (const k of (ks || []) as any[]) kullaniciMap[k.id] = k;
+
+          setIlanlar(prev => prev.map(ilan => {
+            const kb = ilan.user_id ? kullaniciMap[ilan.user_id] : null;
+            return {
+              ...ilan,
+              telefonDogrulandi: kb?.phone_verified === true,
+              yeniUye: kb ? yeniUye(kb.created_at) : false,
+            };
+          }));
+        }
       } catch (err) {
         console.error('Ana sayfa veri hatası:', err);
-        setIlanlar([]);
-      } finally {
-        setYukleniyor(false);
+        if (!cancelled) { setIlanlar([]); setYukleniyor(false); }
       }
-    }
-
-    init();
+    })();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event: AuthChangeEvent, session: Session | null) => {
+      if (cancelled) return;
       if (session?.user) {
         const profil = await profilCek(session.user.id);
+        if (cancelled) return;
         setKullanici(profil || { display_name: null, email: session.user.email ?? null, user_type: null });
       } else {
         setKullanici(null);
       }
     });
-    return () => subscription.unsubscribe();
+    return () => { cancelled = true; subscription.unsubscribe(); };
   }, []);
 
   const filtered = ilanlar.filter((i: any) => {
