@@ -47,7 +47,27 @@ export async function proxy(request: NextRequest) {
     }
   );
 
-  const { data: { user } } = await supabase.auth.getUser();
+  let user;
+  try {
+    const { data, error } = await supabase.auth.getUser();
+    if (error) {
+      // Geçersiz/süresi dolmuş refresh token — cookie'leri temizle
+      if (
+        error.message.includes('refresh_token_not_found') ||
+        error.message.includes('Invalid Refresh Token') ||
+        error.status === 400
+      ) {
+        const clearResponse = NextResponse.next({ request });
+        request.cookies.getAll().forEach(({ name }) => {
+          if (name.startsWith('sb-')) clearResponse.cookies.delete(name);
+        });
+        return clearResponse;
+      }
+    }
+    user = data?.user ?? null;
+  } catch {
+    user = null;
+  }
 
   if (!user && KORUNMALI.some(r => pathname.startsWith(r))) {
     return NextResponse.redirect(new URL(`/giris?redirect=${pathname}`, request.url));
