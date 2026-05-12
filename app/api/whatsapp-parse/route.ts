@@ -264,7 +264,7 @@ export async function POST(request: NextRequest) {
           source_raw_post_id: sourceRawPostId,
           message_timestamp: (() => { try { const [date, time] = msg.timestamp.split(' '); const [day, month, year] = date.split('.'); return new Date(`${year}-${month}-${day}T${time}`).toISOString(); } catch { return new Date().toISOString(); } })(),
           quality_score: gate.score,
-          processing_status: isRepost ? 'repost' : 'pending',
+          processing_status: 'pending',
           detected_ad_count: 1,
           message_date: msgDate,
         }).select().single();
