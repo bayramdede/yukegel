@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
+import { structuredLog } from '../../../lib/logger'
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
@@ -36,8 +37,14 @@ export async function GET(request: Request) {
       const role = (profil as any)?.role || 'user'
 
       // Admin / moderator → direkt yönlendir
-      if (role === 'admin') return NextResponse.redirect(`${origin}/admin`)
-      if (role === 'moderator') return NextResponse.redirect(`${origin}/moderator`)
+      if (role === 'admin') {
+        structuredLog('INFO', 'auth', 'Başarılı giriş', { user_id: user.id, method: 'google', role: 'admin' })
+        return NextResponse.redirect(`${origin}/admin`)
+      }
+      if (role === 'moderator') {
+        structuredLog('INFO', 'auth', 'Başarılı giriş', { user_id: user.id, method: 'google', role: 'moderator' })
+        return NextResponse.redirect(`${origin}/moderator`)
+      }
 
       // Profil tamamlanmamış (yeni kayıt) → profil-tamamla
       if (!profil?.user_type) {
@@ -64,6 +71,7 @@ export async function GET(request: Request) {
       }
 
       // Normal kullanıcı, profil tamam → panele yönlendir
+      structuredLog('INFO', 'auth', 'Başarılı giriş', { user_id: user.id, method: 'google', role: 'user' })
       return NextResponse.redirect(`${origin}/panel`)
     }
   }

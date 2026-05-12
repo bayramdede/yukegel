@@ -2,6 +2,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
+import { structuredLog } from '../../lib/logger';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -68,7 +69,15 @@ export async function ilanKaydet(formData: {
     .select()
     .single();
 
-  if (error) throw new Error(error.message);
+  if (error) {
+    structuredLog('ERROR', 'db-transaction', 'İlan oluşturma hatası', {
+      user_id: user?.id ?? 'anonim',
+      error_message: error.message,
+      listing_type: formData.tip,
+      origin_city: formData.kalkis,
+    });
+    throw new Error(error.message);
+  }
 
   const stops = formData.duraklar.map((d, i) => ({
     listing_id: listing.id,
@@ -86,7 +95,24 @@ export async function ilanKaydet(formData: {
     .from('listing_stops')
     .insert(stops);
 
-  if (stopError) throw new Error(stopError.message);
+  if (stopError) {
+    structuredLog('ERROR', 'db-transaction', 'İlan durak oluşturma hatası', {
+      user_id: user?.id ?? 'anonim',
+      listing_id: listing.id,
+      error_message: stopError.message,
+    });
+    throw new Error(stopError.message);
+  }
+
+  structuredLog('INFO', 'db-transaction', 'İlan oluşturuldu', {
+    user_id: user?.id ?? 'anonim',
+    listing_id: listing.id,
+    listing_type: formData.tip,
+    origin_city: formData.kalkis,
+    stop_count: stops.length,
+    ai_parsed: formData.ai_parsed ?? false,
+    source: 'form',
+  });
 
   return { success: true, id: listing.id };
 }

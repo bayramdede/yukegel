@@ -198,7 +198,7 @@ Açık rotalar: /giris, /auth/, /profil-tamamla, /nasil-calisir, /hakkimizda,
 
 ### ✅ Tamamlanan
 - **Diagnostic & Güvenlik Log Specleri** (12 May 2026): Phone privacy, service_role audit, shadow ban, LLM parse, transaction, Excel import, RLS 42501, AI kota logları. Format standardı + maskeleme kuralları + yazılımcı kontrol listesi → `docs/LOG_VE_GUVENLIK_SPECLERI.md`
-- **Log implementasyonu** (12 May 2026): `lib/logger.ts` oluşturuldu (structuredLog, maskPhone/Tckn/Vkn/Ip, logPhoneAccess, logRlsError, logModeratorAction). `proxy.ts` SecurityLogger, `parse-listing` pre_check_failed + error, `excel-import` satır-bazlı + tamamlanma logu, `parse-text` quota WARN — tümü devreye alındı.
+- **Log implementasyonu** (12 May 2026): `lib/logger.ts` oluşturuldu. `proxy.ts` SecurityLogger, `parse-listing` pre_check_failed + error, `excel-import` satır-bazlı + tamamlanma, `parse-text` quota WARN, `ilan-ver/actions.ts` ilan yaratma INFO/ERROR, `moderator/toplu-islem` tüm moderasyon aksiyonları — tümü devreye alındı.
 - Auth (OTP + e-posta + Google + merge), profil-tamamla
 - Moderatör paneli v3, admin paneli
 - WhatsApp parse + alias, Excel yükleme, Sahiplen akışı

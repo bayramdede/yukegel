@@ -5,6 +5,14 @@ import { useRouter } from 'next/navigation';
 
 const supabase = createClient();
 
+async function authLog(event: string, method: string) {
+  await fetch('/api/auth/log', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ event, method }),
+  }).catch(() => {})
+}
+
 const KULLANICI_TIPLERI = [
   { value: 'yuk_sahibi', label: '📦 Yük Sahibi', desc: 'Taşıtmak istediğiniz yük var' },
   { value: 'arac_sahibi', label: '🚛 Araç Sahibi', desc: 'Taşımacılık yapıyorsunuz' },
@@ -221,6 +229,7 @@ export default function ProfilTamamla() {
       });
     }
 
+    await authLog('kayit_tamamlandi', userType);
     router.push('/panel');
     setYukleniyor(false);
   }

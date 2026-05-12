@@ -9,6 +9,15 @@ const supabase = createClient();
 type Mod = 'giris' | 'kayit' | 'reset' | 'reset_tamam' | 'dogrulama_bekle' | 'merge_onay';
 type Sekme = 'telefon' | 'eposta';
 
+// Auth event'i server'a ilet — client'ta structuredLog çağrılamaz
+async function authLog(event: string, method: string, reason?: string) {
+  await fetch('/api/auth/log', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ event, method, reason }),
+  }).catch(() => {}) // log hatası kullanıcı akışını durdurmasın
+}
+
 function GirisIci() {
   const [sekme, setSekme] = useState<Sekme>('telefon');
   const [mod, setMod] = useState<Mod>('giris');
@@ -65,7 +74,11 @@ function GirisIci() {
     const temiz = telefon.replace(/\D/g, '');
     const fmt = temiz.startsWith('90') ? `+${temiz}` : temiz.startsWith('0') ? `+9${temiz}` : `+90${temiz}`;
     const { data, error } = await supabase.auth.verifyOtp({ phone: fmt, token: otp, type: 'sms' });
-    if (error) { setHata('Kod hatalı veya süresi dolmuş.'); setYukleniyor(false); return; }
+    if (error) {
+      setHata('Kod hatalı veya süresi dolmuş.');
+      authLog('otp_failed', 'otp', error.message);
+      setYukleniyor(false); return;
+    }
 
     const mevcutUserId = data.user?.id;
     if (!mevcutUserId) { setHata('Giriş yapılamadı, lütfen tekrar deneyin.'); setYukleniyor(false); return; }
@@ -92,6 +105,7 @@ function GirisIci() {
 
     // 3. Aktif profil varsa direkt giriş
     if (mevcutProfil?.is_active && mevcutProfil?.user_type) {
+      authLog('login_success', 'otp');
       await yonlendir();
       setYukleniyor(false);
       return;
@@ -171,7 +185,9 @@ function GirisIci() {
       if (error.message.includes('Invalid login')) setHata('E-posta veya şifre hatalı.');
       else if (error.message.includes('Email not confirmed')) setHata('E-posta adresinizi doğrulamadınız. Gelen kutunuzu kontrol edin.');
       else setHata(error.message);
+      authLog('login_failed', 'eposta', error.message);
     } else {
+      authLog('login_success', 'eposta');
       await yonlendir();
     }
     setYukleniyor(false);

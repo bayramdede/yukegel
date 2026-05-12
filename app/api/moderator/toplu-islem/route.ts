@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSupabase, getServiceSupabase } from '../../../../lib/auth';
+import { logModeratorAction } from '../../../../lib/logger';
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,7 +14,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Yetkisiz' }, { status: 403 });
     }
 
-    // Tüm body tek seferde parse et — correction_reason/message gibi ekstra alanlar kaybolmasın
     const body = await request.json() as {
       ids: string[];
       action: 'approve' | 'reject' | 'passive' | 'archive' | 'unarchive'
@@ -34,7 +34,6 @@ export async function POST(request: NextRequest) {
         correction_message:      body.correction_message || null,
         correction_requested_at: now,
       };
-      // Mevcut internal_audit_logs ile birleştir
       const { data: mevcutIlanlar } = await svc
         .from('listings')
         .select('id, internal_audit_logs')
@@ -49,6 +48,12 @@ export async function POST(request: NextRequest) {
         }).eq('id', ilan.id);
         if (error) return NextResponse.json({ error: error.message }, { status: 500 });
       }
+      logModeratorAction({
+        adminId: user.id,
+        action: 'correction_needed',
+        affectedIds: ids,
+        reason: body.correction_reason,
+      });
       return NextResponse.json({ success: true, updated: ids.length });
     }
 
@@ -58,6 +63,7 @@ export async function POST(request: NextRequest) {
         .update({ is_shadow_banned: false, moderation_status: 'approved', status: 'active', reviewed_at: now })
         .in('id', ids);
       if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+      logModeratorAction({ adminId: user.id, action: 'shadow_ban_kaldir', affectedIds: ids });
       return NextResponse.json({ success: true, updated: count ?? ids.length });
     }
 
@@ -67,6 +73,7 @@ export async function POST(request: NextRequest) {
         .update({ is_shadow_banned: true, reviewed_at: now })
         .in('id', ids);
       if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+      logModeratorAction({ adminId: user.id, action: 'shadow_ban', affectedIds: ids });
       return NextResponse.json({ success: true, updated: count ?? ids.length });
     }
 
@@ -83,6 +90,8 @@ export async function POST(request: NextRequest) {
 
     const { error, count } = await svc.from('listings').update(payload).in('id', ids);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+    logModeratorAction({ adminId: user.id, action, affectedIds: ids });
 
     return NextResponse.json({ success: true, updated: count ?? ids.length });
   } catch (e: any) {
