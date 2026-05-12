@@ -153,13 +153,20 @@ export default function Home() {
     // 1) Auth — getSession() local'den okur, ağ çağrısı yok
     (async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        const { data: { session }, error } = await supabase.auth.getSession();
+        // Geçersiz refresh token → local state'i temizle, listing'i bloklama
+        if (error) {
+          await supabase.auth.signOut({ scope: 'local' });
+        }
         if (cancelled) return;
-        if (session?.user) {
+        if (!error && session?.user) {
           const profil = await profilCek(session.user.id);
           if (cancelled) return;
           setKullanici(profil || { display_name: null, email: session.user.email ?? null, user_type: null });
         }
+      } catch {
+        // Token refresh exception — local state'i temizle
+        try { await supabase.auth.signOut({ scope: 'local' }); } catch { /* ignore */ }
       } finally {
         if (!cancelled) setAuthHazir(true);
       }
@@ -168,7 +175,7 @@ export default function Home() {
     // 2) Listings — auth ile paralel başlar
     (async () => {
       try {
-        const { data } = await supabase
+        const sorgu = supabase
           .from('listings')
           .select(`
             id, listing_type, origin_city, origin_district,
@@ -185,8 +192,14 @@ export default function Home() {
           .order('created_at', { ascending: false })
           .limit(30);
 
+        // 10 saniyelik timeout — Supabase client takılırsa sonsuz yüklemeyi önle
+        const timeout = new Promise<{ data: null; error: Error }>(resolve =>
+          setTimeout(() => resolve({ data: null, error: new Error('timeout') }), 10000)
+        );
+        const { data, error: sorguHata } = await Promise.race([sorgu, timeout]);
+
         if (cancelled) return;
-        if (!data || data.length === 0) { setIlanlar([]); setYukleniyor(false); return; }
+        if (sorguHata || !data || data.length === 0) { setIlanlar([]); setYukleniyor(false); return; }
 
         // ÖNCE rozetsiz hızlı render → progressive enhancement
         const baseList = (data as any[]).map((ilan: any) => {
