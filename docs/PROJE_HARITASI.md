@@ -1,6 +1,6 @@
 # Yükegel — Proje Haritası
 > **Kullanım:** Her sohbet başında sadece bu dosyayı oku. Kaynak dosyaları sadece o dosyada değişiklik yapacaksan oku.  
-> Son güncelleme: 12 Mayıs 2026 — WhatsApp Bot akışı haritaya eklendi
+> Son güncelleme: 12 Mayıs 2026 — WhatsApp Bot canlıya alındı ✅
 
 **Referans Dökümanlar:**
 - `docs/LOG_VE_GUVENLIK_SPECLERI.md` — Log format standartları, audit trail, SecurityLogger kontrol listesi
@@ -198,7 +198,7 @@ Açık rotalar: /giris, /auth/, /profil-tamamla, /nasil-calisir, /hakkimizda,
 ## 14. GÖREV DURUMU
 
 ### ✅ Tamamlanan
-- **Diagnostic & Güvenlik Log Specleri** (12 May 2026): Phone privacy, service_role audit, shadow ban, LLM parse, transaction, Excel import, RLS 42501, AI kota logları. Format standardı + maskeleme kuralları + yazılımcı kontrol listesi → `docs/LOG_VE_GUVENLIK_SPECLERI.md`
+- **WhatsApp Bot** (12 May 2026): `app/api/whatsapp/route.ts` — Twilio Sandbox entegrasyonu, kayıt/kota/LLM parse/listing insert akışı. +90 normalize, imza doğrulama, TwiML yanıt. `price_offer`+`vehicle_type[]` şema uyumu.
 - **Log implementasyonu** (12 May 2026): `lib/logger.ts` oluşturuldu. `proxy.ts` SecurityLogger, `parse-listing` pre_check_failed + error, `excel-import` satır-bazlı + tamamlanma, `parse-text` quota WARN, `ilan-ver/actions.ts` ilan yaratma INFO/ERROR, `moderator/toplu-islem` tüm moderasyon aksiyonları — tümü devreye alındı.
 - Auth (OTP + e-posta + Google + merge), profil-tamamla
 - Moderatör paneli v3, admin paneli
@@ -216,7 +216,7 @@ Açık rotalar: /giris, /auth/, /profil-tamamla, /nasil-calisir, /hakkimizda,
 ### ⏳ Faz 1 — Kalanlar
 1. **Müşteri ilan detayı** — plaka onay, araç sil/pasifleştir modalları, progress bar
 2. **E-posta bildirimleri** — durum değişikliklerinde tetiklenen mailler
-3. **WhatsApp Bot** — nakliyeci/müşteri WhatsApp'tan mesaj atar → bot LLM ile ayrıştırır → ilan oluşturulur → link döner (detay: §11)
+3. **WhatsApp Bot** — nakliyeci/müşteri WhatsApp'tan mesaj atar → bot LLM ile ayrıştırır → ilan oluşturulur → link döner (detay: §11) ✅
 3. **Log implementasyonu** (detay: `docs/LOG_VE_GUVENLIK_SPECLERI.md` §4 kontrol listesi)
    - `proxy.ts` → `SecurityLogger` (yetkisiz phone erişim → WARN) ✅
    - `supabase/functions/parse-listing` → null input `pre_check_failed` logu + error log ✅
@@ -277,12 +277,12 @@ Bot WhatsApp'tan cevap yazar:
 ### Teknik Gereksinimler
 | Bileşen | Açıklama | Durum |
 |---|---|---|
-| Webhook endpoint | `app/api/whatsapp/route.ts` — Twilio POST alır, TwiML ile yanıtlar | ✅ Yazıldı |
-| WhatsApp Business API | **Twilio** entegrasyonu — webhook kaydı | 🔮 Twilio Console |
-| Mesaj yönlendirme | Numaraya göre kullanıcı eşleme (`users.phone`) | 🔮 Yapılacak |
-| Parse | Mevcut `parse-listing` Edge Fn veya `/api/parse-text` kullanılır (regex + LLM) | ♻️ Mevcut altyapı |
-| Kayıtsız kullanıcı | Kayıt yok → LLM çağrılmadan kayıt linki döner, ilan açılmaz | 🔮 Yapılacak |
-| Quota | LLM'den önce `ai_listing_quota_daily` kontrolü — `source='whatsapp'` dahil | 🔮 Yapılacak |
+| Webhook endpoint | `app/api/whatsapp/route.ts` — Twilio POST alır, TwiML ile yanıtlar | ✅ |
+| WhatsApp Business API | **Twilio** Sandbox — webhook kaydı yapıldı | ✅ |
+| Mesaj yönlendirme | Numaraya göre kullanıcı eşleme (`users.phone`, +90 normalize) | ✅ |
+| Parse | Mevcut `parse-listing` Edge Fn veya `/api/parse-text` kullanılır (regex + LLM) | ✅ |
+| Kayıtsız kullanıcı | Kayıt yok → LLM çağrılmadan kayıt linki döner, ilan açılmaz | ✅ |
+| Quota | LLM'den önce `ai_listing_quota_daily` kontrolü — `source='whatsapp'` dahil | ✅ |
 | Landing hero | WhatsApp botunu ön plana çıkaran mesaj/CTA ("Sadece yaz, ilanın yayında") | 🔮 Yapılacak |
 
 ### Landing Entegrasyonu
@@ -308,3 +308,4 @@ Bot WhatsApp'tan cevap yazar:
 | 4 | E-posta kayıt profil-tamamla | ✅ |
 | 5 | Admin/Gmail /ilan-ver erişim | ✅ |
 | 6 | Moderatör düzenleme: ilçe/input her tuşta focus kaybı (inline component) | ✅ 8 May 2026 |
+| 7 | `refresh_token_not_found` — geçersiz token döngüsü | ✅ 12 May 2026 — middleware.ts eklendi, getCurrentUser hata yakalıyor |

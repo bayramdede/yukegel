@@ -49,7 +49,24 @@ export function getServiceSupabase() {
  */
 export async function getCurrentUser(): Promise<{ id: string; email: string | null; role: UserRole } | null> {
   const supabase = await getServerSupabase();
-  const { data: { user } } = await supabase.auth.getUser();
+  let user;
+  try {
+    const { data, error } = await supabase.auth.getUser();
+    if (error) {
+      // Geçersiz refresh token — sessizce null dön, middleware temizler
+      if (
+        error.message.includes('refresh_token_not_found') ||
+        error.message.includes('Invalid Refresh Token') ||
+        error.status === 400
+      ) {
+        return null;
+      }
+      return null;
+    }
+    user = data.user;
+  } catch {
+    return null;
+  }
   if (!user) return null;
 
   const { data: profil } = await supabase
