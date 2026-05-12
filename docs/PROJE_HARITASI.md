@@ -1,6 +1,6 @@
 # Yükegel — Proje Haritası
 > **Kullanım:** Her sohbet başında sadece bu dosyayı oku. Kaynak dosyaları sadece o dosyada değişiklik yapacaksan oku.  
-> Son güncelleme: 12 Mayıs 2026 — Diagnostic & Güvenlik Log Specleri ✅
+> Son güncelleme: 12 Mayıs 2026 — WhatsApp Bot akışı haritaya eklendi
 
 **Referans Dökümanlar:**
 - `docs/LOG_VE_GUVENLIK_SPECLERI.md` — Log format standartları, audit trail, SecurityLogger kontrol listesi
@@ -123,6 +123,7 @@ ZIP/TXT → raw_posts → DB trigger → parse-listing Edge Fn → listings → 
 | `/api/excel-import` | Excel toplu yükleme (auto_published) |
 | `/api/auth/tekil-kontrol` | telefon/tckn/vkn tekillik (service role) |
 | `/api/parse-text` | Tekil kullanıcı metnini Haiku ile JSON'a çevirir + per-user günlük quota kontrolü (429) |
+| `/api/whatsapp` | Twilio WhatsApp webhook — kayıt/kota kontrolü + LLM parse + ilan oluştur |
 | `/api/admin/kullanici` | role / is_active / moderator_sources / **ai_listing_quota_daily** PATCH |
 
 ---
@@ -215,6 +216,7 @@ Açık rotalar: /giris, /auth/, /profil-tamamla, /nasil-calisir, /hakkimizda,
 ### ⏳ Faz 1 — Kalanlar
 1. **Müşteri ilan detayı** — plaka onay, araç sil/pasifleştir modalları, progress bar
 2. **E-posta bildirimleri** — durum değişikliklerinde tetiklenen mailler
+3. **WhatsApp Bot** — nakliyeci/müşteri WhatsApp'tan mesaj atar → bot LLM ile ayrıştırır → ilan oluşturulur → link döner (detay: §11)
 3. **Log implementasyonu** (detay: `docs/LOG_VE_GUVENLIK_SPECLERI.md` §4 kontrol listesi)
    - `proxy.ts` → `SecurityLogger` (yetkisiz phone erişim → WARN) ✅
    - `supabase/functions/parse-listing` → null input `pre_check_failed` logu + error log ✅
@@ -234,6 +236,65 @@ Açık rotalar: /giris, /auth/, /profil-tamamla, /nasil-calisir, /hakkimizda,
 - Puanlama (çift yönlü)
 - Trust score, MERNİS/GİB, canlı konum
 - Doğal dil arama, ödeme sistemi, push bildirim
+
+---
+
+## 11. WHATSAPP BOT (Faz 1)
+
+### Kullanıcı Akışı
+```
+Kullanıcı WhatsApp'tan yazar:
+  "Selam, yarın Konya'dan İstanbul'a 20 ton buğdayım var, tır lazım."
+    ↓
+[1] KAYIT KONTROLÜ
+    SELECT * FROM users WHERE phone = '+90...' LIMIT 1
+    ↓
+    ✗ Kayıt yok → Bot cevap yazar:
+        "Bu numara ile kayıtlı hesap bulunamadı.
+         Kayıt olmak için: yukegel.app/giris"
+        → AKIŞ DURUR (LLM çağrılmaz)
+    ✓ Kayıt var → devam
+    ↓
+[2] AI KOTA KONTROLÜ (LLM'den önce)
+    Son 24s içinde bu user'ın WhatsApp'tan oluşturduğu ilan sayısı
+    >= ai_listing_quota_daily → Bot cevap yazar:
+        "Günlük AI ilan limitine ulaştınız.
+         Yeni ilanı yukegel.app/ilan-ver adresinden oluşturabilirsiniz."
+        → AKIŞ DURUR (LLM çağrılmaz)
+    < limit → devam
+    ↓
+[3] LLM PARSE (Haiku)
+    Metni ayrıştırır:
+    { nereden: "Konya", nereye: "İstanbul", yuk: "Buğday",
+      agirlik: 20, birim: "ton", arac_tipi: "Tır" }
+    ↓
+[4] listing + listing_stops tablolarına INSERT (source: 'whatsapp')
+    ↓
+Bot WhatsApp'tan cevap yazar:
+  "İlanın yayına alındı! ✅ Link: yukegel.app/ilan/123"
+```
+
+### Teknik Gereksinimler
+| Bileşen | Açıklama | Durum |
+|---|---|---|
+| Webhook endpoint | `app/api/whatsapp/route.ts` — Twilio POST alır, TwiML ile yanıtlar | ✅ Yazıldı |
+| WhatsApp Business API | **Twilio** entegrasyonu — webhook kaydı | 🔮 Twilio Console |
+| Mesaj yönlendirme | Numaraya göre kullanıcı eşleme (`users.phone`) | 🔮 Yapılacak |
+| Parse | Mevcut `parse-listing` Edge Fn veya `/api/parse-text` kullanılır (regex + LLM) | ♻️ Mevcut altyapı |
+| Kayıtsız kullanıcı | Kayıt yok → LLM çağrılmadan kayıt linki döner, ilan açılmaz | 🔮 Yapılacak |
+| Quota | LLM'den önce `ai_listing_quota_daily` kontrolü — `source='whatsapp'` dahil | 🔮 Yapılacak |
+| Landing hero | WhatsApp botunu ön plana çıkaran mesaj/CTA ("Sadece yaz, ilanın yayında") | 🔮 Yapılacak |
+
+### Landing Entegrasyonu
+- Hero bölümünde WhatsApp ikonlu belirgin CTA: **"WhatsApp'tan yaz, saniyeler içinde yayında"**
+- Nasıl Çalışır sayfasına WhatsApp adımı eklenmeli
+- Mobilde direkt WhatsApp deep link: `https://wa.me/90XXXXXXXXXX?text=...`
+
+### Öncelik Sırası
+1. WhatsApp Business API hesabı + webhook kaydı
+2. `/api/whatsapp-parse` endpoint (mevcut parse altyapısını çağırır)
+3. Kullanıcı eşleme + onboarding yanıtı
+4. Landing hero güncellemesi
 
 ---
 
