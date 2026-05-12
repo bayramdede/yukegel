@@ -36,7 +36,10 @@ function validateTwilioSignature(req: NextRequest, body: string): boolean {
 
 // ── Telefon normalizasyonu: "whatsapp:+905321234567" → "+905321234567" ────────
 function normalizePhone(from: string): string {
-  return from.replace('whatsapp:', '').trim();
+  return from
+    .replace('whatsapp:', '')
+    .trim()
+    .replace(/^\+90/, '0');  // +905380855996 → 05380855996
 }
 
 // ── LLM parse (parse-text ile aynı prompt) ───────────────────────────────────
@@ -137,12 +140,12 @@ export async function POST(req: NextRequest) {
   if (!userRow) {
     structuredLog('INFO', 'whatsapp-webhook', 'Kayıtsız numara, kayıt linki gönderildi', { phone });
     return twiml(
-      'Merhaba! 👋 Bu numara YÜKEGEL\'de kayıtlı değil.\n\nKayıt olmak için: https://yukegel.app/giris\n\nKayıt sonrası WhatsApp\'tan ilan oluşturabilirsiniz.'
+      'Merhaba! 👋 Bu numara YÜKEGEL\'de kayıtlı değil.\n\nKayıt olmak için: https://www.yukegel.com/giris\n\nKayıt sonrası WhatsApp\'tan ilan oluşturabilirsiniz.'
     );
   }
 
   if (!userRow.is_active) {
-    return twiml('Hesabınız askıya alınmış. Destek için: https://yukegel.app/iletisim');
+    return twiml('Hesabınız askıya alınmış. Destek için: https://www.yukegel.com/iletisim');
   }
 
   // ── 2. AI kota kontrolü (LLM'den önce) ────────────────────────────────────
@@ -153,13 +156,13 @@ export async function POST(req: NextRequest) {
   ]);
 
   if (quota === 0) {
-    return twiml('AI ile ilan oluşturma özelliği hesabınız için kapalı. İlan oluşturmak için: https://yukegel.app/ilan-ver');
+    return twiml('AI ile ilan oluşturma özelliği hesabınız için kapalı. İlan oluşturmak için: https://www.yukegel.com/ilan-ver');
   }
 
   if (kullanim >= quota) {
     structuredLog('WARN', 'whatsapp-webhook', 'WhatsApp AI kota aşıldı', { user_id: userId, quota, kullanim });
     return twiml(
-      `Günlük AI ilan limitinize ulaştınız (${kullanim}/${quota}). ⏰\n\n24 saat sonra tekrar deneyebilir veya ilanlarınızı buradan oluşturabilirsiniz: https://yukegel.app/ilan-ver`
+      `Günlük AI ilan limitinize ulaştınız (${kullanim}/${quota}). ⏰\n\n24 saat sonra tekrar deneyebilir veya ilanlarınızı buradan oluşturabilirsiniz: https://www.yukegel.com/ilan-ver`
     );
   }
 
@@ -233,6 +236,6 @@ export async function POST(req: NextRequest) {
   });
 
   return twiml(
-    `İlanınız yayına alındı! ✅\n\nDetay ve düzenleme: https://yukegel.app/ilan/${listing.id}\n\nKalan günlük limit: ${quota - kullanim - 1}/${quota}`
+    `İlanınız yayına alındı! ✅\n\nDetay ve düzenleme: https://www.yukegel.com/ilan/${listing.id}\n\nKalan günlük limit: ${quota - kullanim - 1}/${quota}`
   );
 }
