@@ -20,7 +20,7 @@ function validateTwilioSignature(req: NextRequest, body: string): boolean {
   if (!token) return false;
 
   const signature = req.headers.get('x-twilio-signature') || '';
-  const url = `https://yukegel.app/api/whatsapp`;
+  const url = `https://${req.headers.get('host')}/api/whatsapp`;
 
   // Parametreleri alfabetik sıraya diz, URL'e ekle
   const params = new URLSearchParams(body);
