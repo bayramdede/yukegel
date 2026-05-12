@@ -98,7 +98,7 @@ export async function POST(request: NextRequest) {
 
     logModeratorAction({ adminId: user.id, action, affectedIds: ids });
 
-    return NextResponse.json({ success: true, updated: count ?? ids.length });
+    return NextResponse.json({ success: true, updated: ids.length });
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 });
   }
