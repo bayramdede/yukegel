@@ -28,6 +28,17 @@ export async function POST(request: NextRequest) {
     const svc = getServiceSupabase();
     const now = new Date().toISOString();
 
+    // Supabase .in() URL limiti (~2KB) için batch helper
+    async function batchUpdate(allIds: string[], payload: object): Promise<{ error: any }> {
+      const BATCH = 50;
+      for (let i = 0; i < allIds.length; i += BATCH) {
+        const slice = allIds.slice(i, i + BATCH);
+        const { error } = await svc.from('listings').update(payload).in('id', slice);
+        if (error) return { error };
+      }
+      return { error: null };
+    }
+
     if (action === 'correction_needed') {
       const logPatch = {
         correction_reason:       body.correction_reason  || null,
@@ -58,23 +69,17 @@ export async function POST(request: NextRequest) {
     }
 
     if (action === 'shadow_ban_kaldir') {
-      const { error, count } = await svc
-        .from('listings')
-        .update({ is_shadow_banned: false, moderation_status: 'approved', status: 'active', reviewed_at: now })
-        .in('id', ids);
+      const { error } = await batchUpdate(ids, { is_shadow_banned: false, moderation_status: 'approved', status: 'active', reviewed_at: now });
       if (error) return NextResponse.json({ error: error.message }, { status: 500 });
       logModeratorAction({ adminId: user.id, action: 'shadow_ban_kaldir', affectedIds: ids });
-      return NextResponse.json({ success: true, updated: count ?? ids.length });
+      return NextResponse.json({ success: true, updated: ids.length });
     }
 
     if (action === 'shadow_ban') {
-      const { error, count } = await svc
-        .from('listings')
-        .update({ is_shadow_banned: true, reviewed_at: now })
-        .in('id', ids);
+      const { error } = await batchUpdate(ids, { is_shadow_banned: true, reviewed_at: now });
       if (error) return NextResponse.json({ error: error.message }, { status: 500 });
       logModeratorAction({ adminId: user.id, action: 'shadow_ban', affectedIds: ids });
-      return NextResponse.json({ success: true, updated: count ?? ids.length });
+      return NextResponse.json({ success: true, updated: ids.length });
     }
 
     const updateMap: Record<string, object> = {
@@ -88,7 +93,7 @@ export async function POST(request: NextRequest) {
     const payload = updateMap[action];
     if (!payload) return NextResponse.json({ error: 'Geçersiz action' }, { status: 400 });
 
-    const { error, count } = await svc.from('listings').update(payload).in('id', ids);
+    const { error } = await batchUpdate(ids, payload);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
     logModeratorAction({ adminId: user.id, action, affectedIds: ids });
