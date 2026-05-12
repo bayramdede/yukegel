@@ -137,6 +137,17 @@ export default async function IlanDetay({ params }: { params: Promise<{ id: stri
   );
   const { data: { user } } = await supabaseAuth.auth.getUser();
 
+  // ── Profil tamamlanmış mı? (telefon numarası gösterimi için)
+  let profilTamamlandi = false;
+  if (user) {
+    const { data: mevcutProfil } = await supabase
+      .from('users')
+      .select('user_type')
+      .eq('id', user.id)
+      .maybeSingle();
+    profilTamamlandi = !!mevcutProfil?.user_type;
+  }
+
   // ── Sprint 1: Shadow ban kontrolü
   // Shadow banned ilan sadece ilan sahibi, moderatör ve admin tarafından görülebilir.
   if (ilan.is_shadow_banned) {
@@ -394,12 +405,22 @@ export default async function IlanDetay({ params }: { params: Promise<{ id: stri
         {/* İletişim */}
         <div style={{ background: '#161b22', border: '1px solid #166534', borderRadius: 12, padding: 24 }}>
           <div style={{ fontSize: '0.72rem', color: '#8b949e', fontWeight: 700, letterSpacing: '0.08em', marginBottom: 16 }}>İLETİŞİM</div>
-          {user ? (
+          {user && profilTamamlandi ? (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
               <div style={{ color: '#e2e8f0', fontSize: '1.1rem', fontWeight: 700 }}>📞 {ilan.contact_phone}</div>
               <a href={`tel:${ilan.contact_phone}`}
                 style={{ background: '#22c55e', color: '#000', fontWeight: 800, fontSize: '1rem', padding: '12px 32px', borderRadius: 8, textDecoration: 'none' }}>
                 Hemen Ara
+              </a>
+            </div>
+          ) : user && !profilTamamlandi ? (
+            <div style={{ textAlign: 'center', padding: '8px 0' }}>
+              <div style={{ color: '#8b949e', fontSize: '0.85rem', marginBottom: 12 }}>
+                Telefon numarasını görmek için profilinizi tamamlayın.
+              </div>
+              <a href="/profil-tamamla"
+                style={{ display: 'inline-block', background: '#22c55e', color: '#000', fontWeight: 800, fontSize: '1rem', padding: '12px 32px', borderRadius: 8, textDecoration: 'none' }}>
+                Profili Tamamla
               </a>
             </div>
           ) : (
