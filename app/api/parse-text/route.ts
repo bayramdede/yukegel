@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSupabase } from '../../../lib/auth';
 import { getAiQuotaForUser, countAiListingsLast24h } from '../../../lib/auditLimits';
+import { structuredLog } from '../../../lib/logger';
 
 export const runtime = 'nodejs';
 
@@ -24,6 +25,11 @@ export async function POST(request: NextRequest) {
       countAiListingsLast24h(user.id),
     ]);
     if (quota === 0) {
+      structuredLog('WARN', 'llm-quota', 'Günlük AI ilan kotası kapatılmış (quota=0) — 429 döndürüldü', {
+        user_id: user.id,
+        quota_limit: 0,
+        used_today: kullanim,
+      });
       return NextResponse.json({
         success: false,
         error: 'AI ile ilan oluşturma özelliği hesabınız için kapalı. Lütfen tekil ilan formunu kullanın.',
@@ -31,6 +37,11 @@ export async function POST(request: NextRequest) {
       }, { status: 429 });
     }
     if (kullanim >= quota) {
+      structuredLog('WARN', 'llm-quota', 'Günlük AI ilan kotası aşıldı — 429 döndürüldü', {
+        user_id: user.id,
+        quota_limit: quota,
+        used_today: kullanim,
+      });
       return NextResponse.json({
         success: false,
         error: `Günlük AI ilan limitiniz doldu (${kullanim}/${quota}). 24 saat sonra tekrar deneyin veya tekil ilan formunu kullanın.`,

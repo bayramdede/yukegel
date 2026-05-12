@@ -7,6 +7,22 @@ const supabase = createClient(
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 )
 
+// ── Inline structured logger (Deno ortamında lib/logger.ts import edilemez) ──
+function edgeLog(
+  level: 'INFO' | 'WARN' | 'ERROR',
+  message: string,
+  metadata: Record<string, unknown> = {}
+): void {
+  console.log(JSON.stringify({
+    level,
+    service: 'yukegel-api',
+    context: 'llm-parser',
+    message,
+    metadata,
+    timestamp: new Date().toISOString(),
+  }))
+}
+
 // -------------------------
 // Mesaj temizleme (LLM öncesi token tasarrufu)
 // -------------------------
@@ -480,15 +496,35 @@ Deno.serve(async (req) => {
 
     if (!rawPost) return new Response(JSON.stringify({ error: 'raw_post bulunamadı' }), { status: 404 })
 
+    // ── PRE-CHECK: raw_text boş veya null ise LLM''e gidilmez ──
+    const rawText: string | null = rawPost.raw_text ?? null
+    if (!rawText || rawText.trim().length === 0) {
+      edgeLog('WARN', 'PRE-CHECK FAILED — raw_text boş veya null', {
+        raw_post_id,
+        output_status: 'pre_check_failed',
+        error_message: 'raw_text boş veya null',
+      })
+      await supabase.from('raw_posts').update({ processing_status: 'no_lane' }).eq('id', raw_post_id)
+      return new Response(JSON.stringify({ success: false, reason: 'empty_raw_text' }), { status: 400 })
+    }
+
     // Alias'ları yükle
     const { data: aliases } = await supabase.from('aliases').select('*').eq('is_active', true)
 
     // Telefonu ham metinden çıkar (cleanMessage telefon satırlarını siliyor)
-    const phonesFromRaw = extractPhones(rawPost.raw_text)
+    const phonesFromRaw = extractPhones(rawText)
 
     // Parse için mesajı temizle
-    const cleanedText = cleanMessage(rawPost.raw_text)
+    const cleanedText = cleanMessage(rawText)
     const result = parseMessage(cleanedText, aliases || [])
+
+    edgeLog('INFO', 'LLM parse tamamlandı', {
+      raw_post_id,
+      output_status: 'success',
+      input_length: rawText.length,
+      lanes_found: result.lanes.length,
+      raw_text_preview: rawText.substring(0, 80),
+    })
 
     // Ham metinden bulunan telefonları ekle
     if (phonesFromRaw.length > 0 && result.phones.length === 0) {
@@ -548,6 +584,10 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ success: true, lanes: result.lanes.length, created }))
 
   } catch (err: any) {
+    edgeLog('ERROR', 'Parse hatası', {
+      output_status: 'error',
+      error_message: err?.message ?? String(err),
+    })
     return new Response(JSON.stringify({ error: err.message }), { status: 500 })
   }
 })

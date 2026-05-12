@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 import { createServerClient } from '@supabase/ssr';
 import * as XLSX from 'xlsx';
+import { structuredLog, logRlsError } from '../../../../lib/logger';
 
 const svc = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -57,6 +58,7 @@ export async function POST(request: NextRequest) {
 
   const hatalar: { satir: number; mesaj: string }[] = [];
   const olusturulanlar: string[] = [];
+  const baslangic = Date.now();
 
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
@@ -67,6 +69,13 @@ export async function POST(request: NextRequest) {
 
     if (!kalkis || !varis) {
       hatalar.push({ satir, mesaj: 'Kalkış ve Varış şehri zorunludur' });
+      structuredLog('WARN', 'excel-import', 'Excel validasyon hatası', {
+        user_id: profil.id,
+        filename: file.name,
+        row: satir,
+        field: 'kalkis|varis',
+        reason: 'Kalkış ve Varış şehri zorunludur',
+      });
       continue;
     }
 
@@ -100,6 +109,21 @@ export async function POST(request: NextRequest) {
 
     if (lErr || !listing) {
       hatalar.push({ satir, mesaj: lErr?.message || 'İlan oluşturulamadı' });
+      logRlsError({
+        userId: profil.id,
+        route: '/api/excel-import',
+        table: 'listings',
+        operation: 'INSERT',
+        rawError: lErr,
+      });
+      if (lErr && lErr.code !== '42501') {
+        structuredLog('ERROR', 'excel-import', 'Listing INSERT hatası', {
+          user_id: profil.id,
+          filename: file.name,
+          row: satir,
+          error_message: lErr?.message ?? 'İlan oluşturulamadı',
+        });
+      }
       continue;
     }
 
@@ -118,6 +142,17 @@ export async function POST(request: NextRequest) {
 
     olusturulanlar.push(listing.id);
   }
+
+  const tamamlanmaSuresi = Date.now() - baslangic;
+  structuredLog('INFO', 'excel-import', 'Excel yükleme tamamlandı', {
+    user_id: profil.id,
+    filename: file.name,
+    row_count: rows.length,
+    created: olusturulanlar.length,
+    error_count: hatalar.length,
+    processing_time_ms: tamamlanmaSuresi,
+    validation_errors: hatalar,
+  });
 
   return NextResponse.json({
     basarili: olusturulanlar.length,

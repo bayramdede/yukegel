@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { logPhoneAccess } from './lib/logger'
 
 const ACIK_ROTALAR = [
   '/giris',
@@ -64,6 +65,11 @@ export async function proxy(request: NextRequest) {
     }
 
     if (!profil?.user_type) {
+      // Profil tamamlanmamış kullanıcı korumalı rotaya girmeye çalışıyor — WARN
+      logPhoneAccess({
+        viewerId: user.id,
+        profileCompleted: false,
+      })
       return NextResponse.redirect(new URL('/profil-tamamla', request.url));
     }
   }

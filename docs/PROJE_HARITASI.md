@@ -1,6 +1,9 @@
 # Yükegel — Proje Haritası
 > **Kullanım:** Her sohbet başında sadece bu dosyayı oku. Kaynak dosyaları sadece o dosyada değişiklik yapacaksan oku.  
-> Son güncelleme: 8 Mayıs 2026 — Audit eşikleri konfigüre edilebilir + AI ilan limiti per-user ✅
+> Son güncelleme: 12 Mayıs 2026 — Diagnostic & Güvenlik Log Specleri ✅
+
+**Referans Dökümanlar:**
+- `docs/LOG_VE_GUVENLIK_SPECLERI.md` — Log format standartları, audit trail, SecurityLogger kontrol listesi
 
 ---
 
@@ -194,6 +197,8 @@ Açık rotalar: /giris, /auth/, /profil-tamamla, /nasil-calisir, /hakkimizda,
 ## 14. GÖREV DURUMU
 
 ### ✅ Tamamlanan
+- **Diagnostic & Güvenlik Log Specleri** (12 May 2026): Phone privacy, service_role audit, shadow ban, LLM parse, transaction, Excel import, RLS 42501, AI kota logları. Format standardı + maskeleme kuralları + yazılımcı kontrol listesi → `docs/LOG_VE_GUVENLIK_SPECLERI.md`
+- **Log implementasyonu** (12 May 2026): `lib/logger.ts` oluşturuldu (structuredLog, maskPhone/Tckn/Vkn/Ip, logPhoneAccess, logRlsError, logModeratorAction). `proxy.ts` SecurityLogger, `parse-listing` pre_check_failed + error, `excel-import` satır-bazlı + tamamlanma logu, `parse-text` quota WARN — tümü devreye alındı.
 - Auth (OTP + e-posta + Google + merge), profil-tamamla
 - Moderatör paneli v3, admin paneli
 - WhatsApp parse + alias, Excel yükleme, Sahiplen akışı
@@ -210,6 +215,14 @@ Açık rotalar: /giris, /auth/, /profil-tamamla, /nasil-calisir, /hakkimizda,
 ### ⏳ Faz 1 — Kalanlar
 1. **Müşteri ilan detayı** — plaka onay, araç sil/pasifleştir modalları, progress bar
 2. **E-posta bildirimleri** — durum değişikliklerinde tetiklenen mailler
+3. **Log implementasyonu** (detay: `docs/LOG_VE_GUVENLIK_SPECLERI.md` §4 kontrol listesi)
+   - `proxy.ts` → `SecurityLogger` (yetkisiz phone erişim → WARN) ✅
+   - `supabase/functions/parse-listing` → null input `pre_check_failed` logu + error log ✅
+   - `/api/excel-import` → satır bazlı validasyon + tamamlanma logu ✅
+   - `/api/parse-text` → quota aşımı WARN logu ✅
+   - `lib/logger.ts` → `logRlsError()` yardımcısı oluşturuldu; diğer route'larda kullanılabilir ✅
+   - `app/ilan/[id]` → henüz `raw_text` yok; Faz 2'de ekle ⏳
+   - Vercel Analytics bot-trafik izleme → altyapı gerektiriyor, Faz 2 ⏳
 
 ### 🔧 Kısmi / Geliştirme Gereken
 - Profil: doğrulama rozetleri, güven skoru
