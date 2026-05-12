@@ -14,6 +14,7 @@ export type LogContext =
   | 'llm-quota'
   | 'rls-monitor'
   | 'auth'
+  | 'whatsapp-webhook'
 
 interface LogEntry {
   level: LogLevel
