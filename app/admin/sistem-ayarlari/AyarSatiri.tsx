@@ -1,6 +1,9 @@
 'use client';
 import { useState, useTransition } from 'react';
 import { ayarKaydet } from './actions';
+import DosyaYukleButonu from './DosyaYukleButonu';
+
+const DOSYA_YUKLEME_KEYLERI = ['logo_url', 'favicon_url'];
 
 type Ayar = {
   category: string;
@@ -19,6 +22,22 @@ export default function AyarSatiri({ ayar }: { ayar: Ayar }) {
   const [isPending, start] = useTransition();
 
   const degisti = deger !== orijinal;
+
+  // Dosya yükleme gerektiren key'ler için özel UI
+  if (DOSYA_YUKLEME_KEYLERI.includes(ayar.key)) {
+    return (
+      <div style={{ background: '#0d1117', border: '1px solid #21262d', borderRadius: 8, padding: 14 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12, marginBottom: 4 }}>
+          <code style={{ color: '#22c55e', fontSize: '0.82rem', fontWeight: 600, fontFamily: 'ui-monospace, monospace' }}>{ayar.key}</code>
+          <span style={{ color: '#4b5563', fontSize: '0.7rem', fontFamily: 'ui-monospace, monospace' }}>image upload</span>
+        </div>
+        {ayar.description && (
+          <div style={{ color: '#8b949e', fontSize: '0.78rem', marginBottom: 10, lineHeight: 1.4 }}>{ayar.description}</div>
+        )}
+        <DosyaYukleButonu configKey={ayar.key} mevcutUrl={baslangicDeger} />
+      </div>
+    );
+  }
 
   function kaydet() {
     setMesaj(null);
