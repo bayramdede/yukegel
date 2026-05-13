@@ -1,4 +1,4 @@
-import { getConfig } from '../../../lib/config';
+import { getConfig } from '../../lib/config';
 
 export default async function Footer() {
   const sirketUnvani = await getConfig('sirket_unvani', 'Yükegel');
