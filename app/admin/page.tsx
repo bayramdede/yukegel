@@ -1,4 +1,5 @@
 import { requireAdmin } from '../../lib/auth';
+import ReprocessWidget from './ReprocessWidget';
 
 export const dynamic = 'force-dynamic';
 
@@ -56,6 +57,10 @@ export default async function AdminAna() {
         <div style={{ marginBottom: 28 }}>
           <h1 style={{ color: '#e2e8f0', fontWeight: 800, fontSize: '1.6rem', margin: 0, marginBottom: 6 }}>Yönetim Paneli</h1>
           <div style={{ color: '#8b949e', fontSize: '0.9rem' }}>Sistem genelini buradan yönetirsiniz.</div>
+        </div>
+
+        <div style={{ marginBottom: 20 }}>
+          <ReprocessWidget />
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 14 }}>

@@ -37,6 +37,8 @@ function cleanMessage(text: string): string {
   return text
     .split('\n')
     .map(line => {
+      // Ok karakterlerini ASCII'ye çevir (emoji-strip'ten ÖNCE — ➡️ U+27A1 aynı range'de)
+      line = line.replace(/[➡➜➔⟶]/gu, '->')
       // Emojileri sil
       line = line.replace(/[\u{1F000}-\u{1FFFF}\u{2600}-\u{27FF}\u{2300}-\u{23FF}\u{2B00}-\u{2BFF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA9F}]/gu, '')
       // WhatsApp format karakterlerini sil
