@@ -258,7 +258,7 @@ Açık rotalar: /giris, /auth/, /profil-tamamla, /nasil-calisir, /hakkimizda,
 
 ### 🔮 Faz 2
 - "Bu işi aldım" akışı (durum güncellemeleri, bildirim, ilan pasife)
-- Puanlama (çift yönlü)
+- **Güven ve İtibar Sistemi** — çift körleme puanlama, rozet sistemi (detay: §15)
 - Trust score, MERNİS/GİB, canlı konum
 - Doğal dil arama, ödeme sistemi, push bildirim
 
@@ -320,6 +320,93 @@ Bot WhatsApp'tan cevap yazar:
 2. `/api/whatsapp-parse` endpoint (mevcut parse altyapısını çağırır)
 3. Kullanıcı eşleme + onboarding yanıtı
 4. Landing hero güncellemesi
+
+---
+
+---
+
+## 15. GÜVEN VE İTİBAR SİSTEMİ (Airbnb Çift Körleme Modeli)
+
+### Genel Bakış
+Platform güvenilirliğini artırmak için çift kör (double-blind) puanlama sistemi. İki taraf da yorum yazmadan yorumlar yayınlanmaz; sadece biri yazarsa 7 gün sonra otomatik yayınlanır.
+
+### İş Akışı
+```
+1. Nakliyeci → "İşi Aldım" butonu → Yük sahibi onayı → transaction kaydı oluşur
+2. Taşıma tamamlandıktan 24 saat sonra her iki tarafa değerlendirme bildirimi
+3. Her iki taraf yorum yazarsa → anında is_published = true
+4. Sadece biri yazarsa → 7 günlük cron job otomatik yayınlar
+5. Hiçbiri yazmazsa → yorum kaydı açık kalır, 7 gün sonra kapanır
+```
+
+### Veritabanı Gereksinimleri
+```sql
+-- transactions tablosu ("Bu işi aldım" akışı için)
+CREATE TABLE transactions (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  listing_id uuid REFERENCES listings(id),
+  carrier_id uuid REFERENCES users(id),   -- nakliyeci
+  owner_id uuid REFERENCES users(id),     -- yük sahibi
+  status text DEFAULT 'pending',          -- pending|active|completed|cancelled
+  created_at timestamptz DEFAULT now(),
+  completed_at timestamptz
+);
+
+-- reviews tablosu
+CREATE TABLE reviews (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  transaction_id uuid REFERENCES transactions(id),
+  listing_id uuid REFERENCES listings(id),
+  reviewer_id uuid REFERENCES users(id),
+  target_id uuid REFERENCES users(id),
+  rating smallint CHECK (rating BETWEEN 1 AND 5),
+  comment text,
+  is_published boolean DEFAULT false,
+  created_at timestamptz DEFAULT now(),
+  published_at timestamptz
+);
+```
+RLS: Kullanıcı yalnızca kendi yazdığı yorumları ve `is_published = true` olanları görebilir.
+
+### Çift Körleme Mantığı (Edge Function / DB Webhook)
+- Her iki taraf `reviews` tablosuna yazdığında → her iki kaydı da `is_published = true` yap
+- pg_cron (günlük): `created_at < now() - interval '7 days'` olan tek taraflı kayıtları yayınla
+
+### Rozet Sistemi
+| Rozet | Kriter | Kime |
+|---|---|---|
+| ⚡ Hızlı Ödemeci | Faz 2 ödeme modülüyle tanımlanacak | Yük sahibi |
+| 🛡️ Güvenilir Nakliyeci | Son 10 işte ortalama puan ≥ 4.5 | Nakliyeci |
+| ⏰ Dakik Şoför | Zamanında teslimat oranı ≥ %90 | Nakliyeci |
+
+Rozetler DB function ile hesaplanır, `users.badges jsonb` kolonunda saklanır.
+
+### UI/UX Gereksinimleri
+- **İlan Kartları:** Yük sahibinin ⭐ puanı + toplam tamamladığı iş sayısı kart üzerinde
+- **Profil Sayfası:** Alınan yorumlar kronolojik liste + kazanılan rozetler bölümü
+- **Değerlendirme Formu:** 5 yıldız + metin alanı (opsiyonel), "Puanla ve Bitir" butonu
+- **Çift körleme durumu:** "Karşı taraf henüz değerlendirme yazmadı, X gün sonra yayınlanacak"
+
+### Görevler
+- [ ] `transactions` tablosu + RLS politikaları
+- [ ] `reviews` tablosu + RLS politikaları
+- [ ] `users.badges jsonb` kolonu
+- [ ] "İşi Aldım" butonu → yük sahibi onay/red akışı (transaction INSERT)
+- [ ] Çift körleme mantığı: DB Webhook veya Edge Function
+- [ ] pg_cron job: 7 günlük tek taraflı yorum otomatik yayınlama
+- [ ] Taşıma bittikten 24s sonra değerlendirme bildirimi tetikleyicisi
+- [ ] Rozet hesaplama DB function
+- [ ] İlan kartına puan + iş sayısı bileşeni
+- [ ] Profil sayfasına Yorumlar + Rozetler bölümü
+- [ ] Değerlendirme formu UI (nakliyeci tarafı + müşteri tarafı)
+
+### Öncelik Sırası
+1. DB şeması (`transactions` + `reviews` + `users.badges`)
+2. "İşi Aldım / Onayla" transaction akışı UI
+3. Değerlendirme formu UI'ları
+4. Çift körleme Edge Function + pg_cron
+5. Bildirim tetikleyicileri (24s sonra)
+6. Profil sayfası güncelleme + rozet sistemi
 
 ---
 
