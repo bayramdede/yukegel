@@ -1,6 +1,6 @@
 # Yükegel — Proje Haritası
 > **Kullanım:** Her sohbet başında sadece bu dosyayı oku. Kaynak dosyaları sadece o dosyada değişiklik yapacaksan oku.  
-> Son güncelleme: 13 Mayıs 2026 — page.tsx server wrapper'a dönüştürüldü, Footer + HomeClient ayrıldı ✅
+> Son güncelleme: 13 Mayıs 2026 — Hakkimizda: SEO/GEO iyileştirmesi (generateMetadata, JSON-LD Organization schema, semantic HTML: main/section/h2/h3/header) ✅
 
 **Referans Dökümanlar:**
 - `docs/LOG_VE_GUVENLIK_SPECLERI.md` — Log format standartları, audit trail, SecurityLogger kontrol listesi
