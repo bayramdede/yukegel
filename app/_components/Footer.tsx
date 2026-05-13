@@ -5,7 +5,7 @@ export default async function Footer() {
   const yil = new Date().getFullYear();
 
   return (
-    <footer style={{ borderTop: '1px solid #30363d', marginTop: 48, padding: '32px 16px' }}>
+    <footer style={{ borderTop: '1px solid #30363d', marginTop: 0, padding: '32px 16px', background: '#0d1117', fontFamily: "'IBM Plex Sans', system-ui, sans-serif" }}>
       <div style={{ maxWidth: 1280, margin: '0 auto', display: 'flex', flexWrap: 'wrap', gap: 32, justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
           <div style={{ fontWeight: 800, fontSize: '1rem', marginBottom: 8 }}>
