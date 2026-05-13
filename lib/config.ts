@@ -1,13 +1,21 @@
 // lib/config.ts — system_config tablosundan parametre okuma
-// Yasal metinler, marka adı, logo, favicon gibi dinamik değerler için kullanılır.
-import { getServiceSupabase } from './auth';
+// next/headers bağımlılığı yok — server component ve layout içinde kullanılabilir.
+import { createClient } from '@supabase/supabase-js';
+
+function getClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { persistSession: false } }
+  );
+}
 
 /**
  * system_config tablosundan tek bir değer okur.
  * Bulunamazsa `defaultValue` döner.
  */
 export async function getConfig(key: string, defaultValue: string = ''): Promise<string> {
-  const supabase = getServiceSupabase();
+  const supabase = getClient();
   const { data } = await supabase
     .from('system_config')
     .select('value')
@@ -24,7 +32,7 @@ export async function getConfigs(
   keys: string[],
   defaultValues: Record<string, string> = {}
 ): Promise<Record<string, string>> {
-  const supabase = getServiceSupabase();
+  const supabase = getClient();
   const { data } = await supabase
     .from('system_config')
     .select('key, value')

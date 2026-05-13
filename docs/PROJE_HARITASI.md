@@ -1,6 +1,6 @@
 # Yükegel — Proje Haritası
 > **Kullanım:** Her sohbet başında sadece bu dosyayı oku. Kaynak dosyaları sadece o dosyada değişiklik yapacaksan oku.  
-> Son güncelleme: 13 Mayıs 2026 — Footer server component'a taşındı, sirket_unvani dinamik ✅
+> Son güncelleme: 13 Mayıs 2026 — page.tsx server wrapper'a dönüştürüldü, Footer + HomeClient ayrıldı ✅
 
 **Referans Dökümanlar:**
 - `docs/LOG_VE_GUVENLIK_SPECLERI.md` — Log format standartları, audit trail, SecurityLogger kontrol listesi
@@ -55,7 +55,8 @@ yukegel/
 │   ├── kvkk/page.tsx                   # ✅ — sirket_unvani config'den
 │   ├── kullanim-kosullari/page.tsx     # ✅ — sirket_unvani config'den
 │   ├── _components/
-│   │   └── Footer.tsx                  # Server component — sirket_unvani config'den
+│   │   ├── Footer.tsx                  # Server component — sirket_unvani config'den
+│   │   └── HomeClient.tsx              # Client component — eski page.tsx içeriği
 │   ├── giris/page.tsx
 │   ├── auth/callback/ + reset/
 │   ├── profil-tamamla/page.tsx
