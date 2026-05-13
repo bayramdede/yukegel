@@ -4,6 +4,7 @@ import AyarSatiri from './AyarSatiri';
 export const dynamic = 'force-dynamic';
 
 const KATEGORI_BASLIK: Record<string, { ikon: string; baslik: string; aciklama: string }> = {
+  brand: { ikon: '🎨', baslik: 'Marka & Kimlik', aciklama: 'Marka adı, ticari ünvan, logo, favicon, site başlığı.' },
   rate_limit: { ikon: '⏱️', baslik: 'Rate Limit', aciklama: 'API ve işlem hız sınırları.' },
   expire: { ikon: '📅', baslik: 'Süre & Expire', aciklama: 'İlan, OTP ve oturum süreleri.' },
   otp: { ikon: '🔐', baslik: 'OTP', aciklama: 'SMS doğrulama parametreleri.' },
@@ -30,7 +31,7 @@ export default async function SistemAyarlari() {
     gruplar[k].push(a);
   });
 
-  const kategoriSira = ['rate_limit', 'expire', 'otp', 'llm', 'parse', 'general'];
+  const kategoriSira = ['brand', 'rate_limit', 'expire', 'otp', 'llm', 'parse', 'general'];
   const sirali = [
     ...kategoriSira.filter(k => gruplar[k]),
     ...Object.keys(gruplar).filter(k => !kategoriSira.includes(k)),

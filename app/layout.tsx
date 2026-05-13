@@ -1,21 +1,29 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { IBM_Plex_Sans } from "next/font/google";
 import "./globals.css";
+import { getConfigs } from "../lib/config";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const ibmPlexSans = IBM_Plex_Sans({
+  variable: "--font-ibm-plex-sans",
   subsets: ["latin"],
+  weight: ["400", "500", "600", "700", "800"],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
-
-export const metadata: Metadata = {
-  title: "Yükegel - Türkiye'nin Nakliye İlan Platformu",
-  description: "Yük ve araç ilanları. Ücretsiz, hızlı, güvenilir.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const cfg = await getConfigs(
+    ['site_basligi', 'site_aciklamasi', 'favicon_url'],
+    {
+      site_basligi: "Yükegel - Türkiye'nin Nakliye İlan Platformu",
+      site_aciklamasi: 'Yük ve araç ilanları. Ücretsiz, hızlı, güvenilir.',
+      favicon_url: '/favicon.ico',
+    }
+  );
+  return {
+    title: cfg.site_basligi,
+    description: cfg.site_aciklamasi,
+    icons: { icon: cfg.favicon_url },
+  };
+}
 
 export default function RootLayout({
   children,
@@ -23,10 +31,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
-    >
+    <html lang="tr" className={`${ibmPlexSans.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );

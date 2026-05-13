@@ -1,15 +1,20 @@
+import { getConfigs } from '../../lib/config';
+
+export const dynamic = 'force-dynamic';
+
 const GUNCELLEME = '6 Mayıs 2026';
 
-const BOLUMLER = [
-  {
-    baslik: '1. Taraflar ve Kapsam',
-    icerik: `Bu Kullanım Koşulları ("Koşullar"), Yükegel Teknoloji A.Ş. ("Yükegel", "biz") ile platformu kullanan gerçek veya tüzel kişiler ("Kullanıcı", "siz") arasındaki ilişkiyi düzenler.
+function getBolumler(sirketUnvani: string) {
+  return [
+    {
+      baslik: '1. Taraflar ve Kapsam',
+      icerik: `Bu Kullanım Koşulları ("Koşullar"), ${sirketUnvani} ("Yükegel", "biz") ile platformu kullanan gerçek veya tüzel kişiler ("Kullanıcı", "siz") arasındaki ilişkiyi düzenler.
 
 Platforma üye olarak veya hizmetlerden yararlanarak bu Koşulları kabul etmiş sayılırsınız. Koşulları kabul etmiyorsanız platformu kullanmayınız.`,
-  },
-  {
-    baslik: '2. Platformun Niteliği',
-    icerik: `Yükegel, yük sahipleri ile nakliyecileri buluşturan bir ilan platformudur. Yükegel:
+    },
+    {
+      baslik: '2. Platformun Niteliği',
+      icerik: `Yükegel, yük sahipleri ile nakliyecileri buluşturan bir ilan platformudur. Yükegel:
 
 • Taşıma sözleşmesinin tarafı değildir.
 • Nakliye hizmeti sağlayıcısı değildir.
@@ -17,18 +22,18 @@ Platforma üye olarak veya hizmetlerden yararlanarak bu Koşulları kabul etmiş
 • Kullanıcılar arasında gerçekleşen taşıma işlemlerinden sorumlu tutulamaz.
 
 Platform yalnızca iletişim ve ilan yayın altyapısı sunar.`,
-  },
-  {
-    baslik: '3. Üyelik ve Hesap',
-    icerik: `• Platforma üye olmak için gerçek ve doğru bilgiler sağlamak zorundasınız.
+    },
+    {
+      baslik: '3. Üyelik ve Hesap',
+      icerik: `• Platforma üye olmak için gerçek ve doğru bilgiler sağlamak zorundasınız.
 • Her kullanıcı yalnızca bir hesap oluşturabilir.
 • Hesabınızın güvenliğinden siz sorumlusunuz. Yetkisiz erişim şüphesinde derhal bildirim yapınız.
 • 18 yaşından küçükler platform hizmetlerinden yararlanamaz.
 • Yükegel, gerekli gördüğü hallerde herhangi bir gerekçe göstermeksizin üyeliği askıya alma veya sonlandırma hakkını saklı tutar.`,
-  },
-  {
-    baslik: '4. İlan Kuralları',
-    icerik: `Kullanıcılar ilan oluştururken aşağıdaki kurallara uymakla yükümlüdür:
+    },
+    {
+      baslik: '4. İlan Kuralları',
+      icerik: `Kullanıcılar ilan oluştururken aşağıdaki kurallara uymakla yükümlüdür:
 
 • İlan içerikleri gerçek ve doğru olmalıdır.
 • Yanıltıcı, sahte veya aldatıcı ilan yayınlanamaz.
@@ -37,10 +42,10 @@ Platform yalnızca iletişim ve ilan yayın altyapısı sunar.`,
 • Spam, tekrarlayan veya içeriksiz ilanlar yayınlanamaz.
 
 Kurallara aykırı ilanlar moderasyon süreci sonucunda kaldırılabilir, hesap askıya alınabilir.`,
-  },
-  {
-    baslik: '5. Yasaklı Kullanımlar',
-    icerik: `Aşağıdaki kullanımlar kesinlikle yasaktır:
+    },
+    {
+      baslik: '5. Yasaklı Kullanımlar',
+      icerik: `Aşağıdaki kullanımlar kesinlikle yasaktır:
 
 • Platformu dolandırıcılık, sahtecilik veya yanıltma amacıyla kullanmak
 • Diğer kullanıcıları taciz etmek, tehdit etmek veya zarar vermek
@@ -48,32 +53,33 @@ Kurallara aykırı ilanlar moderasyon süreci sonucunda kaldırılabilir, hesap 
 • Otomasyon araçları, botlar veya scraper kullanmak
 • Rekabete aykırı faaliyetlerde bulunmak
 • Üçüncü tarafların fikri mülkiyet haklarını ihlal etmek`,
-  },
-  {
-    baslik: '6. İçerik ve Fikri Mülkiyet',
-    icerik: `• Platform tasarımı, yazılımı, logosu ve marka unsurları Yükegel'e aittir.
+    },
+    {
+      baslik: '6. İçerik ve Fikri Mülkiyet',
+      icerik: `• Platform tasarımı, yazılımı, logosu ve marka unsurları Yükegel'e aittir.
 • Kullanıcılar tarafından oluşturulan ilan içerikleri kullanıcıya aittir; ancak kullanıcı bu içerikleri yayınlamak için Yükegel'e lisans tanır.
 • Platform içeriği izinsiz kopyalanamaz, çoğaltılamaz veya dağıtılamaz.`,
-  },
-  {
-    baslik: '7. Sorumluluk Sınırlaması',
-    icerik: `• Yükegel, kullanıcılar arasındaki işlemlerden, anlaşmazlıklardan veya kayıplardan sorumlu değildir.
+    },
+    {
+      baslik: '7. Sorumluluk Sınırlaması',
+      icerik: `• Yükegel, kullanıcılar arasındaki işlemlerden, anlaşmazlıklardan veya kayıplardan sorumlu değildir.
 • Platform "olduğu gibi" sunulmaktadır; kesintisiz veya hatasız hizmet garantisi verilmemektedir.
 • Yükegel'in herhangi bir nedenle doğabilecek sorumluluğu, ilgili dönemde ödenen üyelik ücreti (varsa) ile sınırlıdır.`,
-  },
-  {
-    baslik: '8. Gizlilik',
-    icerik: `Kişisel verilerinizin işlenmesine ilişkin detaylı bilgi için KVKK Aydınlatma Metnimizi inceleyiniz. Platforma üye olarak kişisel verilerinizin Aydınlatma Metni kapsamında işlenmesini kabul etmiş sayılırsınız.`,
-  },
-  {
-    baslik: '9. Değişiklikler',
-    icerik: `Yükegel bu Koşulları önceden bildirimde bulunmaksızın değiştirme hakkını saklı tutar. Güncel Koşullar her zaman bu sayfada yayınlanır. Değişiklikler yayınlandıktan sonra platformu kullanmaya devam etmek, güncel Koşulları kabul ettiğiniz anlamına gelir.`,
-  },
-  {
-    baslik: '10. Uygulanacak Hukuk ve Yetki',
-    icerik: `Bu Koşullar Türk Hukuku'na tabidir. Uyuşmazlıklarda İstanbul Mahkemeleri ve İcra Daireleri yetkilidir.`,
-  },
-];
+    },
+    {
+      baslik: '8. Gizlilik',
+      icerik: `Kişisel verilerinizin işlenmesine ilişkin detaylı bilgi için KVKK Aydınlatma Metnimizi inceleyiniz. Platforma üye olarak kişisel verilerinizin Aydınlatma Metni kapsamında işlenmesini kabul etmiş sayılırsınız.`,
+    },
+    {
+      baslik: '9. Değişiklikler',
+      icerik: `Yükegel bu Koşulları önceden bildirimde bulunmaksızın değiştirme hakkını saklı tutar. Güncel Koşullar her zaman bu sayfada yayınlanır. Değişiklikler yayınlandıktan sonra platformu kullanmaya devam etmek, güncel Koşulları kabul ettiğiniz anlamına gelir.`,
+    },
+    {
+      baslik: '10. Uygulanacak Hukuk ve Yetki',
+      icerik: `Bu Koşullar Türk Hukuku'na tabidir. Uyuşmazlıklarda İstanbul Mahkemeleri ve İcra Daireleri yetkilidir.`,
+    },
+  ];
+}
 
 function NavBar() {
   return (
@@ -91,7 +97,14 @@ function NavBar() {
   );
 }
 
-export default function KullanimKosullari() {
+export default async function KullanimKosullari() {
+  const cfg = await getConfigs(
+    ['sirket_unvani'],
+    { sirket_unvani: 'Yükegel' }
+  );
+
+  const BOLUMLER = getBolumler(cfg.sirket_unvani);
+
   return (
     <div style={{ minHeight: '100vh', background: '#0d1117', fontFamily: "'IBM Plex Sans', system-ui, sans-serif" }}>
       <NavBar />

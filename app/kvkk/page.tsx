@@ -1,27 +1,32 @@
+import { getConfigs } from '../../lib/config';
+
+export const dynamic = 'force-dynamic';
+
 const GUNCELLEME = '6 Mayıs 2026';
 
-const BOLUMLER = [
-  {
-    baslik: '1. Veri Sorumlusu',
-    icerik: `Bu aydınlatma metni, 6698 sayılı Kişisel Verilerin Korunması Kanunu ("KVKK") kapsamında Yükegel Teknoloji A.Ş. ("Yükegel") tarafından hazırlanmıştır.
+function getBolumler(sirketUnvani: string) {
+  return [
+    {
+      baslik: '1. Veri Sorumlusu',
+      icerik: `Bu aydınlatma metni, 6698 sayılı Kişisel Verilerin Korunması Kanunu ("KVKK") kapsamında ${sirketUnvani} ("Yükegel") tarafından hazırlanmıştır.
 
-Veri Sorumlusu: Yükegel Teknoloji A.Ş.
+Veri Sorumlusu: ${sirketUnvani}
 Adres: İstanbul, Türkiye
 E-posta: kvkk@yukegel.com`,
-  },
-  {
-    baslik: '2. İşlenen Kişisel Veriler',
-    icerik: `Platform kullanımı sırasında aşağıdaki kişisel verileriniz işlenmektedir:
+    },
+    {
+      baslik: '2. İşlenen Kişisel Veriler',
+      icerik: `Platform kullanımı sırasında aşağıdaki kişisel verileriniz işlenmektedir:
 
 • Kimlik Bilgileri: Ad, soyad, TC Kimlik Numarası, Vergi Kimlik Numarası
 • İletişim Bilgileri: Telefon numarası, e-posta adresi
 • Araç Bilgileri: Plaka numarası, araç tipi, üst yapı özellikleri
 • İşlem Bilgileri: Oluşturulan ilanlar, yorum ve değerlendirmeler
 • Teknik Veriler: IP adresi, tarayıcı bilgisi, oturum verileri`,
-  },
-  {
-    baslik: '3. Kişisel Verilerin İşlenme Amaçları',
-    icerik: `Kişisel verileriniz aşağıdaki amaçlarla işlenmektedir:
+    },
+    {
+      baslik: '3. Kişisel Verilerin İşlenme Amaçları',
+      icerik: `Kişisel verileriniz aşağıdaki amaçlarla işlenmektedir:
 
 • Üyelik ve hesap yönetimi
 • İlan oluşturma, yayınlama ve yönetimi
@@ -29,37 +34,37 @@ E-posta: kvkk@yukegel.com`,
 • Platform güvenliğinin sağlanması ve dolandırıcılığın önlenmesi
 • Yasal yükümlülüklerin yerine getirilmesi
 • Kullanıcı deneyiminin iyileştirilmesi`,
-  },
-  {
-    baslik: '4. Kişisel Verilerin İşlenme Hukuki Dayanağı',
-    icerik: `Kişisel verileriniz KVKK Madde 5 kapsamında aşağıdaki hukuki dayanıklara göre işlenmektedir:
+    },
+    {
+      baslik: '4. Kişisel Verilerin İşlenme Hukuki Dayanağı',
+      icerik: `Kişisel verileriniz KVKK Madde 5 kapsamında aşağıdaki hukuki dayanıklara göre işlenmektedir:
 
 • Sözleşmenin kurulması veya ifası için zorunlu olması
 • Hukuki yükümlülüklerimizin yerine getirilmesi
 • Meşru menfaatlerimizin korunması
 • Açık rızanıza dayalı işleme (rızaya dayalı haller için)`,
-  },
-  {
-    baslik: '5. Kişisel Verilerin Aktarılması',
-    icerik: `Kişisel verileriniz aşağıdaki taraflara aktarılabilir:
+    },
+    {
+      baslik: '5. Kişisel Verilerin Aktarılması',
+      icerik: `Kişisel verileriniz aşağıdaki taraflara aktarılabilir:
 
 • Altyapı hizmet sağlayıcıları (sunucu, veritabanı): Supabase Inc. (ABD — SCCs kapsamında)
 • SMS doğrulama hizmet sağlayıcısı: Twilio Inc. (ABD — SCCs kapsamında)
 • Yetkili kamu kurum ve kuruluşları (yasal zorunluluk halinde)
 
 Yurt dışı aktarımlar, KVKK'nın 9. maddesi kapsamında gerekli güvenceler sağlanarak gerçekleştirilmektedir.`,
-  },
-  {
-    baslik: '6. Kişisel Verilerin Saklanma Süresi',
-    icerik: `Kişisel verileriniz:
+    },
+    {
+      baslik: '6. Kişisel Verilerin Saklanma Süresi',
+      icerik: `Kişisel verileriniz:
 
 • Üyelik süresince ve üyelik sonrası yasal saklama yükümlülükleri kapsamında saklanır.
 • Vergi ve ticaret hukuku kapsamındaki veriler 5–10 yıl boyunca tutulur.
 • Talep edilmesi halinde, yasal zorunluluk bulunmayan veriler silinir veya anonimleştirilir.`,
-  },
-  {
-    baslik: '7. İlgili Kişinin Hakları',
-    icerik: `KVKK'nın 11. maddesi uyarınca aşağıdaki haklara sahipsiniz:
+    },
+    {
+      baslik: '7. İlgili Kişinin Hakları',
+      icerik: `KVKK'nın 11. maddesi uyarınca aşağıdaki haklara sahipsiniz:
 
 • Kişisel verilerinizin işlenip işlenmediğini öğrenme
 • İşlenmişse buna ilişkin bilgi talep etme
@@ -71,16 +76,17 @@ Yurt dışı aktarımlar, KVKK'nın 9. maddesi kapsamında gerekli güvenceler s
 • Kanuna aykırı işleme nedeniyle zararın giderilmesini talep etme
 
 Taleplerinizi kvkk@yukegel.com adresine iletebilirsiniz. Başvurular en geç 30 gün içinde yanıtlanır.`,
-  },
-  {
-    baslik: '8. Çerezler (Cookies)',
-    icerik: `Platform, teknik zorunluluk ve oturum yönetimi amacıyla çerez kullanmaktadır. Üçüncü taraf reklam veya izleme çerezleri kullanılmamaktadır. Tarayıcı ayarlarınızdan çerezleri yönetebilirsiniz; ancak bazı işlevler çerez devre dışı bırakıldığında çalışmayabilir.`,
-  },
-  {
-    baslik: '9. Değişiklikler',
-    icerik: `Bu aydınlatma metni zaman zaman güncellenebilir. Önemli değişiklikler platform üzerinden duyurulur. Güncel metin her zaman bu sayfada yer alır.`,
-  },
-];
+    },
+    {
+      baslik: '8. Çerezler (Cookies)',
+      icerik: `Platform, teknik zorunluluk ve oturum yönetimi amacıyla çerez kullanmaktadır. Üçüncü taraf reklam veya izleme çerezleri kullanılmamaktadır. Tarayıcı ayarlarınızdan çerezleri yönetebilirsiniz; ancak bazı işlevler çerez devre dışı bırakıldığında çalışmayabilir.`,
+    },
+    {
+      baslik: '9. Değişiklikler',
+      icerik: `Bu aydınlatma metni zaman zaman güncellenebilir. Önemli değişiklikler platform üzerinden duyurulur. Güncel metin her zaman bu sayfada yer alır.`,
+    },
+  ];
+}
 
 function NavBar() {
   return (
@@ -98,7 +104,14 @@ function NavBar() {
   );
 }
 
-export default function Kvkk() {
+export default async function Kvkk() {
+  const cfg = await getConfigs(
+    ['sirket_unvani', 'logo_url'],
+    { sirket_unvani: 'Yükegel', logo_url: '/logo.svg' }
+  );
+
+  const BOLUMLER = getBolumler(cfg.sirket_unvani);
+
   return (
     <div style={{ minHeight: '100vh', background: '#0d1117', fontFamily: "'IBM Plex Sans', system-ui, sans-serif" }}>
       <NavBar />

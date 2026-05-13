@@ -1,11 +1,33 @@
 # Yükegel — Proje Haritası
 > **Kullanım:** Her sohbet başında sadece bu dosyayı oku. Kaynak dosyaları sadece o dosyada değişiklik yapacaksan oku.  
-> Son güncelleme: 12 Mayıs 2026 — WhatsApp Bot canlıya alındı ✅
+> Son güncelleme: 13 Mayıs 2026 — Sistem config helper + Marka/ticari ünvan system_config'e taşındı ✅
 
 **Referans Dökümanlar:**
 - `docs/LOG_VE_GUVENLIK_SPECLERI.md` — Log format standartları, audit trail, SecurityLogger kontrol listesi
 
 ---
+
+## 0. SİSTEM CONFIG PARAMETRELERİ (system_config)
+
+### Brand kategorisi — SQL:
+```sql
+INSERT INTO system_config (key, value, category, data_type, description) VALUES
+  ('sirket_unvani',   'Yükegel',                                       'brand', 'string', 'Ticari ünvan — KVKK ve Kullanım Koşulları metinlerinde kullanılır'),
+  ('marka_adi',       'Yükegel',                                       'brand', 'string', 'Marka adı — navbar ve genel gösterimde kullanılır'),
+  ('logo_url',        '/logo.svg',                                     'brand', 'string', 'Logo dosya yolu (/public altında)'),
+  ('favicon_url',     '/favicon.ico',                                  'brand', 'string', 'Favicon dosya yolu (/public altında)'),
+  ('site_basligi',    'Yükegel - Türkiye''nin Nakliye İlan Platformu', 'brand', 'string', 'Tarayıcı sekmesi başlığı (SEO title)'),
+  ('site_aciklamasi', 'Yük ve araç ilanları. Ücretsiz, hızlı, güvenilir.', 'brand', 'string', 'Meta description (SEO)')
+ON CONFLICT (key) DO NOTHING;
+```
+
+### Kullanım:
+- `lib/config.ts` → `getConfig(key, default)` / `getConfigs(keys[], defaults)`
+- `layout.tsx` → `generateMetadata()` ile site başlığı + favicon
+- `kvkk/page.tsx` + `kullanim-kosullari/page.tsx` → `sirket_unvani`
+- Admin paneli → Sistem Ayarları > 🎨 Marka & Kimlik kategorisi
+
+> **Not:** Navbar logo görsel URL'si şimdilik hardcode `/logo.svg`. Dinamik hale getirmek için tüm sayfalara ortak `<Navbar>` server component gerekir — ileriye bırakıldı.
 
 ## 1. STACK & ORTAM
 
@@ -30,9 +52,9 @@ yukegel/
 │   ├── page.tsx                        # Landing — 3 senaryo ✅
 │   ├── nasil-calisir/page.tsx          # ✅
 │   ├── hakkimizda/page.tsx             # ✅
-│   ├── kvkk/page.tsx                   # ✅
-│   ├── kullanim-kosullari/page.tsx     # ✅
-│   ├── layout.tsx / globals.css
+│   ├── kvkk/page.tsx                   # ✅ — sirket_unvani config'den
+│   ├── kullanim-kosullari/page.tsx     # ✅ — sirket_unvani config'den
+│   ├── layout.tsx / globals.css        # generateMetadata() — title/favicon config'den
 │   ├── giris/page.tsx
 │   ├── auth/callback/ + reset/
 │   ├── profil-tamamla/page.tsx
@@ -198,6 +220,7 @@ Açık rotalar: /giris, /auth/, /profil-tamamla, /nasil-calisir, /hakkimizda,
 ## 14. GÖREV DURUMU
 
 ### ✅ Tamamlanan
+- **Expired pending otomatik arşiv** (12 May 2026): pg_cron job — her saat başı, 24 saatten eski `pending` ilanları `archived` yapar. Migration: `docs/20260512_auto_archive_expired_pending.sql`.
 - **WhatsApp Bot** (12 May 2026): `app/api/whatsapp/route.ts` — Twilio Sandbox entegrasyonu, kayıt/kota/LLM parse/listing insert akışı. +90 normalize, imza doğrulama, TwiML yanıt. `price_offer`+`vehicle_type[]` şema uyumu.
 - **Log implementasyonu** (12 May 2026): `lib/logger.ts` oluşturuldu. `proxy.ts` SecurityLogger, `parse-listing` pre_check_failed + error, `excel-import` satır-bazlı + tamamlanma, `parse-text` quota WARN, `ilan-ver/actions.ts` ilan yaratma INFO/ERROR, `moderator/toplu-islem` tüm moderasyon aksiyonları — tümü devreye alındı.
 - Auth (OTP + e-posta + Google + merge), profil-tamamla
