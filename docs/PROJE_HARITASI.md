@@ -1,6 +1,6 @@
 # Yükegel — Proje Haritası
 > **Kullanım:** Her sohbet başında sadece bu dosyayı oku. Kaynak dosyaları sadece o dosyada değişiklik yapacaksan oku.  
-> Son güncelleme: 13 Mayıs 2026 — Sistem config helper + Marka/ticari ünvan system_config'e taşındı ✅
+> Son güncelleme: 13 Mayıs 2026 — Footer server component'a taşındı, sirket_unvani dinamik ✅
 
 **Referans Dökümanlar:**
 - `docs/LOG_VE_GUVENLIK_SPECLERI.md` — Log format standartları, audit trail, SecurityLogger kontrol listesi
@@ -54,7 +54,8 @@ yukegel/
 │   ├── hakkimizda/page.tsx             # ✅
 │   ├── kvkk/page.tsx                   # ✅ — sirket_unvani config'den
 │   ├── kullanim-kosullari/page.tsx     # ✅ — sirket_unvani config'den
-│   ├── layout.tsx / globals.css        # generateMetadata() — title/favicon config'den
+│   ├── _components/
+│   │   └── Footer.tsx                  # Server component — sirket_unvani config'den
 │   ├── giris/page.tsx
 │   ├── auth/callback/ + reset/
 │   ├── profil-tamamla/page.tsx
