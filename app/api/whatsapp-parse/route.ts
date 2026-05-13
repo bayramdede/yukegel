@@ -22,14 +22,6 @@ function normalizeArrows(s: string): string {
     .replace(/\s+/g, ' ').trim();
 }
 
-function cleanLineForNotes(line: string): string {
-  return normalizeArrows(line)
-    .replace(/[📌⭕🔥📦🚛🚚✅❌⚡🔴🟢🟡⚠️🏁📍]/gu, '')
-    .replace(/[\u{1F000}-\u{1FFFF}]/gu, '')
-    .replace(/[*•~]/g, '')
-    .replace(/\s+/g, ' ').trim();
-}
-
 function trNorm(s: string): string {
   return normalizeArrows(s || '')
     .replace(/İ/g, 'i').replace(/I/g, 'i')
@@ -42,15 +34,9 @@ function trNorm(s: string): string {
 
 function extractPhones(text: string): string[] {
   const phones: string[] = [];
-
-  // +90 / +9 0 gibi prefix'leri 0'a çevir, parantezleri boşluğa dönüştür
   const t = text
     .replace(/\+\s*9\s*0\s*/g, '0')
     .replace(/[()]/g, ' ');
-
-  // 05 ile başlayan, rakamlar arasında isteğe bağlı boşluk/ayraç olan
-  // toplamda 11 haneli numaraları yakala
-  // Örnek formatlar: 0537 914 91 90 / 0547 051 3951 / 05379149190
   const re = /0\s*5(?:\s*\d){9}/g;
   let m;
   while ((m = re.exec(t)) !== null) {
@@ -59,28 +45,21 @@ function extractPhones(text: string): string[] {
       phones.push(digits);
     }
   }
-
   return [...new Set(phones)];
 }
 
 function parseChatTxt(content: string): Array<{ sender: string; timestamp: string; message: string }> {
   const lines = content.split('\n');
   const messages: Array<{ sender: string; timestamp: string; message: string }> = [];
-
-  // Format 1 (Android TR): [DD.MM.YYYY HH:MM:SS] Gönderen: mesaj
   const patternAndroid = /^\[(\d{1,2}\.\d{1,2}\.\d{4}[,\s]\d{1,2}:\d{1,2}(?::\d{1,2})?)\]\s(.+?):\s(.*)$/;
-  // Format 2 (iOS TR):   DD.MM.YYYY, HH:MM - Gönderen: mesaj
   const patternIOS    = /^(\d{1,2}\.\d{1,2}\.\d{4}[,\s]\d{1,2}:\d{1,2})\s?-\s(.+?):\s(.*)$/;
-
   let current: { sender: string; timestamp: string; lines: string[] } | null = null;
   const SISTEM = ['katıldı', 'ekledi', 'çıkardı', 'ayrıldı', 'silindi', 'şifreli', 'güvenlik kodu',
     'değiştirdi', 'e-fatura', 'gider fişi', 'medya dahil edilmedi', 'bu mesaj silindi',
     'süreli mesajlar', 'uçtan uca', 'missed voice call', 'missed video call', 'this message was deleted'];
-
   for (const line of lines) {
     const trimmed = line.replace(/[\u200e\u202a\u202c\u200f\u200b]/g, '').trim();
     if (!trimmed) continue;
-
     const match = patternAndroid.exec(trimmed) || patternIOS.exec(trimmed);
     if (match) {
       if (current && current.lines.length > 0) {
@@ -101,7 +80,8 @@ function parseChatTxt(content: string): Array<{ sender: string; timestamp: strin
   return messages;
 }
 
-async function gatekeeper(message: string, aliases: any[]): Promise<{ isAd: boolean; score: number; phones: string[]; cities: string[]; vehicles: string[] }> {
+// Sync version — DB çağrısı yok, tüm veriler bellekte
+function gatekeeper_sync(message: string, aliases: any[]): { isAd: boolean; score: number; phones: string[]; cities: string[]; vehicles: string[] } {
   const norm = trNorm(message);
   const phones = extractPhones(message);
   const blacklist = aliases.filter(a => a.type === 'blacklist').map(a => trNorm(a.alias));
@@ -130,17 +110,6 @@ async function gatekeeper(message: string, aliases: any[]): Promise<{ isAd: bool
   return { isAd, score, phones, cities: foundCities, vehicles: foundVehicles };
 }
 
-// ── Spam kontrolü ────────────────────────────────────────────────
-async function spamKontrol(phone: string, spamEsik: number): Promise<boolean> {
-  const birSaatOnce = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-  const { count } = await supabase
-    .from('raw_posts')
-    .select('*', { count: 'exact', head: true })
-    .eq('contact_phone', phone)
-    .gte('created_at', birSaatOnce);
-  return (count || 0) >= spamEsik;
-}
-
 async function repostListings(sourceRawPostId: string, newRawPostId: string): Promise<void> {
   const { data: originalListings } = await supabase.from('listings').select('*, listing_stops(*)').eq('raw_post_id', sourceRawPostId);
   if (!originalListings || originalListings.length === 0) return;
@@ -162,10 +131,18 @@ export async function POST(request: NextRequest) {
     const files = formData.getAll('files') as File[];
     const saatFiltre = parseInt(formData.get('saat_filtre') as string || '12');
     const cutoff = new Date(Date.now() - saatFiltre * 60 * 60 * 1000);
-    const groupName = (formData.get('group_name') as string) || files[0]?.name.replace(/\.zip$/i, '').replace(/\.txt$/i, '').replace(/WhatsApp Sohbeti - /i, '').replace(/WhatsApp Chat - /i, '').replace(/[\u{1F000}-\u{1FFFF}]/gu, '').replace(/[\u200e\u202a\u202c\u200f\u200b]/g, '').replace(/\s+/g, ' ').trim() || 'Bilinmiyor';
+    const groupName = (formData.get('group_name') as string) ||
+      files[0]?.name
+        .replace(/\.zip$/i, '').replace(/\.txt$/i, '')
+        .replace(/WhatsApp Sohbeti - /i, '').replace(/WhatsApp Chat - /i, '')
+        .replace(/[\u{1F000}-\u{1FFFF}]/gu, '')
+        .replace(/[\u200e\u202a\u202c\u200f\u200b]/g, '')
+        .replace(/\s+/g, ' ').trim() || 'Bilinmiyor';
 
-    if (!files || files.length === 0) return NextResponse.json({ error: 'Dosya bulunamadı' }, { status: 400 });
+    if (!files || files.length === 0)
+      return NextResponse.json({ error: 'Dosya bulunamadı' }, { status: 400 });
 
+    // ── 1. Dosyaları oku ──────────────────────────────────────────────────────
     const fileContents: { name: string; content: string }[] = [];
     for (const file of files) {
       let content = '';
@@ -173,7 +150,6 @@ export async function POST(request: NextRequest) {
         const buffer = await file.arrayBuffer();
         const JSZip = (await import('jszip')).default;
         const zip = await JSZip.loadAsync(buffer);
-        // _chat.txt (EN), sohbet ile başlayanlar (TR), veya tek .txt varsa onu al
         const allTxts = Object.keys(zip.files).filter(name => !zip.files[name].dir && name.toLowerCase().endsWith('.txt'));
         const chatFile = allTxts.find(n => n.toLowerCase().includes('_chat')) ||
                          allTxts.find(n => n.toLowerCase().includes('chat')) ||
@@ -187,22 +163,34 @@ export async function POST(request: NextRequest) {
       fileContents.push({ name: file.name, content });
     }
 
+    // ── 2. DB'den aliases + config'i PARALEL çek (tek seferlik) ──────────────
+    const [aliasesRes, configRes] = await Promise.all([
+      supabase.from('aliases').select('*').eq('is_active', true),
+      supabase.from('system_config').select('value').eq('key', 'spam_threshold').single(),
+    ]);
+    const aliases = aliasesRes.data || [];
+    const spamEsik: number = configRes.data?.value?.max_listings_per_hour ?? 3;
+
+    // ── 3. Tüm mesajları parse et + gatekeeper (tamamen in-memory, DB yok) ───
+    type Candidate = {
+      msg: { sender: string; timestamp: string; message: string };
+      msgDate: string;
+      msgTimestamp: string;
+      hash: string;
+      phone: string | null;
+      gate: { isAd: boolean; score: number; phones: string[]; cities: string[]; vehicles: string[] };
+    };
+
     let totalMessages = 0;
-    for (const fc of fileContents) totalMessages += parseChatTxt(fc.content).length;
-
-    // ── Tüm işlemi response’dan ÖNCE yap (Vercel serverless’ta fire-and-forget çalışmıyor) ──
-    const { data: aliases } = await supabase.from('aliases').select('*').eq('is_active', true);
-    const { data: configRow } = await supabase.from('system_config').select('value').eq('key', 'spam_threshold').single();
-    const spamEsik: number = configRow?.value?.max_listings_per_hour ?? 3;
-
-    let savedToDb = 0, skipped = 0, reposted = 0, spamEngel = 0;
+    const rawCandidates: Omit<Candidate, 'hash'>[] = [];
     const debugLog: string[] = [];
 
     for (const fc of fileContents) {
       const messages = parseChatTxt(fc.content);
+      totalMessages += messages.length;
       for (const msg of messages) {
-        let msgDate: string = new Date().toISOString().split('T')[0];
-        let passedTimeFilter = false;
+        let msgDate = '';
+        let msgTimestamp = new Date().toISOString();
         try {
           const tsClean = msg.timestamp.replace(',', '').replace(/\s+/g, ' ').trim();
           const tsParts = tsClean.split(' ');
@@ -214,65 +202,170 @@ export async function POST(request: NextRequest) {
           const isoDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
           const d = new Date(`${isoDate}T${timePart}`);
           if (isNaN(d.getTime())) { debugLog.push(`SKIP invalid_date: ${isoDate}T${timePart}`); continue; }
-          if (d < cutoff) { debugLog.push(`SKIP cutoff: ${isoDate}T${timePart} < ${cutoff.toISOString()}`); continue; }
+          if (d < cutoff) { debugLog.push(`SKIP cutoff: ${isoDate}T${timePart}`); continue; }
           msgDate = isoDate;
-          passedTimeFilter = true;
+          msgTimestamp = d.toISOString();
         } catch (e: any) { debugLog.push(`SKIP ts_error: ${e.message}`); continue; }
 
-        const gate = await gatekeeper(msg.message, aliases || []);
+        const gate = gatekeeper_sync(msg.message, aliases);
         debugLog.push(`MSG ${msgDate} | isAd=${gate.isAd} score=${gate.score} phones=${gate.phones.length} cities=${gate.cities.join(',')} vehicles=${gate.vehicles.join(',')} | ${msg.message.slice(0, 60).replace(/\n/g, ' ')}`);
         if (!gate.isAd || gate.score < 30) continue;
 
-        const hash = await cleanHash(msg.message);
-        const phone = gate.phones[0] || null;
+        rawCandidates.push({ msg, msgDate, msgTimestamp, phone: gate.phones[0] || null, gate });
+      }
+    }
 
-        if (phone) {
-          const isSpam = await spamKontrol(phone, spamEsik);
-          if (isSpam) { spamEngel++; continue; }
+    if (rawCandidates.length === 0) {
+      return NextResponse.json({
+        success: true, total_messages: totalMessages, passed_gate: 0,
+        saved_to_db: 0, skipped: 0, spam_blocked: 0, reposted: 0,
+        cutoff: cutoff.toISOString(), saat_filtre: saatFiltre, debug: debugLog,
+      });
+    }
+
+    // ── 4. Hash'leri PARALEL hesapla ─────────────────────────────────────────
+    const candidates: Candidate[] = await Promise.all(
+      rawCandidates.map(async c => ({ ...c, hash: await cleanHash(c.msg.message) }))
+    );
+
+    // ── 5. BATCH DB sorguları (3 sorgu toplam) ────────────────────────────────
+    const allHashes = [...new Set(candidates.map(c => c.hash))];
+    const allPhones = [...new Set(candidates.map(c => c.phone).filter(Boolean) as string[])];
+    const birSaatOnce = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+
+    const [existingPostsRes, recentByPhoneRes, repostCandidatesRes] = await Promise.all([
+      // 5a. Aynı hash'e sahip tüm mevcut kayıtlar
+      supabase.from('raw_posts')
+        .select('id, clean_hash, message_date, contact_phone')
+        .in('clean_hash', allHashes),
+      // 5b. Son 1 saatte bu telefonlardan kaç kayıt var (spam kontrolü)
+      allPhones.length > 0
+        ? supabase.from('raw_posts')
+            .select('contact_phone')
+            .in('contact_phone', allPhones)
+            .gte('created_at', birSaatOnce)
+        : Promise.resolve({ data: [] as any[], error: null }),
+      // 5c. Repost tespiti: aynı hash + aynı telefon ama farklı tarih
+      allPhones.length > 0
+        ? supabase.from('raw_posts')
+            .select('id, clean_hash, contact_phone, message_date')
+            .in('clean_hash', allHashes)
+            .in('contact_phone', allPhones)
+        : Promise.resolve({ data: [] as any[], error: null }),
+    ]);
+
+    // Lookup map'leri oluştur (O(1) erişim)
+    const existingMap = new Map<string, { id: string; contact_phone: string | null }>();
+    for (const row of existingPostsRes.data || []) {
+      existingMap.set(`${row.clean_hash}__${row.message_date}`, { id: row.id, contact_phone: row.contact_phone });
+    }
+
+    const phoneCountMap = new Map<string, number>();
+    for (const row of recentByPhoneRes.data || []) {
+      if (row.contact_phone)
+        phoneCountMap.set(row.contact_phone, (phoneCountMap.get(row.contact_phone) || 0) + 1);
+    }
+
+    // Repost map: (hash + phone) → en son kayıt id'si
+    const repostMap = new Map<string, { id: string; message_date: string }>();
+    for (const row of repostCandidatesRes.data || []) {
+      const key = `${row.clean_hash}__${row.contact_phone}`;
+      const existing = repostMap.get(key);
+      if (!existing || row.message_date > existing.message_date)
+        repostMap.set(key, { id: row.id, message_date: row.message_date });
+    }
+
+    // ── 6. Her adayı değerlendir ─────────────────────────────────────────────
+    let skipped = 0, spamEngel = 0;
+    const toInsert: any[] = [];
+    const phoneUpdates: Array<{ rawPostId: string; phone: string }> = [];
+
+    for (const c of candidates) {
+      const exactKey = `${c.hash}__${c.msgDate}`;
+      const exactMatch = existingMap.get(exactKey);
+      if (exactMatch) {
+        if (!exactMatch.contact_phone && c.phone) {
+          phoneUpdates.push({ rawPostId: exactMatch.id, phone: c.phone });
+          debugLog.push(`PHONE_UPDATE queued: ${exactMatch.id} → ${c.phone}`);
         }
+        skipped++;
+        continue;
+      }
 
-        // Aynı gün aynı mesaj zaten var mı? (clean_hash + date — telefon fark etmeksizin)
-        const { data: exactMatch } = await supabase.from('raw_posts')
-          .select('id, contact_phone')
-          .eq('clean_hash', hash)
-          .eq('message_date', msgDate)
-          .maybeSingle();
-        if (exactMatch) {
-          // Eski kayıtta telefon yoksa şimdi güncelle
-          if (!exactMatch.contact_phone && phone) {
-            await supabase.from('raw_posts').update({ contact_phone: phone }).eq('id', exactMatch.id);
-            await supabase.from('listings').update({ contact_phone: phone }).eq('raw_post_id', exactMatch.id);
-            debugLog.push(`PHONE_UPDATE: ${exactMatch.id} → ${phone}`);
-          }
-          skipped++; continue;
+      if (c.phone && (phoneCountMap.get(c.phone) || 0) >= spamEsik) {
+        spamEngel++;
+        continue;
+      }
+
+      let isRepost = false;
+      let sourceRawPostId: string | null = null;
+      if (c.phone) {
+        const repostKey = `${c.hash}__${c.phone}`;
+        const prev = repostMap.get(repostKey);
+        if (prev && prev.message_date !== c.msgDate) {
+          isRepost = true;
+          sourceRawPostId = prev.id;
         }
+      }
 
-        let isRepost = false, sourceRawPostId: string | null = null;
-        if (phone) {
-          const { data: prevMatch } = await supabase.from('raw_posts').select('id, message_date').eq('clean_hash', hash).eq('contact_phone', phone).neq('message_date', msgDate).order('message_date', { ascending: false }).limit(1).maybeSingle();
-          if (prevMatch) { isRepost = true; sourceRawPostId = prevMatch.id; }
+      toInsert.push({
+        source: 'whatsapp',
+        source_group: groupName,
+        sender_name: c.msg.sender,
+        raw_text: c.msg.message,
+        clean_hash: c.hash,
+        contact_phone: c.phone,
+        is_repost: isRepost,
+        source_raw_post_id: sourceRawPostId,
+        message_timestamp: c.msgTimestamp,
+        quality_score: c.gate.score,
+        processing_status: 'pending',
+        detected_ad_count: 1,
+        message_date: c.msgDate,
+        // geçici meta — insert sonrası repost için, DB'ye gitmez
+        _sourceRawPostId: sourceRawPostId,
+        _isRepost: isRepost,
+      });
+    }
+
+    // ── 7. Phone güncellemelerini PARALEL yap ────────────────────────────────
+    if (phoneUpdates.length > 0) {
+      await Promise.all(phoneUpdates.map(u =>
+        Promise.all([
+          supabase.from('raw_posts').update({ contact_phone: u.phone }).eq('id', u.rawPostId),
+          supabase.from('listings').update({ contact_phone: u.phone }).eq('raw_post_id', u.rawPostId),
+        ])
+      ));
+    }
+
+    // ── 8. Yeni kayıtları BATCH INSERT (100'lük chunk'lar) ───────────────────
+    let savedToDb = 0, reposted = 0;
+    if (toInsert.length > 0) {
+      const repostMeta = toInsert.map(r => ({ sourceRawPostId: r._sourceRawPostId, isRepost: r._isRepost }));
+      const cleanRows = toInsert.map(({ _sourceRawPostId, _isRepost, ...rest }) => rest);
+
+      const CHUNK = 100;
+      for (let i = 0; i < cleanRows.length; i += CHUNK) {
+        const chunk = cleanRows.slice(i, i + CHUNK);
+        const meta = repostMeta.slice(i, i + CHUNK);
+        const { data: inserted, error } = await supabase.from('raw_posts').insert(chunk).select('id');
+        if (error) {
+          if (error.code !== '23505') console.error('batch insert hatası:', error.message);
+          continue;
         }
+        savedToDb += (inserted || []).length;
 
-        const { data: newPost, error } = await supabase.from('raw_posts').insert({
-          source: 'whatsapp',
-          source_group: groupName,
-          sender_name: msg.sender,
-          raw_text: msg.message,
-          clean_hash: hash,
-          contact_phone: phone,
-          is_repost: isRepost,
-          source_raw_post_id: sourceRawPostId,
-          message_timestamp: (() => { try { const [date, time] = msg.timestamp.split(' '); const [day, month, year] = date.split('.'); return new Date(`${year}-${month}-${day}T${time}`).toISOString(); } catch { return new Date().toISOString(); } })(),
-          quality_score: gate.score,
-          processing_status: 'pending',
-          detected_ad_count: 1,
-          message_date: msgDate,
-        }).select().single();
-
-        if (error) { if (error.code !== '23505') console.error('raw_posts insert hatası:', error.message); continue; }
-
-        savedToDb++;
-        if (isRepost && sourceRawPostId && newPost) { await repostListings(sourceRawPostId, newPost.id); reposted++; }
+        // Repost olanlar için listing kopyala (paralel)
+        await Promise.all(
+          (inserted || []).map((row, idx) => {
+            const m = meta[idx];
+            if (m.isRepost && m.sourceRawPostId) {
+              reposted++;
+              return repostListings(m.sourceRawPostId, row.id);
+            }
+            return Promise.resolve();
+          })
+        );
       }
     }
 
