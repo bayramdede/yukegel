@@ -107,6 +107,7 @@ export async function POST(req: NextRequest) {
         alias: alias.trim(),
         normalized: normalized.trim(),
         type: type ?? 'city',
+        district: body.district?.trim() || null,
         is_active: true,
         created_by_ai: false,
         is_approved: true,
@@ -296,6 +297,7 @@ export async function PATCH(req: NextRequest) {
   if (updates.alias !== undefined) izinli.alias = String(updates.alias).trim().toLowerCase();
   if (updates.normalized !== undefined) izinli.normalized = String(updates.normalized).trim();
   if (updates.type !== undefined) izinli.type = updates.type;
+  if ('district' in updates) izinli.district = updates.district?.trim() || null;
 
   if (Object.keys(izinli).length === 0) {
     return NextResponse.json({ error: 'Guncellenecek alan yok' }, { status: 400 });

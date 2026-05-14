@@ -2,15 +2,14 @@
 
 import { useState, useEffect, useCallback } from 'react';
 
-// ── Tipler ──
 interface Alias {
   id: number;
   alias: string;
   normalized: string;
-  type: string;       // city, vehicle, blacklist, district, ...
+  type: string;
   is_active: boolean;
   priority?: number;
-  district?: string;
+  district?: string | null;
   created_by_ai?: boolean;
   created_at: string;
 }
@@ -45,56 +44,45 @@ interface PendingAlias {
   created_at: string;
 }
 
-// ── Tip renkleri ──
 const TIP_RENK: Record<string, string> = {
   city:      '#60a5fa',
-  district:  '#a78bfa',
   vehicle:   '#22c55e',
   body:      '#fb923c',
   blacklist: '#f87171',
 };
 function tipRenk(t: string) { return TIP_RENK[t] ?? '#8b949e'; }
 
-// ── Stil yardimcilari ──
 const S = {
   btn: (bg: string, color: string, disabled?: boolean): React.CSSProperties => ({
     background: disabled ? '#1c2128' : bg,
     color: disabled ? '#484f58' : color,
     border: `1px solid ${disabled ? '#30363d' : color + '50'}`,
-    borderRadius: 6,
-    padding: '6px 14px',
-    fontSize: '0.82rem',
-    fontWeight: 600,
-    cursor: disabled ? 'not-allowed' : 'pointer',
-    opacity: disabled ? 0.6 : 1,
+    borderRadius: 6, padding: '6px 14px', fontSize: '0.82rem', fontWeight: 600,
+    cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.6 : 1,
     whiteSpace: 'nowrap' as const,
   }),
   input: (): React.CSSProperties => ({
-    background: '#0d1117',
-    border: '1px solid #30363d',
-    borderRadius: 6,
-    color: '#e2e8f0',
-    padding: '7px 10px',
-    fontSize: '0.85rem',
-    outline: 'none',
-    width: '100%',
-    boxSizing: 'border-box' as const,
+    background: '#0d1117', border: '1px solid #30363d', borderRadius: 6,
+    color: '#e2e8f0', padding: '7px 10px', fontSize: '0.85rem', outline: 'none',
+    width: '100%', boxSizing: 'border-box' as const,
   }),
   badge: (color: string): React.CSSProperties => ({
-    background: color + '22',
-    color,
-    borderRadius: 4,
-    fontSize: '0.65rem',
-    fontWeight: 700,
-    padding: '2px 7px',
-    whiteSpace: 'nowrap' as const,
+    background: color + '22', color, borderRadius: 4, fontSize: '0.65rem',
+    fontWeight: 700, padding: '2px 7px', whiteSpace: 'nowrap' as const,
   }),
   card: (): React.CSSProperties => ({
-    background: '#0d1117',
-    border: '1px solid #30363d',
-    borderRadius: 8,
-    padding: '12px 14px',
-    marginBottom: 8,
+    background: '#0d1117', border: '1px solid #30363d',
+    borderRadius: 8, padding: '12px 14px', marginBottom: 8,
+  }),
+  tipBtn: (aktif: boolean, color: string): React.CSSProperties => ({
+    padding: '5px 12px', borderRadius: 6, fontSize: '0.8rem', fontWeight: 600,
+    cursor: 'pointer', border: `1px solid ${aktif ? color + '60' : '#30363d'}`,
+    background: aktif ? color + '22' : '#0d1117', color: aktif ? color : '#8b949e',
+  }),
+  altTipBtn: (aktif: boolean): React.CSSProperties => ({
+    padding: '4px 12px', borderRadius: 6, fontSize: '0.78rem', fontWeight: 600,
+    cursor: 'pointer', border: `1px solid ${aktif ? '#60a5fa50' : '#30363d'}`,
+    background: aktif ? '#1e3a5f' : '#0d1117', color: aktif ? '#60a5fa' : '#8b949e',
   }),
 };
 
@@ -102,61 +90,69 @@ const S = {
 // Sekme 1: Alias Kutuphanesi
 // ─────────────────────────────────────────
 function AliasSekme() {
-  const [aliases, setAliases] = useState<Alias[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [ara, setAra] = useState('');
-  const [tipFiltre, setTipFiltre] = useState('');
-  const [yeniAlias, setYeniAlias] = useState('');
-  const [yeniNorm, setYeniNorm] = useState('');
-  const [yeniType, setYeniType] = useState('city');
-  const [ekleniyor, setEkleniyor] = useState(false);
-  const [duzenlenen, setDuzenlenen] = useState<number | null>(null);
-  const [duzVal, setDuzVal] = useState({ alias: '', normalized: '', type: '' });
+  const [aliases, setAliases]       = useState<Alias[]>([]);
+  const [loading, setLoading]       = useState(true);
+  const [ara, setAra]               = useState('');
+  const [tipFiltre, setTipFiltre]   = useState('');
+
+  // Yeni alias state
+  const [yeniAlias, setYeniAlias]     = useState('');
+  const [yeniNorm, setYeniNorm]       = useState('');
+  const [yeniType, setYeniType]       = useState('city');
+  const [yeniAltTip, setYeniAltTip]   = useState<'il' | 'ilce'>('il');
+  const [yeniDistrict, setYeniDistrict] = useState('');
+  const [ekleniyor, setEkleniyor]     = useState(false);
+
+  // Düzenle state
+  const [duzenlenen, setDuzenlenen]   = useState<number | null>(null);
+  const [duzVal, setDuzVal]           = useState({ alias: '', normalized: '', type: '', district: '' });
+  const [duzAltTip, setDuzAltTip]     = useState<'il' | 'ilce'>('il');
+
   const [mesaj, setMesaj] = useState('');
 
   const yukle = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/admin/learn-aliases?sekme=aliases&limit=500');
+      const res  = await fetch('/api/admin/learn-aliases?sekme=aliases&limit=500');
       const json = await res.json();
       setAliases(json.data ?? []);
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   }, []);
 
   useEffect(() => { yukle(); }, [yukle]);
 
-  // Tip listesi (dinamik)
   const tipler = Array.from(new Set(aliases.map(a => a.type))).sort();
 
+  const ekleDisabled =
+    ekleniyor || !yeniAlias || !yeniNorm ||
+    (yeniType === 'city' && yeniAltTip === 'ilce' && !yeniDistrict);
+
   const ekle = async () => {
-    if (!yeniAlias.trim() || !yeniNorm.trim()) return;
+    if (ekleDisabled) return;
     setEkleniyor(true);
     try {
-      const res = await fetch('/api/admin/learn-aliases', {
+      const district = yeniType === 'city' && yeniAltTip === 'ilce'
+        ? yeniDistrict.trim() : null;
+      const res  = await fetch('/api/admin/learn-aliases', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'create', alias: yeniAlias, normalized: yeniNorm, type: yeniType }),
+        body: JSON.stringify({ action: 'create', alias: yeniAlias, normalized: yeniNorm, type: yeniType, district }),
       });
       const json = await res.json();
       if (json.success) {
-        setMesaj(`Eklendi: "${yeniAlias}" -> "${yeniNorm}"`);
-        setYeniAlias(''); setYeniNorm('');
+        setMesaj(`Eklendi: "${yeniAlias}" -> "${yeniNorm}"${district ? ` / ${district}` : ''}`);
+        setYeniAlias(''); setYeniNorm(''); setYeniDistrict('');
         yukle();
       } else {
         setMesaj(`Hata: ${json.error}`);
       }
-    } finally {
-      setEkleniyor(false);
-    }
+    } finally { setEkleniyor(false); }
   };
 
   const sil = async (id: number, alias: string) => {
     if (!confirm(`"${alias}" silinsin mi?`)) return;
     const res = await fetch('/api/admin/learn-aliases', {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
+      method: 'DELETE', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id }),
     });
     if ((await res.json()).success) { setMesaj('Silindi'); yukle(); }
@@ -164,15 +160,17 @@ function AliasSekme() {
 
   const duzenlemeBaslat = (a: Alias) => {
     setDuzenlenen(a.id);
-    setDuzVal({ alias: a.alias, normalized: a.normalized, type: a.type });
+    setDuzVal({ alias: a.alias, normalized: a.normalized, type: a.type, district: a.district ?? '' });
+    setDuzAltTip(a.type === 'city' && a.district ? 'ilce' : 'il');
   };
 
   const duzenlemeKaydet = async () => {
     if (!duzenlenen) return;
+    const district = duzVal.type === 'city' && duzAltTip === 'ilce'
+      ? duzVal.district.trim() || null : null;
     const res = await fetch('/api/admin/learn-aliases', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: duzenlenen, ...duzVal }),
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: duzenlenen, alias: duzVal.alias, normalized: duzVal.normalized, type: duzVal.type, district }),
     });
     if ((await res.json()).success) { setDuzenlenen(null); setMesaj('Guncellendi'); yukle(); }
   };
@@ -181,38 +179,100 @@ function AliasSekme() {
     const tipOk = !tipFiltre || a.type === tipFiltre;
     const araOk = !ara ||
       a.alias.toLowerCase().includes(ara.toLowerCase()) ||
-      a.normalized.toLowerCase().includes(ara.toLowerCase());
+      a.normalized.toLowerCase().includes(ara.toLowerCase()) ||
+      (a.district ?? '').toLowerCase().includes(ara.toLowerCase());
     return tipOk && araOk;
   });
 
   return (
     <div>
-      {/* Yeni alias ekle */}
+      {/* ── Yeni Alias Ekle ── */}
       <div style={{ background: '#161b22', border: '1px solid #30363d', borderRadius: 8, padding: 16, marginBottom: 16 }}>
-        <div style={{ color: '#e2e8f0', fontWeight: 700, fontSize: '0.88rem', marginBottom: 12 }}>+ Yeni Alias Ekle</div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto auto', gap: 8, alignItems: 'end' }}>
+        <div style={{ color: '#e2e8f0', fontWeight: 700, fontSize: '0.88rem', marginBottom: 12 }}>
+          + Yeni Alias Ekle
+        </div>
+
+        {/* Tip seçici */}
+        <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
+          {[
+            { v: 'city',      l: 'Sehir (Il/Ilce)' },
+            { v: 'vehicle',   l: 'Arac Tipi' },
+            { v: 'body',      l: 'Kasa Tipi' },
+            { v: 'blacklist', l: 'Kara Liste' },
+          ].map(({ v, l }) => (
+            <button key={v} onClick={() => setYeniType(v)} style={S.tipBtn(yeniType === v, tipRenk(v))}>
+              {l}
+            </button>
+          ))}
+        </div>
+
+        {/* city tipi için İl / İlçe alt seçici */}
+        {yeniType === 'city' && (
+          <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+            <button
+              onClick={() => { setYeniAltTip('il'); setYeniDistrict(''); }}
+              style={S.altTipBtn(yeniAltTip === 'il')}
+            >
+              Il &mdash; district: null
+            </button>
+            <button
+              onClick={() => setYeniAltTip('ilce')}
+              style={S.altTipBtn(yeniAltTip === 'ilce')}
+            >
+              Ilce &mdash; district: dolu
+            </button>
+          </div>
+        )}
+
+        {/* Alan girişleri */}
+        <div style={{
+          display: 'grid',
+          gap: 8,
+          gridTemplateColumns: yeniType === 'city' && yeniAltTip === 'ilce'
+            ? '1fr 1fr 1fr auto'
+            : '1fr 1fr auto',
+          alignItems: 'end',
+        }}>
           <div>
-            <div style={{ color: '#8b949e', fontSize: '0.72rem', marginBottom: 4 }}>Alias (ham / kisaltma)</div>
-            <input style={S.input()} placeholder="Orn: g.antep" value={yeniAlias} onChange={e => setYeniAlias(e.target.value)} />
+            <div style={{ color: '#8b949e', fontSize: '0.72rem', marginBottom: 4 }}>Alias (ham)</div>
+            <input
+              style={S.input()}
+              placeholder={
+                yeniType === 'city'
+                  ? yeniAltTip === 'ilce' ? 'Orn: finike' : 'Orn: antalya'
+                  : 'Orn: tir'
+              }
+              value={yeniAlias}
+              onChange={e => setYeniAlias(e.target.value)}
+            />
           </div>
           <div>
-            <div style={{ color: '#8b949e', fontSize: '0.72rem', marginBottom: 4 }}>Normalized (standart karsilik)</div>
-            <input style={S.input()} placeholder="Orn: Gaziantep" value={yeniNorm} onChange={e => setYeniNorm(e.target.value)} />
+            <div style={{ color: '#8b949e', fontSize: '0.72rem', marginBottom: 4 }}>
+              {yeniType === 'city' ? 'Normalized (Il adi)' : 'Normalized (standart)'}
+            </div>
+            <input
+              style={S.input()}
+              placeholder={yeniType === 'city' ? 'Orn: Antalya' : 'Orn: TIR'}
+              value={yeniNorm}
+              onChange={e => setYeniNorm(e.target.value)}
+            />
           </div>
-          <div>
-            <div style={{ color: '#8b949e', fontSize: '0.72rem', marginBottom: 4 }}>Tip</div>
-            <select style={{ ...S.input(), width: 'auto' }} value={yeniType} onChange={e => setYeniType(e.target.value)}>
-              <option value="city">city (Il/Ilce)</option>
-              <option value="vehicle">vehicle (Arac tipi)</option>
-              <option value="body">body (Kasa tipi)</option>
-              <option value="blacklist">blacklist</option>
-            </select>
-          </div>
-          <button onClick={ekle} disabled={ekleniyor || !yeniAlias || !yeniNorm}
-            style={S.btn('#14532d', '#22c55e', ekleniyor || !yeniAlias || !yeniNorm)}>
+          {yeniType === 'city' && yeniAltTip === 'ilce' && (
+            <div>
+              <div style={{ color: '#8b949e', fontSize: '0.72rem', marginBottom: 4 }}>Ilce adi (district)</div>
+              <input
+                style={S.input()}
+                placeholder='Orn: Finike'
+                value={yeniDistrict}
+                onChange={e => setYeniDistrict(e.target.value)}
+              />
+            </div>
+          )}
+          <button onClick={ekle} disabled={ekleDisabled} style={S.btn('#14532d', '#22c55e', ekleDisabled)}>
             {ekleniyor ? '...' : 'Ekle'}
           </button>
         </div>
+
         {mesaj && (
           <div style={{ marginTop: 8, fontSize: '0.8rem', color: mesaj.startsWith('Hata') ? '#f87171' : '#22c55e' }}>
             {mesaj}
@@ -220,7 +280,7 @@ function AliasSekme() {
         )}
       </div>
 
-      {/* Filtreler */}
+      {/* ── Filtreler ── */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
         <input
           style={{ ...S.input(), flex: 1, minWidth: 180 }}
@@ -228,11 +288,7 @@ function AliasSekme() {
           value={ara}
           onChange={e => setAra(e.target.value)}
         />
-        <select
-          style={{ ...S.input(), width: 'auto' }}
-          value={tipFiltre}
-          onChange={e => setTipFiltre(e.target.value)}
-        >
+        <select style={{ ...S.input(), width: 'auto' }} value={tipFiltre} onChange={e => setTipFiltre(e.target.value)}>
           <option value="">Tum tipler</option>
           {tipler.map(t => (
             <option key={t} value={t}>{t} ({aliases.filter(a => a.type === t).length})</option>
@@ -240,6 +296,7 @@ function AliasSekme() {
         </select>
       </div>
 
+      {/* ── Liste ── */}
       {loading ? (
         <div style={{ color: '#8b949e', textAlign: 'center', padding: 32 }}>Yukleniyor...</div>
       ) : filtreli.length === 0 ? (
@@ -249,28 +306,76 @@ function AliasSekme() {
           {filtreli.map(a => (
             <div key={a.id} style={S.card()}>
               {duzenlenen === a.id ? (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto auto auto', gap: 8, alignItems: 'center' }}>
-                  <input style={S.input()} value={duzVal.alias} onChange={e => setDuzVal(p => ({ ...p, alias: e.target.value }))} />
-                  <input style={S.input()} value={duzVal.normalized} onChange={e => setDuzVal(p => ({ ...p, normalized: e.target.value }))} />
-                  <select style={{ ...S.input(), width: 'auto' }} value={duzVal.type} onChange={e => setDuzVal(p => ({ ...p, type: e.target.value }))}>  
-                  <option value="city">city</option>
-                  <option value="vehicle">vehicle</option>
-                  <option value="body">body</option>
-                    <option value="blacklist">blacklist</option>
-                  </select>
-                  <button onClick={duzenlemeKaydet} style={S.btn('#14532d', '#22c55e')}>OK</button>
-                  <button onClick={() => setDuzenlenen(null)} style={S.btn('#1c2128', '#8b949e')}>X</button>
+                /* ── Düzenle satırı ── */
+                <div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: 8, marginBottom: 8 }}>
+                    <div>
+                      <div style={{ color: '#8b949e', fontSize: '0.7rem', marginBottom: 3 }}>Alias</div>
+                      <input style={S.input()} value={duzVal.alias}
+                        onChange={e => setDuzVal(p => ({ ...p, alias: e.target.value }))} />
+                    </div>
+                    <div>
+                      <div style={{ color: '#8b949e', fontSize: '0.7rem', marginBottom: 3 }}>Normalized</div>
+                      <input style={S.input()} value={duzVal.normalized}
+                        onChange={e => setDuzVal(p => ({ ...p, normalized: e.target.value }))} />
+                    </div>
+                    <div>
+                      <div style={{ color: '#8b949e', fontSize: '0.7rem', marginBottom: 3 }}>Tip</div>
+                      <select style={{ ...S.input(), width: 'auto' }} value={duzVal.type}
+                        onChange={e => setDuzVal(p => ({ ...p, type: e.target.value }))}>
+                        <option value="city">city</option>
+                        <option value="vehicle">vehicle</option>
+                        <option value="body">body</option>
+                        <option value="blacklist">blacklist</option>
+                      </select>
+                    </div>
+                  </div>
+                  {/* city için il/ilçe alt seçici */}
+                  {duzVal.type === 'city' && (
+                    <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+                      <button
+                        onClick={() => { setDuzAltTip('il'); setDuzVal(p => ({ ...p, district: '' })); }}
+                        style={S.altTipBtn(duzAltTip === 'il')}
+                      >
+                        Il (district: null)
+                      </button>
+                      <button onClick={() => setDuzAltTip('ilce')} style={S.altTipBtn(duzAltTip === 'ilce')}>
+                        Ilce (district dolu)
+                      </button>
+                      {duzAltTip === 'ilce' && (
+                        <input
+                          style={{ ...S.input(), flex: 1 }}
+                          placeholder='Ilce adi'
+                          value={duzVal.district}
+                          onChange={e => setDuzVal(p => ({ ...p, district: e.target.value }))}
+                        />
+                      )}
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <button onClick={duzenlemeKaydet} style={S.btn('#14532d', '#22c55e')}>Kaydet</button>
+                    <button onClick={() => setDuzenlenen(null)} style={S.btn('#1c2128', '#8b949e')}>Iptal</button>
+                  </div>
                 </div>
               ) : (
+                /* ── Normal satır ── */
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
-                    <code style={{ color: '#e2e8f0', fontSize: '0.85rem', minWidth: 120 }}>{a.alias}</code>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0, flexWrap: 'wrap' }}>
+                    <code style={{ color: '#e2e8f0', fontSize: '0.85rem', minWidth: 110 }}>{a.alias}</code>
                     <span style={{ color: '#484f58' }}>-&gt;</span>
                     <span style={{ color: '#22c55e', fontSize: '0.85rem', fontWeight: 600 }}>{a.normalized}</span>
-                    {a.district && <span style={{ color: '#8b949e', fontSize: '0.78rem' }}>({a.district})</span>}
+                    {/* district varsa ilçe rozeti */}
+                    {a.district && (
+                      <span style={{ color: '#a78bfa', fontSize: '0.82rem' }}>/ {a.district}</span>
+                    )}
                     <span style={S.badge(tipRenk(a.type))}>{a.type}</span>
+                    {/* Il / Ilce etiketi (sadece city tipi) */}
+                    {a.type === 'city' && (
+                      <span style={S.badge(a.district ? '#a78bfa' : '#60a5fa')}>
+                        {a.district ? 'ILCE' : 'IL'}
+                      </span>
+                    )}
                     {a.created_by_ai && <span style={S.badge('#f59e0b')}>AI</span>}
-                    {a.priority != null && a.priority >= 90 && <span style={S.badge('#22c55e')}>p{a.priority}</span>}
                   </div>
                   <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
                     <button onClick={() => duzenlemeBaslat(a)} style={S.btn('#1e3a5f', '#60a5fa')}>Duzenle</button>
@@ -290,50 +395,39 @@ function AliasSekme() {
 // Sekme 2: AI Kesif Alani
 // ─────────────────────────────────────────
 function KesifSekme() {
-  const [noLane, setNoLane] = useState<NoLaneData>({ raw_posts: [], listings_no_origin: [], total: 0 });
-  const [loading, setLoading] = useState(true);
+  const [noLane, setNoLane]       = useState<NoLaneData>({ raw_posts: [], listings_no_origin: [], total: 0 });
+  const [loading, setLoading]     = useState(true);
   const [kesfediyor, setKesfediyor] = useState(false);
-  const [limit, setLimit] = useState(50);
-  const [sonuc, setSonuc] = useState<any>(null);
-  const [acilanId, setAcilanId] = useState<string | null>(null);
+  const [limit, setLimit]         = useState(50);
+  const [sonuc, setSonuc]         = useState<any>(null);
+  const [acilanId, setAcilanId]   = useState<string | null>(null);
 
   const yukle = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/admin/learn-aliases?sekme=no_lane&limit=200');
+      const res  = await fetch('/api/admin/learn-aliases?sekme=no_lane&limit=200');
       const json = await res.json();
-      setNoLane({
-        raw_posts: json.raw_posts ?? [],
-        listings_no_origin: json.listings_no_origin ?? [],
-        total: json.total ?? 0,
-      });
-    } finally {
-      setLoading(false);
-    }
+      setNoLane({ raw_posts: json.raw_posts ?? [], listings_no_origin: json.listings_no_origin ?? [], total: json.total ?? 0 });
+    } finally { setLoading(false); }
   }, []);
 
   useEffect(() => { yukle(); }, [yukle]);
 
   const kesfet = async () => {
-    setKesfediyor(true);
-    setSonuc(null);
+    setKesfediyor(true); setSonuc(null);
     try {
       const res = await fetch('/api/admin/learn-aliases', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'discover', limit }),
       });
       setSonuc(await res.json());
-    } finally {
-      setKesfediyor(false);
-    }
+    } finally { setKesfediyor(false); }
   };
 
   const toplamNoLane = noLane.total;
 
   return (
     <div>
-      {/* Kesif kutusu */}
       <div style={{ background: '#161b22', border: '1px solid #30363d', borderRadius: 8, padding: 16, marginBottom: 20 }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
           <div>
@@ -342,22 +436,16 @@ function KesifSekme() {
               no_lane raw_post metinlerini Haiku'ya gonderir, bilinmeyen yer adlarini tespit eder.
             </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
             <select style={{ ...S.input(), width: 'auto' }} value={limit} onChange={e => setLimit(Number(e.target.value))}>
-              <option value={20}>20 kayit</option>
-              <option value={50}>50 kayit</option>
-              <option value={100}>100 kayit</option>
+              <option value={20}>20</option><option value={50}>50</option><option value={100}>100</option>
             </select>
-            <button
-              onClick={kesfet}
-              disabled={kesfediyor || toplamNoLane === 0}
-              style={S.btn('#713f12', '#fbbf24', kesfediyor || toplamNoLane === 0)}
-            >
-              {kesfediyor ? 'Analiz ediliyor...' : 'AI Kesfini Baslat'}
+            <button onClick={kesfet} disabled={kesfediyor || toplamNoLane === 0}
+              style={S.btn('#713f12', '#fbbf24', kesfediyor || toplamNoLane === 0)}>
+              {kesfediyor ? 'Analiz...' : 'AI Kesfi Baslat'}
             </button>
           </div>
         </div>
-
         {sonuc && (
           <div style={{ background: '#0d1117', borderRadius: 6, padding: 12, marginTop: 12 }}>
             {sonuc.error ? (
@@ -367,7 +455,7 @@ function KesifSekme() {
                 <div style={{ color: '#22c55e', fontWeight: 700, fontSize: '0.88rem', marginBottom: 8 }}>{sonuc.message}</div>
                 {sonuc.suggestions?.length > 0 && (
                   <div>
-                    <div style={{ color: '#8b949e', fontSize: '0.78rem', marginBottom: 6 }}>
+                    <div style={{ color: '#8b949e', fontSize: '0.75rem', marginBottom: 6 }}>
                       Kaydedilen oneriler (Onay Bekleyen sekmesine gec):
                     </div>
                     {sonuc.suggestions.map((s: any, i: number) => (
@@ -386,13 +474,10 @@ function KesifSekme() {
         )}
       </div>
 
-      {/* No-lane listeleri */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
         <div style={{ color: '#e2e8f0', fontWeight: 700, fontSize: '0.9rem' }}>
           Rotasi Cozulemeyen Kayitlar
-          <span style={{ color: loading ? '#8b949e' : '#f59e0b', marginLeft: 8 }}>
-            ({loading ? '...' : toplamNoLane})
-          </span>
+          <span style={{ color: loading ? '#8b949e' : '#f59e0b', marginLeft: 8 }}>({loading ? '...' : toplamNoLane})</span>
         </div>
         <button onClick={yukle} style={S.btn('#1e3a5f', '#60a5fa')}>Yenile</button>
       </div>
@@ -405,7 +490,6 @@ function KesifSekme() {
         </div>
       ) : (
         <div>
-          {/* WhatsApp no_lane */}
           {noLane.raw_posts.length > 0 && (
             <>
               <div style={{ color: '#6e7681', fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>
@@ -436,8 +520,6 @@ function KesifSekme() {
               </div>
             </>
           )}
-
-          {/* Form ilanlari — origin_city bos */}
           {noLane.listings_no_origin.length > 0 && (
             <>
               <div style={{ color: '#6e7681', fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>
@@ -477,22 +559,20 @@ function KesifSekme() {
 // Sekme 3: Onay Bekleyen + Re-parse
 // ─────────────────────────────────────────
 function OnaySekme() {
-  const [pending, setPending] = useState<PendingAlias[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [islem, setIslem] = useState<string | null>(null);
-  const [reparsing, setReparsing] = useState(false);
-  const [reparseIlerleme, setReparseIlerleme] = useState({ done: 0, total: 0, ok: 0, still: 0 });
+  const [pending, setPending]       = useState<PendingAlias[]>([]);
+  const [loading, setLoading]       = useState(true);
+  const [islem, setIslem]           = useState<string | null>(null);
+  const [reparsing, setReparsing]   = useState(false);
+  const [ilerleme, setIlerleme]     = useState({ done: 0, total: 0, ok: 0, still: 0 });
   const [reparseMsg, setReparseMsg] = useState('');
 
   const yukle = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/admin/learn-aliases?sekme=pending');
+      const res  = await fetch('/api/admin/learn-aliases?sekme=pending');
       const json = await res.json();
       setPending(json.data ?? []);
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   }, []);
 
   useEffect(() => { yukle(); }, [yukle]);
@@ -501,14 +581,11 @@ function OnaySekme() {
     setIslem(String(id));
     try {
       await fetch('/api/admin/learn-aliases', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id, action }),
       });
       yukle();
-    } finally {
-      setIslem(null);
-    }
+    } finally { setIslem(null); }
   };
 
   const topluOnayla = async () => {
@@ -516,61 +593,40 @@ function OnaySekme() {
     setIslem('bulk');
     for (const p of pending) {
       await fetch('/api/admin/learn-aliases', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: p.id, action: 'approve' }),
       });
     }
-    setIslem(null);
-    yukle();
+    setIslem(null); yukle();
   };
 
   const reparseBaslat = async () => {
-    setReparsing(true);
-    setReparseMsg('');
-    setReparseIlerleme({ done: 0, total: 0, ok: 0, still: 0 });
-
-    const idsRes = await fetch('/api/admin/reprocess-no-lane');
-    const idsJson = await idsRes.json();
+    setReparsing(true); setReparseMsg(''); setIlerleme({ done: 0, total: 0, ok: 0, still: 0 });
+    const idsJson = await fetch('/api/admin/reprocess-no-lane').then(r => r.json());
     const ids: string[] = idsJson.ids ?? [];
-
-    if (ids.length === 0) {
-      setReparseMsg('Yeniden islenecek no_lane kayit yok.');
-      setReparsing(false);
-      return;
-    }
-
-    setReparseIlerleme(p => ({ ...p, total: ids.length }));
+    if (ids.length === 0) { setReparseMsg('Yeniden islenecek no_lane kayit yok.'); setReparsing(false); return; }
+    setIlerleme(p => ({ ...p, total: ids.length }));
     let done = 0, ok = 0, still = 0;
-    const BATCH = 4;
-
-    for (let i = 0; i < ids.length; i += BATCH) {
-      const batch = ids.slice(i, i + BATCH);
+    for (let i = 0; i < ids.length; i += 4) {
       const results = await Promise.all(
-        batch.map(id =>
+        ids.slice(i, i + 4).map(id =>
           fetch('/api/admin/reprocess-no-lane', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ raw_post_id: id }),
-          })
-            .then(r => r.json())
-            .then(j => ((j.lanes ?? 0) > 0 ? 'ok' : 'no_lane'))
-            .catch(() => 'error')
+          }).then(r => r.json()).then(j => (j.lanes ?? 0) > 0 ? 'ok' : 'no').catch(() => 'err')
         )
       );
       for (const r of results) { done++; if (r === 'ok') ok++; else still++; }
-      setReparseIlerleme({ done, total: ids.length, ok, still });
+      setIlerleme({ done, total: ids.length, ok, still });
     }
-
-    setReparseMsg(`Tamamlandi: ${ok} kayit rotaya alindi, ${still} hala no_lane.`);
+    setReparseMsg(`Tamamlandi: ${ok} kayit rotalandi, ${still} hala no_lane.`);
     setReparsing(false);
   };
 
-  const pct = reparseIlerleme.total > 0 ? Math.round((reparseIlerleme.done / reparseIlerleme.total) * 100) : 0;
+  const pct = ilerleme.total > 0 ? Math.round((ilerleme.done / ilerleme.total) * 100) : 0;
 
   return (
     <div>
-      {/* Re-parse kutusu */}
       <div style={{ background: '#161b22', border: '1px solid #30363d', borderRadius: 8, padding: 16, marginBottom: 20 }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
           <div>
@@ -583,12 +639,11 @@ function OnaySekme() {
             {reparsing ? 'Isleniyor...' : 'Yeniden Isle'}
           </button>
         </div>
-
         {reparsing && (
           <div style={{ marginTop: 12 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: '#8b949e', marginBottom: 4 }}>
-              <span>{reparseIlerleme.done}/{reparseIlerleme.total} (%{pct})</span>
-              <span>{reparseIlerleme.ok} rotalandi / {reparseIlerleme.still} kaldi</span>
+              <span>{ilerleme.done}/{ilerleme.total} (%{pct})</span>
+              <span>{ilerleme.ok} rotalandi / {ilerleme.still} kaldi</span>
             </div>
             <div style={{ background: '#0d1117', borderRadius: 4, height: 6, overflow: 'hidden' }}>
               <div style={{ background: '#22c55e', height: '100%', width: `${pct}%`, transition: 'width 0.3s' }} />
@@ -598,10 +653,9 @@ function OnaySekme() {
         {reparseMsg && <div style={{ marginTop: 10, fontSize: '0.85rem', color: '#22c55e' }}>{reparseMsg}</div>}
       </div>
 
-      {/* Pending listesi */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
         <div style={{ color: '#e2e8f0', fontWeight: 700, fontSize: '0.9rem' }}>
-          AI Onerisi Bekleyen Alias'lar
+          AI Onerisi Bekleyen
           <span style={{ color: '#f59e0b', marginLeft: 8 }}>({loading ? '...' : pending.length})</span>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
@@ -619,7 +673,6 @@ function OnaySekme() {
       ) : pending.length === 0 ? (
         <div style={{ background: '#161b22', border: '1px solid #30363d', borderRadius: 8, padding: 24, textAlign: 'center', color: '#8b949e', fontSize: '0.9rem' }}>
           Onay bekleyen AI onerisi yok.
-          Kesif sekmesinden yeni tarama baslatabilirsiniz.
         </div>
       ) : (
         <div style={{ maxHeight: 480, overflowY: 'auto' }}>
@@ -632,34 +685,16 @@ function OnaySekme() {
                     <span style={{ color: '#484f58' }}>-&gt;</span>
                     <span style={{ color: '#22c55e', fontWeight: 600 }}>{p.normalized}</span>
                     <span style={S.badge(tipRenk(p.type))}>{p.type}</span>
-                    <span style={S.badge(
-                      p.llm_confidence >= 90 ? '#22c55e' :
-                      p.llm_confidence >= 70 ? '#f59e0b' : '#f87171'
-                    )}>
+                    <span style={S.badge(p.llm_confidence >= 90 ? '#22c55e' : p.llm_confidence >= 70 ? '#f59e0b' : '#f87171')}>
                       %{p.llm_confidence}
                     </span>
-                    {p.source_listing_ids?.length > 0 && (
-                      <span style={{ color: '#484f58', fontSize: '0.72rem' }}>
-                        {p.source_listing_ids.length} kaynaktan
-                      </span>
-                    )}
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                  <button
-                    onClick={() => islemYap(p.id, 'approve')}
-                    disabled={islem === String(p.id)}
-                    style={S.btn('#14532d', '#22c55e', islem === String(p.id))}
-                  >
-                    Onayla
-                  </button>
-                  <button
-                    onClick={() => islemYap(p.id, 'reject')}
-                    disabled={islem === String(p.id)}
-                    style={S.btn('#450a0a', '#f87171', islem === String(p.id))}
-                  >
-                    Reddet
-                  </button>
+                  <button onClick={() => islemYap(p.id, 'approve')} disabled={islem === String(p.id)}
+                    style={S.btn('#14532d', '#22c55e', islem === String(p.id))}>Onayla</button>
+                  <button onClick={() => islemYap(p.id, 'reject')} disabled={islem === String(p.id)}
+                    style={S.btn('#450a0a', '#f87171', islem === String(p.id))}>Reddet</button>
                 </div>
               </div>
             </div>
@@ -675,38 +710,26 @@ function OnaySekme() {
 // ─────────────────────────────────────────
 export default function OgrenmeMerkeziClient() {
   const [aktifSekme, setAktifSekme] = useState<'aliases' | 'kesif' | 'onay'>('aliases');
-
   const sekmeler: Array<{ id: 'aliases' | 'kesif' | 'onay'; label: string }> = [
     { id: 'aliases', label: 'Alias Kutuphanesi' },
     { id: 'kesif',   label: 'AI Kesif Alani'   },
     { id: 'onay',    label: 'Onay Bekleyen'     },
   ];
-
   return (
     <div>
       <div style={{ display: 'flex', gap: 4, marginBottom: 24, borderBottom: '1px solid #30363d' }}>
         {sekmeler.map(s => (
-          <button
-            key={s.id}
-            onClick={() => setAktifSekme(s.id)}
-            style={{
-              background: aktifSekme === s.id ? '#161b22' : 'transparent',
-              color: aktifSekme === s.id ? '#e2e8f0' : '#8b949e',
-              border: 'none',
-              borderBottom: aktifSekme === s.id ? '2px solid #22c55e' : '2px solid transparent',
-              padding: '10px 18px',
-              fontSize: '0.88rem',
-              fontWeight: aktifSekme === s.id ? 700 : 400,
-              cursor: 'pointer',
-              borderRadius: '6px 6px 0 0',
-              marginBottom: -1,
-            }}
-          >
+          <button key={s.id} onClick={() => setAktifSekme(s.id)} style={{
+            background: aktifSekme === s.id ? '#161b22' : 'transparent',
+            color: aktifSekme === s.id ? '#e2e8f0' : '#8b949e',
+            border: 'none', borderBottom: aktifSekme === s.id ? '2px solid #22c55e' : '2px solid transparent',
+            padding: '10px 18px', fontSize: '0.88rem', fontWeight: aktifSekme === s.id ? 700 : 400,
+            cursor: 'pointer', borderRadius: '6px 6px 0 0', marginBottom: -1,
+          }}>
             {s.label}
           </button>
         ))}
       </div>
-
       {aktifSekme === 'aliases' && <AliasSekme />}
       {aktifSekme === 'kesif'   && <KesifSekme />}
       {aktifSekme === 'onay'    && <OnaySekme />}
