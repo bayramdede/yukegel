@@ -10,6 +10,8 @@ export default function WhatsappYukle() {
   const [saatFiltre, setSaatFiltre] = useState(48);
 
 
+  const [debugAcik, setDebugAcik] = useState(false);
+
   async function yukle() {
     if (dosyalar.length === 0) return;
     setYukleniyor(true);
@@ -84,17 +86,43 @@ export default function WhatsappYukle() {
             </button>
 
             {sonuc && (
-              <div style={{ background: sonuc.success ? '#0d2b1a' : '#2a0d0d', border: `1px solid ${sonuc.success ? '#166534' : '#7f1d1d'}`, borderRadius: 6, padding: '8px 14px', fontSize: '0.82rem' }}>
-                {sonuc.success ? (
-                  <span style={{ color: '#22c55e' }}>
-                    ✅ {sonuc.total_messages} mesaj tarandı — {sonuc.saved_to_db} kaydedildi
-                    {sonuc.skipped > 0 && ` · ${sonuc.skipped} tekrar`}
-                    {sonuc.spam_blocked > 0 && ` · ${sonuc.spam_blocked} spam`}
-                    {sonuc.reposted > 0 && ` · ${sonuc.reposted} repost`}
-                    {sonuc.total_messages === 0 && ' ⚠️ Mesaj parse edilemedi — format kontrol et'}
-                  </span>
-                ) : (
-                  <span style={{ color: '#ef4444' }}>⚠️ {sonuc.error}</span>
+              <div style={{ width: '100%', marginTop: 4 }}>
+                <div style={{ background: sonuc.success ? '#0d2b1a' : '#2a0d0d', border: `1px solid ${sonuc.success ? '#166534' : '#7f1d1d'}`, borderRadius: 6, padding: '8px 14px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                  {sonuc.success ? (
+                    <>
+                      <span style={{ color: '#22c55e' }}>
+                        ✅ {sonuc.total_messages} mesaj tarandı — {sonuc.saved_to_db} kaydedildi
+                        {sonuc.skipped > 0 && ` · ${sonuc.skipped} tekrar`}
+                        {sonuc.spam_blocked > 0 && ` · ${sonuc.spam_blocked} spam`}
+                        {sonuc.reposted > 0 && ` · ${sonuc.reposted} repost`}
+                        {sonuc.aliases_count !== undefined && ` · ${sonuc.aliases_count} alias`}
+                        {sonuc.total_messages === 0 && ' ⚠️ Mesaj parse edilemedi — format kontrol et'}
+                      </span>
+                      {sonuc.debug?.length > 0 && (
+                        <button onClick={() => setDebugAcik(d => !d)}
+                          style={{ background: 'none', border: '1px solid #30363d', color: '#6b7280', borderRadius: 4, padding: '2px 8px', cursor: 'pointer', fontSize: '0.72rem' }}>
+                          {debugAcik ? '▲ debug gizle' : '▼ debug göster'}
+                        </button>
+                      )}
+                    </>
+                  ) : (
+                    <span style={{ color: '#ef4444' }}>⚠️ {sonuc.error}</span>
+                  )}
+                </div>
+                {debugAcik && sonuc.debug?.length > 0 && (
+                  <div style={{ background: '#0d1117', border: '1px solid #1f2937', borderRadius: 6, padding: 10, marginTop: 4, maxHeight: 300, overflowY: 'auto' }}>
+                    {sonuc.debug.slice(0, 60).map((line: string, i: number) => (
+                      <div key={i} style={{
+                        fontSize: '0.68rem', fontFamily: 'monospace', marginBottom: 2, lineHeight: 1.4,
+                        color: line.startsWith('SKIP') ? '#f87171' : line.startsWith('MSG') && line.includes('isAd=true') ? '#22c55e' : line.startsWith('PHONE') ? '#60a5fa' : '#4b5563',
+                      }}>
+                        {line}
+                      </div>
+                    ))}
+                    {sonuc.debug.length > 60 && (
+                      <div style={{ color: '#4b5563', fontSize: '0.68rem', marginTop: 4 }}>... {sonuc.debug.length - 60} satır daha</div>
+                    )}
+                  </div>
                 )}
               </div>
             )}
