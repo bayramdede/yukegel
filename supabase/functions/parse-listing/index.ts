@@ -37,14 +37,18 @@ function cleanMessage(text: string): string {
   return text
     .split('\n')
     .map(line => {
-      // Ok karakterlerini ASCII'ye çevir (emoji-strip'ten ÖNCE — ➡️ U+27A1 aynı range'de)
-      line = line.replace(/[➡➜➔⟶]/gu, '->')
-      // Emojileri sil
-      line = line.replace(/[\u{1F000}-\u{1FFFF}\u{2600}-\u{27FF}\u{2300}-\u{23FF}\u{2B00}-\u{2BFF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA9F}]/gu, '')
-      // WhatsApp format karakterlerini sil
-      line = line.replace(/[\u200e\u202a\u202c\u200f\u200b\u{FE0F}]/gu, '')
+      // Ok karakterlerini ASCII'ye çevir (emoji-strip'ten ÖNCE)
+      // ➡ U+27A1, ⏩ U+23E9 (YUKİ), ⏪ U+23EA, ▶ U+25B6, ⏩ vb. aynı range'de
+      line = line.replace(/[➡➜➔⟶⏩⏪▶◀⇒⇔]/gu, '->')
+      // Emojileri BOŞ KARAKTERLE değil BOŞLUKLA değiştir
+      // Aksi halde "KIZILTEPE🔲ANTEP" → "kiziltepeantep" oluşur (token ayırıcı kaybolur)
+      line = line.replace(/[\u{1F000}-\u{1FFFF}\u{2600}-\u{27FF}\u{2300}-\u{23FF}\u{2B00}-\u{2BFF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA9F}]/gu, ' ')
+      // WhatsApp format + görünmez Unicode karakterlerini sil
+      // U+200C/D (ZWJ/ZWNJ), U+2060 (WJ), U+FEFF (BOM) city adlarını böler — trNorm'da boşluğa dönüşür
+      line = line.replace(/[\u200e\u202a\u202c\u200f\u200b\u200c\u200d\u2060\ufeff\u{FE0F}]/gu, '')
       // Kalın/italic WhatsApp formatını sil (* ve _)
-      line = line.replace(/\*([^*]+)\*/g, '$1').replace(/_([^_]+)_/g, '$1')
+      // Önemli: boşlukla değiştir, aksi halde "*AFYON*İŞBİTİMİ" → "AFYONİŞBİTİMİ" olur
+      line = line.replace(/\*([^*]+)\*/g, ' $1 ').replace(/_([^_]+)_/g, ' $1 ')
       // Telefon numaralarını sil
       line = line.replace(/(?:\+?9?0?)?\s*5\d[\s\-\.]?\d{3}[\s\-\.]?\d{2}[\s\-\.]?\d{2}/g, '')
       line = line.replace(/0\s*5\s*\d[\s\-\.]?\d{2}[\s\-\.]?\d{3}[\s\-\.]?\d{2}[\s\-\.]?\d{2}/g, '')
@@ -71,8 +75,25 @@ function cleanMessage(text: string): string {
 // -------------------------
 // Türkçe normalizasyon
 // -------------------------
+
+// Unicode küçük harf / IPA karakter eşlemeleri (WhatsApp fancy font kullanımı)
+// ᴋɪᴢɪʟᴛᴇᴘᴇ gibi küçük caps karakterler → normal ASCII
+const UNICODE_SMALL_CAPS: [RegExp, string][] = [
+  [/[ᴀᴁ]/gu, 'a'], [/ʙ/gu, 'b'], [/ᴄ/gu, 'c'], [/ᴅ/gu, 'd'],
+  [/[ᴇ]/gu, 'e'], [/[ɢɡ]/gu, 'g'], [/ʜ/gu, 'h'],
+  [/[ɪɩ]/gu, 'i'], [/[ᴊʝ]/gu, 'j'], [/ᴋ/gu, 'k'],
+  [/ʟ/gu, 'l'], [/ᴍ/gu, 'm'], [/[ɴɴ]/gu, 'n'],
+  [/[ᴏ]/gu, 'o'], [/ᴘ/gu, 'p'], [/[ʀʁ]/gu, 'r'],
+  [/[ꜱsꜱ]/gu, 's'], [/ᴛ/gu, 't'], [/[ᴜʊ]/gu, 'u'],
+  [/ᴠ/gu, 'v'], [/ᴡ/gu, 'w'], [/ʏ/gu, 'y'],
+  [/[ᴢᴢ]/gu, 'z'],
+]
+
 function trNorm(s: string): string {
-  return (s || '')
+  let t = (s || '')
+  // Unicode small caps / IPA → ASCII
+  for (const [re, rep] of UNICODE_SMALL_CAPS) t = t.replace(re, rep)
+  return t
     .replace(/İ/g, 'i').replace(/I/g, 'i')  // toLowerCase'den ÖNCE
     .toLowerCase()
     .replace(/ç/g, 'c').replace(/ğ/g, 'g').replace(/ı/g, 'i')
@@ -104,6 +125,18 @@ function stripSuffix(token: string): string {
     }
   }
   return t
+}
+
+// Tek tur suffix soyma — ara formu korur (tuzladan → tuzla, full strip → tuzl)
+// findPlaces hem stripSuffixOnce hem de stripSuffix ’i dener
+function stripSuffixOnce(token: string): string {
+  if (token.length < 5) return token
+  for (const suf of CASE_SUFFIXES) {
+    if (token.endsWith(suf) && token.length - suf.length >= 3) {
+      return token.slice(0, -suf.length)
+    }
+  }
+  return token
 }
 
 // -------------------------
@@ -140,8 +173,11 @@ function detectAdType(text: string): 'yuk' | 'arac' {
 // -------------------------
 // Satır ilişki tespiti (ok, tire, den-ye)
 // -------------------------
+// Pass 2 reset için: ~ dahil değil ("MANİSA ~ 3 TIR" pattern'ini reset etmemek için)
+const BLOCK_RESET_RE = /\s+[-–—]\s+/
+
 const ARROW_RE = /➡️|->|→|⇒|⟶|—>|➜|➔/
-const DASH_RE = /\s+[-–—]\s+/
+const DASH_RE = /\s+[-–—~]\s+/
 const DEN_RE = /(.+?)\s+(?:'?\s*)?(?:den|dan|ten|tan)\b\s+(.+)/i
 
 function splitByRelation(line: string): { left: string, right: string, rel: string } | null {
@@ -228,10 +264,12 @@ function findPlaces(text: string, aliases: Alias[]): PlaceHit[] {
     }
   }
 
-  // Unigram
+  // Unigram — 3 form: ham, tek-strip (ara form), tam-strip
   for (const token of tokens) {
-    const stripped = stripSuffix(token)
-    for (const cand of [token, stripped]) {
+    const stripped1 = stripSuffixOnce(token)
+    const strippedFull = stripSuffix(token)
+    const candidates = [...new Set([token, stripped1, strippedFull])]
+    for (const cand of candidates) {
       const match = cityAliases.find(a => trNorm(a.alias) === cand)
       if (match && !seen.has(match.normalized)) {
         hits.push({ normalized: match.normalized, priority: match.priority || 50, matched: cand, district: match.district || null })
@@ -310,10 +348,17 @@ function parseMessage(message: string, aliases: Alias[]): {
 
   const lines = message.split('\n').map(l => l.trim()).filter(l => l.length > 3)
 
+  // Pass 1: ok/tire/den-ye ilişki tespiti + contextFrom (başa ok satırları için)
+  let contextFrom: PlaceHit | null = null
+
   for (const line of lines) {
     const rel = splitByRelation(line)
     if (!rel) {
-      // İlişki yok ama + var mı? Çoklu varış satırı olabilir
+      // İlişki yok — contextFrom'u güncelle (ok'suz origin satırlar için)
+      const nonRelHits = findPlaces(line, aliases)
+      if (nonRelHits.length > 0) contextFrom = nonRelHits[0]
+
+      // + var mı? Çoklu varış satırı olabilir
       if (line.includes('+')) {
         const parts = line.split(/[+\/]/).map(p => p.trim()).filter(p => p.length > 2)
         if (parts.length > 1) {
@@ -349,15 +394,19 @@ function parseMessage(message: string, aliases: Alias[]): {
       continue
     }
 
-    const fromHits = findPlaces(rel.left, aliases)
+    // Ok solunda şehir yoksa ("->DİYARBAKIR" gibi) önceki bağlamı kullan
+    const from = rel.left.trim()
+      ? bestPlace(findPlaces(rel.left, aliases))
+      : contextFrom
+
     const toHits = findPlaces(rel.right, aliases)
 
-    const from = bestPlace(fromHits)
-    
     // + veya / ile ayrılmış çoklu varış
     const rightParts = rel.right.split(/[+\/]/).map(p => p.trim()).filter(p => p.length > 2)
 
     if (!from) continue
+    // Başarılı from → contextFrom güncelle
+    contextFrom = from
 
     if (rightParts.length > 1) {
       for (const part of rightParts) {
@@ -405,7 +454,12 @@ function parseMessage(message: string, aliases: Alias[]): {
 
     for (const line of lines) {
       const normLine = trNorm(line)
-      const isYuklemeli = normLine.includes('yuklemeli') || normLine.includes('yuklemesi') || normLine.includes('yuklenecek')
+      // "YÜKLEMELİ" + "YÜKLER"/"YÜKLEME" blok origin tespiti
+      // Ör: "ÇORLU YÜKLEME\nESENYURT TIR", "ANKARA GÖLBAŞINDAN YÜKLER\nİSTANBUL..."
+      const isYuklemeli = normLine.includes('yuklemeli') || normLine.includes('yuklemesi')
+        || normLine.includes('yuklenecek') || normLine.includes('yukleme') || normLine.includes('yukler')
+        || normLine.includes('sarar') // NAZİLLİDEN SARAR gibi
+        || normLine.includes('yukle') // Hadımköy yükle gibi
 
       if (isYuklemeli) {
         blockOrigin = bestPlace(findPlaces(line, aliases))
@@ -415,7 +469,7 @@ function parseMessage(message: string, aliases: Alias[]): {
       }
 
       // Ok veya tire içeren satır yeni bir blok/hat başlangıcı — reset
-      if (blockOrigin && (ARROW_RE.test(line) || DASH_RE.test(line) || /[-–—]/.test(line))) {
+      if (blockOrigin && (ARROW_RE.test(line) || BLOCK_RESET_RE.test(line) || /[-–—]/.test(line))) {
         blockOrigin = null
         continue
       }

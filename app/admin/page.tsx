@@ -32,6 +32,13 @@ const KARTLAR = [
     aciklama: 'İlan moderasyonu, onaylama ve düzenleme.',
     aktif: true,
   },
+  {
+    yol: '/admin/ogrenme-merkezi',
+    ikon: '🧠',
+    baslik: 'Öğrenme Merkezi (SLH)',
+    aciklama: 'no_lane alias keşfi, AI önerileri, ilan yeniden işleme.',
+    aktif: true,
+  },
 ];
 
 export default async function AdminAna() {

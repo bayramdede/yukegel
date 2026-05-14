@@ -1,6 +1,6 @@
 # Yükegel — Proje Haritası
 > **Kullanım:** Her sohbet başında sadece bu dosyayı oku. Kaynak dosyaları sadece o dosyada değişiklik yapacaksan oku.  
-> Son güncelleme: 13 Mayıs 2026 — Hakkimizda: SEO/GEO iyileştirmesi (generateMetadata, JSON-LD Organization schema, semantic HTML: main/section/h2/h3/header) ✅
+> Son güncelleme: 14 Mayıs 2026 — Smart Learning Hub (SLH): `/admin/ogrenme-merkezi` — 3 sekmeli alias keşif + onay + re-parse paneli ✅
 
 **Referans Dökümanlar:**
 - `docs/LOG_VE_GUVENLIK_SPECLERI.md` — Log format standartları, audit trail, SecurityLogger kontrol listesi
@@ -222,6 +222,7 @@ Açık rotalar: /giris, /auth/, /profil-tamamla, /nasil-calisir, /hakkimizda,
 ## 14. GÖREV DURUMU
 
 ### ✅ Tamamlanan
+- **Smart Learning Hub (SLH)** (14 May 2026): `/admin/ogrenme-merkezi` — 3 sekmeli alias yönetim paneli. Sekme 1: Alias Kütüphanesi (CRUD). Sekme 2: AI Keşif — no_lane ilanları Haiku'ya gönderir, bilinmeyen yer adlarını tespit eder (confidence≥70 → pending kaydeder). Sekme 3: Onay Bekleyen — human-in-the-loop onay/red + "İlanları Yeniden İşle" re-parse trigger. Migration: `docs/20260514_slh_aliases_columns.sql` (aliases'a `created_by_ai`, `is_approved`, `approved_by`, `approved_at`, `llm_confidence`, `source_listing_ids` eklendi). API: `app/api/admin/learn-aliases/route.ts` (GET/POST/PATCH/DELETE).
 - **Expired pending otomatik arşiv** (12 May 2026): pg_cron job — her saat başı, 24 saatten eski `pending` ilanları `archived` yapar. Migration: `docs/20260512_auto_archive_expired_pending.sql`.
 - **WhatsApp Bot** (12 May 2026): `app/api/whatsapp/route.ts` — Twilio Sandbox entegrasyonu, kayıt/kota/LLM parse/listing insert akışı. +90 normalize, imza doğrulama, TwiML yanıt. `price_offer`+`vehicle_type[]` şema uyumu.
 - **Log implementasyonu** (12 May 2026): `lib/logger.ts` oluşturuldu. `proxy.ts` SecurityLogger, `parse-listing` pre_check_failed + error, `excel-import` satır-bazlı + tamamlanma, `parse-text` quota WARN, `ilan-ver/actions.ts` ilan yaratma INFO/ERROR, `moderator/toplu-islem` tüm moderasyon aksiyonları — tümü devreye alındı.
