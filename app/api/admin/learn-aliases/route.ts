@@ -45,8 +45,9 @@ export async function GET(req: NextRequest) {
     // 1. WhatsApp no_lane raw_posts
     const { data: rawPosts, error: rawErr } = await svc
       .from('raw_posts')
-      .select('id, raw_text, contact_phone, created_at, processing_status, source_group')
+      .select('id, raw_text, contact_phone, created_at, processing_status, source_group, slh_scanned_at')
       .eq('processing_status', 'no_lane')
+      .order('slh_scanned_at', { ascending: true, nullsFirst: true }) // taranmamislar once
       .order('created_at', { ascending: false })
       .limit(Math.floor(limit * 0.7));
 
@@ -122,11 +123,12 @@ export async function POST(req: NextRequest) {
   if (body.action === 'discover') {
     const limit = Math.min(Number(body.limit ?? 50), 100);
 
-    // 1. no_lane raw_posts çek
+    // 1. Sadece daha önce taranmamış no_lane raw_posts çek
     const { data: rawPosts, error: fetchErr } = await svc
       .from('raw_posts')
       .select('id, raw_text')
       .eq('processing_status', 'no_lane')
+      .is('slh_scanned_at', null)          // daha önce taranmamış
       .order('created_at', { ascending: false })
       .limit(limit);
 
@@ -225,6 +227,11 @@ KURALLAR:
     }
 
     if (!Array.isArray(suggestions) || suggestions.length === 0) {
+      // LLM baktı ama öneri çıkarmadı — yine de işaretle
+      await svc
+        .from('raw_posts')
+        .update({ slh_scanned_at: new Date().toISOString() })
+        .in('id', rawPosts.map((r: any) => r.id));
       return NextResponse.json({ success: true, message: 'LLM yeni alias bulamadi', suggestions: [] });
     }
 
@@ -243,6 +250,11 @@ KURALLAR:
       }));
 
     if (kayitlar.length === 0) {
+      // Oneriler vardı ama hepsi confidence < 70 — yine de isaretle
+      await svc
+        .from('raw_posts')
+        .update({ slh_scanned_at: new Date().toISOString() })
+        .in('id', rawPosts.map((r: any) => r.id));
       return NextResponse.json({
         success: true,
         message: 'Guvenilir oneri bulunamadi (confidence < 70)',
@@ -255,6 +267,13 @@ KURALLAR:
       .upsert(kayitlar, { onConflict: 'alias', ignoreDuplicates: false });
 
     if (insertErr) return NextResponse.json({ error: insertErr.message }, { status: 500 });
+
+    // Taranmis kayitlari isaretle (bir daha LLM'e gonderilmesin)
+    const taranmisIds = rawPosts.map((r: any) => r.id);
+    await svc
+      .from('raw_posts')
+      .update({ slh_scanned_at: new Date().toISOString() })
+      .in('id', taranmisIds);
 
     return NextResponse.json({
       success: true,
