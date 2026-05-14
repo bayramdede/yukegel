@@ -47,9 +47,10 @@ interface PendingAlias {
 
 // ── Tip renkleri ──
 const TIP_RENK: Record<string, string> = {
-  city: '#60a5fa',
-  district: '#a78bfa',
-  vehicle: '#22c55e',
+  city:      '#60a5fa',
+  district:  '#a78bfa',
+  vehicle:   '#22c55e',
+  body:      '#fb923c',
   blacklist: '#f87171',
 };
 function tipRenk(t: string) { return TIP_RENK[t] ?? '#8b949e'; }
@@ -203,6 +204,7 @@ function AliasSekme() {
             <select style={{ ...S.input(), width: 'auto' }} value={yeniType} onChange={e => setYeniType(e.target.value)}>
               <option value="city">city (Il/Ilce)</option>
               <option value="vehicle">vehicle (Arac tipi)</option>
+              <option value="body">body (Kasa tipi)</option>
               <option value="blacklist">blacklist</option>
             </select>
           </div>
@@ -250,9 +252,10 @@ function AliasSekme() {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto auto auto', gap: 8, alignItems: 'center' }}>
                   <input style={S.input()} value={duzVal.alias} onChange={e => setDuzVal(p => ({ ...p, alias: e.target.value }))} />
                   <input style={S.input()} value={duzVal.normalized} onChange={e => setDuzVal(p => ({ ...p, normalized: e.target.value }))} />
-                  <select style={{ ...S.input(), width: 'auto' }} value={duzVal.type} onChange={e => setDuzVal(p => ({ ...p, type: e.target.value }))}>
-                    <option value="city">city</option>
-                    <option value="vehicle">vehicle</option>
+                  <select style={{ ...S.input(), width: 'auto' }} value={duzVal.type} onChange={e => setDuzVal(p => ({ ...p, type: e.target.value }))}>  
+                  <option value="city">city</option>
+                  <option value="vehicle">vehicle</option>
+                  <option value="body">body</option>
                     <option value="blacklist">blacklist</option>
                   </select>
                   <button onClick={duzenlemeKaydet} style={S.btn('#14532d', '#22c55e')}>OK</button>

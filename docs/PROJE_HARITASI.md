@@ -101,6 +101,17 @@ user_id (nullable), source: 'form'|'whatsapp'|'excel'
 
 ### `users` — `role`, `is_active`, `user_type`, `phone_verified`, `company_name`, `ai_listing_quota_daily` (NULL = sistem default)
 ### `raw_posts`, `aliases`, `vehicles`
+
+### `aliases` kolonözeti
+```
+alias      — ham/kısaltma form (küçük harf, normalize edilmiş)
+normalized — standart karşılık (Gaziantep, İstanbul...)
+type       — city | vehicle | body | blacklist | district
+is_active  — parse motorunun görmesi için zorunlu
+priority   — öncelik puanı (90+ = yüksek)
+district   — ilçe adı (city tipi için, normalize ile ilişkilendirir)
+created_by_ai / is_approved / llm_confidence / source_listing_ids  (SLH kolonları)
+```
 ### `system_config` — `parse.auto_publish_score_max`, `parse.reject_score_min`, `llm.ai_listing_quota_default` ve diğerleri
 ### `safety_rules`, `blacklist`
 
@@ -222,7 +233,14 @@ Açık rotalar: /giris, /auth/, /profil-tamamla, /nasil-calisir, /hakkimizda,
 ## 14. GÖREV DURUMU
 
 ### ✅ Tamamlanan
-- **Smart Learning Hub (SLH)** (14 May 2026): `/admin/ogrenme-merkezi` — 3 sekmeli alias yönetim paneli. Sekme 1: Alias Kütüphanesi (CRUD). Sekme 2: AI Keşif — no_lane ilanları Haiku'ya gönderir, bilinmeyen yer adlarını tespit eder (confidence≥70 → pending kaydeder). Sekme 3: Onay Bekleyen — human-in-the-loop onay/red + "İlanları Yeniden İşle" re-parse trigger. Migration: `docs/20260514_slh_aliases_columns.sql` (aliases'a `created_by_ai`, `is_approved`, `approved_by`, `approved_at`, `llm_confidence`, `source_listing_ids` eklendi). API: `app/api/admin/learn-aliases/route.ts` (GET/POST/PATCH/DELETE).
+- **Smart Learning Hub (SLH)** (14 May 2026): `/admin/ogrenme-merkezi` — 3 sekmeli alias yönetim paneli.
+  - Sekme 1 — Alias Kütüphanesi: CRUD (ekle/düzenle/sil), tip filtresi (`city`, `vehicle`, `blacklist`), arama. 
+  - Sekme 2 — AI Keşif Alanı: `raw_posts.processing_status='no_lane'` + `listings.origin_city IS NULL` listeleme; Haiku ile toplu alias keşfi (confidence≥70 → pending + `is_active=false`).
+  - Sekme 3 — Onay Bekleyen: human-in-the-loop onay/red (`is_approved=true`+`is_active=true`) + “Yeniden İşle” re-parse trigger.
+  - **Önemli kolon adları:** `aliases.normalized` (canonical değil), `raw_posts.raw_text` (message_text değil).
+  - Admin ana sayfa: ReprocessWidget kaldırıldı, Öğrenme Merkezi kartı eklendi.
+  - Migration: `docs/20260514_slh_aliases_columns.sql` (`created_by_ai`, `is_approved`, `approved_by`, `approved_at`, `llm_confidence`, `source_listing_ids`).
+  - API: `app/api/admin/learn-aliases/route.ts` (GET/POST/PATCH/DELETE).
 - **Expired pending otomatik arşiv** (12 May 2026): pg_cron job — her saat başı, 24 saatten eski `pending` ilanları `archived` yapar. Migration: `docs/20260512_auto_archive_expired_pending.sql`.
 - **WhatsApp Bot** (12 May 2026): `app/api/whatsapp/route.ts` — Twilio Sandbox entegrasyonu, kayıt/kota/LLM parse/listing insert akışı. +90 normalize, imza doğrulama, TwiML yanıt. `price_offer`+`vehicle_type[]` şema uyumu.
 - **Log implementasyonu** (12 May 2026): `lib/logger.ts` oluşturuldu. `proxy.ts` SecurityLogger, `parse-listing` pre_check_failed + error, `excel-import` satır-bazlı + tamamlanma, `parse-text` quota WARN, `ilan-ver/actions.ts` ilan yaratma INFO/ERROR, `moderator/toplu-islem` tüm moderasyon aksiyonları — tümü devreye alındı.
