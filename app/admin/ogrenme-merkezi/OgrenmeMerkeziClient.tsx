@@ -477,13 +477,8 @@ function KesifSekme() {
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
         <div style={{ color: '#e2e8f0', fontWeight: 700, fontSize: '0.9rem' }}>
-          Rotasi Cozulemeyen Kayitlar
+          Taranmamis no_lane Kayitlar
           <span style={{ color: loading ? '#8b949e' : '#f59e0b', marginLeft: 8 }}>({loading ? '...' : toplamNoLane})</span>
-          {!loading && noLane.raw_posts.filter(r => !r.slh_scanned_at).length > 0 && (
-            <span style={{ color: '#f59e0b', fontSize: '0.75rem', marginLeft: 6 }}>
-              &mdash; {noLane.raw_posts.filter(r => !r.slh_scanned_at).length} taranmadi
-            </span>
-          )}
         </div>
         <button onClick={yukle} style={S.btn('#1e3a5f', '#60a5fa')}>Yenile</button>
       </div>
@@ -508,10 +503,7 @@ function KesifSekme() {
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', marginBottom: 4 }}>
                           <span style={S.badge('#f87171')}>no_lane</span>
-                          {r.slh_scanned_at
-                            ? <span style={S.badge('#484f58')} title={new Date(r.slh_scanned_at).toLocaleString('tr-TR')}>tarandı</span>
-                            : <span style={S.badge('#f59e0b')}>yeni</span>
-                          }
+                          <span style={S.badge('#f59e0b')}>taranmadi</span>
                           {r.source_group && <span style={{ color: '#484f58', fontSize: '0.75rem' }}>{r.source_group}</span>}
                           <span style={{ color: '#484f58', fontSize: '0.72rem' }}>{new Date(r.created_at).toLocaleDateString('tr-TR')}</span>
                         </div>

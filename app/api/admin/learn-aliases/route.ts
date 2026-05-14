@@ -47,7 +47,7 @@ export async function GET(req: NextRequest) {
       .from('raw_posts')
       .select('id, raw_text, contact_phone, created_at, processing_status, source_group, slh_scanned_at')
       .eq('processing_status', 'no_lane')
-      .order('slh_scanned_at', { ascending: true, nullsFirst: true }) // taranmamislar once
+      .is('slh_scanned_at', null)          // sadece hic taranmamislar
       .order('created_at', { ascending: false })
       .limit(Math.floor(limit * 0.7));
 
