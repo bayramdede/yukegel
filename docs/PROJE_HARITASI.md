@@ -1,6 +1,6 @@
 # Yükegel — Proje Haritası
 > **Kullanım:** Her sohbet başında sadece bu dosyayı oku. Kaynak dosyaları sadece o dosyada değişiklik yapacaksan oku.  
-> Son güncelleme: 14 Mayıs 2026 — Smart Learning Hub (SLH): `/admin/ogrenme-merkezi` — 3 sekmeli alias keşif + onay + re-parse paneli ✅
+> Son güncelleme: 14 Mayıs 2026 — SLH kolon düzeltmeleri: `normalized`/`raw_text`, tüm alias tipleri, admin ReprocessWidget kaldırıldı ✅
 
 **Referans Dökümanlar:**
 - `docs/LOG_VE_GUVENLIK_SPECLERI.md` — Log format standartları, audit trail, SecurityLogger kontrol listesi

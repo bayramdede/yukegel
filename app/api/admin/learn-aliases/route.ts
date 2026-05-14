@@ -13,10 +13,10 @@ async function yetkiKontrol() {
 }
 
 // ──────────────────────────────────────────────
-// GET  — 3 sekme verisi
-//   ?sekme=aliases   → Tüm onaylı alias'lar
-//   ?sekme=no_lane   → raw_posts.processing_status='no_lane' (parse edilememiş WA mesajları)
-//                      + listings.origin_city IS NULL (formdaki eksik ilanlar)
+// GET — 3 sekme verisi
+//   ?sekme=aliases   → Tüm onaylı alias'lar (CRUD)
+//   ?sekme=no_lane   → raw_posts.processing_status='no_lane'
+//                    + listings.origin_city IS NULL
 //   ?sekme=pending   → AI önerisi bekleyen alias'lar (is_approved=false)
 // ──────────────────────────────────────────────
 export async function GET(req: NextRequest) {
@@ -26,27 +26,31 @@ export async function GET(req: NextRequest) {
   const sekme = req.nextUrl.searchParams.get('sekme') ?? 'aliases';
   const limit = Math.min(Number(req.nextUrl.searchParams.get('limit') ?? '200'), 500);
 
+  // ── Sekme 1: Alias Kütüphanesi ──
   if (sekme === 'aliases') {
     const { data, error } = await svc
       .from('aliases')
-      .select('id, alias, canonical, type, created_by_ai, is_approved, llm_confidence, created_at')
+      .select('id, alias, normalized, type, is_active, priority, district, created_by_ai, is_approved, llm_confidence, created_at')
       .eq('is_approved', true)
-      .order('canonical', { ascending: true })
+      .eq('is_active', true)
+      .order('type', { ascending: true })
+      .order('normalized', { ascending: true })
       .limit(limit);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json({ data: data ?? [] });
   }
 
+  // ── Sekme 2: no_lane kayıtlar ──
   if (sekme === 'no_lane') {
-    // 1. WhatsApp no_lane raw_posts (parse edilemedi)
+    // 1. WhatsApp no_lane raw_posts
     const { data: rawPosts, error: rawErr } = await svc
       .from('raw_posts')
-      .select('id, message_text, phone_number, created_at, processing_status')
+      .select('id, raw_text, contact_phone, created_at, processing_status, source_group')
       .eq('processing_status', 'no_lane')
       .order('created_at', { ascending: false })
       .limit(Math.floor(limit * 0.7));
 
-    // 2. Form ilanları — origin_city boş olanlar
+    // 2. Form ilanları — origin_city boş
     const { data: noOrigin, error: noOrgErr } = await svc
       .from('listings')
       .select('id, raw_text, source, origin_city, notes, created_at, moderation_status')
@@ -64,10 +68,11 @@ export async function GET(req: NextRequest) {
     });
   }
 
+  // ── Sekme 3: Onay bekleyen AI önerileri ──
   if (sekme === 'pending') {
     const { data, error } = await svc
       .from('aliases')
-      .select('id, alias, canonical, type, llm_confidence, source_listing_ids, created_at')
+      .select('id, alias, normalized, type, llm_confidence, source_listing_ids, created_at')
       .eq('created_by_ai', true)
       .eq('is_approved', false)
       .order('created_at', { ascending: false })
@@ -76,13 +81,13 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ data: data ?? [] });
   }
 
-  return NextResponse.json({ error: 'Geçersiz sekme' }, { status: 400 });
+  return NextResponse.json({ error: 'Gecersiz sekme' }, { status: 400 });
 }
 
 // ──────────────────────────────────────────────
 // POST — İşlemler
-//   { action: 'create', alias, canonical, type }   → Manuel alias ekle
-//   { action: 'discover', limit?: number }         → LLM ile no_lane keşfi
+//   { action: 'create', alias, normalized, type }  → Manuel alias ekle
+//   { action: 'discover', limit? }                 → LLM ile no_lane keşfi
 // ──────────────────────────────────────────────
 export async function POST(req: NextRequest) {
   if (!(await yetkiKontrol())) return NextResponse.json({ error: 'Yetkisiz' }, { status: 401 });
@@ -92,16 +97,17 @@ export async function POST(req: NextRequest) {
 
   // ── Manuel alias oluştur ──
   if (body.action === 'create') {
-    const { alias, canonical, type } = body;
-    if (!alias?.trim() || !canonical?.trim()) {
-      return NextResponse.json({ error: 'alias ve canonical zorunlu' }, { status: 400 });
+    const { alias, normalized, type } = body;
+    if (!alias?.trim() || !normalized?.trim()) {
+      return NextResponse.json({ error: 'alias ve normalized zorunlu' }, { status: 400 });
     }
     const { data, error } = await svc
       .from('aliases')
       .insert({
         alias: alias.trim(),
-        canonical: canonical.trim(),
+        normalized: normalized.trim(),
         type: type ?? 'city',
+        is_active: true,
         created_by_ai: false,
         is_approved: true,
       })
@@ -115,69 +121,72 @@ export async function POST(req: NextRequest) {
   if (body.action === 'discover') {
     const limit = Math.min(Number(body.limit ?? 50), 100);
 
-    // 1. no_lane raw_posts çek (bunlar en zengin kaynak — ham WA metni)
+    // 1. no_lane raw_posts çek
     const { data: rawPosts, error: fetchErr } = await svc
       .from('raw_posts')
-      .select('id, message_text')
+      .select('id, raw_text')
       .eq('processing_status', 'no_lane')
       .order('created_at', { ascending: false })
       .limit(limit);
 
     if (fetchErr) return NextResponse.json({ error: fetchErr.message }, { status: 500 });
     if (!rawPosts || rawPosts.length === 0) {
-      return NextResponse.json({ success: true, message: 'Keşfedilecek no_lane kayıt yok', suggestions: [] });
+      return NextResponse.json({ success: true, message: 'Kesfedilecek no_lane kayit yok', suggestions: [] });
     }
 
-    // 2. Mevcut (onaylı) alias listesini çek
+    // 2. Mevcut onaylı alias'ları çek (LLM'e ver, tekrar önermesin)
     const { data: mevcutAliaslar } = await svc
       .from('aliases')
-      .select('alias, canonical')
+      .select('alias, normalized, type')
       .eq('is_approved', true)
+      .eq('is_active', true)
+      .in('type', ['city', 'district'])
       .limit(500);
 
     const mevcutMap = (mevcutAliaslar ?? [])
-      .map((a: any) => `"${a.alias}"→"${a.canonical}"`)
+      .map((a: any) => `"${a.alias}"=>"${a.normalized}"`)
       .join(', ');
 
-    // 3. Ham metinleri birleştir
+    // 3. Metinleri birleştir
     const metinler = rawPosts
-      .map((r: any, i: number) => `[${i + 1}] (ID:${r.id})\n${(r.message_text || '').substring(0, 400)}`)
+      .map((r: any, i: number) => `[${i + 1}] (ID:${r.id})\n${(r.raw_text || '').substring(0, 400)}`)
       .join('\n\n---\n\n');
 
-    // 4. LLM çağrısı (Haiku)
+    // 4. Haiku çağrısı
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) return NextResponse.json({ error: 'ANTHROPIC_API_KEY eksik' }, { status: 500 });
 
-    const prompt = `Türk nakliye ilan metinlerinden YER ADI ALIAS'LARINI keşfet.
+    const prompt = `Turk nakliye ilan metinlerinden YER ADI ALIAS'LARINI kesvet.
 
-MEVCUT ALIAS'LAR (bunları tekrar önerme): ${mevcutMap || '(boş)'}
+MEVCUT ALIAS'LAR (bunlari tekrar onerme): ${mevcutMap || '(bos)'}
 
-AŞAĞIDA ${rawPosts.length} ADET ROTALARI ÇÖZÜLEMEMİŞ İLAN VAR:
+ASAGIDA ${rawPosts.length} ADET ROTALARI COZULEMAMIS ILAN VAR:
 ${metinler}
 
-GÖREV:
-Bu metinlerde geçen yer isimlerinden standart Türkiye il/ilçe listesinde OLMAYANLARI tespit et.
-Bunların standart karşılıklarını bul.
-Örnekler: "G.Antep"→"Gaziantep", "İkitelli"→"İstanbul", "Eskişeh"→"Eskişehir",
-           "Antep"→"Gaziantep", "Çorlu san."→"Çorlu", "D.Bakır"→"Diyarbakır"
+GOREV:
+Bu metinlerde gecen yer isimlerinden standart Turkiye il/ilce listesinde OLMAYANLARI tespit et.
+Bunlarin standart karsiligini bul.
+Ornekler: "G.Antep"=>"Gaziantep", "ikitelli"=>"Istanbul", "eskiseh"=>"Eskisehir",
+           "antep"=>"Gaziantep", "corlu san."=>"Corlu", "d.bakir"=>"Diyarbakir",
+           "izmit"=>"Kocaeli", "gebze"=>"Kocaeli", "tuzla"=>"Istanbul"
 
-SADECE GEÇERLİ JSON ARRAY DÖNDÜR, başka hiçbir şey yazma:
+SADECE GECERLI JSON ARRAY DONDUR, baska hicbir sey yazma:
 [
   {
     "alias": "bulunan_kelime_veya_kisaltma",
-    "canonical": "standart_il_veya_ilce_adi",
-    "type": "city|district",
-    "confidence": 0-100,
-    "source_ids": ["id1", "id2"]
+    "normalized": "standart_il_veya_ilce_adi_turkce",
+    "type": "city",
+    "confidence": 85,
+    "source_ids": ["id1"]
   }
 ]
 
 KURALLAR:
-- type: il → "city", ilçe → "district"
-- confidence: emin olma yüzdesi (0-100). Sadece ≥70 öneri gönder.
-- canonical: Türkçe doğru yazım (örn: "Gaziantep", "Şanlıurfa", "Kahramanmaraş")
-- Mevcut alias listesindeki girişleri tekrar önerme
-- Hiç bulamazsan: [] döndür`;
+- type: her zaman "city" kullan (il veya ilce olsun)
+- confidence: 0-100. Sadece >=70 gonder.
+- normalized: Turkce dogru yazim (ornek: "Gaziantep", "Sanlıurfa", "Kahramanmaras")
+- Mevcut listede olan alias'lari tekrar onerme
+- Hic bulamazsan: [] dondur`;
 
     let llmResponse: any;
     try {
@@ -200,7 +209,7 @@ KURALLAR:
       }
       llmResponse = await res.json();
     } catch (e: any) {
-      return NextResponse.json({ error: `LLM erişim hatası: ${e.message}` }, { status: 502 });
+      return NextResponse.json({ error: `LLM erisim hatasi: ${e.message}` }, { status: 502 });
     }
 
     const rawText = llmResponse.content?.[0]?.text ?? '';
@@ -211,20 +220,21 @@ KURALLAR:
       const m = clean.match(/\[[\s\S]*\]/);
       suggestions = m ? JSON.parse(m[0]) : [];
     } catch {
-      return NextResponse.json({ error: 'LLM yanıtı parse edilemedi', raw: clean.slice(0, 500) }, { status: 502 });
+      return NextResponse.json({ error: 'LLM yaniti parse edilemedi', raw: clean.slice(0, 500) }, { status: 502 });
     }
 
     if (!Array.isArray(suggestions) || suggestions.length === 0) {
-      return NextResponse.json({ success: true, message: 'LLM yeni alias bulamadı', suggestions: [] });
+      return NextResponse.json({ success: true, message: 'LLM yeni alias bulamadi', suggestions: [] });
     }
 
-    // 5. Confidence ≥70 olanları pending olarak DB'ye yaz
+    // 5. Confidence ≥70 olanları pending olarak yaz
     const kayitlar = suggestions
-      .filter((s: any) => s.alias && s.canonical && (s.confidence ?? 0) >= 70)
+      .filter((s: any) => s.alias && s.normalized && (s.confidence ?? 0) >= 70)
       .map((s: any) => ({
-        alias: String(s.alias).trim(),
-        canonical: String(s.canonical).trim(),
-        type: s.type ?? 'city',
+        alias: String(s.alias).trim().toLowerCase(),
+        normalized: String(s.normalized).trim(),
+        type: 'city',
+        is_active: false,          // admin onaylayana kadar pasif
         created_by_ai: true,
         is_approved: false,
         llm_confidence: Math.min(100, Math.max(0, Number(s.confidence ?? 80))),
@@ -234,7 +244,7 @@ KURALLAR:
     if (kayitlar.length === 0) {
       return NextResponse.json({
         success: true,
-        message: 'Güvenilir öneri bulunamadı (confidence < 70)',
+        message: 'Guvenilir oneri bulunamadi (confidence < 70)',
         suggestions,
       });
     }
@@ -247,17 +257,17 @@ KURALLAR:
 
     return NextResponse.json({
       success: true,
-      message: `${kayitlar.length} yeni alias önerisi kaydedildi (onay bekliyor)`,
+      message: `${kayitlar.length} yeni alias onerisi kaydedildi (onay bekliyor)`,
       suggestions: kayitlar,
       scanned_count: rawPosts.length,
     });
   }
 
-  return NextResponse.json({ error: 'Geçersiz action' }, { status: 400 });
+  return NextResponse.json({ error: 'Gecersiz action' }, { status: 400 });
 }
 
 // ──────────────────────────────────────────────
-// PATCH — Alias onayla / güncelle
+// PATCH — Onayla / güncelle
 // ──────────────────────────────────────────────
 export async function PATCH(req: NextRequest) {
   if (!(await yetkiKontrol())) return NextResponse.json({ error: 'Yetkisiz' }, { status: 401 });
@@ -269,7 +279,7 @@ export async function PATCH(req: NextRequest) {
   if (action === 'approve') {
     const { error } = await svc
       .from('aliases')
-      .update({ is_approved: true, approved_at: new Date().toISOString() })
+      .update({ is_approved: true, is_active: true, approved_at: new Date().toISOString() })
       .eq('id', id);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json({ success: true });
@@ -283,12 +293,12 @@ export async function PATCH(req: NextRequest) {
 
   // Alan güncelle
   const izinli: Record<string, any> = {};
-  if (updates.alias !== undefined) izinli.alias = String(updates.alias).trim();
-  if (updates.canonical !== undefined) izinli.canonical = String(updates.canonical).trim();
+  if (updates.alias !== undefined) izinli.alias = String(updates.alias).trim().toLowerCase();
+  if (updates.normalized !== undefined) izinli.normalized = String(updates.normalized).trim();
   if (updates.type !== undefined) izinli.type = updates.type;
 
   if (Object.keys(izinli).length === 0) {
-    return NextResponse.json({ error: 'Güncellenecek alan yok' }, { status: 400 });
+    return NextResponse.json({ error: 'Guncellenecek alan yok' }, { status: 400 });
   }
 
   const { error } = await svc.from('aliases').update(izinli).eq('id', id);
