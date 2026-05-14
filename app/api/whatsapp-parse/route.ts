@@ -280,6 +280,7 @@ export async function POST(request: NextRequest) {
     let skipped = 0, spamEngel = 0;
     const toInsert: any[] = [];
     const phoneUpdates: Array<{ rawPostId: string; phone: string }> = [];
+    const batchKeys = new Set<string>(); // intra-batch dedup: aynı (hash,phone,date) batch içinde çakışmasın
 
     for (const c of candidates) {
       const exactKey = `${c.hash}__${c.msgDate}`;
@@ -297,6 +298,10 @@ export async function POST(request: NextRequest) {
         spamEngel++;
         continue;
       }
+
+      const batchKey = `${c.hash}__${c.phone ?? ''}__${c.msgDate}`;
+      if (batchKeys.has(batchKey)) { skipped++; continue; }
+      batchKeys.add(batchKey);
 
       let isRepost = false;
       let sourceRawPostId: string | null = null;
