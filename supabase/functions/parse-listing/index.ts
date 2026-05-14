@@ -163,7 +163,10 @@ function extractPhones(text: string): string[] {
 // -------------------------
 function detectAdType(text: string): 'yuk' | 'arac' {
   const norm = trNorm(text)
-  const aracKelimeler = ['bos arac', 'bos tir', 'bos kamyon', 'yuklenecek', 'yuk ariyor', 'yukum var', 'bosaltir', 'boşaltır', 'boş araç', 'boş tır']
+  // 'bosaltir'/'boşaltır' kasıtlı çıkarıldı — "YÜKLER BOŞALTIR" gibi ifadeler yük ilanında araç
+  // varış noktasını belirtir, araç ilanı sinyali değil.
+  // 'yukum var' da çıkarıldı — "yükümüz var" = yük ilanı sinyali.
+  const aracKelimeler = ['bos arac', 'bos tir', 'bos kamyon', 'yuklenecek', 'yuk ariyor', 'boş araç', 'boş tır']
   for (const k of aracKelimeler) {
     if (norm.includes(trNorm(k))) return 'arac'
   }

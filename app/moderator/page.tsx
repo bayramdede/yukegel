@@ -157,6 +157,7 @@ export default function Moderator() {
   const [kullaniciAramaYukleniyor, setKullaniciAramaYukleniyor] = useState(false);
 
   // Kaynak ve kullanıcı filtreleri
+  const [filtreIlanTipi, setFiltreIlanTipi] = useState<'hepsi' | 'yuk' | 'arac'>('hepsi');
   const [filtreKaynak, setFiltreKaynak] = useState('');
   const [filtreKullaniciId, setFiltreKullaniciId] = useState('');
   const [filtreKullaniciAd, setFiltreKullaniciAd] = useState('');
@@ -276,6 +277,7 @@ export default function Moderator() {
     if (filtreKalkis && ilan.origin_city !== filtreKalkis) return false;
     if (filtreVaris && !stops.some((s: any) => s.city === filtreVaris)) return false;
     if (filtreAracTipi && !(ilan.vehicle_type || []).includes(filtreAracTipi)) return false;
+    if (filtreIlanTipi !== 'hepsi' && ilan.listing_type !== filtreIlanTipi) return false;
     if (filtreSkor !== 'hepsi') {
       const r = skorRenk(ilan);
       if (filtreSkor === 'yesil' && r.badge !== '🟢') return false;
@@ -550,10 +552,11 @@ export default function Moderator() {
   function filtreTemizle() {
     setAramaMetni(''); setFiltreTelefon(''); setFiltreKalkis(''); setFiltreVaris('');
     setFiltreAracTipi(''); setFiltreSkor('hepsi');
+    setFiltreIlanTipi('hepsi');
     setFiltreKaynak(''); setFiltreKullaniciId(''); setFiltreKullaniciAd('');
     setFiltreTarihBaslangic(''); setFiltreTarihBitis('');
   }
-  const aktifFiltre = aramaMetni || filtreTelefon || filtreKalkis || filtreVaris || filtreAracTipi || filtreSkor !== 'hepsi' || filtreKaynak || filtreKullaniciId || filtreTarihBaslangic || filtreTarihBitis;
+  const aktifFiltre = aramaMetni || filtreTelefon || filtreKalkis || filtreVaris || filtreAracTipi || filtreSkor !== 'hepsi' || filtreKaynak || filtreKullaniciId || filtreTarihBaslangic || filtreTarihBitis || filtreIlanTipi !== 'hepsi';
 
   if (yetkiKontrol) return (
     <div style={{ minHeight: '100vh', background: '#0d1117', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#8b949e' }}>⏳</div>
@@ -837,7 +840,12 @@ export default function Moderator() {
               <option value=''>🏁 Varış</option>{ILLER.map(il => <option key={il}>{il}</option>)}
             </select>
             <select value={filtreAracTipi} onChange={e => setFiltreAracTipi(e.target.value)} style={{ ...inp, width: 110, borderRadius: 6 }}>
-              <option value=''>🚛 Araç</option>{ARAC_TIPLERI.map(t => <option key={t}>{t}</option>)}
+              <option value=''>🚛 Araç Tipi</option>{ARAC_TIPLERI.map(t => <option key={t}>{t}</option>)}
+            </select>
+            <select value={filtreIlanTipi} onChange={e => setFiltreIlanTipi(e.target.value as any)} style={{ ...inp, width: 110, borderRadius: 6 }}>
+              <option value='hepsi'>📦 Tüm Tipler</option>
+              <option value='yuk'>📦 Yük</option>
+              <option value='arac'>🚛 Araç</option>
             </select>
             {/* Kaynak filtresi */}
             <select value={filtreKaynak} onChange={e => setFiltreKaynak(e.target.value)} style={{ ...inp, width: 120, borderRadius: 6 }}>
