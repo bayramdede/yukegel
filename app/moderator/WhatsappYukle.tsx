@@ -7,7 +7,7 @@ export default function WhatsappYukle() {
   const [grupAdi, setGrupAdi] = useState('');
   const [yukleniyor, setYukleniyor] = useState(false);
   const [sonuc, setSonuc] = useState<any>(null);
-  const [saatFiltre, setSaatFiltre] = useState(12);
+  const [saatFiltre, setSaatFiltre] = useState(48);
 
 
   async function yukle() {
