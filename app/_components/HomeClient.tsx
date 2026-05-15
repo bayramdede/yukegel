@@ -244,6 +244,7 @@ export default function HomeClient() {
           `)
           .in('moderation_status', ['approved', 'auto_published'])
           .eq('is_shadow_banned', false)
+          .eq('status', 'active')
           .order('created_at', { ascending: false })
           .limit(30);
 
@@ -253,7 +254,8 @@ export default function HomeClient() {
         const { data, error: sorguHata } = await Promise.race([sorgu, timeout]);
 
         if (cancelled) return;
-        if (sorguHata || !data || data.length === 0) { setIlanlar([]); setYukleniyor(false); return; }
+        if (sorguHata) { console.error('Listings sorgu hatası:', sorguHata); setIlanlar([]); setYukleniyor(false); return; }
+        if (!data || data.length === 0) { console.warn('Listings boş döndü (data:', data, ')'); setIlanlar([]); setYukleniyor(false); return; }
 
         const baseList = (data as any[]).map((ilan: any) => {
           const stops = (ilan.listing_stops || []).sort((a: any, b: any) => a.stop_order - b.stop_order);
