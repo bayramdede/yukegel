@@ -230,17 +230,14 @@ export default function HomeClient() {
 
     (async () => {
       try {
-        const sorgu = supabase
+        // Ana sorgu — listing_stops join olmadan, daha hızlı
+        const { data, error: sorguHata } = await supabase
           .from('listings')
           .select(`
             id, listing_type, origin_city, origin_district,
             contact_phone, price_offer, source, created_at,
             trust_level, user_id, vehicle_type, body_type,
-            available_date, date_flexible,
-            listing_stops (
-              stop_order, city, district,
-              vehicle_count, cargo_type, weight_ton, pallet_count
-            )
+            available_date, date_flexible
           `)
           .in('moderation_status', ['approved', 'auto_published'])
           .eq('is_shadow_banned', false)
@@ -248,17 +245,27 @@ export default function HomeClient() {
           .order('created_at', { ascending: false })
           .limit(30);
 
-        const timeout = new Promise<{ data: null; error: Error }>(resolve =>
-          setTimeout(() => resolve({ data: null, error: new Error('timeout') }), 10000)
-        );
-        const { data, error: sorguHata } = await Promise.race([sorgu, timeout]);
-
         if (cancelled) return;
         if (sorguHata) { console.error('Listings sorgu hatası:', sorguHata); setIlanlar([]); setYukleniyor(false); return; }
-        if (!data || data.length === 0) { console.warn('Listings boş döndü (data:', data, ')'); setIlanlar([]); setYukleniyor(false); return; }
+        if (!data || data.length === 0) { console.warn('Listings boş döndü:', data); setIlanlar([]); setYukleniyor(false); return; }
+
+        // Stops ayrı sorguda çek
+        const ilanIds = (data as any[]).map((i: any) => i.id);
+        const { data: stopsData } = await supabase
+          .from('listing_stops')
+          .select('listing_id, stop_order, city, district, vehicle_count, cargo_type, weight_ton, pallet_count')
+          .in('listing_id', ilanIds)
+          .order('stop_order', { ascending: true });
+
+        if (cancelled) return;
+        const stopsMap: Record<string, any[]> = {};
+        for (const s of (stopsData || []) as any[]) {
+          if (!stopsMap[s.listing_id]) stopsMap[s.listing_id] = [];
+          stopsMap[s.listing_id].push(s);
+        }
 
         const baseList = (data as any[]).map((ilan: any) => {
-          const stops = (ilan.listing_stops || []).sort((a: any, b: any) => a.stop_order - b.stop_order);
+          const stops = (stopsMap[ilan.id] || []);
           const aracTipiList: string[] = ilan.vehicle_type?.length
             ? ilan.vehicle_type
             : [...new Set(stops.map((s: any) => s.cargo_type).filter(Boolean))] as string[];
