@@ -1,17 +1,9 @@
 import type { NextConfig } from "next";
 
-const nextConfig = {
-  headers: async () => [
-    {
-      source: '/',
-      headers: [
-        { key: 'Cache-Control', value: 'no-store' },
-      ],
-    },
-  ],
+const nextConfig: NextConfig = {
+  // Cache-Control: no-store kaldırıldı — ISR (revalidate=30) Vercel edge cache'ini kullanır.
+  // Browser'lar her zaman fresh sayfa görür (Next.js ISR bunu otomatik yönetir).
 };
 
 export default nextConfig;
-
-/** @type {import('next').NextConfig} */
 
