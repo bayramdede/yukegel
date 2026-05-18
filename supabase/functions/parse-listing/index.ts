@@ -465,9 +465,34 @@ function parseMessage(message: string, aliases: Alias[]): {
         || normLine.includes('yukle') // Hadımköy yükle gibi
 
       if (isYuklemeli) {
-        blockOrigin = bestPlace(findPlaces(line, aliases))
+        const yuklemePlaces = findPlaces(line, aliases)
+        blockOrigin = bestPlace(yuklemePlaces)
         blockVehicle = findVehicle(line, aliases)
         blockBody = findBodyType(line, aliases)
+        // Aynı satırda hem kaynak hem hedef varsa (ör: "İKİTELLİ YÜKLEME HADIMKÖY")
+        if (blockOrigin && yuklemePlaces.length >= 2) {
+          const dest = yuklemePlaces.find(p =>
+            p.normalized !== blockOrigin!.normalized || (p.district ?? '') !== (blockOrigin!.district ?? '')
+          )
+          if (dest) {
+            const key = `${blockOrigin.normalized}|${blockOrigin.district ?? ''}|${dest.normalized}|${dest.district ?? ''}`
+            if (!blockSeen.has(key)) {
+              lanes.push({
+                from: blockOrigin.normalized,
+                fromDistrict: blockOrigin.district || null,
+                to: dest.normalized,
+                toDistrict: dest.district || null,
+                vehicle: blockVehicle,
+                body_type: blockBody,
+                weight_ton: extractWeight(line),
+                pallet: extractPallet(line),
+                raw_line: line
+              })
+              blockSeen.add(key)
+            }
+            blockOrigin = null // tek satırlık, devam satırı bekleme
+          }
+        }
         continue
       }
 
