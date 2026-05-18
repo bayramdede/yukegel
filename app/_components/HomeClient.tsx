@@ -190,12 +190,14 @@ function IlanKart({ ilan, kullanici }: { ilan: any; kullanici: any }) {
   );
 }
 
-export default function HomeClient() {
-  const [ilanlar, setIlanlar] = useState<any[]>([]);
-  const [yukleniyor, setYukleniyor] = useState(true);
+export default function HomeClient({ initialIlanlar = [] }: { initialIlanlar?: any[] }) {
+  // İlanlar: server-side veriden başla — client-side spinner yok
+  const [ilanlar, setIlanlar] = useState<any[]>(initialIlanlar);
+  const [yukleniyor, setYukleniyor] = useState(initialIlanlar.length === 0);
   const [tip, setTip] = useState<'tumu' | 'yuk' | 'arac'>('tumu');
   const [kalkis, setKalkis] = useState('');
   const [varis, setVaris] = useState('');
+  // Auth: başlangıçta misafir göster, resolve olunca güncelle
   const [kullanici, setKullanici] = useState<{ display_name: string | null; email: string | null; user_type: string | null } | null>(null);
   const [authHazir, setAuthHazir] = useState(false);
 
@@ -211,6 +213,7 @@ export default function HomeClient() {
   useEffect(() => {
     let cancelled = false;
 
+    // Auth kontrolü (her zaman çalışır)
     (async () => {
       try {
         const { data: { session }, error } = await supabase.auth.getSession();
@@ -228,81 +231,83 @@ export default function HomeClient() {
       }
     })();
 
-    (async () => {
-      try {
-        // Ana sorgu — listing_stops join olmadan, daha hızlı
-        const { data, error: sorguHata } = await supabase
-          .from('listings')
-          .select(`
-            id, listing_type, origin_city, origin_district,
-            contact_phone, price_offer, source, created_at,
-            trust_level, user_id, vehicle_type, body_type,
-            available_date, date_flexible
-          `)
-          .in('moderation_status', ['approved', 'auto_published'])
-          .eq('is_shadow_banned', false)
-          .eq('status', 'active')
-          .order('created_at', { ascending: false })
-          .limit(30);
+    // Listings: sadece server-side veri yoksa client-side fetch yap (fallback)
+    if (initialIlanlar.length === 0) {
+      (async () => {
+        try {
+          const { data, error: sorguHata } = await supabase
+            .from('listings')
+            .select(`
+              id, listing_type, origin_city, origin_district,
+              contact_phone, price_offer, source, created_at,
+              trust_level, user_id, vehicle_type, body_type,
+              available_date, date_flexible
+            `)
+            .in('moderation_status', ['approved', 'auto_published'])
+            .eq('is_shadow_banned', false)
+            .eq('status', 'active')
+            .order('created_at', { ascending: false })
+            .limit(30);
 
-        if (cancelled) return;
-        if (sorguHata) { console.error('Listings sorgu hatası:', sorguHata); setIlanlar([]); setYukleniyor(false); return; }
-        if (!data || data.length === 0) { console.warn('Listings boş döndü:', data); setIlanlar([]); setYukleniyor(false); return; }
-
-        // Stops ayrı sorguda çek
-        const ilanIds = (data as any[]).map((i: any) => i.id);
-        const { data: stopsData } = await supabase
-          .from('listing_stops')
-          .select('listing_id, stop_order, city, district, vehicle_count, cargo_type, weight_ton, pallet_count')
-          .in('listing_id', ilanIds)
-          .order('stop_order', { ascending: true });
-
-        if (cancelled) return;
-        const stopsMap: Record<string, any[]> = {};
-        for (const s of (stopsData || []) as any[]) {
-          if (!stopsMap[s.listing_id]) stopsMap[s.listing_id] = [];
-          stopsMap[s.listing_id].push(s);
-        }
-
-        const baseList = (data as any[]).map((ilan: any) => {
-          const stops = (stopsMap[ilan.id] || []);
-          const aracTipiList: string[] = ilan.vehicle_type?.length
-            ? ilan.vehicle_type
-            : [...new Set(stops.map((s: any) => s.cargo_type).filter(Boolean))] as string[];
-          return {
-            id: ilan.id, tip: ilan.listing_type,
-            kalkis: ilan.origin_city, kalkis_ilce: ilan.origin_district || '',
-            duraklar: stops.map((s: any) => ({ sehir: s.city, ilce: s.district || '', ton: s.weight_ton, palet: s.pallet_count, arac_adet: s.vehicle_count })),
-            kaynak: ilan.source || 'form',
-            sure: new Date(ilan.created_at).toLocaleDateString('tr-TR'),
-            tel: ilan.contact_phone, fiyat: ilan.price_offer?.toString() ?? null,
-            tarih: ilan.available_date, tarihEsnek: ilan.date_flexible,
-            aracTipleri: aracTipiList, ustyapilari: (ilan.body_type || []) as string[],
-            dogrulanmamis: !ilan.user_id || ilan.trust_level === 'social',
-            telefonDogrulandi: false,
-            yeniUye: false,
-            user_id: ilan.user_id,
-          };
-        });
-        setIlanlar(baseList);
-        setYukleniyor(false);
-
-        const userIds = [...new Set(baseList.map(i => i.user_id).filter(Boolean))];
-        if (userIds.length > 0) {
-          const { data: ks } = await supabase.from('users').select('id, phone_verified, created_at').in('id', userIds);
           if (cancelled) return;
-          const kullaniciMap: Record<string, { phone_verified: boolean; created_at: string }> = {};
-          for (const k of (ks || []) as any[]) kullaniciMap[k.id] = k;
-          setIlanlar(prev => prev.map(ilan => {
-            const kb = ilan.user_id ? kullaniciMap[ilan.user_id] : null;
-            return { ...ilan, telefonDogrulandi: kb?.phone_verified === true, yeniUye: kb ? yeniUye(kb.created_at) : false };
-          }));
+          if (sorguHata) { setIlanlar([]); setYukleniyor(false); return; }
+          if (!data || data.length === 0) { setIlanlar([]); setYukleniyor(false); return; }
+
+          const ilanIds = (data as any[]).map((i: any) => i.id);
+          const { data: stopsData } = await supabase
+            .from('listing_stops')
+            .select('listing_id, stop_order, city, district, vehicle_count, cargo_type, weight_ton, pallet_count')
+            .in('listing_id', ilanIds)
+            .order('stop_order', { ascending: true });
+
+          if (cancelled) return;
+          const stopsMap: Record<string, any[]> = {};
+          for (const s of (stopsData || []) as any[]) {
+            if (!stopsMap[s.listing_id]) stopsMap[s.listing_id] = [];
+            stopsMap[s.listing_id].push(s);
+          }
+
+          const baseList = (data as any[]).map((ilan: any) => {
+            const stops = stopsMap[ilan.id] || [];
+            const aracTipiList: string[] = ilan.vehicle_type?.length
+              ? ilan.vehicle_type
+              : [...new Set(stops.map((s: any) => s.cargo_type).filter(Boolean))] as string[];
+            return {
+              id: ilan.id, tip: ilan.listing_type,
+              kalkis: ilan.origin_city, kalkis_ilce: ilan.origin_district || '',
+              duraklar: stops.map((s: any) => ({ sehir: s.city, ilce: s.district || '', ton: s.weight_ton, palet: s.pallet_count, arac_adet: s.vehicle_count })),
+              kaynak: ilan.source || 'form',
+              sure: new Date(ilan.created_at).toLocaleDateString('tr-TR'),
+              tel: ilan.contact_phone, fiyat: ilan.price_offer?.toString() ?? null,
+              tarih: ilan.available_date, tarihEsnek: ilan.date_flexible,
+              aracTipleri: aracTipiList, ustyapilari: (ilan.body_type || []) as string[],
+              dogrulanmamis: !ilan.user_id || ilan.trust_level === 'social',
+              telefonDogrulandi: false,
+              yeniUye: false,
+              user_id: ilan.user_id,
+            };
+          });
+          setIlanlar(baseList);
+          setYukleniyor(false);
+
+          // Badge zenginleştirme
+          const userIds = [...new Set(baseList.map(i => i.user_id).filter(Boolean))];
+          if (userIds.length > 0) {
+            const { data: ks } = await supabase.from('users').select('id, phone_verified, created_at').in('id', userIds);
+            if (cancelled) return;
+            const kullaniciMap: Record<string, { phone_verified: boolean; created_at: string }> = {};
+            for (const k of (ks || []) as any[]) kullaniciMap[k.id] = k;
+            setIlanlar(prev => prev.map(ilan => {
+              const kb = ilan.user_id ? kullaniciMap[ilan.user_id] : null;
+              return { ...ilan, telefonDogrulandi: kb?.phone_verified === true, yeniUye: kb ? yeniUye(kb.created_at) : false };
+            }));
+          }
+        } catch (err) {
+          console.error('Listings fetch hatası:', err);
+          if (!cancelled) { setIlanlar([]); setYukleniyor(false); }
         }
-      } catch (err) {
-        console.error('Ana sayfa veri hatası:', err);
-        if (!cancelled) { setIlanlar([]); setYukleniyor(false); }
-      }
-    })();
+      })();
+    }
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event: AuthChangeEvent, session: Session | null) => {
       if (cancelled) return;
@@ -315,7 +320,7 @@ export default function HomeClient() {
       }
     });
     return () => { cancelled = true; subscription.unsubscribe(); };
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const filtered = ilanlar.filter((i: any) => {
     if (tip !== 'tumu' && i.tip !== tip) return false;
@@ -331,7 +336,7 @@ export default function HomeClient() {
   return (
     <div style={{ minHeight: '100vh', background: '#0d1117', fontFamily: "'IBM Plex Sans', system-ui, sans-serif" }}>
 
-      {/* NAVBAR */}
+      {/* NAVBAR — misafir linkler hemen göster, auth resolve olunca güncelle */}
       <nav style={{ background: '#161b22', borderBottom: '1px solid #30363d', position: 'sticky', top: 0, zIndex: 50 }}>
         <div style={{ maxWidth: 1280, margin: '0 auto', padding: '0 16px', height: 56, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
@@ -347,22 +352,23 @@ export default function HomeClient() {
               <a href="/hakkimizda" style={{ color: '#8b949e', fontSize: '0.82rem', textDecoration: 'none', padding: '4px 8px', borderRadius: 5 }}>Hakkımızda</a>
             </div>
           </div>
+          {/* Auth resolve olana kadar misafir linkler, resolve olunca kişisel */}
           {kullanici ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <a href="/panel" style={{ color: '#e2e8f0', fontSize: '0.85rem', textDecoration: 'none', fontWeight: 600 }}>👤 {ad}</a>
               <a href="/ilan-ver" style={{ background: '#22c55e', color: '#000', fontWeight: 700, fontSize: '0.85rem', padding: '6px 16px', borderRadius: 6, textDecoration: 'none' }}>+ İlan Ver</a>
             </div>
-          ) : authHazir ? (
+          ) : (
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <a href="/giris" style={{ color: '#8b949e', fontSize: '0.85rem', textDecoration: 'none' }}>Giriş Yap</a>
               <a href="/giris" style={{ background: '#22c55e', color: '#000', fontWeight: 700, fontSize: '0.85rem', padding: '6px 16px', borderRadius: 6, textDecoration: 'none' }}>Üye Ol</a>
             </div>
-          ) : null}
+          )}
         </div>
       </nav>
 
-      {/* HERO */}
-      {authHazir && !kullanici && <HeroKayitsiz />}
+      {/* HERO — misafir hero hemen görünür, auth resolve olunca kişiselleşir */}
+      {!kullanici && <HeroKayitsiz />}
       {authHazir && isMusteri && <HeroMusteri ad={ad} />}
       {authHazir && isNakliyeci && <HeroNakliyeci ad={ad} />}
 
