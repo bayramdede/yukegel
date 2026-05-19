@@ -39,6 +39,7 @@ interface PendingAlias {
   id: number;
   alias: string;
   normalized: string;
+  district?: string | null;
   type: string;
   llm_confidence: number;
   source_listing_ids: string[];
@@ -686,6 +687,14 @@ function OnaySekme() {
                     <code style={{ color: '#e2e8f0', fontWeight: 600 }}>{p.alias}</code>
                     <span style={{ color: '#484f58' }}>-&gt;</span>
                     <span style={{ color: '#22c55e', fontWeight: 600 }}>{p.normalized}</span>
+                    {p.district && (
+                      <span style={{ color: '#a78bfa', fontSize: '0.82rem' }}>/ {p.district}</span>
+                    )}
+                    {p.type === 'city' && (
+                      <span style={S.badge(p.district ? '#a78bfa' : '#60a5fa')}>
+                        {p.district ? 'ILCE' : 'IL'}
+                      </span>
+                    )}
                     <span style={S.badge(tipRenk(p.type))}>{p.type}</span>
                     <span style={S.badge(p.llm_confidence >= 90 ? '#22c55e' : p.llm_confidence >= 70 ? '#f59e0b' : '#f87171')}>
                       %{p.llm_confidence}
