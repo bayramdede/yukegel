@@ -246,8 +246,7 @@ export default function HomeClient({ initialIlanlar = [] }: { initialIlanlar?: a
             .in('moderation_status', ['approved', 'auto_published'])
             .eq('is_shadow_banned', false)
             .eq('status', 'active')
-            .order('created_at', { ascending: false })
-            .limit(30);
+            .order('created_at', { ascending: false });
 
           if (cancelled) return;
           if (sorguHata) { setIlanlar([]); setYukleniyor(false); return; }
