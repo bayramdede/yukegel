@@ -74,7 +74,7 @@ export async function GET(req: NextRequest) {
   if (sekme === 'pending') {
     const { data, error } = await svc
       .from('aliases')
-      .select('id, alias, normalized, type, llm_confidence, source_listing_ids, created_at')
+      .select('id, alias, normalized, district, type, llm_confidence, source_listing_ids, created_at')
       .eq('created_by_ai', true)
       .eq('is_approved', false)
       .order('created_at', { ascending: false })
