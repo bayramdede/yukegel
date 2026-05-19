@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin, getServiceSupabase } from '../../../../lib/auth';
 
 export const runtime = 'nodejs';
+export const maxDuration = 60; // LLM keşif çağrısı için
 
 async function yetkiKontrol() {
   try {
@@ -202,7 +203,7 @@ KURALLAR:
         },
         body: JSON.stringify({
           model: 'claude-haiku-4-5-20251001',
-          max_tokens: 2048,
+          max_tokens: 1024,
           messages: [{ role: 'user', content: prompt }],
         }),
       });
