@@ -170,15 +170,22 @@ ${metinler}
 GOREV:
 Bu metinlerde gecen yer isimlerinden standart Turkiye il/ilce listesinde OLMAYANLARI tespit et.
 Bunlarin standart karsiligini bul.
-Ornekler: "G.Antep"=>"Gaziantep", "ikitelli"=>"Istanbul", "eskiseh"=>"Eskisehir",
-           "antep"=>"Gaziantep", "corlu san."=>"Corlu", "d.bakir"=>"Diyarbakir",
-           "izmit"=>"Kocaeli", "gebze"=>"Kocaeli", "tuzla"=>"Istanbul"
+Ornekler:
+- "G.Antep"  => normalized:"Gaziantep", district:null     (il)
+- "eskiseh"  => normalized:"Eskisehir", district:null     (il)
+- "izmit"    => normalized:"Kocaeli",   district:"Izmit"  (ilce)
+- "gebze"    => normalized:"Kocaeli",   district:"Gebze"  (ilce)
+- "tuzla"    => normalized:"Istanbul",  district:"Tuzla"  (ilce)
+- "ikitelli" => normalized:"Istanbul",  district:"Ikitelli" (ilce)
+- "corlu"    => normalized:"Tekirdag",  district:"Corlu"  (ilce)
+- "antakya"  => normalized:"Hatay",     district:"Antakya" (ilce)
 
 SADECE GECERLI JSON ARRAY DONDUR, baska hicbir sey yazma:
 [
   {
     "alias": "bulunan_kelime_veya_kisaltma",
-    "normalized": "standart_il_veya_ilce_adi_turkce",
+    "normalized": "bagli_oldugu_il_adi_turkce",
+    "district": "ilce_adi_turkce_veya_null",
     "type": "city",
     "confidence": 85,
     "source_ids": ["id1"]
@@ -186,9 +193,10 @@ SADECE GECERLI JSON ARRAY DONDUR, baska hicbir sey yazma:
 ]
 
 KURALLAR:
-- type: her zaman "city" kullan (il veya ilce olsun)
+- type: her zaman "city" kullan
+- normalized: DAIMA il adi (ornek: "Istanbul", "Kocaeli", "Gaziantep")
+- district: eger alias bir ILCE ise ilcenin dogru Turkce adi; eger alias IL ise null
 - confidence: 0-100. Sadece >=70 gonder.
-- normalized: Turkce dogru yazim (ornek: "Gaziantep", "Sanlıurfa", "Kahramanmaras")
 - Mevcut listede olan alias'lari tekrar onerme
 - Hic bulamazsan: [] dondur`;
 
@@ -243,6 +251,7 @@ KURALLAR:
         alias: String(s.alias).trim().toLowerCase(),
         normalized: String(s.normalized).trim(),
         type: 'city',
+        district: s.district ? String(s.district).trim() : null,
         is_active: false,          // admin onaylayana kadar pasif
         created_by_ai: true,
         is_approved: false,
