@@ -15,6 +15,7 @@ async function fetchInitialIlanlar() {
   try {
     const supabase = createPublicServerClient();
 
+    // expires_at 48 saat — aktif havuz küçük, LIMIT yok
     const { data, error } = await supabase
       .from('listings')
       .select(`
@@ -26,8 +27,7 @@ async function fetchInitialIlanlar() {
       .in('moderation_status', ['approved', 'auto_published'])
       .eq('is_shadow_banned', false)
       .eq('status', 'active')
-      .order('created_at', { ascending: false })
-      .limit(30);
+      .order('created_at', { ascending: false });
 
     if (error || !data || data.length === 0) return [];
 
@@ -45,7 +45,6 @@ async function fetchInitialIlanlar() {
       stopsMap[s.listing_id].push(s);
     }
 
-    // Kullanıcı rozetleri server-side da çek (phone_verified, yeniUye)
     const userIds = [...new Set(data.map((i) => i.user_id).filter(Boolean))];
     const kullaniciMap: Record<string, { phone_verified: boolean; created_at: string }> = {};
     if (userIds.length > 0) {
