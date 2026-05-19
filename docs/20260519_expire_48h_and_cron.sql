@@ -1,6 +1,6 @@
 -- ============================================================
 -- expires_at: 7 gün → 48 saat + aktif ilan expire cron job
--- Tarih: 19 Mayıs 2026
+-- Tarih: 19 Mayıs 2026 (v2 — moderation_status dokunmadan sadece status=passive)
 -- ============================================================
 
 -- 1. listings tablosunun expires_at default'unu 48 saate düşür
@@ -8,14 +8,11 @@ ALTER TABLE public.listings
   ALTER COLUMN expires_at SET DEFAULT (now() + INTERVAL '48 hours');
 
 -- 2. Mevcut eski aktif ilanları pasife al (tek seferlik migration)
+--    Sadece status'u passive yap, moderation_status olduğu gibi kalsın
 UPDATE public.listings
 SET
-  status            = 'passive',
-  moderation_status = CASE
-    WHEN moderation_status IN ('approved', 'auto_published') THEN 'passive'
-    ELSE moderation_status
-  END,
-  updated_at        = now()
+  status     = 'passive',
+  updated_at = now()
 WHERE
   status = 'active'
   AND created_at < now() - INTERVAL '48 hours';
@@ -32,12 +29,8 @@ SELECT cron.schedule(
   $$
     UPDATE public.listings
     SET
-      status            = 'passive',
-      moderation_status = CASE
-        WHEN moderation_status IN ('approved', 'auto_published') THEN 'passive'
-        ELSE moderation_status
-      END,
-      updated_at        = now()
+      status     = 'passive',
+      updated_at = now()
     WHERE
       status = 'active'
       AND expires_at < now();
