@@ -440,7 +440,7 @@ function KesifSekme() {
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
             <select style={{ ...S.input(), width: 'auto' }} value={limit} onChange={e => setLimit(Number(e.target.value))}>
-              <option value={20}>20</option><option value={50}>50</option><option value={100}>100</option>
+              <option value={10}>10</option><option value={20}>20</option><option value={50}>50</option>
             </select>
             <button onClick={kesfet} disabled={kesfediyor || toplamNoLane === 0}
               style={S.btn('#713f12', '#fbbf24', kesfediyor || toplamNoLane === 0)}>
