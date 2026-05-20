@@ -205,26 +205,37 @@ KURALLAR:
 
     let llmResponse: any;
     try {
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01',
-        },
-        body: JSON.stringify({
-          model: 'claude-haiku-4-5-20251001',
-          max_tokens: 1024,
-          messages: [{ role: 'user', content: prompt }],
-        }),
-      });
-      if (!res.ok) {
-        const err = await res.text();
-        return NextResponse.json({ error: `LLM hata (${res.status}): ${err.slice(0, 200)}` }, { status: 502 });
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 8000); // 8s hard timeout
+      let res: Response;
+      try {
+        res = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          signal: controller.signal,
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': apiKey,
+            'anthropic-version': '2023-06-01',
+          },
+          body: JSON.stringify({
+            model: 'claude-haiku-4-5-20251001',
+            max_tokens: 512,  // 1024→512: yanit sureşini kisalt
+            messages: [{ role: 'user', content: prompt }],
+          }),
+        });
+      } finally {
+        clearTimeout(timeout);
       }
-      llmResponse = await res.json();
+      if (!res!.ok) {
+        const err = await res!.text();
+        return NextResponse.json({ error: `LLM hata (${res!.status}): ${err.slice(0, 200)}` }, { status: 502 });
+      }
+      llmResponse = await res!.json();
     } catch (e: any) {
-      return NextResponse.json({ error: `LLM erisim hatasi: ${e.message}` }, { status: 502 });
+      const mesaj = e?.name === 'AbortError'
+        ? 'LLM 8 saniyede yanit vermedi — limit azalt veya tekrar dene'
+        : `LLM erisim hatasi: ${e.message}`;
+      return NextResponse.json({ error: mesaj }, { status: 502 });
     }
 
     const rawText = llmResponse.content?.[0]?.text ?? '';
