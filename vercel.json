@@ -1,0 +1,7 @@
+{
+  "functions": {
+    "app/api/admin/learn-aliases/route.ts": {
+      "maxDuration": 60
+    }
+  }
+}
