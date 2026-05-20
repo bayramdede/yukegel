@@ -400,7 +400,7 @@ function KesifSekme() {
   const [noLane, setNoLane]       = useState<NoLaneData>({ raw_posts: [], listings_no_origin: [], total: 0 });
   const [loading, setLoading]     = useState(true);
   const [kesfediyor, setKesfediyor] = useState(false);
-  const [limit, setLimit]         = useState(50);
+  const [limit, setLimit]         = useState(10);
   const [sonuc, setSonuc]         = useState<any>(null);
   const [acilanId, setAcilanId]   = useState<string | null>(null);
 
