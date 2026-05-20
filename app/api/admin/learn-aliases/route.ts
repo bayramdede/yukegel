@@ -122,30 +122,33 @@ export async function POST(req: NextRequest) {
 
   // ── LLM Keşif ──
   if (body.action === 'discover') {
-    const limit = Math.min(Number(body.limit ?? 50), 100);
+    const limit = Math.min(Number(body.limit ?? 20), 50); // 50→20 default, max 50 (LLM hızı için)
 
-    // 1. Sadece daha önce taranmamış no_lane raw_posts çek
-    const { data: rawPosts, error: fetchErr } = await svc
-      .from('raw_posts')
-      .select('id, raw_text')
-      .eq('processing_status', 'no_lane')
-      .is('slh_scanned_at', null)          // daha önce taranmamış
-      .order('created_at', { ascending: false })
-      .limit(limit);
+    // 1+2. raw_posts ve mevcut alias'ları paralel çek
+    const [rawResult, aliasResult] = await Promise.all([
+      svc
+        .from('raw_posts')
+        .select('id, raw_text')
+        .eq('processing_status', 'no_lane')
+        .is('slh_scanned_at', null)
+        .order('created_at', { ascending: false })
+        .limit(limit),
+      svc
+        .from('aliases')
+        .select('alias, normalized, type')
+        .eq('is_approved', true)
+        .eq('is_active', true)
+        .in('type', ['city', 'district'])
+        .limit(500),
+    ]);
+
+    const { data: rawPosts, error: fetchErr } = rawResult;
+    const { data: mevcutAliaslar } = aliasResult;
 
     if (fetchErr) return NextResponse.json({ error: fetchErr.message }, { status: 500 });
     if (!rawPosts || rawPosts.length === 0) {
       return NextResponse.json({ success: true, message: 'Kesfedilecek no_lane kayit yok', suggestions: [] });
     }
-
-    // 2. Mevcut onaylı alias'ları çek (LLM'e ver, tekrar önermesin)
-    const { data: mevcutAliaslar } = await svc
-      .from('aliases')
-      .select('alias, normalized, type')
-      .eq('is_approved', true)
-      .eq('is_active', true)
-      .in('type', ['city', 'district'])
-      .limit(500);
 
     const mevcutMap = (mevcutAliaslar ?? [])
       .map((a: any) => `"${a.alias}"=>"${a.normalized}"`)
@@ -153,8 +156,8 @@ export async function POST(req: NextRequest) {
 
     // 3. Metinleri birleştir
     const metinler = rawPosts
-      .map((r: any, i: number) => `[${i + 1}] (ID:${r.id})\n${(r.raw_text || '').substring(0, 400)}`)
-      .join('\n\n---\n\n');
+      .map((r: any, i: number) => `[${i + 1}] (ID:${r.id})\n${(r.raw_text || '').substring(0, 200)}`)
+      .join('\n\n---\n\n'); // 400→200 char: prompt boyutunu yarıya indir
 
     // 4. Haiku çağrısı
     const apiKey = process.env.ANTHROPIC_API_KEY;
