@@ -328,6 +328,7 @@ export async function POST(request: NextRequest) {
         processing_status: 'pending',
         detected_ad_count: 1,
         message_date: c.msgDate,
+        post_date: c.msgDate,
         // geçici meta — insert sonrası repost için, DB'ye gitmez
         _sourceRawPostId: sourceRawPostId,
         _isRepost: isRepost,
