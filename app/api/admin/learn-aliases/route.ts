@@ -122,33 +122,30 @@ export async function POST(req: NextRequest) {
 
   // ── LLM Keşif ──
   if (body.action === 'discover') {
-    const limit = Math.min(Number(body.limit ?? 20), 50); // 50→20 default, max 50 (LLM hızı için)
+    const limit = Math.min(Number(body.limit ?? 10), 50); // frontend default 10
 
-    // 1+2. raw_posts ve mevcut alias'ları paralel çek
-    const [rawResult, aliasResult] = await Promise.all([
-      svc
-        .from('raw_posts')
-        .select('id, raw_text')
-        .eq('processing_status', 'no_lane')
-        .is('slh_scanned_at', null)
-        .order('created_at', { ascending: false })
-        .limit(limit),
-      svc
-        .from('aliases')
-        .select('alias, normalized, type')
-        .eq('is_approved', true)
-        .eq('is_active', true)
-        .in('type', ['city', 'district'])
-        .limit(500),
-    ]);
-
-    const { data: rawPosts, error: fetchErr } = rawResult;
-    const { data: mevcutAliaslar } = aliasResult;
+    // 1. raw_posts çek
+    const { data: rawPosts, error: fetchErr } = await svc
+      .from('raw_posts')
+      .select('id, raw_text')
+      .eq('processing_status', 'no_lane')
+      .is('slh_scanned_at', null)
+      .order('created_at', { ascending: false })
+      .limit(limit);
 
     if (fetchErr) return NextResponse.json({ error: fetchErr.message }, { status: 500 });
     if (!rawPosts || rawPosts.length === 0) {
       return NextResponse.json({ success: true, message: 'Kesfedilecek no_lane kayit yok', suggestions: [] });
     }
+
+    // 2. Mevcut alias'ları çek
+    const { data: mevcutAliaslar } = await svc
+      .from('aliases')
+      .select('alias, normalized, type')
+      .eq('is_approved', true)
+      .eq('is_active', true)
+      .in('type', ['city', 'district'])
+      .limit(500);
 
     const mevcutMap = (mevcutAliaslar ?? [])
       .map((a: any) => `"${a.alias}"=>"${a.normalized}"`)
