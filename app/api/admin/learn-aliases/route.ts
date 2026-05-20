@@ -232,6 +232,7 @@ KURALLAR:
       const mesaj = e?.name === 'AbortError'
         ? 'LLM 8 saniyede yanit vermedi — limit azalt veya tekrar dene'
         : `LLM erisim hatasi: ${e.message}`;
+      console.error('[learn-aliases] Anthropic fetch hatasi:', e?.name, e?.message, e?.cause);
       return NextResponse.json({ error: mesaj }, { status: 502 });
     }
 
