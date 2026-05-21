@@ -83,6 +83,22 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ data: data ?? [] });
   }
 
+  // ── Sekme: source — raw_post id'leri için ham metni getir ──
+  if (sekme === 'source') {
+    const rawIds = (req.nextUrl.searchParams.get('ids') ?? '')
+      .split(',')
+      .map(s => s.trim())
+      .filter(Boolean)
+      .slice(0, 5);
+    if (rawIds.length === 0) return NextResponse.json({ data: [] });
+    const { data, error } = await svc
+      .from('raw_posts')
+      .select('id, raw_text')
+      .in('id', rawIds);
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ data: data ?? [] });
+  }
+
   return NextResponse.json({ error: 'Gecersiz sekme' }, { status: 400 });
 }
 
@@ -319,10 +335,16 @@ export async function PATCH(req: NextRequest) {
   if (!id) return NextResponse.json({ error: 'id gerekli' }, { status: 400 });
 
   if (action === 'approve') {
-    const { error } = await svc
-      .from('aliases')
-      .update({ is_approved: true, is_active: true, approved_at: new Date().toISOString() })
-      .eq('id', id);
+    const payload: Record<string, any> = {
+      is_approved: true,
+      is_active: true,
+      approved_at: new Date().toISOString(),
+    };
+    // Düzeltme alanları varsa güncelle (düzenle + onayla akışı)
+    if (updates.alias !== undefined) payload.alias = String(updates.alias).trim().toLowerCase();
+    if (updates.normalized !== undefined) payload.normalized = String(updates.normalized).trim();
+    if ('district' in updates) payload.district = updates.district?.trim() || null;
+    const { error } = await svc.from('aliases').update(payload).eq('id', id);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json({ success: true });
   }
