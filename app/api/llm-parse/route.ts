@@ -1,8 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+// WhatsApp mesajlarında tek başına surrogate (U+D800–U+DFFF) karakterler
+// JSON.stringify ile gönderilince Anthropic API 400 hatası verir.
+function stripSurrogates(s: string): string {
+  return s.replace(/[\uD800-\uDFFF]/g, '')
+}
+
 export async function POST(request: NextRequest) {
   try {
-    const { raw_text, notes } = await request.json();
+    const { raw_text: rawInput, notes } = await request.json();
+    const raw_text = rawInput ? stripSurrogates(rawInput) : rawInput;
 
     if (!raw_text) {
       return NextResponse.json({ success: false, error: 'raw_text boş, LLM çağrısı yapılamadı' }, { status: 400 });
