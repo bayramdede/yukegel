@@ -76,19 +76,19 @@ export async function POST(request: NextRequest) {
     // ── URL arşivleme (fire-and-forget, ana akışı etkilemez) ─────────────────
     const foundUrls = extractUrlsFromText(text);
     if (foundUrls.length > 0) {
-      ssrClient
-        .from('archived_links')
-        .upsert(
-          foundUrls.map(({ url, domain, category }) => ({
-            url, domain, category,
-            source: 'user_text',
-            user_id: user.id,
-            status: 'pending_review',
-          })),
-          { onConflict: 'url', ignoreDuplicates: true }
-        )
-        .then(() => {}) // sonucu beklemiyoruz
-        .catch(() => {});
+      void Promise.resolve(
+        ssrClient
+          .from('archived_links')
+          .upsert(
+            foundUrls.map(({ url, domain, category }) => ({
+              url, domain, category,
+              source: 'user_text',
+              user_id: user.id,
+              status: 'pending_review',
+            })),
+            { onConflict: 'url', ignoreDuplicates: true }
+          )
+      ).catch(() => {});
     }
 
     const apiKey = process.env.ANTHROPIC_API_KEY;
