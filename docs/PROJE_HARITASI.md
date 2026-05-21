@@ -1,6 +1,6 @@
 # Yükegel — Proje Haritası
 > **Kullanım:** Her sohbet başında sadece bu dosyayı oku. Kaynak dosyaları sadece o dosyada değişiklik yapacaksan oku.  
-> Son güncelleme: 21 Mayıs 2026 — Moderatör Bekleyenler sekmesi: süresi dolmuş pending ilanlar artık gösterilmiyor (expires_at filtresi)
+> Son güncelleme: 21 Mayıs 2026 — `lib/auth.ts` temizliği: `requireModerator` ve `landingForRole` kaldırıldı (proxy.ts + service_role'e taşınmıştı); `lib/logger.ts` maskeleme fonksiyonları KVKK fazı için bilerek korunuyor
 
 **Referans Dökümanlar:**
 - `docs/LOG_VE_GUVENLIK_SPECLERI.md` — Log format standartları, audit trail, SecurityLogger kontrol listesi
