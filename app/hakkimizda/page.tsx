@@ -70,6 +70,15 @@ export default function Hakkimizda() {
 
       <main style={{ maxWidth: 860, margin: '0 auto', padding: '56px 16px 80px' }}>
 
+        {/* BETA BANNER */}
+        <div style={{ background: '#1c1a0e', border: '1px solid #78716c', borderRadius: 10, padding: '12px 20px', marginBottom: 40, display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+          <span style={{ fontSize: '1rem', flexShrink: 0, marginTop: 1 }}>🚧</span>
+          <div>
+            <span style={{ color: '#d6d3d1', fontWeight: 700, fontSize: '0.85rem' }}>Platform beta aşamasında. </span>
+            <span style={{ color: '#a8a29e', fontSize: '0.85rem' }}>Sistemdeki veriler ve ilanlar gerçektir; bazı özellikler hâlâ geliştirme aşamasındadır. Bu sayfadaki bazı rakamlar ve özellik açıklamaları hedef durumu yansıtmaktadır.</span>
+          </div>
+        </div>
+
         {/* BAŞLIK */}
         <header style={{ textAlign: 'center', marginBottom: 56 }}>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#0d2b1a', border: '1px solid #166534', borderRadius: 20, padding: '4px 14px', marginBottom: 16 }}>
