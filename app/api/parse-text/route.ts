@@ -5,6 +5,25 @@ import { structuredLog } from '../../../lib/logger';
 
 export const runtime = 'nodejs';
 
+// ── URL çıkarma + arşivleme yardımcısı ──────────────────────────────────────
+const URL_REGEX = /https?:\/\/[^\s\u200b\u200c\u200d\u2060\u00A0]+/gi;
+
+function extractUrlsFromText(text: string): Array<{ url: string; domain: string; category: string }> {
+  const raw = (text.match(URL_REGEX) || []).map(u => u.replace(/[.,;!?)"']+$/, ''));
+  const unique = [...new Set(raw)];
+  return unique.map(url => {
+    let domain = '';
+    let category = 'other';
+    try { domain = new URL(url).hostname.replace(/^www\./, ''); } catch { /* malformed */ }
+    if (domain === 'chat.whatsapp.com') category = 'whatsapp_group';
+    else if (domain === 't.me' || domain.includes('telegram.')) category = 'telegram';
+    else if (domain.includes('facebook.com') || domain === 'fb.com') category = 'facebook_group';
+    else if (domain.includes('instagram.com')) category = 'instagram';
+    else if (domain.includes('linkedin.com')) category = 'linkedin';
+    return { url, domain, category };
+  });
+}
+
 // Tek bir kullanıcı metnini Anthropic Haiku ile yapılandırılmış JSON'a çevirir.
 // "regex/alias-first, LLM as last resort" felsefesine sadık kalmak için ileride
 // alias-bazlı bir hızlı parse adımı eklenebilir; tekil mesajlarda doğruluk önemli
@@ -52,6 +71,24 @@ export async function POST(request: NextRequest) {
     const { text } = await request.json();
     if (!text || typeof text !== 'string' || text.trim().length < 10) {
       return NextResponse.json({ success: false, error: 'Lütfen daha uzun bir ilan metni girin.' }, { status: 400 });
+    }
+
+    // ── URL arşivleme (fire-and-forget, ana akışı etkilemez) ─────────────────
+    const foundUrls = extractUrlsFromText(text);
+    if (foundUrls.length > 0) {
+      ssrClient
+        .from('archived_links')
+        .upsert(
+          foundUrls.map(({ url, domain, category }) => ({
+            url, domain, category,
+            source: 'user_text',
+            user_id: user.id,
+            status: 'pending_review',
+          })),
+          { onConflict: 'url', ignoreDuplicates: true }
+        )
+        .then(() => {}) // sonucu beklemiyoruz
+        .catch(() => {});
     }
 
     const apiKey = process.env.ANTHROPIC_API_KEY;
