@@ -196,6 +196,28 @@ export default function LinkHavuzuPage() {
                 {link.user_id && <span style={{ marginLeft: 12 }}>👤 kullanıcı bağlı</span>}
               </div>
 
+              {/* raw_post metni */}
+              {link.raw_posts?.raw_text && (
+                <details style={{ marginBottom: 10 }}>
+                  <summary style={{ fontSize: 12, color: '#8b949e', cursor: 'pointer', userSelect: 'none' }}>
+                    📝 Ham mesaj
+                    {link.raw_posts.message_date && (
+                      <span style={{ marginLeft: 8, color: '#6b7280' }}>
+                        {formatDate(link.raw_posts.message_date)}
+                      </span>
+                    )}
+                  </summary>
+                  <pre style={{
+                    marginTop: 8, padding: '10px 12px',
+                    background: '#0d1117', border: '1px solid #30363d', borderRadius: 6,
+                    fontSize: 12, color: '#cdd9e5', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+                    maxHeight: 200, overflowY: 'auto', lineHeight: 1.6,
+                  }}>
+                    {link.raw_posts.raw_text}
+                  </pre>
+                </details>
+              )}
+
               {/* Aksiyon butonları (sadece pending_review'de) */}
               {status === 'pending_review' && (
                 <div style={{ display: 'flex', gap: 8 }}>
