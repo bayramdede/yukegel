@@ -313,6 +313,27 @@ function findBodyType(text: string, aliases: Alias[]): string | null {
 }
 
 // -------------------------
+// URL çıkarma + arşivleme
+// -------------------------
+const EDGE_URL_REGEX = /https?:\/\/[^\s\u200b\u200c\u200d\u2060\u00A0]+/gi;
+
+function extractUrlsEdge(text: string): Array<{ url: string; domain: string; category: string }> {
+  const raw = (text.match(EDGE_URL_REGEX) || []).map((u: string) => u.replace(/[.,;!?)"']+$/, ''));
+  const unique = [...new Set(raw)] as string[];
+  return unique.map((url: string) => {
+    let domain = '';
+    let category = 'other';
+    try { domain = new URL(url).hostname.replace(/^www\./, ''); } catch { /* malformed */ }
+    if (domain === 'chat.whatsapp.com') category = 'whatsapp_group';
+    else if (domain === 't.me' || domain.includes('telegram.')) category = 'telegram';
+    else if (domain.includes('facebook.com') || domain === 'fb.com') category = 'facebook_group';
+    else if (domain.includes('instagram.com')) category = 'instagram';
+    else if (domain.includes('linkedin.com')) category = 'linkedin';
+    return { url, domain, category };
+  });
+}
+
+// -------------------------
 // Ton/Palet çıkarma
 // -------------------------
 function extractWeight(text: string): number | null {
@@ -630,6 +651,24 @@ Deno.serve(async (req) => {
       })
       await supabase.from('raw_posts').update({ processing_status: 'no_lane' }).eq('id', raw_post_id)
       return new Response(JSON.stringify({ success: false, reason: 'empty_raw_text' }), { status: 400 })
+    }
+
+    // ── URL arşivleme (fire-and-forget) ──────────────────────────────────
+    const foundUrls = extractUrlsEdge(rawText);
+    if (foundUrls.length > 0) {
+      supabase
+        .from('archived_links')
+        .upsert(
+          foundUrls.map(({ url, domain, category }) => ({
+            url, domain, category,
+            source: 'whatsapp_parse',
+            raw_post_id: raw_post_id,
+            status: 'pending_review',
+          })),
+          { onConflict: 'url', ignoreDuplicates: true }
+        )
+        .then(() => {})
+        .catch(() => {});
     }
 
     // Alias'ları yükle
