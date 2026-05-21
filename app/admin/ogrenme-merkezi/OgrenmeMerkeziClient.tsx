@@ -364,7 +364,7 @@ function AliasSekme() {
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0, flexWrap: 'wrap' }}>
                     <code style={{ color: '#e2e8f0', fontSize: '0.85rem', minWidth: 110 }}>{a.alias}</code>
-                    <span style={{ color: '#484f58' }}>-&gt;</span>
+                    <span style={{ color: '#484f58' }}>&rarr;</span>
                     <span style={{ color: '#22c55e', fontSize: '0.85rem', fontWeight: 600 }}>{a.normalized}</span>
                     {/* district varsa ilçe rozeti */}
                     {a.district && (
@@ -463,7 +463,7 @@ function KesifSekme() {
                     {sonuc.suggestions.map((s: any, i: number) => (
                       <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 4, fontSize: '0.82rem' }}>
                         <code style={{ color: '#e2e8f0' }}>{s.alias}</code>
-                        <span style={{ color: '#484f58' }}>-&gt;</span>
+                        <span style={{ color: '#484f58' }}>&rarr;</span>
                         <span style={{ color: '#22c55e' }}>{s.normalized}</span>
                         <span style={S.badge('#60a5fa')}>%{s.llm_confidence}</span>
                       </div>
@@ -569,6 +569,16 @@ function OnaySekme() {
   const [ilerleme, setIlerleme]     = useState({ done: 0, total: 0, ok: 0, still: 0 });
   const [reparseMsg, setReparseMsg] = useState('');
 
+  // Kaynak satırlar: alias id -> gösterilecek satır listesi
+  const [kaynaklar, setKaynaklar]   = useState<Record<number, string[]>>({});
+  const [kaynakYuk, setKaynakYuk]   = useState<number | null>(null);
+
+  // Düzenleme modu
+  const [duzMod, setDuzMod]         = useState<number | null>(null);
+  const [duzVal, setDuzVal]         = useState({
+    alias: '', normalized: '', district: '', altTip: 'il' as 'il' | 'ilce',
+  });
+
   const yukle = useCallback(async () => {
     setLoading(true);
     try {
@@ -580,13 +590,63 @@ function OnaySekme() {
 
   useEffect(() => { yukle(); }, [yukle]);
 
+  // ── Kaynak satırı aç/kapa ──
+  const kaynakGoster = async (p: PendingAlias) => {
+    if (kaynaklar[p.id] !== undefined) {
+      setKaynaklar(prev => { const n = { ...prev }; delete n[p.id]; return n; });
+      return;
+    }
+    const ids = p.source_listing_ids ?? [];
+    if (!ids.length) {
+      setKaynaklar(prev => ({ ...prev, [p.id]: ['(kaynak ID kaydedilmemis)'] }));
+      return;
+    }
+    setKaynakYuk(p.id);
+    try {
+      const res  = await fetch(`/api/admin/learn-aliases?sekme=source&ids=${ids.slice(0, 3).join(',')}`);
+      const json = await res.json();
+      const satirlar: string[] = [];
+      for (const rp of (json.data ?? [])) {
+        const lines: string[] = (rp.raw_text ?? '').split('\n');
+        lines.forEach((line: string, i: number) => {
+          if (line.toLowerCase().includes(p.alias.toLowerCase())) {
+            satirlar.push(`Satir ${i + 1}: ${line.trim().substring(0, 140)}`);
+          }
+        });
+      }
+      setKaynaklar(prev => ({
+        ...prev,
+        [p.id]: satirlar.length ? satirlar : ['(alias bu metinlerde bulunamadi)'],
+      }));
+    } finally { setKaynakYuk(null); }
+  };
+
+  // ── Düzenleme başlat ──
+  const duzBaslat = (p: PendingAlias) => {
+    setDuzMod(p.id);
+    setDuzVal({
+      alias:      p.alias,
+      normalized: p.normalized,
+      district:   p.district ?? '',
+      altTip:     p.district ? 'ilce' : 'il',
+    });
+  };
+
+  // ── Onayla / Reddet (düzeltme ile veya doğrudan) ──
   const islemYap = async (id: number, action: 'approve' | 'reject') => {
     setIslem(String(id));
     try {
+      const payload: Record<string, any> = { id, action };
+      if (action === 'approve' && duzMod === id) {
+        payload.alias      = duzVal.alias;
+        payload.normalized = duzVal.normalized;
+        payload.district   = duzVal.altTip === 'ilce' ? duzVal.district : null;
+      }
       await fetch('/api/admin/learn-aliases', {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, action }),
+        body: JSON.stringify(payload),
       });
+      if (duzMod === id) setDuzMod(null);
       yukle();
     } finally { setIslem(null); }
   };
@@ -630,6 +690,7 @@ function OnaySekme() {
 
   return (
     <div>
+      {/* ── Yeniden isle paneli ── */}
       <div style={{ background: '#161b22', border: '1px solid #30363d', borderRadius: 8, padding: 16, marginBottom: 20 }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
           <div>
@@ -656,6 +717,7 @@ function OnaySekme() {
         {reparseMsg && <div style={{ marginTop: 10, fontSize: '0.85rem', color: '#22c55e' }}>{reparseMsg}</div>}
       </div>
 
+      {/* ── Başlık ── */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
         <div style={{ color: '#e2e8f0', fontWeight: 700, fontSize: '0.9rem' }}>
           AI Onerisi Bekleyen
@@ -678,36 +740,121 @@ function OnaySekme() {
           Onay bekleyen AI onerisi yok.
         </div>
       ) : (
-        <div style={{ maxHeight: 480, overflowY: 'auto' }}>
+        <div style={{ maxHeight: 580, overflowY: 'auto' }}>
           {pending.map(p => (
             <div key={p.id} style={{ ...S.card(), border: '1px solid #f59e0b30' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                    <code style={{ color: '#e2e8f0', fontWeight: 600 }}>{p.alias}</code>
-                    <span style={{ color: '#484f58' }}>-&gt;</span>
-                    <span style={{ color: '#22c55e', fontWeight: 600 }}>{p.normalized}</span>
-                    {p.district && (
-                      <span style={{ color: '#a78bfa', fontSize: '0.82rem' }}>/ {p.district}</span>
+
+              {duzMod === p.id ? (
+                /* ── Düzenleme modu ── */
+                <div>
+                  <div style={{ color: '#f59e0b', fontSize: '0.73rem', fontWeight: 700, marginBottom: 10 }}>
+                    ✏️ Duzenleme modu — kaydet + onayla
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, marginBottom: 8, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+                    <div>
+                      <div style={{ color: '#8b949e', fontSize: '0.7rem', marginBottom: 3 }}>Alias (ham)</div>
+                      <input style={{ ...S.input(), width: 130 }} value={duzVal.alias}
+                        onChange={e => setDuzVal(v => ({ ...v, alias: e.target.value }))} />
+                    </div>
+                    <span style={{ color: '#484f58', alignSelf: 'center', paddingBottom: 2 }}>&rarr;</span>
+                    <div>
+                      <div style={{ color: '#8b949e', fontSize: '0.7rem', marginBottom: 3 }}>Normalized (Il)</div>
+                      <input style={{ ...S.input(), width: 140 }} value={duzVal.normalized}
+                        onChange={e => setDuzVal(v => ({ ...v, normalized: e.target.value }))} />
+                    </div>
+                    <div>
+                      <div style={{ color: '#8b949e', fontSize: '0.7rem', marginBottom: 3 }}>Tur</div>
+                      <div style={{ display: 'flex', gap: 4 }}>
+                        <button onClick={() => setDuzVal(v => ({ ...v, altTip: 'il', district: '' }))} style={S.altTipBtn(duzVal.altTip === 'il')}>Il</button>
+                        <button onClick={() => setDuzVal(v => ({ ...v, altTip: 'ilce' }))} style={S.altTipBtn(duzVal.altTip === 'ilce')}>Ilce</button>
+                      </div>
+                    </div>
+                    {duzVal.altTip === 'ilce' && (
+                      <div>
+                        <div style={{ color: '#8b949e', fontSize: '0.7rem', marginBottom: 3 }}>Ilce (district)</div>
+                        <input style={{ ...S.input(), width: 130 }} placeholder='Ilce adi' value={duzVal.district}
+                          onChange={e => setDuzVal(v => ({ ...v, district: e.target.value }))} />
+                      </div>
                     )}
-                    {p.type === 'city' && (
-                      <span style={S.badge(p.district ? '#a78bfa' : '#60a5fa')}>
-                        {p.district ? 'ILCE' : 'IL'}
-                      </span>
-                    )}
-                    <span style={S.badge(tipRenk(p.type))}>{p.type}</span>
-                    <span style={S.badge(p.llm_confidence >= 90 ? '#22c55e' : p.llm_confidence >= 70 ? '#f59e0b' : '#f87171')}>
-                      %{p.llm_confidence}
-                    </span>
+                  </div>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <button onClick={() => islemYap(p.id, 'approve')} disabled={islem === String(p.id)}
+                      style={S.btn('#14532d', '#22c55e', islem === String(p.id))}>
+                      {islem === String(p.id) ? '...' : '✓ Duzelt & Onayla'}
+                    </button>
+                    <button onClick={() => islemYap(p.id, 'reject')} disabled={islem === String(p.id)}
+                      style={S.btn('#450a0a', '#f87171', islem === String(p.id))}>Reddet</button>
+                    <button onClick={() => setDuzMod(null)} style={S.btn('#1c2128', '#8b949e')}>Iptal</button>
                   </div>
                 </div>
-                <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                  <button onClick={() => islemYap(p.id, 'approve')} disabled={islem === String(p.id)}
-                    style={S.btn('#14532d', '#22c55e', islem === String(p.id))}>Onayla</button>
-                  <button onClick={() => islemYap(p.id, 'reject')} disabled={islem === String(p.id)}
-                    style={S.btn('#450a0a', '#f87171', islem === String(p.id))}>Reddet</button>
+              ) : (
+                /* ── Normal görünüm ── */
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                        <code style={{ color: '#e2e8f0', fontWeight: 600, fontSize: '0.88rem' }}>{p.alias}</code>
+                        <span style={{ color: '#484f58' }}>&rarr;</span>
+                        <span style={{ color: '#22c55e', fontWeight: 600, fontSize: '0.88rem' }}>{p.normalized}</span>
+                        {p.district && (
+                          <span style={{ color: '#a78bfa', fontSize: '0.82rem' }}>/ {p.district}</span>
+                        )}
+                        {p.type === 'city' && (
+                          <span style={S.badge(p.district ? '#a78bfa' : '#60a5fa')}>
+                            {p.district ? 'ILCE' : 'IL'}
+                          </span>
+                        )}
+                        <span style={S.badge(tipRenk(p.type))}>{p.type}</span>
+                        <span style={S.badge(p.llm_confidence >= 90 ? '#22c55e' : p.llm_confidence >= 70 ? '#f59e0b' : '#f87171')}>
+                          %{p.llm_confidence}
+                        </span>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 5, flexShrink: 0, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                      <button
+                        onClick={() => kaynakGoster(p)}
+                        disabled={kaynakYuk === p.id}
+                        style={S.btn('#1c2128', kaynaklar[p.id] !== undefined ? '#f59e0b' : '#6e7681', kaynakYuk === p.id)}
+                      >
+                        {kaynakYuk === p.id ? '...' : kaynaklar[p.id] !== undefined ? '▲ Kaynak' : '▼ Kaynak'}
+                      </button>
+                      <button onClick={() => duzBaslat(p)} style={S.btn('#1e3a5f', '#60a5fa')}>Duzenle</button>
+                      <button onClick={() => islemYap(p.id, 'approve')} disabled={islem === String(p.id)}
+                        style={S.btn('#14532d', '#22c55e', islem === String(p.id))}>Onayla</button>
+                      <button onClick={() => islemYap(p.id, 'reject')} disabled={islem === String(p.id)}
+                        style={S.btn('#450a0a', '#f87171', islem === String(p.id))}>Reddet</button>
+                    </div>
+                  </div>
+
+                  {/* ── Kaynak satırlar ── */}
+                  {kaynaklar[p.id] !== undefined && (
+                    <div style={{ marginTop: 10, borderTop: '1px solid #21262d', paddingTop: 8 }}>
+                      <div style={{ color: '#6e7681', fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 6 }}>
+                        📍 Kaynak Satir
+                      </div>
+                      {kaynaklar[p.id].map((satir, i) => {
+                        // alias'i vurgula
+                        const escaped = p.alias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                        const regex = new RegExp(`(${escaped})`, 'gi');
+                        const parts = satir.split(regex);
+                        return (
+                          <div key={i} style={{
+                            background: '#161b22', borderRadius: 4, padding: '5px 10px',
+                            marginBottom: 4, fontSize: '0.77rem', fontFamily: 'monospace',
+                            color: '#c9d1d9', lineHeight: 1.5,
+                          }}>
+                            {parts.map((part, j) =>
+                              part.toLowerCase() === p.alias.toLowerCase()
+                                ? <mark key={j} style={{ background: '#f59e0b33', color: '#fbbf24', borderRadius: 2, padding: '0 2px', fontWeight: 700 }}>{part}</mark>
+                                : <span key={j}>{part}</span>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
-              </div>
+              )}
             </div>
           ))}
         </div>
