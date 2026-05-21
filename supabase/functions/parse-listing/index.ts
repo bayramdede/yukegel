@@ -34,6 +34,8 @@ const BLACKLIST_PHRASES = [
 ]
 
 function cleanMessage(text: string): string {
+  // Lone surrogate karakterleri temizle (WhatsApp mesajlarında oluşabilir, JSON'u bozar)
+  text = text.replace(/[\uD800-\uDFFF]/g, '')
   return text
     .split('\n')
     .map(line => {
