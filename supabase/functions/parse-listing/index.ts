@@ -496,30 +496,68 @@ function parseMessage(message: string, aliases: Alias[]): {
         continue
       }
 
-      // Ok veya tire içeren satır yeni bir blok/hat başlangıcı — reset
-      if (blockOrigin && (ARROW_RE.test(line) || BLOCK_RESET_RE.test(line) || /[-–—]/.test(line))) {
+      // Ok, boşluklu tire veya kendi içinde ilişki olan satır → reset
+      // NOT: satır başı tire (-TUZLA) reset etmemeli — yalnızca ayraç tireler resetler
+      if (blockOrigin && (ARROW_RE.test(line) || BLOCK_RESET_RE.test(line) || splitByRelation(line) !== null)) {
         blockOrigin = null
         continue
       }
 
       if (blockOrigin) {
         const hits = findPlaces(line, aliases)
-        if (hits.length > 0 && hits[0].normalized !== blockOrigin.normalized) {
-          const key = `${blockOrigin.normalized}|${blockOrigin.district ?? ''}|${hits[0].normalized}|${hits[0].district ?? ''}`
-          if (!blockSeen.has(key)) {
-            lanes.push({
-              from: blockOrigin.normalized,
-              fromDistrict: blockOrigin.district || null,
-              to: hits[0].normalized,
-              toDistrict: hits[0].district || null,
-              vehicle: blockVehicle,
-              body_type: blockBody,
-              weight_ton: extractWeight(line),
-              pallet: extractPallet(line),
-              raw_line: line
-            })
-            blockSeen.add(key)
+        if (hits.length > 0) {
+          const h = hits[0]
+          // Aynı şehir farklı ilçe (şehiriçi güzergah) de lane sayılır
+          const isDiff = h.normalized !== blockOrigin.normalized ||
+            (h.district && blockOrigin.district && h.district !== blockOrigin.district)
+          if (isDiff) {
+            const key = `${blockOrigin.normalized}|${blockOrigin.district ?? ''}|${h.normalized}|${h.district ?? ''}`
+            if (!blockSeen.has(key)) {
+              lanes.push({
+                from: blockOrigin.normalized,
+                fromDistrict: blockOrigin.district || null,
+                to: h.normalized,
+                toDistrict: h.district || null,
+                vehicle: blockVehicle,
+                body_type: blockBody,
+                weight_ton: extractWeight(line),
+                pallet: extractPallet(line),
+                raw_line: line
+              })
+              blockSeen.add(key)
+            }
           }
+        }
+      }
+    }
+  }
+
+  // ── Pass 3: Ardışık tek-şehir satırları ────────────────────────────────────
+  // "İstanbul fatih\nİzmir Gaziemir" veya "KARAMAN DAN\nBOLU" gibi
+  // ok/tire olmadan alt alta yazılmış kalkış-varış satırlarını yakalar.
+  if (lanes.length === 0) {
+    for (let i = 0; i < lines.length - 1; i++) {
+      const hitsA = findPlaces(lines[i], aliases)
+      const hitsB = findPlaces(lines[i + 1], aliases)
+      if (
+        hitsA.length === 1 && hitsB.length === 1 &&
+        hitsA[0].priority >= 40 && hitsB[0].priority >= 40
+      ) {
+        const a = hitsA[0], b = hitsB[0]
+        const isDiff = a.normalized !== b.normalized ||
+          (a.district && b.district && a.district !== b.district)
+        if (isDiff) {
+          // Araç/yük bilgisi için çevre satırları da tara
+          const ctx = lines.slice(i, i + 4).join(' ')
+          lanes.push({
+            from: a.normalized, fromDistrict: a.district || null,
+            to: b.normalized, toDistrict: b.district || null,
+            vehicle: findVehicle(ctx, aliases),
+            body_type: findBodyType(ctx, aliases),
+            weight_ton: extractWeight(ctx),
+            pallet: extractPallet(ctx),
+            raw_line: lines[i] + ' ' + lines[i + 1]
+          })
         }
       }
     }
