@@ -93,22 +93,3 @@ export async function requireAdmin() {
   return user;
 }
 
-/**
- * Moderator veya admin olmayanı /giris'e atar.
- */
-export async function requireModerator() {
-  const user = await getCurrentUser();
-  if (!user || (user.role !== 'moderator' && user.role !== 'admin')) {
-    redirect('/giris?redirect=/moderator');
-  }
-  return user;
-}
-
-/**
- * Role'e göre default landing page döner.
- */
-export function landingForRole(role: UserRole): string {
-  if (role === 'admin') return '/admin';
-  if (role === 'moderator') return '/moderator';
-  return '/panel';
-}
