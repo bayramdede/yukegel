@@ -1,6 +1,6 @@
 # Yükegel — Proje Haritası
 > **Kullanım:** Her sohbet başında sadece bu dosyayı oku. Kaynak dosyaları sadece o dosyada değişiklik yapacaksan oku.  
-> Son güncelleme: 19 Mayıs 2026 — expires_at 48 saate düşürüldü, aktif ilan expire cron job eklendi, ana sayfa LIMIT 30 kaldırıldı (aktif havuz küçük tutularak filtreler doğru çalışır)
+> Son güncelleme: 21 Mayıs 2026 — expires_at 48 saate düşürüldü, aktif ilan expire cron job eklendi, ana sayfa LIMIT 30 kaldırıldı (aktif havuz küçük tutularak filtreler doğru çalışır)
 
 **Referans Dökümanlar:**
 - `docs/LOG_VE_GUVENLIK_SPECLERI.md` — Log format standartları, audit trail, SecurityLogger kontrol listesi
