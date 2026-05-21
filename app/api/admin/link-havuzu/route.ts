@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
   const service = getServiceClient();
   let query = service
     .from('archived_links')
-    .select('*', { count: 'exact' })
+    .select('*, raw_posts(raw_text, message_date)', { count: 'exact' })
     .eq('status', status)
     .order('created_at', { ascending: false })
     .range(offset, offset + limit - 1);
