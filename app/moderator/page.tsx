@@ -454,15 +454,15 @@ export default function Moderator() {
   }
 
   function siradakineGec(mevcutId: string, duzenlemeModu = false) {
-    const idx = filtrelenmis.findIndex(i => i.id === mevcutId);
-    const sonraki = filtrelenmis[idx + 1];
+    const idx = siralanmis.findIndex(i => i.id === mevcutId);
+    const sonraki = siralanmis[idx + 1];
     if (sonraki) {
-    setTimeout(() => {
-    ilanRefs.current[sonraki.id]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    if (duzenlemeModu) duzenleAc(sonraki);
-    }, 350);
+      setTimeout(() => {
+        ilanRefs.current[sonraki.id]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        if (duzenlemeModu) duzenleAc(sonraki);
+      }, 350);
     }
-    }
+  }
 
   async function aksiyon(id: string, yeniModerasyon: string, yeniStatus: string) {
     setIslem(id);
