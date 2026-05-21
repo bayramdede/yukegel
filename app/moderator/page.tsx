@@ -246,6 +246,10 @@ export default function Moderator() {
     } else if (filtre === 'riskli') {
       // Sprint 3: audit_score > 30, archived hariç — shadow banned dahil
       query = (query as any).gt('audit_score', 30).neq('moderation_status', 'archived');
+    } else if (filtre === 'pending') {
+      // Süresi dolmuş pending ilanları gösterme (cron arşivlemeden önce de temiz kalsın)
+      query = query.eq('moderation_status', 'pending')
+        .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`);
     } else {
       query = query.eq('moderation_status', filtre);
     }
