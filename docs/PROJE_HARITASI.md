@@ -1,6 +1,6 @@
 # Yükegel — Proje Haritası
 > **Kullanım:** Her sohbet başında sadece bu dosyayı oku. Kaynak dosyaları sadece o dosyada değişiklik yapacaksan oku.  
-> Son güncelleme: 21 Mayıs 2026 — Moderatör paneline kalite puanı (xx/100 badge) + sıralama dropdown'ı eklendi (tarih/risk/kalite, 6 seçenek)
+> Son güncelleme: 21 Mayıs 2026 — Moderatör Bekleyenler sekmesi: süresi dolmuş pending ilanlar artık gösterilmiyor (expires_at filtresi)
 
 **Referans Dökümanlar:**
 - `docs/LOG_VE_GUVENLIK_SPECLERI.md` — Log format standartları, audit trail, SecurityLogger kontrol listesi
