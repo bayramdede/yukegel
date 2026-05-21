@@ -38,6 +38,13 @@ const KARTLAR = [
     aciklama: 'no_lane alias keşfi, AI önerileri, ilan yeniden işleme.',
     aktif: true,
   },
+  {
+    yol: '/admin/link-havuzu',
+    ikon: '🔗',
+    baslik: 'Link Havuzu',
+    aciklama: 'Mesajlardan otomatik çıkarılan URL\'ler. Yeni ilan kaynakları için inceleyin.',
+    aktif: true,
+  },
 ];
 
 export default async function AdminAna() {
