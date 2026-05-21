@@ -167,9 +167,10 @@ export async function POST(req: NextRequest) {
       .map((a: any) => `"${a.alias}"=>"${a.normalized}"`)
       .join(', ');
 
-    // 3. Metinleri birleştir
+    // 3. Metinleri birleştir (lone surrogate'leri temizle — JSON serialize hatasını önler)
+    const stripSurr = (s: string) => s.replace(/[\uD800-\uDFFF]/g, '')
     const metinler = rawPosts
-      .map((r: any, i: number) => `[${i + 1}] (ID:${r.id})\n${(r.raw_text || '').substring(0, 200)}`)
+      .map((r: any, i: number) => `[${i + 1}] (ID:${r.id})\n${stripSurr((r.raw_text || '').substring(0, 200))}`)
       .join('\n\n---\n\n'); // 400→200 char: prompt boyutunu yarıya indir
 
     // 4. Haiku çağrısı
