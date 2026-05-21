@@ -190,16 +190,82 @@ function IlanKart({ ilan, kullanici }: { ilan: any; kullanici: any }) {
   );
 }
 
+<<<<<<< HEAD
 export default function HomeClient({ initialIlanlar = [] }: { initialIlanlar?: any[] }) {
   // İlanlar: server-side veriden başla — client-side spinner yok
   const [ilanlar, setIlanlar] = useState<any[]>(initialIlanlar);
   const [yukleniyor, setYukleniyor] = useState(initialIlanlar.length === 0);
   const [tip, setTip] = useState<'tumu' | 'yuk' | 'arac'>('tumu');
+=======
+// Skeleton gösterimi: auth yüklenirken hero yerine
+function HeroSkeleton() {
+  return (
+    <div style={{ borderBottom: '1px solid #1a3a2a', background: 'linear-gradient(180deg, #0d1f0f 0%, #0d1117 100%)' }}>
+      <div style={{ maxWidth: 1280, margin: '0 auto', padding: '48px 16px 40px' }}>
+        <div style={{ maxWidth: 600, display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div className="sk" style={{ width: 190, height: 26, background: '#161b22', borderRadius: 20 }} />
+          <div className="sk" style={{ width: '75%', height: 40, background: '#161b22', borderRadius: 6 }} />
+          <div className="sk" style={{ width: '55%', height: 20, background: '#161b22', borderRadius: 6 }} />
+          <div style={{ display: 'flex', gap: 12 }}>
+            <div className="sk" style={{ width: 210, height: 44, background: '#161b22', borderRadius: 8 }} />
+            <div className="sk" style={{ width: 210, height: 44, background: '#161b22', borderRadius: 8 }} />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// İlan yüklenirken iskelet kart
+function IlanSkeleton() {
+  return (
+    <div style={{ background: '#161b22', border: '1px solid #30363d', borderRadius: 8, padding: '14px 16px' }}>
+      <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+        <div className="sk" style={{ width: 60, height: 20, background: '#0d1117', borderRadius: 4 }} />
+        <div className="sk" style={{ width: 76, height: 20, background: '#0d1117', borderRadius: 4 }} />
+      </div>
+      <div className="sk" style={{ width: '42%', height: 22, background: '#0d1117', borderRadius: 4, marginBottom: 8 }} />
+      <div className="sk" style={{ width: '34%', height: 22, background: '#0d1117', borderRadius: 4, marginBottom: 10 }} />
+      <div style={{ display: 'flex', gap: 6 }}>
+        <div className="sk" style={{ width: 90, height: 18, background: '#0d1117', borderRadius: 4 }} />
+        <div className="sk" style={{ width: 68, height: 18, background: '#0d1117', borderRadius: 4 }} />
+      </div>
+    </div>
+  );
+}
+
+// Hata durumu + yeniden deneme
+function HataEkrani({ tip, onRetry }: { tip: 'timeout' | 'error'; onRetry: () => void }) {
+  return (
+    <div style={{ textAlign: 'center', padding: '80px 0', color: '#4b5563' }}>
+      <div style={{ fontSize: '2rem', marginBottom: 8 }}>{tip === 'timeout' ? '⏱️' : '⚠️'}</div>
+      <div style={{ fontWeight: 600, color: '#8b949e', marginBottom: 4 }}>
+        {tip === 'timeout' ? 'Bağlantı zaman aşımına uğradı' : 'İlanlar yüklenirken bir hata oluştu'}
+      </div>
+      <div style={{ fontSize: '0.85rem', marginBottom: 20 }}>
+        {tip === 'timeout' ? 'İnternet bağlantınızı kontrol edin ve tekrar deneyin.' : 'Sunucu ile bağlantı kurulamadı. Lütfen tekrar deneyin.'}
+      </div>
+      <button
+        onClick={onRetry}
+        style={{ background: '#22c55e', color: '#000', border: 'none', borderRadius: 7, padding: '10px 24px', fontWeight: 700, fontSize: '0.9rem', cursor: 'pointer' }}>
+        🔄 Tekrar Dene
+      </button>
+    </div>
+  );
+}
+
+export default function HomeClient() {
+  const [ilanlar, setIlanlar] = useState<any[]>([]);
+  const [yukleniyor, setYukleniyor] = useState(true);
+  const [hata, setHata] = useState<'timeout' | 'error' | null>(null);
+  const [tip, setTip] = useState<'yuk' | 'arac'>('arac');
+>>>>>>> claude/musing-khayyam-19ec02
   const [kalkis, setKalkis] = useState('');
   const [varis, setVaris] = useState('');
   // Auth: başlangıçta misafir göster, resolve olunca güncelle
   const [kullanici, setKullanici] = useState<{ display_name: string | null; email: string | null; user_type: string | null } | null>(null);
   const [authHazir, setAuthHazir] = useState(false);
+  const [yenilemeKey, setYenilemeKey] = useState(0);
 
   async function profilCek(userId: string) {
     const { data: profil } = await supabase
@@ -210,6 +276,7 @@ export default function HomeClient({ initialIlanlar = [] }: { initialIlanlar?: a
     return profil;
   }
 
+  // Auth — bir kez çalışır
   useEffect(() => {
     let cancelled = false;
 
@@ -231,6 +298,7 @@ export default function HomeClient({ initialIlanlar = [] }: { initialIlanlar?: a
       }
     })();
 
+<<<<<<< HEAD
     // Listings: sadece server-side veri yoksa client-side fetch yap (fallback)
     if (initialIlanlar.length === 0) {
       (async () => {
@@ -248,6 +316,94 @@ export default function HomeClient({ initialIlanlar = [] }: { initialIlanlar?: a
             .eq('status', 'active')
             .order('created_at', { ascending: false });
 
+=======
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event: AuthChangeEvent, session: Session | null) => {
+      if (cancelled) return;
+      if (session?.user) {
+        const profil = await profilCek(session.user.id);
+        if (cancelled) return;
+        setKullanici(profil || { display_name: null, email: session.user.email ?? null, user_type: null });
+      } else {
+        setKullanici(null);
+      }
+    });
+
+    return () => { cancelled = true; subscription.unsubscribe(); };
+  }, []);
+
+  // İlanlar — yenilemeKey değişince yeniden çalışır (retry desteği)
+  useEffect(() => {
+    let cancelled = false;
+    setYukleniyor(true);
+    setHata(null);
+
+    (async () => {
+      try {
+        const sorgu = supabase
+          .from('listings')
+          .select(`
+            id, listing_type, origin_city, origin_district,
+            contact_phone, price_offer, source, created_at,
+            trust_level, user_id, vehicle_type, body_type,
+            available_date, date_flexible,
+            listing_stops (
+              stop_order, city, district,
+              vehicle_count, cargo_type, weight_ton, pallet_count
+            )
+          `)
+          .in('moderation_status', ['approved', 'auto_published'])
+          .eq('status', 'active')
+          .eq('is_shadow_banned', false)
+          .order('created_at', { ascending: false })
+          .limit(30);
+
+        const timeout = new Promise<{ data: null; error: Error }>(resolve =>
+          setTimeout(() => resolve({ data: null, error: new Error('timeout') }), 8000)
+        );
+        const { data, error: sorguHata } = await Promise.race([sorgu, timeout]);
+
+        if (cancelled) return;
+
+        if (sorguHata) {
+          setHata(sorguHata.message === 'timeout' ? 'timeout' : 'error');
+          setYukleniyor(false);
+          return;
+        }
+
+        if (!data || data.length === 0) {
+          setIlanlar([]);
+          setYukleniyor(false);
+          return;
+        }
+
+        const baseList = (data as any[]).map((ilan: any) => {
+          const stops = (ilan.listing_stops || []).sort((a: any, b: any) => a.stop_order - b.stop_order);
+          const aracTipiList: string[] = ilan.vehicle_type?.length
+            ? ilan.vehicle_type
+            : [...new Set(stops.map((s: any) => s.cargo_type).filter(Boolean))] as string[];
+          return {
+            id: ilan.id, tip: ilan.listing_type,
+            kalkis: ilan.origin_city, kalkis_ilce: ilan.origin_district || '',
+            duraklar: stops.map((s: any) => ({ sehir: s.city, ilce: s.district || '', ton: s.weight_ton, palet: s.pallet_count, arac_adet: s.vehicle_count })),
+            kaynak: ilan.source || 'form',
+            sure: new Date(ilan.created_at).toLocaleDateString('tr-TR'),
+            tel: ilan.contact_phone, fiyat: ilan.price_offer?.toString() ?? null,
+            tarih: ilan.available_date, tarihEsnek: ilan.date_flexible,
+            aracTipleri: aracTipiList, ustyapilari: (ilan.body_type || []) as string[],
+            dogrulanmamis: !ilan.user_id || ilan.trust_level === 'social',
+            telefonDogrulandi: false,
+            yeniUye: false,
+            user_id: ilan.user_id,
+          };
+        });
+        setIlanlar(baseList);
+        setYukleniyor(false);
+
+        // Rozet zenginleştirme: user bilgilerini paralel çek
+        const userIds = [...new Set(baseList.map(i => i.user_id).filter(Boolean))];
+        if (userIds.length > 0) {
+          const { data: ks } = await supabase.from('users').select('id, phone_verified, created_at').in('id', userIds);
+>>>>>>> claude/musing-khayyam-19ec02
           if (cancelled) return;
           if (sorguHata) { setIlanlar([]); setYukleniyor(false); return; }
           if (!data || data.length === 0) { setIlanlar([]); setYukleniyor(false); return; }
@@ -305,6 +461,7 @@ export default function HomeClient({ initialIlanlar = [] }: { initialIlanlar?: a
           console.error('Listings fetch hatası:', err);
           if (!cancelled) { setIlanlar([]); setYukleniyor(false); }
         }
+<<<<<<< HEAD
       })();
     }
 
@@ -320,11 +477,23 @@ export default function HomeClient({ initialIlanlar = [] }: { initialIlanlar?: a
     });
     return () => { cancelled = true; subscription.unsubscribe(); };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+=======
+      } catch (err) {
+        console.error('Ana sayfa veri hatası:', err);
+        if (!cancelled) { setHata('error'); setYukleniyor(false); }
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [yenilemeKey]);
+
+  const filterAktif = !!(kalkis || varis);
+>>>>>>> claude/musing-khayyam-19ec02
 
   const filtered = ilanlar.filter((i: any) => {
-    if (tip !== 'tumu' && i.tip !== tip) return false;
-    if (kalkis && !i.kalkis.includes(kalkis)) return false;
-    if (varis && !i.duraklar.some((d: any) => d.sehir.includes(varis))) return false;
+    if (i.tip !== tip) return false;
+    if (kalkis && !i.kalkis?.includes(kalkis)) return false;
+    if (varis && !i.duraklar.some((d: any) => d.sehir?.includes(varis))) return false;
     return true;
   });
 
@@ -334,6 +503,7 @@ export default function HomeClient({ initialIlanlar = [] }: { initialIlanlar?: a
 
   return (
     <div style={{ minHeight: '100vh', background: '#0d1117', fontFamily: "'IBM Plex Sans', system-ui, sans-serif" }}>
+      <style>{`@keyframes skshimmer{0%,100%{opacity:.5}50%{opacity:.85}}.sk{animation:skshimmer 1.5s ease-in-out infinite}`}</style>
 
       {/* NAVBAR — misafir linkler hemen göster, auth resolve olunca güncelle */}
       <nav style={{ background: '#161b22', borderBottom: '1px solid #30363d', position: 'sticky', top: 0, zIndex: 50 }}>
@@ -362,12 +532,24 @@ export default function HomeClient({ initialIlanlar = [] }: { initialIlanlar?: a
               <a href="/giris" style={{ color: '#8b949e', fontSize: '0.85rem', textDecoration: 'none' }}>Giriş Yap</a>
               <a href="/giris" style={{ background: '#22c55e', color: '#000', fontWeight: 700, fontSize: '0.85rem', padding: '6px 16px', borderRadius: 6, textDecoration: 'none' }}>Üye Ol</a>
             </div>
+<<<<<<< HEAD
+=======
+          ) : (
+            // Auth yüklenirken navbar için yer tutucu
+            <div style={{ width: 140, height: 32, background: '#161b22', borderRadius: 6, opacity: 0 }} />
+>>>>>>> claude/musing-khayyam-19ec02
           )}
         </div>
       </nav>
 
+<<<<<<< HEAD
       {/* HERO — misafir hero hemen görünür, auth resolve olunca kişiselleşir */}
       {!kullanici && <HeroKayitsiz />}
+=======
+      {/* HERO — auth yüklenirken iskelet, hazır olunca gerçek hero */}
+      {!authHazir && <HeroSkeleton />}
+      {authHazir && !kullanici && <HeroKayitsiz />}
+>>>>>>> claude/musing-khayyam-19ec02
       {authHazir && isMusteri && <HeroMusteri ad={ad} />}
       {authHazir && isNakliyeci && <HeroNakliyeci ad={ad} />}
 
@@ -375,10 +557,10 @@ export default function HomeClient({ initialIlanlar = [] }: { initialIlanlar?: a
       <div style={{ background: '#161b22', borderBottom: '1px solid #30363d', position: 'sticky', top: 56, zIndex: 40 }}>
         <div style={{ maxWidth: 1280, margin: '0 auto', padding: '10px 16px', display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
           <div style={{ background: '#0d1117', borderRadius: 6, padding: 2, border: '1px solid #30363d', display: 'flex' }}>
-            {(['tumu', 'yuk', 'arac'] as const).map(t => (
+            {(['arac', 'yuk'] as const).map(t => (
               <button key={t} onClick={() => setTip(t)}
                 style={{ padding: '5px 12px', borderRadius: 4, border: 'none', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600, background: tip === t ? '#22c55e' : 'transparent', color: tip === t ? '#000' : '#8b949e' }}>
-                {t === 'tumu' ? 'Tümü' : t === 'yuk' ? '🔴 Yük' : '🟢 Araç'}
+                {t === 'yuk' ? '🔴 Yük' : '🟢 Araç'}
               </button>
             ))}
           </div>
@@ -392,14 +574,14 @@ export default function HomeClient({ initialIlanlar = [] }: { initialIlanlar?: a
             <option value=''>🏁 Varış İli</option>
             {ILLER.map(il => <option key={il}>{il}</option>)}
           </select>
-          {(kalkis || varis || tip !== 'tumu') && (
-            <button onClick={() => { setTip('tumu'); setKalkis(''); setVaris(''); }}
+          {filterAktif && (
+            <button onClick={() => { setKalkis(''); setVaris(''); }}
               style={{ color: '#22c55e', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600 }}>
               ✕ Temizle
             </button>
           )}
           <span style={{ color: '#8b949e', fontSize: '0.78rem', marginLeft: 'auto' }}>
-            {yukleniyor ? 'Yükleniyor...' : `${filtered.length} ilan`}
+            {yukleniyor ? 'Yükleniyor...' : hata ? '–' : `${filtered.length} ${tip === 'yuk' ? 'yük' : 'araç'} ilanı`}
           </span>
         </div>
       </div>
@@ -407,10 +589,11 @@ export default function HomeClient({ initialIlanlar = [] }: { initialIlanlar?: a
       {/* İLAN LİSTESİ */}
       <main style={{ maxWidth: 1280, margin: '0 auto', padding: '16px' }}>
         {yukleniyor ? (
-          <div style={{ textAlign: 'center', padding: '80px 0', color: '#4b5563' }}>
-            <div style={{ fontSize: '1.5rem', marginBottom: 8 }}>⏳</div>
-            <div>İlanlar yükleniyor...</div>
+          <div style={{ display: 'grid', gap: 12 }}>
+            {Array.from({ length: 6 }).map((_, i) => <IlanSkeleton key={i} />)}
           </div>
+        ) : hata ? (
+          <HataEkrani tip={hata} onRetry={() => setYenilemeKey(k => k + 1)} />
         ) : (
           <div style={{ display: 'grid', gap: 12 }}>
             {!kullanici && filtered.length > 0 ? (
@@ -425,8 +608,18 @@ export default function HomeClient({ initialIlanlar = [] }: { initialIlanlar?: a
             {filtered.length === 0 && (
               <div style={{ textAlign: 'center', padding: '80px 0', color: '#4b5563' }}>
                 <div style={{ fontSize: '2rem', marginBottom: 8 }}>🔍</div>
-                <div style={{ fontWeight: 600 }}>Filtrelerle eşleşen ilan bulunamadı</div>
-                <div style={{ fontSize: '0.85rem', marginTop: 4 }}>Filtreleri değiştirmeyi deneyin</div>
+                <div style={{ fontWeight: 600 }}>
+                  {filterAktif ? 'Filtrelerle eşleşen ilan bulunamadı' : `Henüz aktif ${tip === 'yuk' ? 'yük' : 'araç'} ilanı bulunmuyor`}
+                </div>
+                <div style={{ fontSize: '0.85rem', marginTop: 4 }}>
+                  {filterAktif ? 'Filtreleri değiştirmeyi deneyin' : 'İlk ilanı sen ekle!'}
+                </div>
+                {filterAktif && (
+                  <button onClick={() => { setKalkis(''); setVaris(''); }}
+                    style={{ marginTop: 16, color: '#22c55e', background: 'none', border: '1px solid #22c55e', borderRadius: 6, padding: '7px 16px', fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer' }}>
+                    Filtreleri Temizle
+                  </button>
+                )}
               </div>
             )}
           </div>
