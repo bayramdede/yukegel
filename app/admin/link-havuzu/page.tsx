@@ -15,6 +15,7 @@ interface ArchivedLink {
   notes: string | null;
   reviewed_at: string | null;
   created_at: string;
+  raw_posts: { raw_text: string; message_date: string | null } | null;
 }
 
 // ── Sabitler ─────────────────────────────────────────────────────────────────
