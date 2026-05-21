@@ -145,6 +145,7 @@ export default function Moderator() {
   const [filtreVaris, setFiltreVaris] = useState('');
   const [filtreAracTipi, setFiltreAracTipi] = useState('');
   const [filtreSkor, setFiltreSkor] = useState<'hepsi' | 'yesil' | 'sari' | 'kirmizi'>('hepsi');
+  const [siralama, setSiralama] = useState<'tarih_yeni' | 'tarih_eski' | 'audit_yuksek' | 'audit_dusuk' | 'kalite_yuksek' | 'kalite_dusuk'>('tarih_yeni');
 
   const [filtreTarihBaslangic, setFiltreTarihBaslangic] = useState('');
   const [filtreTarihBitis, setFiltreTarihBitis] = useState('');
@@ -264,7 +265,7 @@ export default function Moderator() {
     setIlanlar(sorted); setYukleniyor(false);
   }
 
-  // ── Client-side filtre
+  // ── Client-side filtre + sıralama
   const filtrelenmis = ilanlar.filter(ilan => {
     const stops = ilan.listing_stops || [];
     if (!sonraBakGoster && sonraBak.has(ilan.id)) return false;
@@ -287,10 +288,21 @@ export default function Moderator() {
     return true;
   });
 
+  // Sıralama uygula
+  const siralanmis = [...filtrelenmis].sort((a, b) => {
+    if (siralama === 'tarih_yeni') return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    if (siralama === 'tarih_eski') return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+    if (siralama === 'audit_yuksek') return (b.audit_score ?? 0) - (a.audit_score ?? 0);
+    if (siralama === 'audit_dusuk') return (a.audit_score ?? 0) - (b.audit_score ?? 0);
+    if (siralama === 'kalite_yuksek') return skorRenk(b).puan - skorRenk(a).puan;
+    if (siralama === 'kalite_dusuk') return skorRenk(a).puan - skorRenk(b).puan;
+    return 0;
+  });
+
   const sonraBakSayisi = ilanlar.filter(i => sonraBak.has(i.id)).length;
-  const yesil   = filtrelenmis.filter(i => skorRenk(i).badge === '🟢').length;
-  const sari    = filtrelenmis.filter(i => skorRenk(i).badge === '🟡').length;
-  const kirmizi = filtrelenmis.filter(i => skorRenk(i).badge === '🔴').length;
+  const yesil   = siralanmis.filter(i => skorRenk(i).badge === '🟢').length;
+  const sari    = siralanmis.filter(i => skorRenk(i).badge === '🟡').length;
+  const kirmizi = siralanmis.filter(i => skorRenk(i).badge === '🔴').length;
 
   // ── Checkbox
   function handleCheckbox(id: string, idx: number, e: React.MouseEvent) {
@@ -310,8 +322,8 @@ export default function Moderator() {
   }
 
   function masterToggle() {
-    if (selectedIds.size === filtrelenmis.length) setSelectedIds(new Set());
-    else setSelectedIds(new Set(filtrelenmis.map(i => i.id)));
+    if (selectedIds.size === siralanmis.length) setSelectedIds(new Set());
+    else setSelectedIds(new Set(siralanmis.map(i => i.id)));
   }
 
   // ── Toplu işlem helper (service role API)
@@ -399,14 +411,14 @@ export default function Moderator() {
   }
 
   async function topluOnaylaYesil() {
-    const ids = filtrelenmis.filter(i => skorRenk(i).badge === '🟢').map(i => i.id);
+    const ids = siralanmis.filter(i => skorRenk(i).badge === '🟢').map(i => i.id);
     if (!ids.length) return;
     try { await topluApi(ids, 'approve'); getIlanlar(); getIstatistik(); }
     catch (e: any) { alert('Toplu onay hatası: ' + e.message); }
   }
 
   async function topluReddet(badge: '🟡' | '🔴') {
-    const ids = filtrelenmis.filter(i => skorRenk(i).badge === badge).map(i => i.id);
+    const ids = siralanmis.filter(i => skorRenk(i).badge === badge).map(i => i.id);
     if (!ids.length) return;
     try { await topluApi(ids, 'reject'); getIlanlar(); getIstatistik(); }
     catch (e: any) { alert('Toplu red hatası: ' + e.message); }
@@ -445,12 +457,12 @@ export default function Moderator() {
     const idx = filtrelenmis.findIndex(i => i.id === mevcutId);
     const sonraki = filtrelenmis[idx + 1];
     if (sonraki) {
-      setTimeout(() => {
-        ilanRefs.current[sonraki.id]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        if (duzenlemeModu) duzenleAc(sonraki);
-      }, 350);
+    setTimeout(() => {
+    ilanRefs.current[sonraki.id]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (duzenlemeModu) duzenleAc(sonraki);
+    }, 350);
     }
-  }
+    }
 
   async function aksiyon(id: string, yeniModerasyon: string, yeniStatus: string) {
     setIslem(id);
@@ -552,11 +564,11 @@ export default function Moderator() {
   function filtreTemizle() {
     setAramaMetni(''); setFiltreTelefon(''); setFiltreKalkis(''); setFiltreVaris('');
     setFiltreAracTipi(''); setFiltreSkor('hepsi');
-    setFiltreIlanTipi('hepsi');
+    setFiltreIlanTipi('hepsi'); setSiralama('tarih_yeni');
     setFiltreKaynak(''); setFiltreKullaniciId(''); setFiltreKullaniciAd('');
     setFiltreTarihBaslangic(''); setFiltreTarihBitis('');
   }
-  const aktifFiltre = aramaMetni || filtreTelefon || filtreKalkis || filtreVaris || filtreAracTipi || filtreSkor !== 'hepsi' || filtreKaynak || filtreKullaniciId || filtreTarihBaslangic || filtreTarihBitis || filtreIlanTipi !== 'hepsi';
+  const aktifFiltre = aramaMetni || filtreTelefon || filtreKalkis || filtreVaris || filtreAracTipi || filtreSkor !== 'hepsi' || filtreKaynak || filtreKullaniciId || filtreTarihBaslangic || filtreTarihBitis || filtreIlanTipi !== 'hepsi' || siralama !== 'tarih_yeni';
 
   if (yetkiKontrol) return (
     <div style={{ minHeight: '100vh', background: '#0d1117', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#8b949e' }}>⏳</div>
@@ -781,9 +793,9 @@ export default function Moderator() {
         <div style={{ maxWidth: 1400, margin: '0 auto', padding: '8px 16px' }}>
           {/* Tab satırı */}
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginBottom: 8 }}>
-            {filtre !== 'no_lane' && filtrelenmis.length > 0 && (
+            {filtre !== 'no_lane' && siralanmis.length > 0 && (
               <div onClick={masterToggle} title="Tümünü seç / seçimi kaldır"
-                style={{ width: 18, height: 18, border: '2px solid', borderRadius: 4, cursor: 'pointer', flexShrink: 0, borderColor: selectedIds.size > 0 ? '#3b82f6' : '#374151', background: selectedIds.size > 0 && selectedIds.size === filtrelenmis.length ? '#3b82f6' : selectedIds.size > 0 ? '#1e3a5f' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                style={{ width: 18, height: 18, border: '2px solid', borderRadius: 4, cursor: 'pointer', flexShrink: 0, borderColor: selectedIds.size > 0 ? '#3b82f6' : '#374151', background: selectedIds.size > 0 && selectedIds.size === siralanmis.length ? '#3b82f6' : selectedIds.size > 0 ? '#1e3a5f' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 {selectedIds.size > 0 && (
                   <span style={{ color: selectedIds.size === filtrelenmis.length ? '#fff' : '#60a5fa', fontSize: '0.65rem', fontWeight: 900 }}>
                     {selectedIds.size === filtrelenmis.length ? '✓' : '–'}
@@ -819,7 +831,7 @@ export default function Moderator() {
             )}
             <span style={{ color: '#8b949e', fontSize: '0.75rem', marginLeft: 'auto' }}>
               {selectedIds.size > 0 && <span style={{ color: '#3b82f6', fontWeight: 700 }}>{selectedIds.size} seçili · </span>}
-              {filtrelenmis.length} / {ilanlar.length} ilan
+              {siralanmis.length} / {ilanlar.length} ilan
             </span>
           </div>
           {/* Filtre satırı */}
@@ -868,6 +880,15 @@ export default function Moderator() {
               <span style={{ color: '#4b5563', fontSize: '0.75rem' }}>–</span>
               <input type="date" value={filtreTarihBitis} onChange={e => setFiltreTarihBitis(e.target.value)} style={{ ...inp, width: 130, borderRadius: 6, colorScheme: 'dark' }} />
             </div>
+            <select value={siralama} onChange={e => setSiralama(e.target.value as any)}
+              style={{ ...inp, width: 170, borderRadius: 6, borderColor: siralama !== 'tarih_yeni' ? '#22c55e' : '#374151' }}>
+              <option value='tarih_yeni'>🕐 Yeniden Eskiye</option>
+              <option value='tarih_eski'>🕐 Eskiden Yenie</option>
+              <option value='audit_yuksek'>⚠️ Risk: Yüksekten Düşüğe</option>
+              <option value='audit_dusuk'>⚠️ Risk: Düşükten Yükseğe</option>
+              <option value='kalite_yuksek'>✅ Kalite: İyiden Kötüye</option>
+              <option value='kalite_dusuk'>❌ Kalite: Kötüden İyiye</option>
+            </select>
             {aktifFiltre && (
               <button onClick={filtreTemizle} style={{ background: 'none', border: '1px solid #374151', color: '#6b7280', borderRadius: 6, padding: '4px 10px', fontSize: '0.78rem', cursor: 'pointer' }}>✕ Temizle</button>
             )}
@@ -942,7 +963,7 @@ export default function Moderator() {
           </div>
         ) : yukleniyor ? (
           <div style={{ textAlign: 'center', padding: '60px 0', color: '#4b5563' }}>⏳ Yükleniyor...</div>
-        ) : filtrelenmis.length === 0 ? (
+        ) : siralanmis.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '60px 0', color: '#4b5563' }}>
             <div style={{ fontSize: '2rem', marginBottom: 8 }}>{filtre === 'riskli' ? '✅' : '🔍'}</div>
             <div>{filtre === 'riskli' ? 'Riskli ilan yok, platform temiz!' : 'Filtrelerle eşleşen ilan bulunamadı'}</div>
@@ -950,7 +971,7 @@ export default function Moderator() {
           </div>
         ) : (
           <div style={{ display: 'grid', gap: 10 }}>
-            {filtrelenmis.map((ilan, idx) => {
+            {siralanmis.map((ilan, idx) => {
               const durum = DURUM_RENK[ilan.moderation_status] || DURUM_RENK.passive;
               const isYuk = ilan.listing_type === 'yuk';
               const durumIslem = islem === ilan.id;
@@ -977,8 +998,9 @@ export default function Moderator() {
                       style={{ width: 18, height: 18, border: '2px solid', borderRadius: 4, cursor: 'pointer', flexShrink: 0, borderColor: secili ? '#3b82f6' : '#374151', background: secili ? '#3b82f6' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       {secili && <span style={{ color: '#fff', fontSize: '0.65rem', fontWeight: 900 }}>✓</span>}
                     </div>
-                    <span style={{ fontSize: '1rem' }} title={`${skor.label} (${skor.puan})`}>{skor.badge}</span>
+                    <span style={{ fontSize: '1rem' }}>{skor.badge}</span>
                     <span style={{ background: '#1f2937', color: '#9ca3af', fontSize: '0.65rem', fontWeight: 700, padding: '1px 6px', borderRadius: 4 }}>{skor.label}</span>
+                    <span title="Kalite puanı (100 üzerinden)" style={{ background: '#0a1a0a', color: skor.badge === '🟢' ? '#22c55e' : skor.badge === '🟡' ? '#fbbf24' : '#f87171', fontSize: '0.65rem', fontWeight: 800, padding: '1px 7px', borderRadius: 4, border: `1px solid ${skor.badge === '🟢' ? '#166534' : skor.badge === '🟡' ? '#854d0e' : '#7f1d1d'}` }}>{skor.puan}/100</span>
                     <span style={{ background: isYuk ? '#7f1d1d' : '#14532d', color: isYuk ? '#fca5a5' : '#86efac', fontSize: '0.68rem', fontWeight: 700, padding: '2px 8px', borderRadius: 4 }}>{isYuk ? '🔴 YÜK' : '🟢 ARAÇ'}</span>
                     <span style={{ background: durum.bg, color: durum.color, fontSize: '0.68rem', fontWeight: 700, padding: '2px 8px', borderRadius: 4 }}>{ilan.moderation_status}</span>
                     {/* Sprint 3: audit score badge — sadece score > 0 ise */}
