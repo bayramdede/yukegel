@@ -42,7 +42,9 @@ async function fetchInitialIlanlar() {
 
     const ilanIds = data.map((i) => i.id);
 
-    const { data: stopsData } = await supabase
+    // Service role kullan — listing_stops RLS anon'u blokluyor olabilir
+    const serviceSupabase = createServiceClient();
+    const { data: stopsData } = await serviceSupabase
       .from('listing_stops')
       .select('listing_id, stop_order, city, district, vehicle_count, cargo_type, weight_ton, pallet_count')
       .in('listing_id', ilanIds)
