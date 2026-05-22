@@ -34,6 +34,9 @@ export default function RootLayout({
   return (
     <html lang="tr" className={`${ibmPlexSans.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col">{children}</body>
+      {process.env.NEXT_PUBLIC_GA_ID && (
+        <GoogleAnalytics gaId={process.env.NEXT_PUBLIC_GA_ID} />
+      )}
     </html>
   );
 }
