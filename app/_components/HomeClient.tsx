@@ -467,20 +467,16 @@ export default function HomeClient({ initialIlanlar = [] }: { initialIlanlar?: a
             <option value=''>🏁 Varış İli</option>
             {ILLER.map(il => <option key={il}>{il}</option>)}
           </select>
-          {aracTipiOptions.length > 0 && (
-            <select value={aracTipi} onChange={e => setAracTipi(e.target.value)}
-              style={{ background: '#0d1117', color: '#e2e8f0', border: '1px solid #30363d', borderRadius: 6, padding: '5px 10px', fontSize: '0.82rem', cursor: 'pointer' }}>
-              <option value=''>🚛 Araç Tipi</option>
-              {aracTipiOptions.map(a => <option key={a}>{a}</option>)}
-            </select>
-          )}
-          {kasaTipiOptions.length > 0 && (
-            <select value={kasaTipi} onChange={e => setKasaTipi(e.target.value)}
-              style={{ background: '#0d1117', color: '#e2e8f0', border: '1px solid #30363d', borderRadius: 6, padding: '5px 10px', fontSize: '0.82rem', cursor: 'pointer' }}>
-              <option value=''>📦 Kasa Tipi</option>
-              {kasaTipiOptions.map(k => <option key={k}>{k}</option>)}
-            </select>
-          )}
+          <select value={aracTipi} onChange={e => setAracTipi(e.target.value)}
+            style={{ background: '#0d1117', color: '#e2e8f0', border: '1px solid #30363d', borderRadius: 6, padding: '5px 10px', fontSize: '0.82rem', cursor: 'pointer' }}>
+            <option value=''>🚛 Araç Tipi</option>
+            {ARAC_TIPLERI_FILTRE.map(a => <option key={a}>{a}</option>)}
+          </select>
+          <select value={kasaTipi} onChange={e => setKasaTipi(e.target.value)}
+            style={{ background: '#0d1117', color: '#e2e8f0', border: '1px solid #30363d', borderRadius: 6, padding: '5px 10px', fontSize: '0.82rem', cursor: 'pointer' }}>
+            <option value=''>📦 Kasa Tipi</option>
+            {KASA_TIPLERI_FILTRE.map(k => <option key={k}>{k}</option>)}
+          </select>
           {filterAktif && (
             <button onClick={() => { setKalkis(''); setVaris(''); setAracTipi(''); setKasaTipi(''); }}
               style={{ color: '#22c55e', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600 }}>
