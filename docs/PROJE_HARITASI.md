@@ -292,6 +292,7 @@ Açık rotalar: /giris, /auth/, /profil-tamamla, /nasil-calisir, /hakkimizda,
 - **Güven ve İtibar Sistemi** — çift körleme puanlama, rozet sistemi (detay: §15)
 - Trust score, MERNİS/GİB, canlı konum
 - Doğal dil arama, ödeme sistemi, push bildirim
+- **WhatsApp'tan İlan Gönder CTA** — Hero bölümüne WhatsApp ikonlu buton ("💬 İlanını WhatsApp'tan Gönder"), GA event + deep link entegrasyonu
 
 ---
 
