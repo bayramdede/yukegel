@@ -149,19 +149,21 @@ function IlanKart({ ilan, kullanici }: { ilan: any; kullanici: any }) {
             {ilan.yeniUye && !ilan.dogrulanmamis && <span style={{ background: '#1e1b4b', color: '#a5b4fc', fontSize: '0.7rem', fontWeight: 700, padding: '2px 8px', borderRadius: 4 }}>🆕 Yeni Üye</span>}
             {ilan.fiyat && <span style={{ background: '#0d2b1a', color: '#22c55e', fontSize: '0.7rem', fontWeight: 700, padding: '2px 8px', borderRadius: 4 }}>✓ Fiyat Belli</span>}
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4 }}>
-            <span style={{ color: '#22c55e', fontSize: '0.7rem', fontWeight: 700, minWidth: 16 }}>K</span>
-            <span style={{ color: '#e2e8f0', fontWeight: 700, fontSize: '0.95rem' }}>{ilan.kalkis}</span>
-            {ilan.kalkis_ilce && <span style={{ color: '#8b949e', fontSize: '0.82rem' }}>/ {ilan.kalkis_ilce}</span>}
+          {/* Rota: Kalkış → Durak1 → Durak2 */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 8, flexWrap: 'wrap' }}>
+            <span style={{ color: '#22c55e', fontWeight: 800, fontSize: '0.95rem' }}>
+              {ilan.kalkis}{ilan.kalkis_ilce ? ` / ${ilan.kalkis_ilce}` : ''}
+            </span>
+            {ilan.duraklar.map((d: any, i: number) => (
+              <span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                <span style={{ color: '#4b5563', fontWeight: 700, fontSize: '0.9rem' }}>→</span>
+                <span style={{ color: '#e2e8f0', fontWeight: 700, fontSize: '0.95rem' }}>
+                  {d.sehir}{d.ilce ? ` / ${d.ilce}` : ''}
+                </span>
+                {d.arac_adet > 1 && <span style={{ color: '#60a5fa', fontSize: '0.78rem' }}>({d.arac_adet} araç)</span>}
+              </span>
+            ))}
           </div>
-          {ilan.duraklar.map((d: any, i: number) => (
-            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4 }}>
-              <span style={{ color: '#f97316', fontSize: '0.7rem', fontWeight: 700, minWidth: 16 }}>V</span>
-              <span style={{ color: '#e2e8f0', fontWeight: 700, fontSize: '0.95rem' }}>{d.sehir}</span>
-              {d.ilce && <span style={{ color: '#8b949e', fontSize: '0.82rem' }}>/ {d.ilce}</span>}
-              {d.arac_adet > 1 && <span style={{ color: '#60a5fa', fontSize: '0.78rem', marginLeft: 4 }}>{d.arac_adet} araç</span>}
-            </div>
-          ))}
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
             {ilan.aracTipleri.map((t: string) => <Chip key={'a-' + t} label={'🚛 ' + t} bg='#1a2535' color='#60a5fa' />)}
             {ilan.ustyapilari.map((u: string) => <Chip key={'u-' + u} label={u} />)}
