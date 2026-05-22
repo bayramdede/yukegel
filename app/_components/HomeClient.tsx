@@ -61,6 +61,16 @@ function HeroKayitsiz() {
             <a href="/giris" style={{ background: '#161b22', color: '#e2e8f0', fontWeight: 700, fontSize: '0.95rem', padding: '12px 24px', borderRadius: 8, textDecoration: 'none', border: '1px solid #30363d' }}>
               🚛 Yük Taşımak İstiyorum
             </a>
+            <button
+              onClick={() => {
+                sendGAEvent({ event: 'buttonClicked', value: 'WhatsApp_Ilan_Gonder' });
+                const waNumara = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '';
+                const mesaj = encodeURIComponent('Merhaba, Yükegel üzerinden ilan vermek istiyorum.');
+                window.open(`https://wa.me/${waNumara}?text=${mesaj}`, '_blank');
+              }}
+              style={{ background: '#25d366', color: '#000', fontWeight: 800, fontSize: '0.95rem', padding: '12px 24px', borderRadius: 8, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}>
+              💬 İlanını WhatsApp'tan Gönder
+            </button>
           </div>
           <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
             {[{ ikon: '⚡', text: 'Anında İlan' }, { ikon: '🔒', text: 'Güvenli Platform' }, { ikon: '🆓', text: 'Ücretsiz' }, { ikon: '📱', text: 'WhatsApp Entegrasyonu' }].map(item => (
