@@ -144,7 +144,7 @@ function IlanKart({ ilan, kullanici }: { ilan: any; kullanici: any }) {
               {isYuk ? '🔴 YÜK' : '🟢 ARAÇ'}
             </span>
             <span style={{ background: kaynak.bg, color: kaynak.color, fontSize: '0.7rem', fontWeight: 600, padding: '2px 8px', borderRadius: 4 }}>{kaynak.label}</span>
-            {ilan.dogrulanmamis && <span style={{ background: '#292019', color: '#f59e0b', fontSize: '0.7rem', fontWeight: 700, padding: '2px 8px', borderRadius: 4 }}>⚠️ Doğrulanmamış</span>}
+            {ilan.dogrulanmamis && <span style={{ background: '#1a1f2e', color: '#94a3b8', fontSize: '0.7rem', fontWeight: 600, padding: '2px 8px', borderRadius: 4 }}>🔗 Dış Kaynak İlanı</span>}
             {ilan.telefonDogrulandi && <span style={{ background: '#0d2b1a', color: '#22c55e', fontSize: '0.7rem', fontWeight: 700, padding: '2px 8px', borderRadius: 4 }}>✅ Tel Doğrulandı</span>}
             {ilan.yeniUye && !ilan.dogrulanmamis && <span style={{ background: '#1e1b4b', color: '#a5b4fc', fontSize: '0.7rem', fontWeight: 700, padding: '2px 8px', borderRadius: 4 }}>🆕 Yeni Üye</span>}
             {ilan.fiyat && <span style={{ background: '#0d2b1a', color: '#22c55e', fontSize: '0.7rem', fontWeight: 700, padding: '2px 8px', borderRadius: 4 }}>✓ Fiyat Belli</span>}
