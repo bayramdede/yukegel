@@ -387,14 +387,20 @@ export default function HomeClient({ initialIlanlar = [] }: { initialIlanlar?: a
     return () => { cancelled = true; };
   }, [yenilemeKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const filterAktif = !!(kalkis || varis);
+  const filterAktif = !!(kalkis || varis || aracTipi || kasaTipi);
 
   const filtered = ilanlar.filter((i: any) => {
     if (i.tip !== tip) return false;
     if (kalkis && !i.kalkis?.includes(kalkis)) return false;
     if (varis && !i.duraklar.some((d: any) => d.sehir?.includes(varis))) return false;
+    if (aracTipi && !i.aracTipleri.some((a: string) => a === aracTipi)) return false;
+    if (kasaTipi && !i.ustyapilari.some((u: string) => u === kasaTipi)) return false;
     return true;
   });
+
+  // Dinamik filtre seçenekleri — mevcut ilanlardan türetilir
+  const aracTipiOptions = [...new Set(ilanlar.flatMap((i: any) => i.aracTipleri as string[]))].sort();
+  const kasaTipiOptions = [...new Set(ilanlar.flatMap((i: any) => i.ustyapilari as string[]))].sort();
 
   const ad = kullanici?.display_name || kullanici?.email?.split('@')[0] || 'Kullanıcı';
   const isNakliyeci = kullanici?.user_type === 'arac_sahibi';
