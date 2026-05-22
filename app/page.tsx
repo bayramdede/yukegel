@@ -22,16 +22,18 @@ function yeniUye(createdAt: string | null): boolean {
 
 async function fetchInitialIlanlar() {
   try {
-    const supabase = createPublicServerClient();
+    // Service role: listing_stops RLS anon'u blokluyor; joined query ile tek seferde çek
+    const serviceSupabase = createServiceClient();
+    const publicSupabase = createPublicServerClient();
 
-    // expires_at 48 saat — aktif havuz küçük, LIMIT yok
-    const { data, error } = await supabase
+    const { data, error } = await serviceSupabase
       .from('listings')
       .select(`
         id, listing_type, origin_city, origin_district,
         contact_phone, price_offer, source, created_at,
         trust_level, user_id, vehicle_type, body_type,
-        available_date, date_flexible
+        available_date, date_flexible,
+        listing_stops ( listing_id, stop_order, city, district, vehicle_count, cargo_type, weight_ton, pallet_count )
       `)
       .in('moderation_status', ['approved', 'auto_published'])
       .eq('is_shadow_banned', false)
@@ -40,26 +42,10 @@ async function fetchInitialIlanlar() {
 
     if (error || !data || data.length === 0) return [];
 
-    const ilanIds = data.map((i) => i.id);
-
-    // Service role kullan — listing_stops RLS anon'u blokluyor olabilir
-    const serviceSupabase = createServiceClient();
-    const { data: stopsData } = await serviceSupabase
-      .from('listing_stops')
-      .select('listing_id, stop_order, city, district, vehicle_count, cargo_type, weight_ton, pallet_count')
-      .in('listing_id', ilanIds)
-      .order('stop_order', { ascending: true });
-
-    const stopsMap: Record<string, any[]> = {};
-    for (const s of (stopsData || []) as any[]) {
-      if (!stopsMap[s.listing_id]) stopsMap[s.listing_id] = [];
-      stopsMap[s.listing_id].push(s);
-    }
-
     const userIds = [...new Set(data.map((i) => i.user_id).filter(Boolean))];
     const kullaniciMap: Record<string, { phone_verified: boolean; created_at: string }> = {};
     if (userIds.length > 0) {
-      const { data: ks } = await supabase
+      const { data: ks } = await publicSupabase
         .from('users')
         .select('id, phone_verified, created_at')
         .in('id', userIds as string[]);
@@ -67,7 +53,8 @@ async function fetchInitialIlanlar() {
     }
 
     return data.map((ilan: any) => {
-      const stops = stopsMap[ilan.id] || [];
+      const stops = ((ilan.listing_stops || []) as any[])
+        .sort((a: any, b: any) => a.stop_order - b.stop_order);
       const aracTipiList: string[] = ilan.vehicle_type?.length
         ? ilan.vehicle_type
         : ([...new Set(stops.map((s: any) => s.cargo_type).filter(Boolean))] as string[]);
