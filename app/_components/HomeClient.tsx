@@ -18,6 +18,10 @@ const ILLER = [
   'Ardahan','Iğdır','Yalova','Karabük','Kilis','Osmaniye','Düzce'
 ];
 
+// ilan-ver/page.tsx ile aynı listeler — statik, değişmez
+const ARAC_TIPLERI_FILTRE = ['TIR', 'Kırkayak', 'Kamyon', 'Kamyonet', 'Panelvan'];
+const KASA_TIPLERI_FILTRE = ['Tenteli', 'Açık Kasa', 'Kapalı Kasa', 'Frigorifik', 'Damperli', 'Lowbed', 'Liftli', 'Silo'];
+
 const KAYNAK_ETIKET: Record<string, { label: string; bg: string; color: string }> = {
   form:     { label: 'Yükegel',     bg: '#0d2b1a', color: '#22c55e' },
   whatsapp: { label: '📱 WhatsApp', bg: '#0d2b0d', color: '#4ade80' },
