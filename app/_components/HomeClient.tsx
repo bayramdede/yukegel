@@ -299,13 +299,17 @@ export default function HomeClient({ initialIlanlar = [] }: { initialIlanlar?: a
 
     (async () => {
       try {
+        // listing_stops RLS anon'u blokluyor — joined query ile tek seferde çek
+        // (listing_stops SELECT politikası eklenince anon client da çalışır;
+        //  yoksa SSR initialIlanlar verisi kullanılır, retry hâlâ boş döner)
         const sorgu = supabase
           .from('listings')
           .select(`
             id, listing_type, origin_city, origin_district,
             contact_phone, price_offer, source, created_at,
             trust_level, user_id, vehicle_type, body_type,
-            available_date, date_flexible
+            available_date, date_flexible,
+            listing_stops ( listing_id, stop_order, city, district, vehicle_count, cargo_type, weight_ton, pallet_count )
           `)
           .in('moderation_status', ['approved', 'auto_published'])
           .eq('is_shadow_banned', false)
@@ -332,23 +336,9 @@ export default function HomeClient({ initialIlanlar = [] }: { initialIlanlar?: a
           return;
         }
 
-        const ilanIds = (data as any[]).map((i: any) => i.id);
-        const { data: stopsData } = await supabase
-          .from('listing_stops')
-          .select('listing_id, stop_order, city, district, vehicle_count, cargo_type, weight_ton, pallet_count')
-          .in('listing_id', ilanIds)
-          .order('stop_order', { ascending: true });
-
-        if (cancelled) return;
-
-        const stopsMap: Record<string, any[]> = {};
-        for (const s of (stopsData || []) as any[]) {
-          if (!stopsMap[s.listing_id]) stopsMap[s.listing_id] = [];
-          stopsMap[s.listing_id].push(s);
-        }
-
         const baseList = (data as any[]).map((ilan: any) => {
-          const stops = stopsMap[ilan.id] || [];
+          const stops = ((ilan.listing_stops || []) as any[])
+            .sort((a: any, b: any) => a.stop_order - b.stop_order);
           const aracTipiList: string[] = ilan.vehicle_type?.length
             ? ilan.vehicle_type
             : ([...new Set(stops.map((s: any) => s.cargo_type).filter(Boolean))] as string[]);
