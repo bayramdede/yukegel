@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
+import { sendGAEvent } from '@next/third-parties/google';
 import { createClient } from '../../lib/supabase';
 import type { AuthChangeEvent, Session } from '@supabase/supabase-js';
 
