@@ -4,7 +4,7 @@ import Footer from './_components/Footer';
 import { createPublicServerClient } from '../lib/supabase-server';
 import { createClient } from '@supabase/supabase-js';
 
-// listing_stops için service role client — RLS'i bypass eder (hassas veri yok)
+// Service role client — RLS'i bypass eder; listings + listing_stops birlikte çekilir
 function createServiceClient() {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
