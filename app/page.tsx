@@ -2,6 +2,15 @@
 import HomeClient from './_components/HomeClient';
 import Footer from './_components/Footer';
 import { createPublicServerClient } from '../lib/supabase-server';
+import { createClient } from '@supabase/supabase-js';
+
+// listing_stops için service role client — RLS'i bypass eder (hassas veri yok)
+function createServiceClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+}
 
 // 30 saniyede bir arka planda yenilenir (stale-while-revalidate)
 export const revalidate = 30;
