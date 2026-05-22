@@ -402,9 +402,6 @@ export default function HomeClient({ initialIlanlar = [] }: { initialIlanlar?: a
     return true;
   });
 
-  // Dinamik filtre seçenekleri — mevcut ilanlardan türetilir
-  const aracTipiOptions = [...new Set(ilanlar.flatMap((i: any) => i.aracTipleri as string[]))].sort();
-  const kasaTipiOptions = [...new Set(ilanlar.flatMap((i: any) => i.ustyapilari as string[]))].sort();
 
   const ad = kullanici?.display_name || kullanici?.email?.split('@')[0] || 'Kullanıcı';
   const isNakliyeci = kullanici?.user_type === 'arac_sahibi';
