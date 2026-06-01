@@ -97,7 +97,19 @@ moderation_status: 'pending'|'approved'|'rejected'|'auto_published'|'archived'|'
 status: 'active'|'passive'|'completed'|'expired'
 is_shadow_banned, audit_score, internal_audit_logs (JSONB)
 user_id (nullable), source: 'form'|'whatsapp'|'excel'
+shadow_profile_id (nullable FK → shadow_profiles.id) — kayıtsız kullanıcı ilanları için
 ```
+
+### `shadow_profiles` — Gölge Profil / CRM
+```
+phone (unique, +90 normalize), name, company_name, notes, status: 'active'|'blocked'|'converted'
+converted_user_id (nullable FK → auth.users.id)
+```
+- Migration: `docs/20260601_shadow_profiles_crm.sql`
+- Upsert RPC: `upsert_shadow_profile(p_phone text) → uuid`
+- View: `shadow_profile_summary` (listing_count, last_listing_at, first_listing_at)
+- Admin UI: `/admin/crm` — tablo + detay drawer (ilan geçmişi, isim/not/şirket düzenleme, durum yönetimi)
+- API: `app/api/admin/crm/route.ts` (GET + PATCH), `app/api/admin/crm/[id]/route.ts` (GET detay)
 
 ### `users` — `role`, `is_active`, `user_type`, `phone_verified`, `company_name`, `ai_listing_quota_daily` (NULL = sistem default)
 ### `raw_posts`, `aliases`, `vehicles`
