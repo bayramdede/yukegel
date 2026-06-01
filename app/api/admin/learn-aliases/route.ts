@@ -273,23 +273,22 @@ KURALLAR:
       return NextResponse.json({ success: true, message: 'LLM yeni alias bulamadi', suggestions: [] });
     }
 
-    // 5. Confidence ≥70 olanları pending olarak yaz
-    const kayitlar = suggestions
+    // 5a. Confidence ≥70 olanları filtrele
+    const adaylar = suggestions
       .filter((s: any) => s.alias && s.normalized && (s.confidence ?? 0) >= 70)
       .map((s: any) => ({
         alias: String(s.alias).trim().toLowerCase(),
         normalized: String(s.normalized).trim(),
         type: 'city',
         district: s.district ? String(s.district).trim() : null,
-        is_active: false,          // admin onaylayana kadar pasif
+        is_active: false,
         created_by_ai: true,
         is_approved: false,
         llm_confidence: Math.min(100, Math.max(0, Number(s.confidence ?? 80))),
         source_listing_ids: Array.isArray(s.source_ids) ? s.source_ids : [],
       }));
 
-    if (kayitlar.length === 0) {
-      // Oneriler vardı ama hepsi confidence < 70 — yine de isaretle
+    if (adaylar.length === 0) {
       await svc
         .from('raw_posts')
         .update({ slh_scanned_at: new Date().toISOString() })
@@ -298,6 +297,28 @@ KURALLAR:
         success: true,
         message: 'Guvenilir oneri bulunamadi (confidence < 70)',
         suggestions,
+      });
+    }
+
+    // 5b. Zaten onaylanmış alias'ları hariç tut — upsert bunları ezip is_approved=false yapmasın
+    const { data: mevcutOnaylilar } = await svc
+      .from('aliases')
+      .select('alias')
+      .in('alias', adaylar.map((a: any) => a.alias))
+      .eq('is_approved', true);
+
+    const onayliSet = new Set((mevcutOnaylilar ?? []).map((a: any) => a.alias));
+    const kayitlar = adaylar.filter((a: any) => !onayliSet.has(a.alias));
+
+    if (kayitlar.length === 0) {
+      await svc
+        .from('raw_posts')
+        .update({ slh_scanned_at: new Date().toISOString() })
+        .in('id', rawPosts.map((r: any) => r.id));
+      return NextResponse.json({
+        success: true,
+        message: 'LLM onerilerinin tamami zaten mevcut — yeni alias yok',
+        suggestions: [],
       });
     }
 
