@@ -329,12 +329,22 @@ KURALLAR:
 
     if (insertErr) return NextResponse.json({ error: insertErr.message }, { status: 500 });
 
-    // Taranmis kayitlari isaretle (bir daha LLM'e gonderilmesin)
+    // Taranmis raw_posts'lari isaretle
     const taranmisIds = rawPosts.map((r: any) => r.id);
     await svc
       .from('raw_posts')
       .update({ slh_scanned_at: new Date().toISOString() })
       .in('id', taranmisIds);
+
+    // Bu batch'te kesfedilen normalized degerleri ile eslesen listings'leri de isaretle
+    const kesfedilenNorm = kayitlar.map((k: any) => k.normalized);
+    if (kesfedilenNorm.length > 0) {
+      await svc
+        .from('listings')
+        .update({ slh_scanned_at: new Date().toISOString() })
+        .is('slh_scanned_at', null)
+        .in('origin_city', kesfedilenNorm);
+    }
 
     return NextResponse.json({
       success: true,
