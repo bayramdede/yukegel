@@ -312,6 +312,7 @@ KURALLAR:
         .from('raw_posts')
         .update({ slh_scanned_at: new Date().toISOString() })
         .in('id', rawPosts.map((r: any) => r.id));
+      await svc.from('raw_posts').update({ slh_scanned_at: now }).in('id', rawPostIds);
       return NextResponse.json({
         success: true,
         message: 'LLM onerilerinin tamami zaten mevcut — yeni alias yok',
