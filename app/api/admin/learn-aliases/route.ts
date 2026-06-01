@@ -265,12 +265,11 @@ KURALLAR:
       return NextResponse.json({ error: 'LLM yaniti parse edilemedi', raw: clean.slice(0, 500) }, { status: 502 });
     }
 
+    const now = new Date().toISOString();
+    const rawPostIds = rawPosts.map((r: any) => r.id);
+
     if (!Array.isArray(suggestions) || suggestions.length === 0) {
-      // LLM baktı ama öneri çıkarmadı — yine de işaretle
-      await svc
-        .from('raw_posts')
-        .update({ slh_scanned_at: new Date().toISOString() })
-        .in('id', rawPosts.map((r: any) => r.id));
+      await svc.from('raw_posts').update({ slh_scanned_at: now }).in('id', rawPostIds);
       return NextResponse.json({ success: true, message: 'LLM yeni alias bulamadi', suggestions: [] });
     }
 
