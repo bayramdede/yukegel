@@ -65,7 +65,7 @@ yukegel/
 │   ├── ilan-ver/ (page + actions + TopluYukle + MetindenIlan)
 │   ├── araclarim/page.tsx
 │   ├── moderator/ + moderator-giris/
-│   ├── admin/ (page + kullanicilar + sistem-ayarlari + guvenlik)
+│   ├── admin/ (page + kullanicilar + sistem-ayarlari + guvenlik + crm)
 │   ├── cikis/
 │   └── u/[username]/page.tsx
 │
