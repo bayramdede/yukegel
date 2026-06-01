@@ -139,9 +139,7 @@ export async function POST(req: NextRequest) {
 
   if (!userRow) {
     // Kayıtsız numara → shadow profile upsert (fire-and-forget, hata ana akışı etkilemez)
-    svc.rpc('upsert_shadow_profile', { p_phone: phone })
-      .then(() => {})
-      .catch(() => {});
+    void svc.rpc('upsert_shadow_profile', { p_phone: phone }).then(() => {});
     structuredLog('INFO', 'whatsapp-webhook', 'Kayıtsız numara → shadow profile upsert + kayıt linki gönderildi', { phone });
     return twiml(
       'Merhaba! 👋 Bu numara YÜKEGEL\'de kayıtlı değil.\n\nKayıt olmak için: https://www.yukegel.com/giris\n\nKayıt sonrası WhatsApp\'tan ilan oluşturabilirsiniz.'
