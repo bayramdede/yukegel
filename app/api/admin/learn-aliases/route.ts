@@ -327,11 +327,7 @@ KURALLAR:
     if (insertErr) return NextResponse.json({ error: insertErr.message }, { status: 500 });
 
     // Taranmis raw_posts'lari isaretle
-    const taranmisIds = rawPosts.map((r: any) => r.id);
-    await svc
-      .from('raw_posts')
-      .update({ slh_scanned_at: new Date().toISOString() })
-      .in('id', taranmisIds);
+    await svc.from('raw_posts').update({ slh_scanned_at: now }).in('id', rawPostIds);
 
     // Bu batch'te kesfedilen normalized degerleri ile eslesen listings'leri de isaretle
     const kesfedilenNorm = kayitlar.map((k: any) => k.normalized);
