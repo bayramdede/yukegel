@@ -45,6 +45,13 @@ const KARTLAR = [
     aciklama: 'Mesajlardan otomatik çıkarılan URL\'ler. Yeni ilan kaynakları için inceleyin.',
     aktif: true,
   },
+  {
+    yol: '/admin/crm',
+    ikon: '📊',
+    baslik: 'CRM — Gölge Profiller',
+    aciklama: 'WhatsApp\'tan ilan atan kayıtsız kullanıcılar. Balinalar, geçmiş ilanlar, davet fırsatları.',
+    aktif: true,
+  },
 ];
 
 export default async function AdminAna() {
