@@ -247,6 +247,13 @@ Açık rotalar: /giris, /auth/, /profil-tamamla, /nasil-calisir, /hakkimizda,
 ## 14. GÖREV DURUMU
 
 ### ✅ Tamamlanan
+- **Shadow Profile / CRM** (1 Haziran 2026): WhatsApp'tan ilan atan kayıtsız numaraların otomatik profillenmesi.
+  - `shadow_profiles` tablosu: phone (unique), name, company_name, notes, status, converted_user_id. RLS: admin only.
+  - `listings.shadow_profile_id` FK eklendi.
+  - Upsert RPC: `upsert_shadow_profile(p_phone)` — transaction güvenli, SECURITY DEFINER.
+  - Entegrasyon: `/api/whatsapp/route.ts` (kayıtsız numara → fire-and-forget upsert + kayıt linki), `parse-listing` Edge Fn (contact_phone + user_id yoksa → upsert + listing'e shadow_profile_id set).
+  - Admin CRM paneli `/admin/crm`: filtreleme (telefon arama, min ilan sayısı "balina" modu), sayfalama, sağdan açılan detay drawer (ilan geçmişi, isim/not/şirket düzenleme, durum).
+  - Migration: `docs/20260601_shadow_profiles_crm.sql`.
 - **Link Havuzu** (21 May 2026): Mesajlardaki URL'leri otomatik arşivleyen ve admin/moderatöre "yeni ilan kaynağı" olarak sunan radar sistemi.
   - `archived_links` tablosu: `url, domain, category, status, source, raw_post_id, user_id`. Unique index `url` üzerinde (duplicate yok).
   - URL çıkarma: `extractUrlsFromText` / `extractUrlsEdge` helper — `https?://...` regex, trailing punctuation trim, domain tespiti.
