@@ -27,6 +27,7 @@ interface Listing {
   created_at: string;
   notes: string | null;
   vehicle_type: string[] | null;
+  raw_text: string | null;
 }
 
 interface DetailData {
