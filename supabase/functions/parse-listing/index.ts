@@ -708,6 +708,19 @@ Deno.serve(async (req) => {
       lineGroups.get(key)!.push(lane)
     }
 
+    // Shadow profile upsert: ilanı gönderen telefon kayıtlı kullanıcı değilse
+    // shadow_profiles'a upsert et ve shadow_profile_id al
+    let shadowProfileId: string | null = null
+    const contactPhone = result.phones[0] || null
+    if (contactPhone && !rawPost.user_id) {
+      // +90 normalize: "05XXXXXXXXX" → "+905XXXXXXXXX"
+      const normalizedPhone = contactPhone.startsWith('0')
+        ? '+9' + contactPhone
+        : contactPhone
+      const { data: spData } = await supabase.rpc('upsert_shadow_profile', { p_phone: normalizedPhone })
+      if (spData) shadowProfileId = spData as string
+    }
+
     let created = 0
     for (const [, lanes] of lineGroups) {
       const firstLane = lanes[0]
@@ -715,7 +728,7 @@ Deno.serve(async (req) => {
         listing_type: result.ad_type,
         origin_city: firstLane.from,
         origin_district: firstLane.fromDistrict || null,
-        contact_phone: result.phones[0] || null,
+        contact_phone: contactPhone,
         source: rawPost.source || 'whatsapp',
         moderation_status: 'pending',
         trust_level: 'social',
@@ -724,6 +737,7 @@ Deno.serve(async (req) => {
         notes: firstLane.raw_line,
         vehicle_type: firstLane.vehicle ? [firstLane.vehicle] : null,
         body_type: firstLane.body_type ? [firstLane.body_type] : null,
+        shadow_profile_id: shadowProfileId,
       }).select().single()
 
       if (listing) {
