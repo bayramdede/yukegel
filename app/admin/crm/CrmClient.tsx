@@ -369,6 +369,23 @@ export default function CrmClient() {
                               {l.notes}
                             </div>
                           )}
+                          {l.raw_text && (
+                            <div onClick={e => { e.preventDefault(); e.stopPropagation(); toggleRaw(l.id); }} style={{ marginTop: 8 }}>
+                              <span style={{ color: '#4b9eff', fontSize: '0.72rem', cursor: 'pointer', userSelect: 'none' }}>
+                                {expandedRaw.has(l.id) ? '▲ Ham metni gizle' : '▼ Ham metni göster'}
+                              </span>
+                              {expandedRaw.has(l.id) && (
+                                <pre style={{
+                                  marginTop: 8, background: '#0d1117', border: '1px solid #30363d',
+                                  borderRadius: 6, padding: '10px 12px', fontSize: '0.75rem',
+                                  color: '#94a3b8', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+                                  maxHeight: 260, overflowY: 'auto', fontFamily: 'monospace',
+                                }}>
+                                  {l.raw_text}
+                                </pre>
+                              )}
+                            </div>
+                          )}
                         </a>
                       ))}
                     </div>
