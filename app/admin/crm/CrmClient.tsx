@@ -80,6 +80,7 @@ export default function CrmClient() {
   const [search, setSearch]        = useState('');
   const [minListings, setMin]      = useState(0);
   const [selected, setSelected]    = useState<DetailData | null>(null);
+  const [expandedRaw, setExpanded] = useState<Set<string>>(new Set());
   const [drawerOpen, setDrawer]    = useState(false);
   const [editDraft, setEditDraft]  = useState<Partial<ShadowProfile>>({});
   const [saving, setSaving]        = useState(false);
