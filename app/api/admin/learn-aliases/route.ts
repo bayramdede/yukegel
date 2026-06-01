@@ -52,12 +52,13 @@ export async function GET(req: NextRequest) {
       .order('created_at', { ascending: false })
       .limit(Math.floor(limit * 0.7));
 
-    // 2. Form ilanları — origin_city boş
+    // 2. Form ilanları — origin_city boş + SLH taranmamış
     const { data: noOrigin, error: noOrgErr } = await svc
       .from('listings')
       .select('id, raw_text, source, origin_city, notes, created_at, moderation_status')
       .is('origin_city', null)
       .not('raw_text', 'is', null)
+      .is('slh_scanned_at', null)        // sadece hiç taranmamışlar
       .order('created_at', { ascending: false })
       .limit(Math.floor(limit * 0.3));
 
