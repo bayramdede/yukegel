@@ -402,6 +402,13 @@ export default function CrmClient() {
                   )}
 
                   {/* ── Sekme: AI Profil Analizi ── */}
+                  {drawerTab === 'analiz' && (() => {
+                    // Sekme ilk açıldığında kaydedilmiş analizi çek
+                    if (!analiz && !analizLoading && !analizErr) {
+                      loadAnaliz(selected.profile.id);
+                    }
+                    return null;
+                  })()}
                   {drawerTab === 'analiz' && (
                     <div>
                       {!analiz && !analizLoading && !analizErr && (
