@@ -102,3 +102,10 @@ GROUP BY sp.id;
 
 -- View erişim: admin servis rolü ile çalışır
 GRANT SELECT ON public.shadow_profile_summary TO authenticated;
+
+-- ============================================================
+-- Ek: AI analiz sonuçlarını sakla (2026-06-02)
+-- ============================================================
+ALTER TABLE public.shadow_profiles
+  ADD COLUMN IF NOT EXISTS ai_analiz       jsonb,
+  ADD COLUMN IF NOT EXISTS ai_analiz_at    timestamptz;
