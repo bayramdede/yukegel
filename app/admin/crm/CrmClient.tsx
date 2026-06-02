@@ -297,129 +297,275 @@ export default function CrmClient() {
             {detailLoading ? (
               <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#8b949e' }}>Yükleniyor…</div>
             ) : selected ? (
-              <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 24, flex: 1 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
 
                 {/* İstatistik şerit */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, padding: '16px 24px 0' }}>
                   {[
                     { label: 'Toplam İlan', val: selected.profile.listing_count },
                     { label: 'İlk İlan', val: tarih(selected.profile.first_listing_at) },
                     { label: 'Son İlan', val: tarih(selected.profile.last_listing_at) },
                   ].map(c => (
-                    <div key={c.label} style={{ background: '#161b22', border: '1px solid #21262d', borderRadius: 8, padding: '12px 14px' }}>
-                      <div style={{ color: '#8b949e', fontSize: '0.72rem', marginBottom: 4 }}>{c.label}</div>
-                      <div style={{ color: '#e2e8f0', fontWeight: 700, fontSize: '1rem' }}>{c.val}</div>
+                    <div key={c.label} style={{ background: '#161b22', border: '1px solid #21262d', borderRadius: 8, padding: '10px 12px' }}>
+                      <div style={{ color: '#8b949e', fontSize: '0.68rem', marginBottom: 3 }}>{c.label}</div>
+                      <div style={{ color: '#e2e8f0', fontWeight: 700, fontSize: '0.95rem' }}>{c.val}</div>
                     </div>
                   ))}
                 </div>
 
-                {/* Düzenleme formu */}
-                <div style={{ background: '#161b22', border: '1px solid #21262d', borderRadius: 10, padding: 18 }}>
-                  <div style={{ color: '#e2e8f0', fontWeight: 700, fontSize: '0.9rem', marginBottom: 14 }}>✏️ Profil Bilgileri</div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                    {([
-                      { field: 'name',         label: 'İsim',      placeholder: 'Ahmet Yılmaz' },
-                      { field: 'company_name', label: 'Firma Adı', placeholder: 'Yılmaz Nakliyat' },
-                    ] as const).map(f => (
-                      <div key={f.field}>
-                        <label style={{ color: '#8b949e', fontSize: '0.78rem', display: 'block', marginBottom: 5 }}>{f.label}</label>
-                        <input
-                          value={(editDraft as any)[f.field] ?? ''}
-                          onChange={e => setEditDraft(d => ({ ...d, [f.field]: e.target.value }))}
-                          placeholder={f.placeholder}
-                          style={{ width: '100%', background: '#0d1117', border: '1px solid #30363d', color: '#e2e8f0', borderRadius: 7, padding: '8px 12px', fontSize: '0.88rem', outline: 'none', boxSizing: 'border-box' }}
-                        />
-                      </div>
-                    ))}
-                    <div>
-                      <label style={{ color: '#8b949e', fontSize: '0.78rem', display: 'block', marginBottom: 5 }}>Özel Notlar</label>
-                      <textarea
-                        value={editDraft.notes ?? ''}
-                        onChange={e => setEditDraft(d => ({ ...d, notes: e.target.value }))}
-                        placeholder="Örn: Genelde Adana-Mersin arası çalışıyor, komisyoncu olabilir."
-                        rows={3}
-                        style={{ width: '100%', background: '#0d1117', border: '1px solid #30363d', color: '#e2e8f0', borderRadius: 7, padding: '8px 12px', fontSize: '0.88rem', outline: 'none', resize: 'vertical', boxSizing: 'border-box' }}
-                      />
-                    </div>
-                    <div>
-                      <label style={{ color: '#8b949e', fontSize: '0.78rem', display: 'block', marginBottom: 5 }}>Durum</label>
-                      <select
-                        value={editDraft.status}
-                        onChange={e => setEditDraft(d => ({ ...d, status: e.target.value as any }))}
-                        style={{ background: '#0d1117', border: '1px solid #30363d', color: '#e2e8f0', borderRadius: 7, padding: '8px 12px', fontSize: '0.88rem', outline: 'none' }}
-                      >
-                        <option value="active">Aktif</option>
-                        <option value="blocked">Engelli</option>
-                        <option value="converted">Kayıt Oldu</option>
-                      </select>
-                    </div>
-                  </div>
-                  <button
-                    onClick={saveEdit}
-                    disabled={saving}
-                    style={{ marginTop: 16, background: '#22c55e', color: '#0d1117', border: 'none', borderRadius: 8, padding: '10px 22px', fontWeight: 700, fontSize: '0.88rem', cursor: 'pointer', opacity: saving ? 0.6 : 1 }}
-                  >
-                    {saving ? 'Kaydediliyor…' : 'Kaydet'}
-                  </button>
+                {/* Sekme çubuğu */}
+                <div style={{ display: 'flex', borderBottom: '1px solid #21262d', padding: '14px 24px 0', gap: 4 }}>
+                  {([
+                    { id: 'ilanlar', label: `📋 İlanlar (${selected.listings.length})` },
+                    { id: 'analiz',  label: '🤖 AI Profil Analizi' },
+                    { id: 'profil',  label: '✏️ Profil Bilgileri' },
+                  ] as const).map(t => (
+                    <button
+                      key={t.id}
+                      onClick={() => setDrawerTab(t.id)}
+                      style={{
+                        background: 'transparent', border: 'none', cursor: 'pointer',
+                        padding: '8px 14px', fontSize: '0.82rem', fontWeight: drawerTab === t.id ? 700 : 400,
+                        color: drawerTab === t.id ? '#22c55e' : '#8b949e',
+                        borderBottom: drawerTab === t.id ? '2px solid #22c55e' : '2px solid transparent',
+                        marginBottom: -1,
+                      }}
+                    >
+                      {t.label}
+                    </button>
+                  ))}
                 </div>
 
-                {/* İlan geçmişi */}
-                <div>
-                  <div style={{ color: '#e2e8f0', fontWeight: 700, fontSize: '0.9rem', marginBottom: 12 }}>
-                    📋 İlan Geçmişi ({selected.listings.length})
-                  </div>
-                  {selected.listings.length === 0 ? (
-                    <div style={{ color: '#8b949e', fontSize: '0.85rem', padding: '20px 0', textAlign: 'center' }}>Henüz ilan yok.</div>
-                  ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                      {selected.listings.map(l => (
-                        <a
-                          key={l.id}
-                          href={`/ilan/${l.id}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          style={{ background: '#161b22', border: '1px solid #21262d', borderRadius: 8, padding: '10px 14px', textDecoration: 'none', display: 'block' }}
-                        >
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-                            <span style={{ color: '#e2e8f0', fontWeight: 600, fontSize: '0.85rem' }}>
-                              {l.origin_city ?? '—'} · {l.listing_type === 'yuk' ? '📦 Yük' : '🚛 Araç'}
-                            </span>
-                            <span style={{ color: '#8b949e', fontSize: '0.75rem' }}>{tarih(l.created_at)}</span>
-                          </div>
-                          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                            {mod_badge(l.moderation_status)}
-                            {l.vehicle_type?.map(v => (
-                              <span key={v} style={{ background: '#1e293b', color: '#94a3b8', fontSize: '0.65rem', fontWeight: 600, padding: '1px 6px', borderRadius: 4 }}>{v}</span>
-                            ))}
-                          </div>
-                          {l.notes && (
-                            <div style={{ color: '#6b7280', fontSize: '0.75rem', marginTop: 5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {l.notes}
-                            </div>
-                          )}
-                          {l.raw_text && (
-                            <div onClick={e => { e.preventDefault(); e.stopPropagation(); toggleRaw(l.id); }} style={{ marginTop: 8 }}>
-                              <span style={{ color: '#4b9eff', fontSize: '0.72rem', cursor: 'pointer', userSelect: 'none' }}>
-                                {expandedRaw.has(l.id) ? '▲ Ham metni gizle' : '▼ Ham metni göster'}
+                {/* Sekme içerikleri */}
+                <div style={{ flex: 1, overflowY: 'auto', padding: 24 }}>
+
+                  {/* ── Sekme: İlanlar ── */}
+                  {drawerTab === 'ilanlar' && (
+                    selected.listings.length === 0 ? (
+                      <div style={{ color: '#8b949e', fontSize: '0.85rem', textAlign: 'center', paddingTop: 40 }}>Henüz ilan yok.</div>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        {selected.listings.map(l => (
+                          <a
+                            key={l.id}
+                            href={`/ilan/${l.id}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{ background: '#161b22', border: '1px solid #21262d', borderRadius: 8, padding: '10px 14px', textDecoration: 'none', display: 'block' }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                              <span style={{ color: '#e2e8f0', fontWeight: 600, fontSize: '0.85rem' }}>
+                                {l.origin_city ?? '—'} · {l.listing_type === 'yuk' ? '📦 Yük' : '🚛 Araç'}
                               </span>
-                              {expandedRaw.has(l.id) && (
-                                <pre style={{
-                                  marginTop: 8, background: '#0d1117', border: '1px solid #30363d',
-                                  borderRadius: 6, padding: '10px 12px', fontSize: '0.75rem',
-                                  color: '#94a3b8', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
-                                  maxHeight: 260, overflowY: 'auto', fontFamily: 'monospace',
-                                }}>
-                                  {l.raw_text}
-                                </pre>
-                              )}
+                              <span style={{ color: '#8b949e', fontSize: '0.75rem' }}>{tarih(l.created_at)}</span>
+                            </div>
+                            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                              {mod_badge(l.moderation_status)}
+                              {l.vehicle_type?.map(v => (
+                                <span key={v} style={{ background: '#1e293b', color: '#94a3b8', fontSize: '0.65rem', fontWeight: 600, padding: '1px 6px', borderRadius: 4 }}>{v}</span>
+                              ))}
+                            </div>
+                            {l.notes && (
+                              <div style={{ color: '#6b7280', fontSize: '0.75rem', marginTop: 5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {l.notes}
+                              </div>
+                            )}
+                            {l.raw_text && (
+                              <div onClick={e => { e.preventDefault(); e.stopPropagation(); toggleRaw(l.id); }} style={{ marginTop: 8 }}>
+                                <span style={{ color: '#4b9eff', fontSize: '0.72rem', cursor: 'pointer', userSelect: 'none' }}>
+                                  {expandedRaw.has(l.id) ? '▲ Ham metni gizle' : '▼ Ham metni göster'}
+                                </span>
+                                {expandedRaw.has(l.id) && (
+                                  <pre style={{
+                                    marginTop: 8, background: '#0d1117', border: '1px solid #30363d',
+                                    borderRadius: 6, padding: '10px 12px', fontSize: '0.75rem',
+                                    color: '#94a3b8', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+                                    maxHeight: 260, overflowY: 'auto', fontFamily: 'monospace',
+                                  }}>
+                                    {l.raw_text}
+                                  </pre>
+                                )}
+                              </div>
+                            )}
+                          </a>
+                        ))}
+                      </div>
+                    )
+                  )}
+
+                  {/* ── Sekme: AI Profil Analizi ── */}
+                  {drawerTab === 'analiz' && (
+                    <div>
+                      {!analiz && !analizLoading && !analizErr && (
+                        <div style={{ textAlign: 'center', paddingTop: 32 }}>
+                          <div style={{ color: '#e2e8f0', fontWeight: 700, fontSize: '1rem', marginBottom: 10 }}>
+                            🤖 AI ile Profil Analizi
+                          </div>
+                          <div style={{ color: '#8b949e', fontSize: '0.85rem', marginBottom: 24, lineHeight: 1.6 }}>
+                            Bu numaranın tüm ham ilan mesajları Haiku tarafından okunacak.<br />
+                            Rota kalıpları, araç tercihleri, çalışma stili ve kişi tipi tespit edilecek.
+                          </div>
+                          <button
+                            onClick={() => runAnaliz(selected.profile.id)}
+                            style={{ background: '#22c55e', color: '#0d1117', border: 'none', borderRadius: 8, padding: '12px 28px', fontWeight: 800, fontSize: '0.95rem', cursor: 'pointer' }}
+                          >
+                            ▶ Analizi Başlat
+                          </button>
+                        </div>
+                      )}
+
+                      {analizLoading && (
+                        <div style={{ textAlign: 'center', paddingTop: 60, color: '#8b949e' }}>
+                          <div style={{ fontSize: '2rem', marginBottom: 12 }}>⏳</div>
+                          <div>Mesajlar okunuyor ve analiz ediliyor…</div>
+                        </div>
+                      )}
+
+                      {analizErr && (
+                        <div style={{ background: '#2d0a0a', border: '1px solid #7f1d1d', borderRadius: 8, padding: 16, color: '#f87171', fontSize: '0.85rem' }}>
+                          {analizErr}
+                          <button onClick={() => runAnaliz(selected.profile.id)} style={{ marginLeft: 12, background: 'transparent', border: 'none', color: '#f87171', cursor: 'pointer', textDecoration: 'underline', fontSize: '0.85rem' }}>
+                            Tekrar dene
+                          </button>
+                        </div>
+                      )}
+
+                      {analiz && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                          {/* Tip rozeti + özet */}
+                          <div style={{ background: '#161b22', border: '1px solid #21262d', borderRadius: 10, padding: 18 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+                              <span style={{
+                                background: analiz.tip === 'nakliyeci' ? '#0d2818' : analiz.tip === 'komisyoncu' ? '#2d1a00' : analiz.tip === 'musteri' ? '#1e3a5f' : '#1e293b',
+                                color: analiz.tip === 'nakliyeci' ? '#22c55e' : analiz.tip === 'komisyoncu' ? '#f59e0b' : analiz.tip === 'musteri' ? '#60a5fa' : '#94a3b8',
+                                fontWeight: 800, fontSize: '0.78rem', padding: '4px 12px', borderRadius: 6, textTransform: 'uppercase',
+                              }}>
+                                {analiz.tip}
+                              </span>
+                              <span style={{
+                                background: analiz.aktivite_yogunlugu === 'yüksek' ? '#2d1a00' : '#1e293b',
+                                color: analiz.aktivite_yogunlugu === 'yüksek' ? '#f59e0b' : '#94a3b8',
+                                fontSize: '0.72rem', fontWeight: 600, padding: '3px 10px', borderRadius: 6,
+                              }}>
+                                {analiz.aktivite_yogunlugu} aktivite
+                              </span>
+                              <span style={{ background: '#1e293b', color: '#94a3b8', fontSize: '0.72rem', fontWeight: 600, padding: '3px 10px', borderRadius: 6 }}>
+                                {analiz.calisma_stili}
+                              </span>
+                            </div>
+                            <p style={{ color: '#cbd5e1', fontSize: '0.88rem', lineHeight: 1.65, margin: 0 }}>{analiz.ozet}</p>
+                            <p style={{ color: '#6b7280', fontSize: '0.78rem', marginTop: 8, marginBottom: 0, fontStyle: 'italic' }}>{analiz.tip_aciklama}</p>
+                          </div>
+
+                          {/* Rotalar */}
+                          {analiz.aktif_rotalar.length > 0 && (
+                            <div style={{ background: '#161b22', border: '1px solid #21262d', borderRadius: 10, padding: 16 }}>
+                              <div style={{ color: '#8b949e', fontSize: '0.72rem', fontWeight: 700, marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.05em' }}>📍 Aktif Rotalar</div>
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                                {analiz.aktif_rotalar.map((r, i) => (
+                                  <span key={i} style={{ background: '#0d2818', color: '#4ade80', fontSize: '0.8rem', fontWeight: 600, padding: '4px 12px', borderRadius: 20 }}>{r}</span>
+                                ))}
+                              </div>
                             </div>
                           )}
-                        </a>
-                      ))}
+
+                          {/* Araç & Yük tipleri */}
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                            {analiz.arac_tipleri.length > 0 && (
+                              <div style={{ background: '#161b22', border: '1px solid #21262d', borderRadius: 10, padding: 16 }}>
+                                <div style={{ color: '#8b949e', fontSize: '0.72rem', fontWeight: 700, marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.05em' }}>🚛 Araç</div>
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                                  {analiz.arac_tipleri.map((a, i) => (
+                                    <span key={i} style={{ background: '#1e293b', color: '#94a3b8', fontSize: '0.78rem', padding: '3px 10px', borderRadius: 6 }}>{a}</span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                            {analiz.yuk_tipleri.length > 0 && (
+                              <div style={{ background: '#161b22', border: '1px solid #21262d', borderRadius: 10, padding: 16 }}>
+                                <div style={{ color: '#8b949e', fontSize: '0.72rem', fontWeight: 700, marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.05em' }}>📦 Yük</div>
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                                  {analiz.yuk_tipleri.map((y, i) => (
+                                    <span key={i} style={{ background: '#1e293b', color: '#94a3b8', fontSize: '0.78rem', padding: '3px 10px', borderRadius: 6 }}>{y}</span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* İlginç notlar */}
+                          {analiz.ilginc_notlar.length > 0 && (
+                            <div style={{ background: '#2d1a00', border: '1px solid #78350f', borderRadius: 10, padding: 16 }}>
+                              <div style={{ color: '#f59e0b', fontSize: '0.72rem', fontWeight: 700, marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.05em' }}>⚠️ Dikkat Çeken</div>
+                              <ul style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                {analiz.ilginc_notlar.map((n, i) => (
+                                  <li key={i} style={{ color: '#fcd34d', fontSize: '0.83rem', lineHeight: 1.5 }}>{n}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+
+                          <button
+                            onClick={() => runAnaliz(selected.profile.id)}
+                            style={{ background: 'transparent', border: '1px solid #30363d', color: '#8b949e', borderRadius: 8, padding: '8px 16px', fontSize: '0.8rem', cursor: 'pointer' }}
+                          >
+                            🔄 Yeniden Analiz Et
+                          </button>
+                        </div>
+                      )}
                     </div>
                   )}
-                </div>
 
+                  {/* ── Sekme: Profil Bilgileri ── */}
+                  {drawerTab === 'profil' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                      {([
+                        { field: 'name',         label: 'İsim',      placeholder: 'Ahmet Yılmaz' },
+                        { field: 'company_name', label: 'Firma Adı', placeholder: 'Yılmaz Nakliyat' },
+                      ] as const).map(f => (
+                        <div key={f.field}>
+                          <label style={{ color: '#8b949e', fontSize: '0.78rem', display: 'block', marginBottom: 5 }}>{f.label}</label>
+                          <input
+                            value={(editDraft as any)[f.field] ?? ''}
+                            onChange={e => setEditDraft(d => ({ ...d, [f.field]: e.target.value }))}
+                            placeholder={f.placeholder}
+                            style={{ width: '100%', background: '#0d1117', border: '1px solid #30363d', color: '#e2e8f0', borderRadius: 7, padding: '8px 12px', fontSize: '0.88rem', outline: 'none', boxSizing: 'border-box' }}
+                          />
+                        </div>
+                      ))}
+                      <div>
+                        <label style={{ color: '#8b949e', fontSize: '0.78rem', display: 'block', marginBottom: 5 }}>Özel Notlar</label>
+                        <textarea
+                          value={editDraft.notes ?? ''}
+                          onChange={e => setEditDraft(d => ({ ...d, notes: e.target.value }))}
+                          placeholder="Örn: Genelde Adana-Mersin arası çalışıyor, komisyoncu olabilir."
+                          rows={4}
+                          style={{ width: '100%', background: '#0d1117', border: '1px solid #30363d', color: '#e2e8f0', borderRadius: 7, padding: '8px 12px', fontSize: '0.88rem', outline: 'none', resize: 'vertical', boxSizing: 'border-box' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ color: '#8b949e', fontSize: '0.78rem', display: 'block', marginBottom: 5 }}>Durum</label>
+                        <select
+                          value={editDraft.status}
+                          onChange={e => setEditDraft(d => ({ ...d, status: e.target.value as any }))}
+                          style={{ background: '#0d1117', border: '1px solid #30363d', color: '#e2e8f0', borderRadius: 7, padding: '8px 12px', fontSize: '0.88rem', outline: 'none' }}
+                        >
+                          <option value="active">Aktif</option>
+                          <option value="blocked">Engelli</option>
+                          <option value="converted">Kayıt Oldu</option>
+                        </select>
+                      </div>
+                      <button
+                        onClick={saveEdit}
+                        disabled={saving}
+                        style={{ marginTop: 4, background: '#22c55e', color: '#0d1117', border: 'none', borderRadius: 8, padding: '10px 22px', fontWeight: 700, fontSize: '0.88rem', cursor: 'pointer', opacity: saving ? 0.6 : 1, alignSelf: 'flex-start' }}
+                      >
+                        {saving ? 'Kaydediliyor…' : 'Kaydet'}
+                      </button>
+                    </div>
+                  )}
+
+                </div>
               </div>
             ) : null}
           </div>
