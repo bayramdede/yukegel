@@ -151,7 +151,7 @@ export default function CrmClient() {
   async function openDetail(profile: ShadowProfile) {
     setExpanded(new Set());
     setDrawerTab('ilanlar');
-    setAnaliz(null); setAE('');
+    setAnaliz(null); setAE(''); setAnalizAt(null);
     setDrawer(true);
     setDL(true);
     setSelected(null);
