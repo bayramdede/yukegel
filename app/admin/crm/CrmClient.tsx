@@ -97,6 +97,7 @@ export default function CrmClient() {
   const [analiz, setAnaliz]        = useState<Analiz | null>(null);
   const [analizLoading, setAL]     = useState(false);
   const [analizErr, setAE]         = useState('');
+  const [analizAt, setAnalizAt]    = useState<string | null>(null);
   const [drawerOpen, setDrawer]    = useState(false);
   const [editDraft, setEditDraft]  = useState<Partial<ShadowProfile>>({});
   const [saving, setSaving]        = useState(false);
