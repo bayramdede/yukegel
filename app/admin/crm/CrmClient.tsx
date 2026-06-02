@@ -129,9 +129,21 @@ export default function CrmClient() {
     });
   }
 
+  // AI Analiz
+  async function runAnaliz(id: string) {
+    setAL(true); setAE(''); setAnaliz(null);
+    const res = await fetch(`/api/admin/crm/${id}/analiz`, { method: 'POST' });
+    const json = await res.json();
+    if (json.error) setAE(json.error);
+    else setAnaliz(json.analiz);
+    setAL(false);
+  }
+
   // Detay drawer aç
   async function openDetail(profile: ShadowProfile) {
     setExpanded(new Set());
+    setDrawerTab('ilanlar');
+    setAnaliz(null); setAE('');
     setDrawer(true);
     setDL(true);
     setSelected(null);
