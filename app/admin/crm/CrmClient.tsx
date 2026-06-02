@@ -35,6 +35,18 @@ interface DetailData {
   listings: Listing[];
 }
 
+interface Analiz {
+  ozet: string;
+  tip: string;
+  tip_aciklama: string;
+  aktif_rotalar: string[];
+  arac_tipleri: string[];
+  yuk_tipleri: string[];
+  calisma_stili: string;
+  aktivite_yogunlugu: string;
+  ilginc_notlar: string[];
+}
+
 // ── Yardımcılar ───────────────────────────────────────────────────────────────
 function tarih(iso: string | null) {
   if (!iso) return '—';
