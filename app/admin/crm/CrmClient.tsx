@@ -130,13 +130,20 @@ export default function CrmClient() {
     });
   }
 
-  // AI Analiz
+  // AI Analiz — kaydedilmiş sonucu yükle (GET)
+  async function loadAnaliz(id: string) {
+    const res = await fetch(`/api/admin/crm/${id}/analiz`);
+    const json = await res.json();
+    if (json.analiz) { setAnaliz(json.analiz); setAnalizAt(json.ai_analiz_at ?? null); }
+  }
+
+  // AI Analiz — yeni çalıştır ve kaydet (POST)
   async function runAnaliz(id: string) {
-    setAL(true); setAE(''); setAnaliz(null);
+    setAL(true); setAE(''); setAnaliz(null); setAnalizAt(null);
     const res = await fetch(`/api/admin/crm/${id}/analiz`, { method: 'POST' });
     const json = await res.json();
     if (json.error) setAE(json.error);
-    else setAnaliz(json.analiz);
+    else { setAnaliz(json.analiz); setAnalizAt(json.ai_analiz_at ?? null); }
     setAL(false);
   }
 
