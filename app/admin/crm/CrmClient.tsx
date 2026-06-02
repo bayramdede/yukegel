@@ -520,12 +520,19 @@ export default function CrmClient() {
                             </div>
                           )}
 
-                          <button
-                            onClick={() => runAnaliz(selected.profile.id)}
-                            style={{ background: 'transparent', border: '1px solid #30363d', color: '#8b949e', borderRadius: 8, padding: '8px 16px', fontSize: '0.8rem', cursor: 'pointer' }}
-                          >
-                            🔄 Yeniden Analiz Et
-                          </button>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                            <button
+                              onClick={() => runAnaliz(selected.profile.id)}
+                              style={{ background: 'transparent', border: '1px solid #30363d', color: '#8b949e', borderRadius: 8, padding: '8px 16px', fontSize: '0.8rem', cursor: 'pointer' }}
+                            >
+                              🔄 Yeniden Analiz Et
+                            </button>
+                            {analizAt && (
+                              <span style={{ color: '#4b5563', fontSize: '0.72rem' }}>
+                                ✅ Kaydedildi · {new Date(analizAt).toLocaleString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       )}
                     </div>
