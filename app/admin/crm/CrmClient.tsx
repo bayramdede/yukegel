@@ -122,6 +122,13 @@ export default function CrmClient() {
 
   useEffect(() => { load(); }, []); // eslint-disable-line
 
+  // Analiz sekmesi açıldığında kaydedilmiş analizi çek (tek seferlik)
+  useEffect(() => {
+    if (drawerTab === 'analiz' && selected && !analiz && !analizLoading && !analizErr) {
+      loadAnaliz(selected.profile.id);
+    }
+  }, [drawerTab, selected]); // eslint-disable-line
+
   function toggleRaw(id: string) {
     setExpanded(prev => {
       const next = new Set(prev);
