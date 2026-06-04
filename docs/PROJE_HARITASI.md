@@ -174,6 +174,7 @@ ZIP/TXT → raw_posts → DB trigger → parse-listing Edge Fn → listings → 
 | `/api/admin/kullanici` | role / is_active / moderator_sources / **ai_listing_quota_daily** PATCH |
 | `/api/admin/crm` | Shadow Profile listesi (GET) + güncelle (PATCH) |
 | `/api/admin/crm/[id]` | Shadow Profile detay + ilan geçmişi (GET) |
+| `/api/admin/radar` | Radar Intelligence: rota tarama, lead listesi, phone history (GET) |
 
 ---
 
