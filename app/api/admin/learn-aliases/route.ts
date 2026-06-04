@@ -347,6 +347,21 @@ KURALLAR:
     });
   }
 
+  // ── Eski no_lane temizle ──
+  if (body.action === 'clean_no_lane') {
+    const gunler = Math.min(Math.max(Number(body.days ?? 30), 1), 365);
+    const esik = new Date(Date.now() - gunler * 24 * 60 * 60 * 1000).toISOString();
+
+    const { count, error } = await svc
+      .from('raw_posts')
+      .delete({ count: 'exact' })
+      .eq('processing_status', 'no_lane')
+      .lt('created_at', esik);
+
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ success: true, deleted: count ?? 0, days: gunler });
+  }
+
   return NextResponse.json({ error: 'Gecersiz action' }, { status: 400 });
 }
 
