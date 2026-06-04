@@ -34,16 +34,16 @@ export async function GET(req: NextRequest) {
   const days     = Math.min(90, Math.max(7, parseInt(searchParams.get('days') || '30')));
   const mode     = searchParams.get('mode') || 'all'; // 'all' | 'contract'
 
-  if (!fromCity || !toCity) {
+  if (!fromCity && !toCity) {
     return NextResponse.json(
-      { error: 'from_city ve to_city zorunludur' },
+      { error: 'En az kalkış veya varış ili girilmeli' },
       { status: 400 }
     );
   }
 
   const { data, error } = await svc.rpc('get_radar_intelligence', {
-    p_from_city: fromCity,
-    p_to_city:   toCity,
+    p_from_city: fromCity || null,
+    p_to_city:   toCity   || null,
     p_days:      days,
   });
 
