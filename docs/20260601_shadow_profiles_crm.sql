@@ -109,3 +109,10 @@ GRANT SELECT ON public.shadow_profile_summary TO authenticated;
 ALTER TABLE public.shadow_profiles
   ADD COLUMN IF NOT EXISTS ai_analiz       jsonb,
   ADD COLUMN IF NOT EXISTS ai_analiz_at    timestamptz;
+
+-- Etiket / puanlama (2026-06-04)
+ALTER TABLE public.shadow_profiles
+  ADD COLUMN IF NOT EXISTS etiket text
+    CHECK (etiket IN ('vip', 'guvenilir', 'normal', 'suphelı', 'spam'));
+
+CREATE INDEX IF NOT EXISTS shadow_profiles_etiket_idx ON public.shadow_profiles (etiket);
