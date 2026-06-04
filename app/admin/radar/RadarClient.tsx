@@ -45,10 +45,10 @@ interface HistoryListing {
 
 // ── WhatsApp link ──────────────────────────────────────────────────────────
 function waLink(phone: string, fromCity: string, toCity: string) {
-  // E.164'ten + işaretini kaldır (wa.me formatı)
   const num = phone.replace('+', '').replace(/\D/g, '');
+  const rota = [fromCity, toCity].filter(Boolean).join(' - ');
   const text = encodeURIComponent(
-    `Merhaba, ${fromCity}-${toCity} hattında aracımız müsait. İlanınıza dair görüşmek ister misiniz?`
+    `Merhaba, ${rota} hattında aracımız müsait. İlanınıza dair görüşmek ister misiniz?`
   );
   return `https://wa.me/${num}?text=${text}`;
 }
