@@ -152,8 +152,8 @@ export default function RadarClient() {
 
   // ── Arama ──────────────────────────────────────────────────────────────
   const search = useCallback(async (overrideMode?: 'all' | 'contract') => {
-    if (!fromCity.trim() || !toCity.trim()) {
-      setError('Kalkış ve varış ili seçmelisiniz.');
+    if (!fromCity.trim() && !toCity.trim()) {
+      setError('En az kalkış veya varış ili seçmelisiniz.');
       return;
     }
     setLoading(true);
