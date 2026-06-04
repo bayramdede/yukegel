@@ -155,6 +155,16 @@ export default function CrmClient() {
     }
   }, [drawerTab, selected]); // eslint-disable-line
 
+  async function setEtiket(id: string, etiket: Etiket) {
+    setEtiketPicker(null);
+    setRows(prev => prev.map(r => r.id === id ? { ...r, etiket } : r));
+    await fetch('/api/admin/crm', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, etiket }),
+    });
+  }
+
   function toggleRaw(id: string) {
     setExpanded(prev => {
       const next = new Set(prev);
