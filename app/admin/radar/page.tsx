@@ -24,7 +24,15 @@ export default async function RadarPage() {
             <span style={{ color: '#30363d' }}>›</span>
             <span style={{ color: '#e2e8f0', fontSize: '0.85rem', fontWeight: 600 }}>📡 Radar</span>
           </div>
-          <span style={{ color: '#8b949e', fontSize: '0.8rem' }}>{user.email}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <a href="/admin/radar/analitik" style={{
+              color: '#8b949e', fontSize: '0.78rem', textDecoration: 'none',
+              border: '1px solid #30363d', borderRadius: 6, padding: '4px 10px',
+            }}>
+              📊 Analitik →
+            </a>
+            <span style={{ color: '#4b5563', fontSize: '0.78rem' }}>{user.email}</span>
+          </div>
         </div>
       </nav>
 
