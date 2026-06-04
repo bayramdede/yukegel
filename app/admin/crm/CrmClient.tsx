@@ -268,7 +268,7 @@ export default function CrmClient() {
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
           <thead>
             <tr style={{ background: '#161b22', borderBottom: '1px solid #30363d' }}>
-              {['Telefon', 'İsim / Firma', 'İlan Sayısı', 'İlk İlan', 'Son İlan', 'Durum', ''].map(h => (
+              {['Telefon', 'İsim / Firma', 'İlan Sayısı', 'İlk İlan', 'Son İlan', 'Etiket', 'Durum', ''].map(h => (
                 <th key={h} style={{ padding: '10px 14px', textAlign: 'left', color: '#8b949e', fontWeight: 600, whiteSpace: 'nowrap' }}>{h}</th>
               ))}
             </tr>
