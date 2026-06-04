@@ -509,6 +509,8 @@ function KesifSekme() {
             value={temizGun}
             onChange={e => setTemizGun(Number(e.target.value))}
           >
+            <option value={1}>1 gün+</option>
+            <option value={4}>4 gün+</option>
             <option value={7}>7 gün+</option>
             <option value={14}>14 gün+</option>
             <option value={30}>30 gün+</option>
