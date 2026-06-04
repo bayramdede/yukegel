@@ -109,6 +109,8 @@ export default function CrmClient() {
   const [loading, setLoading]      = useState(false);
   const [search, setSearch]        = useState('');
   const [minListings, setMin]      = useState(0);
+  const [siralama, setSiralama]    = useState<'listing_count' | 'etiket' | 'last_listing_at'>('listing_count');
+  const [etiketPicker, setEtiketPicker] = useState<string | null>(null); // açık picker'ın row id'si
   const [selected, setSelected]    = useState<DetailData | null>(null);
   const [expandedRaw, setExpanded] = useState<Set<string>>(new Set());
   const [drawerTab, setDrawerTab]  = useState<'ilanlar' | 'analiz' | 'profil'>('ilanlar');
