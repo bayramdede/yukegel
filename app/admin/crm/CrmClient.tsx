@@ -3,6 +3,20 @@
 import { useState, useEffect, useCallback } from 'react';
 
 // ── Tipler ────────────────────────────────────────────────────────────────────
+type Etiket = 'vip' | 'guvenilir' | 'normal' | 'suphelı' | 'spam' | null;
+
+const ETIKETLER: { value: Etiket; label: string; bg: string; color: string; puan: number }[] = [
+  { value: 'vip',      label: '⭐ VIP',        bg: '#2d1a00', color: '#f59e0b', puan: 5 },
+  { value: 'guvenilir',label: '✅ Güvenilir',  bg: '#0d2818', color: '#22c55e', puan: 4 },
+  { value: 'normal',   label: '○ Normal',      bg: '#1e293b', color: '#94a3b8', puan: 3 },
+  { value: 'suphelı',  label: '⚠️ Şüpheli',   bg: '#2d1a0a', color: '#fb923c', puan: 2 },
+  { value: 'spam',     label: '🚫 Spam',       bg: '#2d0a0a', color: '#f87171', puan: 1 },
+];
+
+function etiketMeta(v: Etiket) {
+  return ETIKETLER.find(e => e.value === v) ?? { value: null, label: '— Etiket', bg: '#161b22', color: '#4b5563', puan: 0 };
+}
+
 interface ShadowProfile {
   id: string;
   phone: string;
@@ -10,6 +24,7 @@ interface ShadowProfile {
   company_name: string | null;
   notes: string | null;
   status: 'active' | 'blocked' | 'converted';
+  etiket: Etiket;
   converted_user_id: string | null;
   created_at: string;
   updated_at: string;
