@@ -45,6 +45,9 @@ interface Analiz {
   calisma_stili: string;
   aktivite_yogunlugu: string;
   ilginc_notlar: string[];
+  isim_tahmini: string | null;
+  firma_tahmini: string | null;
+  notlar_tahmini: string | null;
 }
 
 // ── Yardımcılar ───────────────────────────────────────────────────────────────
