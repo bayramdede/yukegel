@@ -315,13 +315,13 @@ export default function RadarClient() {
         {/* Arama butonu */}
         <button
           onClick={() => search()}
-          disabled={loading || !fromCity || !toCity}
+          disabled={loading || (!fromCity && !toCity)}
           style={{
             background: loading ? '#1a3a2a' : '#22c55e',
             color: '#0d1117', border: 'none', borderRadius: 9,
             padding: '10px 28px', fontWeight: 800, fontSize: '0.92rem',
-            cursor: loading || !fromCity || !toCity ? 'not-allowed' : 'pointer',
-            opacity: !fromCity || !toCity ? 0.5 : 1,
+            cursor: loading || (!fromCity && !toCity) ? 'not-allowed' : 'pointer',
+            opacity: !fromCity && !toCity ? 0.5 : 1,
             whiteSpace: 'nowrap',
           }}
         >
