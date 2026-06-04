@@ -94,7 +94,10 @@ export async function POST(
     }),
   });
 
-  if (!res.ok) return NextResponse.json({ error: 'LLM hatası' }, { status: 500 });
+  if (!res.ok) {
+    const errBody = await res.json().catch(() => ({}));
+    return NextResponse.json({ error: 'LLM hatası', llm_status: res.status, llm_error: errBody }, { status: 500 });
+  }
 
   const data = await res.json();
   const raw = data.content?.[0]?.text ?? '';
