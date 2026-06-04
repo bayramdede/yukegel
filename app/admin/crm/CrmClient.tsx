@@ -125,20 +125,26 @@ export default function CrmClient() {
 
   const LIMIT = 50;
 
-  const load = useCallback(async (p = 1, q = search, min = minListings) => {
+  const load = useCallback(async (p = 1, q = search, min = minListings, sort = siralama) => {
     setLoading(true);
     const params = new URLSearchParams({
       page: String(p), limit: String(LIMIT),
       min_listings: String(min),
+      sort,
     });
     if (q) params.set('search', q);
     const res = await fetch(`/api/admin/crm?${params}`);
     const json = await res.json();
-    setRows(json.data ?? []);
+    // Etiket sıralaması client-side (DB'de string sort yeterli değil, öncelik puanına göre)
+    let data: ShadowProfile[] = json.data ?? [];
+    if (sort === 'etiket') {
+      data = [...data].sort((a, b) => (etiketMeta(b.etiket).puan - etiketMeta(a.etiket).puan) || (b.listing_count - a.listing_count));
+    }
+    setRows(data);
     setTotal(json.total ?? 0);
     setPage(p);
     setLoading(false);
-  }, [search, minListings]);
+  }, [search, minListings, siralama]);
 
   useEffect(() => { load(); }, []); // eslint-disable-line
 
