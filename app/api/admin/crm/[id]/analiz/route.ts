@@ -144,11 +144,17 @@ export async function POST(
       return NextResponse.json({ error: 'LLM JSON parse hatası: ' + rawText.substring(0, 200) }, { status: 500 });
     }
 
-    // 6. Kaydet
+    // 6. Kaydet — etiket_tahmini geçerliyse etiket kolonunu da güncelle
     const now = new Date().toISOString();
-    await svc.from('shadow_profiles').update({ ai_analiz: analiz, ai_analiz_at: now }).eq('id', id);
+    const gecerliEtiketler = ['vip', 'guvenilir', 'normal', 'suphelı', 'spam'];
+    const etiketTahmini = (analiz as any).etiket_tahmini;
+    const updates: Record<string, unknown> = { ai_analiz: analiz, ai_analiz_at: now };
+    if (etiketTahmini && gecerliEtiketler.includes(etiketTahmini)) {
+      updates.etiket = etiketTahmini;
+    }
+    await svc.from('shadow_profiles').update(updates).eq('id', id);
 
-    return NextResponse.json({ analiz, mesaj_sayisi: listings.length, ai_analiz_at: now });
+    return NextResponse.json({ analiz, mesaj_sayisi: listings.length, ai_analiz_at: now, etiket: updates.etiket ?? null });
 
   } catch (err: any) {
     return NextResponse.json({ error: 'Beklenmeyen hata: ' + (err?.message ?? String(err)) }, { status: 500 });
