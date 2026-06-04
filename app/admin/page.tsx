@@ -55,8 +55,15 @@ const KARTLAR = [
   {
     yol: '/admin/radar',
     ikon: '📡',
-    baslik: 'Radar & İstihbarat',
+    baslik: 'Radar — Lead Arama',
     aciklama: 'Belirli bir rotada yük arayan herkesi tespit et. Ham mesajları gör, WhatsApp ile anında ulaş, kontratlı iş fırsatlarını keşfet.',
+    aktif: true,
+  },
+  {
+    yol: '/admin/radar/analitik',
+    ikon: '📊',
+    baslik: 'Radar — Analitik',
+    aciklama: 'Genelden özele drill-down: hangi şehirden nereye, kaç ilan, hangi araç. Kontratlı fırsatları yüzeysel tara.',
     aktif: true,
   },
 ];
