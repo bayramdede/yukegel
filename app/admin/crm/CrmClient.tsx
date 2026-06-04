@@ -437,9 +437,10 @@ export default function CrmClient() {
                       )}
 
                       {analizErr && (
-                        <div style={{ background: '#2d0a0a', border: '1px solid #7f1d1d', borderRadius: 8, padding: 16, color: '#f87171', fontSize: '0.85rem' }}>
-                          {analizErr}
-                          <button onClick={() => runAnaliz(selected.profile.id)} style={{ marginLeft: 12, background: 'transparent', border: 'none', color: '#f87171', cursor: 'pointer', textDecoration: 'underline', fontSize: '0.85rem' }}>
+                        <div style={{ background: '#2d0a0a', border: '1px solid #7f1d1d', borderRadius: 8, padding: 16, color: '#f87171', fontSize: '0.82rem', lineHeight: 1.6, wordBreak: 'break-word' }}>
+                          <strong>Hata:</strong> {analizErr}
+                          <br />
+                          <button onClick={() => runAnaliz(selected.profile.id)} style={{ marginTop: 10, display: 'inline-block', background: 'transparent', border: 'none', color: '#f87171', cursor: 'pointer', textDecoration: 'underline', fontSize: '0.82rem' }}>
                             Tekrar dene
                           </button>
                         </div>
