@@ -347,15 +347,16 @@ KURALLAR:
     });
   }
 
-  // ── Eski no_lane temizle ──
+  // ── Eski no_lane gizle (slh_scanned_at işaretle — silme) ──
   if (body.action === 'clean_no_lane') {
     const gunler = Math.min(Math.max(Number(body.days ?? 30), 1), 365);
     const esik = new Date(Date.now() - gunler * 24 * 60 * 60 * 1000).toISOString();
 
     const { count, error } = await svc
       .from('raw_posts')
-      .delete({ count: 'exact' })
+      .update({ slh_scanned_at: new Date().toISOString() }, { count: 'exact' })
       .eq('processing_status', 'no_lane')
+      .is('slh_scanned_at', null)
       .lt('created_at', esik);
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
