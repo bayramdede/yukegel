@@ -283,10 +283,10 @@ export default function CrmClient() {
           </thead>
           <tbody>
             {loading && (
-              <tr><td colSpan={7} style={{ padding: 40, textAlign: 'center', color: '#8b949e' }}>Yükleniyor…</td></tr>
+              <tr><td colSpan={8} style={{ padding: 40, textAlign: 'center', color: '#8b949e' }}>Yükleniyor…</td></tr>
             )}
             {!loading && rows.length === 0 && (
-              <tr><td colSpan={7} style={{ padding: 40, textAlign: 'center', color: '#8b949e' }}>Kayıt bulunamadı.</td></tr>
+              <tr><td colSpan={8} style={{ padding: 40, textAlign: 'center', color: '#8b949e' }}>Kayıt bulunamadı.</td></tr>
             )}
             {rows.map((r, i) => (
               <tr
