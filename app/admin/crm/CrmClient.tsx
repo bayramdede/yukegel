@@ -524,6 +524,49 @@ export default function CrmClient() {
                             </div>
                           )}
 
+                          {/* Profil alanlarını otomatik doldur */}
+                          {(analiz.isim_tahmini || analiz.firma_tahmini || analiz.notlar_tahmini) && (
+                            <div style={{ background: '#0d2020', border: '1px solid #134e4a', borderRadius: 10, padding: 16 }}>
+                              <div style={{ color: '#2dd4bf', fontSize: '0.75rem', fontWeight: 700, marginBottom: 12, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                ✨ AI Profil Önerileri
+                              </div>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
+                                {analiz.isim_tahmini && (
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <span style={{ color: '#8b949e', fontSize: '0.8rem' }}>İsim:</span>
+                                    <span style={{ color: '#e2e8f0', fontSize: '0.85rem', fontWeight: 600 }}>{analiz.isim_tahmini}</span>
+                                  </div>
+                                )}
+                                {analiz.firma_tahmini && (
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <span style={{ color: '#8b949e', fontSize: '0.8rem' }}>Firma:</span>
+                                    <span style={{ color: '#e2e8f0', fontSize: '0.85rem', fontWeight: 600 }}>{analiz.firma_tahmini}</span>
+                                  </div>
+                                )}
+                                {analiz.notlar_tahmini && (
+                                  <div>
+                                    <span style={{ color: '#8b949e', fontSize: '0.8rem' }}>Not:</span>
+                                    <p style={{ color: '#94a3b8', fontSize: '0.82rem', margin: '4px 0 0', lineHeight: 1.5 }}>{analiz.notlar_tahmini}</p>
+                                  </div>
+                                )}
+                              </div>
+                              <button
+                                onClick={() => {
+                                  setEditDraft(d => ({
+                                    ...d,
+                                    ...(analiz!.isim_tahmini && !d.name ? { name: analiz!.isim_tahmini } : {}),
+                                    ...(analiz!.firma_tahmini && !d.company_name ? { company_name: analiz!.firma_tahmini } : {}),
+                                    ...(analiz!.notlar_tahmini ? { notes: analiz!.notlar_tahmini } : {}),
+                                  }));
+                                  setDrawerTab('profil');
+                                }}
+                                style={{ background: '#0f766e', color: '#ccfbf1', border: 'none', borderRadius: 7, padding: '8px 16px', fontWeight: 700, fontSize: '0.82rem', cursor: 'pointer' }}
+                              >
+                                Profile Uygula →
+                              </button>
+                            </div>
+                          )}
+
                           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                             <button
                               onClick={() => runAnaliz(selected.profile.id)}
