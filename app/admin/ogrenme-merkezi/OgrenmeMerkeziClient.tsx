@@ -497,13 +497,37 @@ function KesifSekme() {
         )}
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: temizMesaj ? 6 : 12, flexWrap: 'wrap', gap: 8 }}>
         <div style={{ color: '#e2e8f0', fontWeight: 700, fontSize: '0.9rem' }}>
           Taranmamis no_lane Kayitlar
           <span style={{ color: loading ? '#8b949e' : '#f59e0b', marginLeft: 8 }}>({loading ? '...' : toplamNoLane})</span>
         </div>
-        <button onClick={yukle} style={S.btn('#1e3a5f', '#60a5fa')}>Yenile</button>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+          <button onClick={yukle} style={S.btn('#1e3a5f', '#60a5fa')}>Yenile</button>
+          <select
+            style={{ ...S.input(), width: 'auto', fontSize: '0.78rem' }}
+            value={temizGun}
+            onChange={e => setTemizGun(Number(e.target.value))}
+          >
+            <option value={7}>7 gün+</option>
+            <option value={14}>14 gün+</option>
+            <option value={30}>30 gün+</option>
+            <option value={60}>60 gün+</option>
+          </select>
+          <button
+            onClick={eskileriTemizle}
+            disabled={temizleniyor || toplamNoLane === 0}
+            style={S.btn('#450a0a', '#f87171', temizleniyor || toplamNoLane === 0)}
+          >
+            {temizleniyor ? 'Siliniyor...' : 'Eskileri Temizle'}
+          </button>
+        </div>
       </div>
+      {temizMesaj && (
+        <div style={{ marginBottom: 10, fontSize: '0.82rem', color: temizMesaj.startsWith('Hata') ? '#f87171' : '#22c55e' }}>
+          {temizMesaj}
+        </div>
+      )}
 
       {loading ? (
         <div style={{ color: '#8b949e', textAlign: 'center', padding: 32 }}>Yukleniyor...</div>
