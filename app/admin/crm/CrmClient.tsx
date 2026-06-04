@@ -194,7 +194,14 @@ export default function CrmClient() {
     const res = await fetch(`/api/admin/crm/${id}/analiz`, { method: 'POST' });
     const json = await res.json();
     if (json.error) setAE(json.error);
-    else { setAnaliz(json.analiz); setAnalizAt(json.ai_analiz_at ?? null); }
+    else {
+      setAnaliz(json.analiz);
+      setAnalizAt(json.ai_analiz_at ?? null);
+      // Liste satırını etiketle güncelle
+      if (json.etiket) {
+        setRows(prev => prev.map(r => r.id === id ? { ...r, etiket: json.etiket } : r));
+      }
+    }
     setAL(false);
   }
 
