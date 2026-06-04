@@ -44,7 +44,7 @@ export async function PATCH(req: NextRequest) {
 
   const svc = getServiceSupabase();
   const body = await req.json();
-  const { id, name, company_name, notes, status } = body;
+  const { id, name, company_name, notes, status, etiket } = body;
 
   if (!id) return NextResponse.json({ error: 'id zorunlu' }, { status: 400 });
 
@@ -53,6 +53,7 @@ export async function PATCH(req: NextRequest) {
   if (company_name !== undefined) updates.company_name = company_name;
   if (notes        !== undefined) updates.notes        = notes;
   if (status       !== undefined) updates.status       = status;
+  if (etiket       !== undefined) updates.etiket       = etiket;
 
   const { error } = await svc
     .from('shadow_profiles')
