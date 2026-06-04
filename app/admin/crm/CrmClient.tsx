@@ -243,8 +243,17 @@ export default function CrmClient() {
           <option value={10}>10+ ilan (Balinalar)</option>
           <option value={20}>20+ ilan</option>
         </select>
+        <select
+          value={siralama}
+          onChange={e => { const v = e.target.value as typeof siralama; setSiralama(v); load(1, search, minListings, v); }}
+          style={{ background: '#161b22', border: '1px solid #30363d', color: '#e2e8f0', borderRadius: 8, padding: '8px 12px', fontSize: '0.88rem', outline: 'none' }}
+        >
+          <option value="listing_count">↓ İlan Sayısı</option>
+          <option value="etiket">↓ Etiket Puanı</option>
+          <option value="last_listing_at">↓ Son Aktivite</option>
+        </select>
         <button
-          onClick={() => load(1, search, minListings)}
+          onClick={() => load(1, search, minListings, siralama)}
           style={{ background: '#22c55e', color: '#0d1117', border: 'none', borderRadius: 8, padding: '8px 18px', fontWeight: 700, fontSize: '0.88rem', cursor: 'pointer' }}
         >
           Ara
