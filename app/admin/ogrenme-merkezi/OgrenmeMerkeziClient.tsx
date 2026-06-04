@@ -418,6 +418,24 @@ function KesifSekme() {
 
   useEffect(() => { yukle(); }, [yukle]);
 
+  const eskileriTemizle = async () => {
+    if (!confirm(`${temizGun} günden eski tüm no_lane raw_post kayıtları kalıcı silinecek. Onaylıyor musun?`)) return;
+    setTemizleniyor(true); setTemizMesaj(null);
+    try {
+      const res  = await fetch('/api/admin/learn-aliases', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'clean_no_lane', days: temizGun }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        setTemizMesaj(`${json.deleted} kayıt silindi (${temizGun} günden eski).`);
+        yukle();
+      } else {
+        setTemizMesaj(`Hata: ${json.error}`);
+      }
+    } finally { setTemizleniyor(false); }
+  };
+
   const kesfet = async () => {
     setKesfediyor(true); setSonuc(null);
     try {
