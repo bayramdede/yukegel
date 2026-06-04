@@ -248,11 +248,10 @@ Açık rotalar: /giris, /auth/, /profil-tamamla, /nasil-calisir, /hakkimizda,
 ## 14. GÖREV DURUMU
 
 ### ✅ Tamamlanan
-- **Radar & İstihbarat Paneli** (4 Haziran 2026): Admin satış radari — rota bazlı (kalkış+varış) lead tarama.
-  - `get_radar_intelligence(p_from_city, p_to_city, p_days)` RPC: listing_stops JOIN, phone normalize (+90), frekans analizi (unique_active_days), NLP keyword tespiti (düzenli/proje/aylık/ihale vb.), SPOT vs CONTRACT_POTENTIAL sınıflandırması, tag üretimi.
-  - API: `app/api/admin/radar/route.ts` (GET — radar + history, admin guard + service role).
-  - UI: `app/admin/radar/` — Mode toggle (Spot / Kontrat), filtre çubuğu, istatistik bandı, lead tablosu, WA/davet/geçmiş aksiyonları, history drawer.
-  - Migration: `docs/20260604_radar_intelligence_rpc.sql` (RPC + 3 performans indexi).
+- **Radar & İstihbarat Paneli** (4 Haziran 2026): Admin satış radari — iki modül.
+  - **Lead Radar** (`/admin/radar`): Rota bazlı (kalkış+varış) lead arama. `get_radar_intelligence` RPC, phone normalize, frekans+NLP sınıflandırma, WA/davet/geçmiş aksiyonları. Migration: `docs/20260604_radar_intelligence_rpc.sql`.
+  - **Analitik Dashboard** (`/admin/radar/analitik`): QlikView-tarzı drill-down. Şehir listesi sol panel, varış/kalkış bar chart, araç tipi dağılımı, sparkline. `get_radar_city_overview` + `get_radar_city_detail(direction)` RPC. Migration: `docs/20260604_radar_analitik_rpc.sql`.
+  - API: `app/api/admin/radar/route.ts` + `app/api/admin/radar/analitik/route.ts`.
 - **Shadow Profile / CRM** (1 Haziran 2026): WhatsApp'tan ilan atan kayıtsız numaraların otomatik profillenmesi.
   - `shadow_profiles` tablosu: phone (unique), name, company_name, notes, status, converted_user_id. RLS: admin only.
   - `listings.shadow_profile_id` FK eklendi.
