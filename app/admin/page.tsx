@@ -52,6 +52,13 @@ const KARTLAR = [
     aciklama: 'WhatsApp\'tan ilan atan kayıtsız kullanıcılar. Balinalar, geçmiş ilanlar, davet fırsatları.',
     aktif: true,
   },
+  {
+    yol: '/admin/radar',
+    ikon: '📡',
+    baslik: 'Radar & İstihbarat',
+    aciklama: 'Belirli bir rotada yük arayan herkesi tespit et. Ham mesajları gör, WhatsApp ile anında ulaş, kontratlı iş fırsatlarını keşfet.',
+    aktif: true,
+  },
 ];
 
 export default async function AdminAna() {
