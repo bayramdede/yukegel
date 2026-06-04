@@ -16,7 +16,10 @@ const SISTEM_PROMPT = `Sen bir Türk lojistik sektörü analistsin. Sana bir num
   "yuk_tipleri": ["Dokme"],
   "calisma_stili": "bolgesel veya ulusal veya sehir ici",
   "aktivite_yogunlugu": "dusuk veya orta veya yuksek",
-  "ilginc_notlar": []
+  "ilginc_notlar": [],
+  "isim_tahmini": "mesajlarda imza veya isim geciyorsa yaz, yoksa null",
+  "firma_tahmini": "mesajlarda firma adi geciyorsa yaz, yoksa null",
+  "notlar_tahmini": "bu kisi icin adminin bilmesi gereken 1-2 cumle ozet not"
 }`;
 
 // Lone surrogate + kontrol karakterlerini temizle (WhatsApp emoji kalıntıları JSON'u bozar)
