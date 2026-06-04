@@ -148,6 +148,14 @@ export default function CrmClient() {
 
   useEffect(() => { load(); }, []); // eslint-disable-line
 
+  // Picker dışına tıklayınca kapat
+  useEffect(() => {
+    if (!etiketPicker) return;
+    const handler = () => setEtiketPicker(null);
+    document.addEventListener('click', handler);
+    return () => document.removeEventListener('click', handler);
+  }, [etiketPicker]);
+
   // Analiz sekmesi açıldığında kaydedilmiş analizi çek (tek seferlik)
   useEffect(() => {
     if (drawerTab === 'analiz' && selected && !analiz && !analizLoading && !analizErr) {
