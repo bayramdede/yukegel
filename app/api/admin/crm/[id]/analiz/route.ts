@@ -19,8 +19,16 @@ const SISTEM_PROMPT = `Sen bir Türk lojistik sektörü analistsin. Sana bir num
   "ilginc_notlar": [],
   "isim_tahmini": "mesajlarda imza veya isim geciyorsa yaz, yoksa null",
   "firma_tahmini": "mesajlarda firma adi geciyorsa yaz, yoksa null",
-  "notlar_tahmini": "bu kisi icin adminin bilmesi gereken 1-2 cumle ozet not"
-}`;
+  "notlar_tahmini": "bu kisi icin adminin bilmesi gereken 1-2 cumle ozet not",
+  "etiket_tahmini": "vip veya guvenilir veya normal veya suphelı veya spam"
+}
+
+Etiket secim kurallari:
+- vip: cok aktif (10+ ilan), tutarli rota, profesyonel nakliyeci
+- guvenilir: duzenli paylasim, net ilan bilgisi, samimi
+- normal: ortalama kullanici, belirgin bir ozellik yok
+- suphelı: tutarsiz bilgi, cok farkli numaralardan ayni icerik, komisyoncu olabilir
+- spam: tek tip kopyala-yapistir, reklam icerigi, anlamsiz mesajlar`;
 
 // Lone surrogate + kontrol karakterlerini temizle (WhatsApp emoji kalıntıları JSON'u bozar)
 function temizle(s: string): string {
