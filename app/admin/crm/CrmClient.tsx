@@ -302,6 +302,50 @@ export default function CrmClient() {
                 </td>
                 <td style={{ padding: '10px 14px', color: '#8b949e' }}>{tarih(r.first_listing_at)}</td>
                 <td style={{ padding: '10px 14px', color: '#8b949e' }}>{tarih(r.last_listing_at)}</td>
+                <td style={{ padding: '10px 14px', position: 'relative' }} onClick={e => e.stopPropagation()}>
+                  {/* Etiket butonu */}
+                  <button
+                    onClick={() => setEtiketPicker(etiketPicker === r.id ? null : r.id)}
+                    style={{
+                      background: etiketMeta(r.etiket).bg,
+                      color: etiketMeta(r.etiket).color,
+                      border: `1px solid ${etiketMeta(r.etiket).color}44`,
+                      borderRadius: 6, padding: '3px 10px', fontSize: '0.75rem',
+                      fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {etiketMeta(r.etiket).label} ▾
+                  </button>
+                  {/* Dropdown picker */}
+                  {etiketPicker === r.id && (
+                    <div style={{
+                      position: 'absolute', zIndex: 100, top: '100%', left: 0,
+                      background: '#161b22', border: '1px solid #30363d', borderRadius: 8,
+                      padding: 6, display: 'flex', flexDirection: 'column', gap: 2, minWidth: 150,
+                    }}>
+                      {ETIKETLER.map(e => (
+                        <button
+                          key={e.value ?? 'null'}
+                          onClick={() => setEtiket(r.id, e.value)}
+                          style={{
+                            background: r.etiket === e.value ? e.bg : 'transparent',
+                            color: e.color, border: 'none', borderRadius: 6,
+                            padding: '6px 10px', textAlign: 'left', cursor: 'pointer',
+                            fontSize: '0.8rem', fontWeight: 600,
+                          }}
+                        >
+                          {e.label}
+                        </button>
+                      ))}
+                      <button
+                        onClick={() => setEtiket(r.id, null)}
+                        style={{ background: 'transparent', color: '#4b5563', border: 'none', borderRadius: 6, padding: '6px 10px', textAlign: 'left', cursor: 'pointer', fontSize: '0.78rem' }}
+                      >
+                        ✕ Etiketi kaldır
+                      </button>
+                    </div>
+                  )}
+                </td>
                 <td style={{ padding: '10px 14px' }}>{durum_badge(r.status)}</td>
                 <td style={{ padding: '10px 14px' }}>
                   <span style={{ color: '#22c55e', fontSize: '0.8rem' }}>Detay →</span>
