@@ -451,6 +451,10 @@ export default function CrmClient() {
 
                       {analiz && (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                          {/* DEBUG */}
+                          <pre style={{ background: '#161b22', border: '1px solid #30363d', borderRadius: 6, padding: 10, fontSize: '0.7rem', color: '#94a3b8', overflowX: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+                            {JSON.stringify({ isim: (analiz as any).isim_tahmini, firma: (analiz as any).firma_tahmini, notlar: (analiz as any).notlar_tahmini }, null, 2)}
+                          </pre>
                           {/* Tip rozeti + özet */}
                           <div style={{ background: '#161b22', border: '1px solid #21262d', borderRadius: 10, padding: 18 }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
