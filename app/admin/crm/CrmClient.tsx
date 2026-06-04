@@ -558,7 +558,7 @@ export default function CrmClient() {
                           </pre>
                           {/* Tip rozeti + özet */}
                           <div style={{ background: '#161b22', border: '1px solid #21262d', borderRadius: 10, padding: 18 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
                               <span style={{
                                 background: analiz.tip === 'nakliyeci' ? '#0d2818' : analiz.tip === 'komisyoncu' ? '#2d1a00' : analiz.tip === 'musteri' ? '#1e3a5f' : '#1e293b',
                                 color: analiz.tip === 'nakliyeci' ? '#22c55e' : analiz.tip === 'komisyoncu' ? '#f59e0b' : analiz.tip === 'musteri' ? '#60a5fa' : '#94a3b8',
@@ -566,6 +566,14 @@ export default function CrmClient() {
                               }}>
                                 {analiz.tip}
                               </span>
+                              {(analiz as any).etiket_tahmini && (() => {
+                                const m = etiketMeta((analiz as any).etiket_tahmini);
+                                return (
+                                  <span style={{ background: m.bg, color: m.color, fontSize: '0.78rem', fontWeight: 800, padding: '4px 12px', borderRadius: 6 }}>
+                                    {m.label}
+                                  </span>
+                                );
+                              })()}
                               <span style={{
                                 background: analiz.aktivite_yogunlugu === 'yüksek' ? '#2d1a00' : '#1e293b',
                                 color: analiz.aktivite_yogunlugu === 'yüksek' ? '#f59e0b' : '#94a3b8',
