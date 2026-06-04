@@ -397,12 +397,15 @@ function AliasSekme() {
 // Sekme 2: AI Kesif Alani
 // ─────────────────────────────────────────
 function KesifSekme() {
-  const [noLane, setNoLane]       = useState<NoLaneData>({ raw_posts: [], listings_no_origin: [], total: 0 });
-  const [loading, setLoading]     = useState(true);
+  const [noLane, setNoLane]         = useState<NoLaneData>({ raw_posts: [], listings_no_origin: [], total: 0 });
+  const [loading, setLoading]       = useState(true);
   const [kesfediyor, setKesfediyor] = useState(false);
-  const [limit, setLimit]         = useState(10);
-  const [sonuc, setSonuc]         = useState<any>(null);
-  const [acilanId, setAcilanId]   = useState<string | null>(null);
+  const [limit, setLimit]           = useState(10);
+  const [sonuc, setSonuc]           = useState<any>(null);
+  const [acilanId, setAcilanId]     = useState<string | null>(null);
+  const [temizGun, setTemizGun]     = useState(30);
+  const [temizleniyor, setTemizleniyor] = useState(false);
+  const [temizMesaj, setTemizMesaj] = useState<string | null>(null);
 
   const yukle = useCallback(async () => {
     setLoading(true);
