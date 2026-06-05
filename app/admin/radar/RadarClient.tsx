@@ -127,12 +127,22 @@ const SEHIRLER = [
 ];
 
 // ── Ana Bileşen ────────────────────────────────────────────────────────────
-export default function RadarClient() {
-  // Filtre state
-  const [fromCity, setFromCity] = useState('');
-  const [toCity, setToCity]     = useState('');
+interface Props {
+  initialFromCity?: string;
+  initialToCity?:   string;
+  initialMode?:     'all' | 'contract';
+}
+
+export default function RadarClient({
+  initialFromCity = '',
+  initialToCity   = '',
+  initialMode     = 'all',
+}: Props) {
+  // Filtre state — URL param'larından pre-populate
+  const [fromCity, setFromCity] = useState(initialFromCity);
+  const [toCity, setToCity]     = useState(initialToCity);
   const [days, setDays]         = useState(30);
-  const [mode, setMode]         = useState<'all' | 'contract'>('all');
+  const [mode, setMode]         = useState<'all' | 'contract'>(initialMode);
 
   // Veri state
   const [leads, setLeads]           = useState<Lead[]>([]);
