@@ -88,23 +88,32 @@ export default function AnalitikClient() {
   const [direction, setDirection]   = useState<Direction>('departure');
   const [cities, setCities]         = useState<CityRow[]>([]);
   const [citiesLoading, setCL]      = useState(false);
+  const [citiesError, setCitiesErr] = useState('');
   const [citySearch, setCitySearch] = useState('');
 
   const [selected, setSelected]     = useState<string | null>(null);
   const [detail, setDetail]         = useState<CityDetail | null>(null);
   const [detailLoading, setDL]      = useState(false);
+  const [detailError, setDetailErr] = useState('');
 
-  const [subSelected, setSubSelected] = useState<string | null>(null); // seçili karşı şehir
+  const [subSelected, setSubSelected] = useState<string | null>(null);
 
   // ── Şehir listesini yükle ──────────────────────────────────────────────
   const loadCities = useCallback(async (d: number) => {
     setCL(true);
+    setCitiesErr('');
     setSelected(null);
     setDetail(null);
     setSubSelected(null);
-    const res = await fetch(`/api/admin/radar/analitik?view=overview&days=${d}`);
-    const json = await res.json();
-    setCities(json.cities ?? []);
+    try {
+      const res  = await fetch(`/api/admin/radar/analitik?view=overview&days=${d}`);
+      const json = await res.json();
+      if (!res.ok || json.error) throw new Error(json.error || 'API hatası');
+      setCities(json.cities ?? []);
+    } catch (e: any) {
+      setCitiesErr(e.message);
+      setCities([]);
+    }
     setCL(false);
   }, []);
 
