@@ -123,12 +123,18 @@ export default function AnalitikClient() {
   const loadDetail = useCallback(async (city: string, dir: Direction, d: number) => {
     setDL(true);
     setDetail(null);
+    setDetailErr('');
     setSubSelected(null);
-    const res = await fetch(
-      `/api/admin/radar/analitik?view=city&city=${encodeURIComponent(city)}&direction=${dir}&days=${d}`
-    );
-    const json = await res.json();
-    setDetail(json);
+    try {
+      const res  = await fetch(
+        `/api/admin/radar/analitik?view=city&city=${encodeURIComponent(city)}&direction=${dir}&days=${d}`
+      );
+      const json = await res.json();
+      if (!res.ok || json.error) throw new Error(json.error || 'API hatası');
+      setDetail(json);
+    } catch (e: any) {
+      setDetailErr(e.message);
+    }
     setDL(false);
   }, []);
 
