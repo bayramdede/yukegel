@@ -193,6 +193,13 @@ export default function RadarClient({
     }
   }, [fromCity, toCity, days, mode]);
 
+  // URL param'larından gelindiyse otomatik ara
+  useEffect(() => {
+    if (initialFromCity || initialToCity) {
+      search();
+    }
+  }, []); // eslint-disable-line
+
   // Mode toggle — anlık olarak tekrar arama yapar
   function toggleMode(newMode: 'all' | 'contract') {
     setMode(newMode);
