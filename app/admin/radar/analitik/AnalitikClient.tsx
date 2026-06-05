@@ -272,8 +272,26 @@ export default function AnalitikClient() {
           <div style={{ maxHeight: 'calc(100vh - 280px)', overflowY: 'auto' }}>
             {citiesLoading ? (
               <div style={{ padding: '32px 14px', textAlign: 'center', color: '#4b5563', fontSize: '0.82rem' }}>Yükleniyor…</div>
+            ) : citiesError ? (
+              <div style={{ padding: '16px 14px' }}>
+                <div style={{ background: '#2d0a0a', border: '1px solid #7f1d1d', borderRadius: 8, padding: '12px 14px', color: '#f87171', fontSize: '0.78rem', lineHeight: 1.6 }}>
+                  <strong>⚠️ API Hatası:</strong><br />{citiesError}
+                </div>
+                <div style={{ marginTop: 10, color: '#4b5563', fontSize: '0.74rem', lineHeight: 1.6 }}>
+                  SQL fonksiyonları Supabase'de henüz çalıştırılmamış olabilir.<br />
+                  <code style={{ color: '#8b949e' }}>docs/20260604_radar_analitik_rpc.sql</code> dosyasını Supabase SQL Editor'da çalıştırın.
+                </div>
+                <button
+                  onClick={() => loadCities(days)}
+                  style={{ marginTop: 10, background: '#161b22', border: '1px solid #30363d', color: '#8b949e', borderRadius: 6, padding: '6px 12px', fontSize: '0.76rem', cursor: 'pointer' }}
+                >
+                  🔄 Tekrar Dene
+                </button>
+              </div>
             ) : filteredCities.length === 0 ? (
-              <div style={{ padding: '32px 14px', textAlign: 'center', color: '#4b5563', fontSize: '0.82rem' }}>Şehir bulunamadı</div>
+              <div style={{ padding: '32px 14px', textAlign: 'center', color: '#4b5563', fontSize: '0.82rem' }}>
+                {citySearch ? 'Şehir bulunamadı' : 'Bu dönemde ilan yok'}
+              </div>
             ) : filteredCities.map((c, i) => {
               const isActive = selected === c.city;
               return (
