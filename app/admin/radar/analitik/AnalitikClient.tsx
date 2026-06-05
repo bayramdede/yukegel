@@ -158,7 +158,8 @@ export default function AnalitikClient() {
   const filteredCities = cities.filter(c =>
     !citySearch || c.city.toLowerCase().includes(citySearch.toLowerCase())
   );
-  const maxCount = filteredCities[0]?.listing_count ?? 1;
+  // Bar oranı tüm veri üzerinden (filtre bar boyutunu bozmasın)
+  const maxCount = cities[0]?.listing_count ?? 1;
 
   // Karşı şehirde maks değer
   const maxCounterpart = detail?.counterparts?.[0]?.count ?? 1;
