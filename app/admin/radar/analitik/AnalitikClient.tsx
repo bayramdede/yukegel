@@ -362,6 +362,13 @@ export default function AnalitikClient() {
             </div>
           )}
 
+          {/* Detay hata */}
+          {detailError && !detailLoading && (
+            <div style={{ background: '#2d0a0a', border: '1px solid #7f1d1d', borderRadius: 12, padding: '20px 24px', color: '#f87171', fontSize: '0.82rem', lineHeight: 1.7 }}>
+              <strong>⚠️ Hata:</strong> {detailError}
+            </div>
+          )}
+
           {/* Yükleniyor */}
           {detailLoading && (
             <div style={{
