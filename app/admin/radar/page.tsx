@@ -3,12 +3,16 @@ import RadarClient from './RadarClient';
 
 export const dynamic = 'force-dynamic';
 
-export default async function RadarPage() {
+export default async function RadarPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string>>;
+}) {
   const user = await requireAdmin();
+  const params = await searchParams;
 
   return (
     <div style={{ minHeight: '100vh', background: '#0d1117', fontFamily: "'IBM Plex Sans', system-ui, sans-serif" }}>
-      {/* Nav */}
       <nav style={{ background: '#161b22', borderBottom: '1px solid #30363d', position: 'sticky', top: 0, zIndex: 50 }}>
         <div style={{ maxWidth: 1280, margin: '0 auto', padding: '0 16px', height: 56, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
@@ -45,7 +49,11 @@ export default async function RadarPage() {
             Belirli bir rotada yük arayan herkesi — kayıtlı veya değil — tespit et, ham mesajlarını gör, WhatsApp ile anında ulaş.
           </div>
         </div>
-        <RadarClient />
+        <RadarClient
+          initialFromCity={params.from_city || ''}
+          initialToCity={params.to_city  || ''}
+          initialMode={(params.mode as 'all' | 'contract') || 'all'}
+        />
       </main>
     </div>
   );
