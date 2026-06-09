@@ -142,20 +142,58 @@ export default function AnalitikClient() {
     setDL(false);
   }, []);
 
+  // ── Rota detayını yükle (subSelected seçilince) ───────────────────────
+  const loadRouteDetail = useCallback(async (city: string, dir: Direction, counterpart: string, d: number) => {
+    setRouteLoading(true);
+    setRouteDetail(null);
+    try {
+      const res  = await fetch(
+        `/api/admin/radar/analitik?view=city&city=${encodeURIComponent(city)}&direction=${dir}&days=${d}&counterpart=${encodeURIComponent(counterpart)}`
+      );
+      const json = await res.json();
+      if (!res.ok || json.error) throw new Error(json.error || 'API hatası');
+      setRouteDetail({
+        total:          json.total,
+        unique_senders: json.unique_senders,
+        vehicle_types:  json.vehicle_types ?? [],
+        daily:          json.daily ?? [],
+      });
+    } catch {
+      setRouteDetail(null);
+    }
+    setRouteLoading(false);
+  }, []);
+
   function selectCity(city: string) {
     setSelected(city);
+    setSubSelected(null);
+    setRouteDetail(null);
     loadDetail(city, direction, days);
   }
 
   function changeDirection(dir: Direction) {
     setDirection(dir);
+    setSubSelected(null);
+    setRouteDetail(null);
     if (selected) loadDetail(selected, dir, days);
   }
 
   function changeDays(d: number) {
     setDays(d);
     loadCities(d);
+    setSubSelected(null);
+    setRouteDetail(null);
     if (selected) loadDetail(selected, direction, d);
+  }
+
+  function selectSubCity(city: string) {
+    const next = subSelected === city ? null : city;
+    setSubSelected(next);
+    if (next && selected) {
+      loadRouteDetail(selected, direction, next, days);
+    } else {
+      setRouteDetail(null);
+    }
   }
 
   // Filtreli şehir listesi
