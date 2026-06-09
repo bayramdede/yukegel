@@ -527,18 +527,25 @@ export default function AnalitikClient() {
 
                   {/* Araç Tipi */}
                   <div style={{ background: '#161b22', border: '1px solid #21262d', borderRadius: 12, overflow: 'hidden' }}>
-                    <div style={{ padding: '14px 18px', borderBottom: '1px solid #21262d' }}>
+                    <div style={{ padding: '14px 18px', borderBottom: '1px solid #21262d', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div style={{ color: '#8b949e', fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                         🚛 Araç Tipi Dağılımı
                       </div>
+                      {subSelected && (
+                        <span style={{ color: '#60a5fa', fontSize: '0.66rem', fontWeight: 600 }}>
+                          {routeLoading ? '⏳' : '📍 rota'}
+                        </span>
+                      )}
                     </div>
-                    {detail.vehicle_types.length === 0 ? (
+                    {routeLoading ? (
+                      <div style={{ padding: '20px 18px', color: '#4b5563', fontSize: '0.8rem' }}>Yükleniyor…</div>
+                    ) : activeVT.length === 0 ? (
                       <div style={{ padding: '20px 18px', color: '#4b5563', fontSize: '0.8rem' }}>Araç tipi bilgisi yok</div>
                     ) : (
                       <div style={{ padding: '10px 0 6px' }}>
-                        {detail.vehicle_types.map((vt, i) => {
+                        {activeVT.map((vt, i) => {
                           const color = VT_COLORS[i % VT_COLORS.length];
-                          const pct = Math.round((vt.count / (detail.total || 1)) * 100);
+                          const pct = Math.round((vt.count / (activeTotal || 1)) * 100);
                           return (
                             <div key={vt.type} style={{ padding: '6px 18px' }}>
                               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
