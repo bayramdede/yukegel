@@ -480,7 +480,7 @@ export default function AnalitikClient() {
                         return (
                           <button
                             key={cp.city}
-                            onClick={() => setSubSelected(isSubSel ? null : cp.city)}
+                            onClick={() => selectSubCity(cp.city)}
                             style={{
                               width: '100%', background: isSubSel ? '#0d1a2a' : 'transparent',
                               border: 'none', padding: '9px 18px', cursor: 'pointer', textAlign: 'left',
