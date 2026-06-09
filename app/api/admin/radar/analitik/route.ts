@@ -28,11 +28,14 @@ export async function GET(req: NextRequest) {
 
   if (view === 'city') {
     if (!city) return NextResponse.json({ error: 'city parametresi gerekli' }, { status: 400 });
-    const { data, error } = await svc.rpc('get_radar_city_detail', {
+    const counterpart = searchParams.get('counterpart')?.trim() || null;
+    const rpcParams: Record<string, unknown> = {
       p_city:      city,
       p_direction: direction,
       p_days:      days,
-    });
+    };
+    if (counterpart) rpcParams.p_counterpart = counterpart;
+    const { data, error } = await svc.rpc('get_radar_city_detail', rpcParams);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json(data ?? {});
   }
