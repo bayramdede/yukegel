@@ -949,6 +949,18 @@ const selectStyle: React.CSSProperties = {
   minWidth: 160,
 };
 
+const inputStyle: React.CSSProperties = {
+  background: '#161b22',
+  border: '1px solid #30363d',
+  color: '#e2e8f0',
+  borderRadius: 8,
+  padding: '9px 12px',
+  fontSize: '0.88rem',
+  outline: 'none',
+  width: '100%',
+  boxSizing: 'border-box',
+};
+
 function actionBtnStyle(bg: string, color: string, isButton = false): React.CSSProperties {
   return {
     background: bg,
