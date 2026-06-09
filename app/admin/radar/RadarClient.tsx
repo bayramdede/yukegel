@@ -612,6 +612,17 @@ export default function RadarClient({
                             >
                               🕵️ Geçmiş
                             </button>
+
+                            {/* Gölge profil düzenle */}
+                            {lead.shadow_profile_id && (
+                              <button
+                                onClick={() => openEdit(lead)}
+                                title="Gölge profili düzenle"
+                                style={actionBtnStyle('#0d1a2a', '#38bdf8', true)}
+                              >
+                                ✏️ Profil
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
