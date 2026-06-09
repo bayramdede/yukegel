@@ -160,6 +160,12 @@ export default function RadarClient({
   const [historyLoading, setHistoryLoading]   = useState(false);
   const [historyExpanded, setHistoryExpanded] = useState<Set<string>>(new Set());
 
+  // Gölge profil düzenleme drawer
+  const [editLead, setEditLead]   = useState<Lead | null>(null);
+  const [editForm, setEditForm]   = useState({ name: '', company_name: '', notes: '', status: 'active', etiket: '' });
+  const [editSaving, setEditSaving] = useState(false);
+  const [editMsg, setEditMsg]     = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
+
   // ── Arama ──────────────────────────────────────────────────────────────
   const search = useCallback(async (overrideMode?: 'all' | 'contract') => {
     if (!fromCity.trim() && !toCity.trim()) {
