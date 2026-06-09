@@ -98,6 +98,10 @@ export default function AnalitikClient() {
 
   const [subSelected, setSubSelected] = useState<string | null>(null);
 
+  // Rota bazlı (şehir çifti) araç tipi + aktivite verisi
+  const [routeDetail, setRouteDetail]   = useState<Pick<CityDetail, 'total' | 'unique_senders' | 'vehicle_types' | 'daily'> | null>(null);
+  const [routeLoading, setRouteLoading] = useState(false);
+
   // ── Şehir listesini yükle ──────────────────────────────────────────────
   const loadCities = useCallback(async (d: number) => {
     setCL(true);
