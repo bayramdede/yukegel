@@ -205,7 +205,12 @@ export default function AnalitikClient() {
 
   // Karşı şehirde maks değer
   const maxCounterpart = detail?.counterparts?.[0]?.count ?? 1;
-  const maxVT = detail?.vehicle_types?.[0]?.count ?? 1;
+
+  // Araç/aktivite: rota seçiliyse routeDetail, yoksa detail
+  const activeVT    = (routeDetail ?? detail)?.vehicle_types ?? [];
+  const activeDaily = (routeDetail ?? detail)?.daily ?? [];
+  const activeTotal = (routeDetail ?? detail)?.total ?? detail?.total ?? 0;
+  const maxVT       = activeVT[0]?.count ?? 1;
 
   // Radar sayfasına link (lead arama)
   function radarLink(from: string | null, to: string | null) {
