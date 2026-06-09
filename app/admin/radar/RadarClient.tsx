@@ -660,6 +660,137 @@ export default function RadarClient({
         )
       )}
 
+      {/* ── Gölge Profil Düzenleme Drawer ──────────────────────────────────── */}
+      {editLead && (
+        <div
+          style={{ position: 'fixed', inset: 0, zIndex: 400 }}
+          onClick={e => { if (e.target === e.currentTarget) setEditLead(null); }}
+        >
+          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.7)' }} />
+          <div style={{
+            position: 'absolute', top: 0, right: 0, bottom: 0, width: 440,
+            background: '#0d1117', borderLeft: '1px solid #30363d',
+            display: 'flex', flexDirection: 'column',
+          }}>
+            {/* Başlık */}
+            <div style={{
+              padding: '18px 24px', borderBottom: '1px solid #21262d',
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            }}>
+              <div>
+                <div style={{ color: '#38bdf8', fontWeight: 800, fontSize: '0.95rem' }}>
+                  ✏️ Gölge Profil Düzenle
+                </div>
+                <div style={{ color: '#8b949e', fontSize: '0.78rem', fontFamily: 'monospace', marginTop: 3 }}>
+                  {editLead.phone}
+                </div>
+              </div>
+              <button
+                onClick={() => setEditLead(null)}
+                style={{ background: 'transparent', border: 'none', color: '#8b949e', fontSize: '1.3rem', cursor: 'pointer' }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Form */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {/* İsim */}
+              <label style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                <span style={{ color: '#8b949e', fontSize: '0.72rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>İsim / Ad Soyad</span>
+                <input
+                  value={editForm.name}
+                  onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))}
+                  placeholder="Ahmet Yılmaz"
+                  style={inputStyle}
+                />
+              </label>
+
+              {/* Şirket */}
+              <label style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                <span style={{ color: '#8b949e', fontSize: '0.72rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Şirket Adı</span>
+                <input
+                  value={editForm.company_name}
+                  onChange={e => setEditForm(f => ({ ...f, company_name: e.target.value }))}
+                  placeholder="Yılmaz Nakliyat Ltd."
+                  style={inputStyle}
+                />
+              </label>
+
+              {/* Durum */}
+              <label style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                <span style={{ color: '#8b949e', fontSize: '0.72rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Durum</span>
+                <select
+                  value={editForm.status}
+                  onChange={e => setEditForm(f => ({ ...f, status: e.target.value }))}
+                  style={inputStyle}
+                >
+                  <option value="active">✅ Aktif</option>
+                  <option value="blocked">🚫 Engelli</option>
+                  <option value="converted">🎉 Dönüştürüldü</option>
+                </select>
+              </label>
+
+              {/* Etiket */}
+              <label style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                <span style={{ color: '#8b949e', fontSize: '0.72rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Etiket</span>
+                <select
+                  value={editForm.etiket}
+                  onChange={e => setEditForm(f => ({ ...f, etiket: e.target.value }))}
+                  style={inputStyle}
+                >
+                  <option value="">— Etiket yok</option>
+                  <option value="vip">⭐ VIP</option>
+                  <option value="guvenilir">✅ Güvenilir</option>
+                  <option value="normal">○ Normal</option>
+                  <option value="suphelı">⚠️ Şüpheli</option>
+                  <option value="spam">🚫 Spam</option>
+                </select>
+              </label>
+
+              {/* Notlar */}
+              <label style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                <span style={{ color: '#8b949e', fontSize: '0.72rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Notlar</span>
+                <textarea
+                  value={editForm.notes}
+                  onChange={e => setEditForm(f => ({ ...f, notes: e.target.value }))}
+                  placeholder="İç notlar…"
+                  rows={4}
+                  style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit' }}
+                />
+              </label>
+            </div>
+
+            {/* Footer */}
+            <div style={{ padding: '14px 24px', borderTop: '1px solid #21262d', display: 'flex', alignItems: 'center', gap: 10 }}>
+              <button
+                onClick={saveEdit}
+                disabled={editSaving}
+                style={{
+                  background: editSaving ? '#1a3a2a' : '#22c55e',
+                  color: '#0d1117', border: 'none', borderRadius: 8,
+                  padding: '9px 24px', fontWeight: 800, fontSize: '0.88rem',
+                  cursor: editSaving ? 'not-allowed' : 'pointer',
+                }}
+              >
+                {editSaving ? '⏳ Kaydediliyor…' : '💾 Kaydet'}
+              </button>
+              <button
+                onClick={() => setEditLead(null)}
+                style={{ background: 'transparent', border: '1px solid #30363d', color: '#8b949e', borderRadius: 8, padding: '9px 18px', fontSize: '0.88rem', cursor: 'pointer' }}
+              >
+                İptal
+              </button>
+              {editMsg && (
+                <span style={{ fontSize: '0.82rem', color: editMsg.type === 'ok' ? '#22c55e' : '#f87171', marginLeft: 4 }}>
+                  {editMsg.text}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── History Drawer ───────────────────────────────────────────────── */}
       {historyPhone && (
         <div
