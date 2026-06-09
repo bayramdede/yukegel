@@ -563,30 +563,43 @@ export default function AnalitikClient() {
                   </div>
 
                   {/* Aktivite Grafiği */}
-                  {detail.daily.length > 1 && (
+                  {(routeLoading || activeDaily.length > 1) && (
                     <div style={{ background: '#161b22', border: '1px solid #21262d', borderRadius: 12, padding: '14px 18px' }}>
-                      <div style={{ color: '#8b949e', fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 12 }}>
-                        📈 Günlük Aktivite
-                      </div>
-                      <Sparkline data={detail.daily} width={280} height={48} />
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6 }}>
-                        <span style={{ color: '#374151', fontSize: '0.66rem' }}>{detail.daily[0]?.day}</span>
-                        <span style={{ color: '#374151', fontSize: '0.66rem' }}>{detail.daily[detail.daily.length - 1]?.day}</span>
-                      </div>
-                      <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
-                        <div>
-                          <div style={{ color: '#4b5563', fontSize: '0.66rem' }}>En Yoğun Gün</div>
-                          <div style={{ color: '#22c55e', fontWeight: 700, fontSize: '0.82rem' }}>
-                            {detail.daily.reduce((a, b) => b.count > a.count ? b : a, detail.daily[0])?.day} — {Math.max(...detail.daily.map(d => d.count))} ilan
-                          </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                        <div style={{ color: '#8b949e', fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                          📈 Günlük Aktivite
                         </div>
-                        <div>
-                          <div style={{ color: '#4b5563', fontSize: '0.66rem' }}>Günlük Ort.</div>
-                          <div style={{ color: '#e2e8f0', fontWeight: 700, fontSize: '0.82rem' }}>
-                            {(detail.total / Math.max(detail.daily.length, 1)).toFixed(1)} ilan
-                          </div>
-                        </div>
+                        {subSelected && (
+                          <span style={{ color: '#60a5fa', fontSize: '0.66rem', fontWeight: 600 }}>
+                            {routeLoading ? '⏳' : '📍 rota'}
+                          </span>
+                        )}
                       </div>
+                      {routeLoading ? (
+                        <div style={{ color: '#4b5563', fontSize: '0.8rem' }}>Yükleniyor…</div>
+                      ) : (
+                        <>
+                          <Sparkline data={activeDaily} width={280} height={48} />
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6 }}>
+                            <span style={{ color: '#374151', fontSize: '0.66rem' }}>{activeDaily[0]?.day}</span>
+                            <span style={{ color: '#374151', fontSize: '0.66rem' }}>{activeDaily[activeDaily.length - 1]?.day}</span>
+                          </div>
+                          <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
+                            <div>
+                              <div style={{ color: '#4b5563', fontSize: '0.66rem' }}>En Yoğun Gün</div>
+                              <div style={{ color: '#22c55e', fontWeight: 700, fontSize: '0.82rem' }}>
+                                {activeDaily.reduce((a, b) => b.count > a.count ? b : a, activeDaily[0])?.day} — {Math.max(...activeDaily.map(d => d.count))} ilan
+                              </div>
+                            </div>
+                            <div>
+                              <div style={{ color: '#4b5563', fontSize: '0.66rem' }}>Günlük Ort.</div>
+                              <div style={{ color: '#e2e8f0', fontWeight: 700, fontSize: '0.82rem' }}>
+                                {(activeTotal / Math.max(activeDaily.length, 1)).toFixed(1)} ilan
+                              </div>
+                            </div>
+                          </div>
+                        </>
+                      )}
                     </div>
                   )}
 
