@@ -435,13 +435,19 @@ export default function AnalitikClient() {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 10 }}>
                 {[
                   {
-                    label: direction === 'departure' ? `${detail.city} çıkışlı ilan` : `${detail.city} varışlı ilan`,
-                    val: detail.total.toLocaleString('tr-TR'),
-                    color: '#22c55e', sub: `son ${days} gün`,
+                    label: subSelected
+                      ? (direction === 'departure' ? `${detail.city} → ${subSelected}` : `${subSelected} → ${detail.city}`)
+                      : (direction === 'departure' ? `${detail.city} çıkışlı ilan` : `${detail.city} varışlı ilan`),
+                    val: (routeDetail ?? detail).total.toLocaleString('tr-TR'),
+                    color: '#22c55e', sub: subSelected ? 'rota ilanı' : `son ${days} gün`,
                   },
-                  { label: 'Tekil Gönderici', val: detail.unique_senders.toLocaleString('tr-TR'), color: '#60a5fa', sub: 'farklı numara' },
+                  {
+                    label: 'Tekil Gönderici',
+                    val: (routeDetail ?? detail).unique_senders.toLocaleString('tr-TR'),
+                    color: '#60a5fa', sub: 'farklı numara',
+                  },
                   { label: 'Varış Noktası', val: detail.counterparts.length, color: '#a78bfa', sub: 'farklı şehir' },
-                  { label: 'Araç Tipi', val: detail.vehicle_types.length, color: '#f59e0b', sub: 'çeşit' },
+                  { label: 'Araç Tipi', val: activeVT.length, color: '#f59e0b', sub: 'çeşit' },
                 ].map(s => (
                   <div key={s.label} style={{
                     background: '#161b22', border: '1px solid #21262d', borderRadius: 10, padding: '14px 16px',
