@@ -246,6 +246,53 @@ export default function RadarClient({
     });
   }
 
+  // Gölge profil düzenleme drawer aç
+  function openEdit(lead: Lead) {
+    setEditLead(lead);
+    setEditForm({
+      name:         lead.display_name    ?? '',
+      company_name: lead.company_name    ?? '',
+      notes:        '',
+      status:       'active',
+      etiket:       lead.etiket          ?? '',
+    });
+    setEditMsg(null);
+  }
+
+  // Gölge profil kaydet
+  async function saveEdit() {
+    if (!editLead?.shadow_profile_id) return;
+    setEditSaving(true);
+    setEditMsg(null);
+    try {
+      const res = await fetch('/api/admin/crm', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id:           editLead.shadow_profile_id,
+          name:         editForm.name         || null,
+          company_name: editForm.company_name || null,
+          notes:        editForm.notes        || null,
+          status:       editForm.status,
+          etiket:       editForm.etiket       || null,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Sunucu hatası');
+      // Local state güncelle
+      setLeads(prev => prev.map(l =>
+        l.phone === editLead.phone
+          ? { ...l, display_name: editForm.name || null, company_name: editForm.company_name || null, etiket: editForm.etiket || null }
+          : l
+      ));
+      setEditMsg({ type: 'ok', text: 'Kaydedildi ✓' });
+    } catch (e: any) {
+      setEditMsg({ type: 'err', text: e.message });
+    } finally {
+      setEditSaving(false);
+    }
+  }
+
   // ── Render ──────────────────────────────────────────────────────────────
   return (
     <>
