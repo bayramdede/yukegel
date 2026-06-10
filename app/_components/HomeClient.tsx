@@ -474,7 +474,9 @@ export default function HomeClient({ initialIlanlar = [], totalCount = 0 }: { in
             </button>
           )}
           <span style={{ color: '#8b949e', fontSize: '0.78rem', marginLeft: 'auto' }}>
-            {yukleniyor ? 'Yükleniyor...' : hata ? '–' : `${filtered.length} ${tip === 'yuk' ? 'yük' : 'araç'} ilanı`}
+            {yukleniyor ? 'Yükleniyor...' : hata ? '–' : filterAktif
+              ? `${filtered.length} ${tip === 'yuk' ? 'yük' : 'araç'} ilanı`
+              : `${totalCount.toLocaleString('tr-TR')} aktif ilan`}
           </span>
         </div>
       </div>
