@@ -208,10 +208,6 @@ function DuzenleForm({ poi, onKaydet, onIptal, kayitYukleniyor }: DuzenleFormPro
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10, marginBottom: 12 }}>
-
-      </div>
-
       <div style={{ display: 'flex', gap: 8 }}>
         <button
           onClick={kaydet}
