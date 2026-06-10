@@ -273,32 +273,38 @@ export default function PoiDetay({ poiId, userLat, userLng, onKapat }: Props) {
             )}
 
             {/* Aksiyon butonları */}
-            <div style={{ display: 'flex', gap: 10, marginBottom: 20 }}>
+            <div style={{ display: 'flex', gap: 10, marginBottom: poi.phone ? 10 : 20 }}>
               <button
                 onClick={handleYolTarifi}
                 style={{
-                  flex: 1, padding: '12px 0', borderRadius: 10,
+                  flex: 1, padding: '13px 0', borderRadius: 10,
                   background: '#22c55e', color: '#0d1117',
                   border: 'none', fontWeight: 700, fontSize: 14, cursor: 'pointer',
                 }}
               >
                 🗺️ Yol Tarifi Al
               </button>
-              {poi.phone && (
-                <a
-                  href={`tel:${poi.phone}`}
-                  style={{
-                    flex: 1, padding: '12px 0', borderRadius: 10,
-                    background: '#21262d', color: '#e6edf3',
-                    border: 'none', fontWeight: 600, fontSize: 14, cursor: 'pointer',
-                    textAlign: 'center', textDecoration: 'none',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  }}
-                >
-                  📞 Ara
-                </a>
-              )}
             </div>
+
+            {/* Telefon — varsa tam genişlikte, numara görünür */}
+            {poi.phone && (
+              <a
+                href={`tel:${poi.phone}`}
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  gap: 10, width: '100%', padding: '13px 0', borderRadius: 10,
+                  background: poi.category === 'tamirci' ? '#7f1d1d' : '#21262d',
+                  border: `1px solid ${poi.category === 'tamirci' ? '#ef4444' : '#30363d'}`,
+                  color: poi.category === 'tamirci' ? '#fca5a5' : '#e6edf3',
+                  fontWeight: 700, fontSize: 15, cursor: 'pointer',
+                  textDecoration: 'none', marginBottom: 20,
+                  boxSizing: 'border-box',
+                }}
+              >
+                <span style={{ fontSize: 20 }}>📞</span>
+                <span>{poi.phone}</span>
+              </a>
+            )}
 
             {/* Yorum yaz butonu */}
             <button
