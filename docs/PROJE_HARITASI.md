@@ -261,6 +261,7 @@ Açık rotalar: /giris, /auth/, /profil-tamamla, /nasil-calisir, /hakkimizda,
 | Kullanım Koşulları | `/kullanim-kosullari` | ✅ |
 | Kayıt | `/giris` → `/profil-tamamla` | ✅ |
 | Giriş | `/giris` | ✅ |
+| Yol Rehberi (POI) | `/yol-rehberi` | ✅ |
 | Panel | `/panel` | ✅ |
 | İlan detay | `/ilan/[id]` | ✅ kısmi |
 | Tekil ilan formu | `/ilan-ver` | ✅ |
