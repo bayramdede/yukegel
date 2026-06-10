@@ -100,6 +100,36 @@ yukegel/
 
 ## 3. VERİTABANI ŞEMASI (public.*)
 
+### `pois` — POI Modülü (Yol Rehberi)
+```
+category: 'park_dinlenme'|'yemek'|'konaklama'|'tamirci'|'tesis_akaryakit'|'kantar_resmi'
+location: geography(Point,4326) — PostGIS
+tags: text[] — özellik etiketleri
+badges: jsonb — tır uygunluk rozetleri
+status: 'pending'|'approved'|'rejected'
+avg_rating, review_count — trigger ile güncellenir
+```
+
+### `poi_reviews`
+```
+rating (1-5), comment, quick_tags (text[])
+category_ratings: jsonb — Faz 2 için boş, şimdilik NULL
+is_verified_visit: bool — geo-fence 200m kontrolü
+review_type: 'verified'|'guest'
+UNIQUE(poi_id, user_id)
+```
+
+### `poi_visit_logs` — Geo-fence için GPS geçmişi
+### `poi_stay_events` — 3 saat+ park takibi (contextual öneri)
+
+### RPCs:
+- `get_pois_in_bbox(...)` — Bounding Box + akıllı sıralama formülü
+- `check_poi_visit(...)` — 200m geo-fence doğrulama
+- `get_nearby_listings_for_parked_driver(city)` — Contextual yük önerisi
+- `get_parked_drivers_for_notification()` — Cron: 3h+ parkta bildirimi bekleyenler
+
+Migration: `docs/20260610_poi_module.sql`
+
 ### `listings`
 ```
 moderation_status: 'pending'|'approved'|'rejected'|'auto_published'|'archived'|'correction_needed'
