@@ -615,6 +615,9 @@ function OnaySekme() {
   const [reparsing, setReparsing]   = useState(false);
   const [ilerleme, setIlerleme]     = useState({ done: 0, total: 0, ok: 0, still: 0 });
   const [reparseMsg, setReparseMsg] = useState('');
+  const [temizGun, setTemizGun]     = useState(30);
+  const [temizleniyor, setTemizleniyor] = useState(false);
+  const [temizMesaj, setTemizMesaj] = useState<string | null>(null);
 
   // Kaynak satırlar: alias id -> gösterilecek satır listesi
   const [kaynaklar, setKaynaklar]   = useState<Record<number, string[]>>({});
