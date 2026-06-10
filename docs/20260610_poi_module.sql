@@ -229,8 +229,8 @@ LANGUAGE sql STABLE AS $$
     END AS ranking_score
   FROM pois p
   WHERE
-    -- Bounding Box filtresi
-    p.location && ST_MakeEnvelope(p_min_lng, p_min_lat, p_max_lng, p_max_lat, 4326)
+    -- Bounding Box filtresi (geography → geometry'ye cast ederek karşılaştır)
+    p.location::geometry && ST_MakeEnvelope(p_min_lng, p_min_lat, p_max_lng, p_max_lat, 4326)
     -- Sadece onaylı POI'ler
     AND p.status = 'approved'
     -- Kategori filtresi
