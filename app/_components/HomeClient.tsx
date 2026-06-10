@@ -232,7 +232,7 @@ function HataEkrani({ tip, onRetry }: { tip: 'timeout' | 'error'; onRetry: () =>
   );
 }
 
-export default function HomeClient({ initialIlanlar = [] }: { initialIlanlar?: any[] }) {
+export default function HomeClient({ initialIlanlar = [], totalCount = 0 }: { initialIlanlar?: any[]; totalCount?: number }) {
   const [ilanlar, setIlanlar] = useState<any[]>(initialIlanlar);
   const [yukleniyor, setYukleniyor] = useState(initialIlanlar.length === 0);
   const [hata, setHata] = useState<'timeout' | 'error' | null>(null);
