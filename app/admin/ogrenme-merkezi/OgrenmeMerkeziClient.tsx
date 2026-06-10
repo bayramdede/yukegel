@@ -713,6 +713,23 @@ function OnaySekme() {
     setIslem(null); yukle();
   };
 
+  const eskileriTemizle = async () => {
+    if (!confirm(`${temizGun} günden eski tüm no_lane raw_post kayıtları kalıcı silinecek. Onaylıyor musun?`)) return;
+    setTemizleniyor(true); setTemizMesaj(null);
+    try {
+      const res  = await fetch('/api/admin/learn-aliases', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'clean_no_lane', days: temizGun }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        setTemizMesaj(`${json.deleted} kayıt silindi (${temizGun} günden eski).`);
+      } else {
+        setTemizMesaj(`Hata: ${json.error}`);
+      }
+    } finally { setTemizleniyor(false); }
+  };
+
   const reparseBaslat = async () => {
     setReparsing(true); setReparseMsg(''); setIlerleme({ done: 0, total: 0, ok: 0, still: 0 });
     const idsJson = await fetch('/api/admin/reprocess-no-lane').then(r => r.json());
