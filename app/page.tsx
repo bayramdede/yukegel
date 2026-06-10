@@ -107,11 +107,14 @@ async function fetchInitialIlanlar() {
 }
 
 export default async function Home() {
-  const initialIlanlar = await fetchInitialIlanlar();
+  const [initialIlanlar, totalCount] = await Promise.all([
+    fetchInitialIlanlar(),
+    fetchTotalIlanCount(),
+  ]);
 
   return (
     <>
-      <HomeClient initialIlanlar={initialIlanlar} />
+      <HomeClient initialIlanlar={initialIlanlar} totalCount={totalCount} />
       <Footer />
     </>
   );
