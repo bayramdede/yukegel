@@ -65,7 +65,7 @@ function Sparkline({ data, width = 120, height = 28 }: { data: DailyRow[]; width
     return `${x},${y}`;
   }).join(' ');
   return (
-    <svg width={width} height={height} style={{ display: 'block' }}>
+    <svg width={width} height={height} style={{ display: 'block', width: '100%', maxWidth: width }}>
       <polyline
         points={pts}
         fill="none"
