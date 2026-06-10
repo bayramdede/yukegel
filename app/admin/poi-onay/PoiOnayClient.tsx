@@ -130,6 +130,18 @@ function DuzenleForm({ poi, onKaydet, onIptal, kayitYukleniyor }: DuzenleFormPro
 
         <div>
           <label style={{ color: C.muted, fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 4 }}>
+            İlçe
+          </label>
+          <input
+            style={inp}
+            value={form.district}
+            onChange={e => set('district', e.target.value)}
+            placeholder="Kadıköy"
+          />
+        </div>
+
+        <div>
+          <label style={{ color: C.muted, fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 4 }}>
             Enlem (Latitude) *
           </label>
           <input
