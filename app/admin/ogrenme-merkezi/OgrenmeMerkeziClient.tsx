@@ -782,6 +782,37 @@ function OnaySekme() {
           </div>
         )}
         {reparseMsg && <div style={{ marginTop: 10, fontSize: '0.85rem', color: '#22c55e' }}>{reparseMsg}</div>}
+
+        {/* ── Temizleme bölümü ── */}
+        <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid #21262d' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <span style={{ color: '#8b949e', fontSize: '0.8rem', flex: 1 }}>Eski no_lane kayıtlarını temizle:</span>
+            <select
+              style={{ ...S.input(), width: 'auto', fontSize: '0.78rem' }}
+              value={temizGun}
+              onChange={e => setTemizGun(Number(e.target.value))}
+            >
+              <option value={1}>1 gün+</option>
+              <option value={4}>4 gün+</option>
+              <option value={7}>7 gün+</option>
+              <option value={14}>14 gün+</option>
+              <option value={30}>30 gün+</option>
+              <option value={60}>60 gün+</option>
+            </select>
+            <button
+              onClick={eskileriTemizle}
+              disabled={temizleniyor}
+              style={S.btn('#450a0a', '#f87171', temizleniyor)}
+            >
+              {temizleniyor ? 'Siliniyor...' : 'Eskileri Temizle'}
+            </button>
+          </div>
+          {temizMesaj && (
+            <div style={{ marginTop: 8, fontSize: '0.8rem', color: temizMesaj.startsWith('Hata') ? '#f87171' : '#22c55e' }}>
+              {temizMesaj}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* ── Başlık ── */}
