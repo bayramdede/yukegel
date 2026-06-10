@@ -34,6 +34,9 @@ interface Poi {
   name: string;
   category: string;
   city: string | null;
+  district: string | null;
+  address: string | null;
+  address_note: string | null;
   latitude: number;
   longitude: number;
   is_emergency: boolean;
