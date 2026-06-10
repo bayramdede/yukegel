@@ -222,6 +222,16 @@ export default function AnalitikClient() {
 
   return (
     <div style={{ maxWidth: 1400, margin: '0 auto', padding: '20px 16px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <style>{`
+        .analitik-main-grid { display: grid; grid-template-columns: 280px 1fr; gap: 14px; align-items: start; }
+        .analitik-detail-grid { display: grid; grid-template-columns: 1fr 340px; gap: 14px; }
+        .analitik-city-scroll { max-height: calc(100vh - 280px); overflow-y: auto; }
+        @media (max-width: 768px) {
+          .analitik-main-grid { grid-template-columns: 1fr !important; }
+          .analitik-detail-grid { grid-template-columns: 1fr !important; }
+          .analitik-city-scroll { max-height: 280px !important; }
+        }
+      `}</style>
 
       {/* ── Toolbar ───────────────────────────────────────────────────── */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
