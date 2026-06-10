@@ -53,3 +53,62 @@ export async function GET(
     return NextResponse.json({ success: false, error: 'Beklenmeyen bir hata oluştu.' }, { status: 500 });
   }
 }
+
+// ─────────────────────────────────────────────
+// PATCH /api/poi/[id]
+// Durum güncelle: approved | rejected (admin/moderatör zorunlu)
+// Body: { status: 'approved' | 'rejected' }
+// ─────────────────────────────────────────────
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+
+    const ssrClient = await getServerSupabase();
+    const { data: { user } } = await ssrClient.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ success: false, error: 'Giriş gerekli.' }, { status: 401 });
+    }
+
+    const supabase = getServiceSupabase();
+    const { data: profil } = await supabase
+      .from('users')
+      .select('role')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    if (!profil || !['admin', 'moderator'].includes(profil.role)) {
+      return NextResponse.json({ success: false, error: 'Yetersiz yetki.' }, { status: 403 });
+    }
+
+    const body = await request.json();
+    const { status } = body;
+
+    if (!['approved', 'rejected'].includes(status)) {
+      return NextResponse.json({ success: false, error: 'Geçersiz durum. approved veya rejected olmalı.' }, { status: 400 });
+    }
+
+    const { data, error } = await supabase
+      .from('pois')
+      .update({ status, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .select('id, name, status')
+      .maybeSingle();
+
+    if (error) {
+      console.error('[poi/[id]/PATCH] DB error:', error);
+      return NextResponse.json({ success: false, error: 'Durum güncellenemedi.' }, { status: 500 });
+    }
+
+    if (!data) {
+      return NextResponse.json({ success: false, error: 'POI bulunamadı.' }, { status: 404 });
+    }
+
+    return NextResponse.json({ success: true, data });
+  } catch (err) {
+    console.error('[poi/[id]/PATCH] Unexpected error:', err);
+    return NextResponse.json({ success: false, error: 'Beklenmeyen bir hata oluştu.' }, { status: 500 });
+  }
+}
