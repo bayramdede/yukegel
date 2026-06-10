@@ -120,9 +120,11 @@ export async function PATCH(
       updates.category = category;
     }
 
-    if (city !== undefined)        updates.city        = city?.trim() || null;
-    if (address !== undefined)     updates.address     = address?.trim() || null;
-    if (description !== undefined) updates.description = description?.trim() || null;
+    if (city !== undefined)         updates.city         = city?.trim() || null;
+    if (district !== undefined)    updates.district     = district?.trim() || null;
+    if (address !== undefined)     updates.address      = address?.trim() || null;
+    if (address_note !== undefined) updates.address_note = address_note?.trim() || null;
+    if (description !== undefined) updates.description  = description?.trim() || null;
     if (is_emergency !== undefined) updates.is_emergency = Boolean(is_emergency);
 
     if (latitude !== undefined || longitude !== undefined) {
