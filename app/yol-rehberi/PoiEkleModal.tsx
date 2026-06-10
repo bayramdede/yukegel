@@ -185,38 +185,37 @@ export default function PoiEkleModal({ userLat, userLng, onKapat, onBasarili }: 
             ))}
           </div>
 
-          {/* Koordinat */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 4 }}>
-            <div>
-              <label style={labelStyle}>Enlem (Lat) *</label>
-              <input
-                value={form.latitude}
-                onChange={e => setForm({ ...form, latitude: e.target.value })}
-                placeholder="39.9334"
-                type="number"
-                step="any"
-                style={inputStyle}
-              />
+          {/* Koordinat — GPS butonu */}
+          <label style={labelStyle}>Konum *</label>
+          <button
+            type="button"
+            onClick={konumDurum === 'loading' ? undefined : konumAl}
+            style={{
+              width: '100%', padding: '12px 16px', borderRadius: 8,
+              border: `1px solid ${konumDurum === 'success' ? '#22c55e' : konumDurum === 'error' ? '#ef4444' : '#30363d'}`,
+              background: konumDurum === 'success' ? '#0d2b1a' : konumDurum === 'loading' ? '#1a2535' : '#0d1117',
+              color: konumDurum === 'success' ? '#22c55e' : konumDurum === 'error' ? '#f87171' : '#e6edf3',
+              fontSize: 14, fontWeight: 600, cursor: konumDurum === 'loading' ? 'wait' : 'pointer',
+              marginBottom: konumDurum === 'success' ? 6 : 14,
+              textAlign: 'left', display: 'flex', alignItems: 'center', gap: 8,
+              fontFamily: "'IBM Plex Sans', sans-serif",
+            }}
+          >
+            {konumDurum === 'loading' && (
+              <span style={{ display: 'inline-block', width: 14, height: 14, border: '2px solid #60a5fa', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.7s linear infinite', flexShrink: 0 }} />
+            )}
+            {konumDurum === 'idle'    && '📍 Konumumu Al'}
+            {konumDurum === 'loading' && 'Konum alınıyor...'}
+            {konumDurum === 'success' && '✅ Konum Alındı'}
+            {konumDurum === 'error'   && '📍 Tekrar Dene'}
+          </button>
+          {konumDurum === 'success' && (
+            <div style={{ fontSize: 12, color: '#8b949e', marginBottom: 14, paddingLeft: 2 }}>
+              {form.latitude}, {form.longitude}
             </div>
-            <div>
-              <label style={labelStyle}>Boylam (Lng) *</label>
-              <input
-                value={form.longitude}
-                onChange={e => setForm({ ...form, longitude: e.target.value })}
-                placeholder="32.8597"
-                type="number"
-                step="any"
-                style={inputStyle}
-              />
-            </div>
-          </div>
-          {userLat && (
-            <button
-              onClick={() => setForm({ ...form, latitude: userLat.toFixed(6), longitude: (userLng || 0).toFixed(6) })}
-              style={{ fontSize: 12, color: '#22c55e', background: 'none', border: 'none', cursor: 'pointer', marginBottom: 12, padding: 0 }}
-            >
-              📍 Mevcut konumumu kullan
-            </button>
+          )}
+          {konumDurum === 'error' && (
+            <div style={{ fontSize: 12, color: '#f87171', marginBottom: 14 }}>{konumHata}</div>
           )}
 
           {/* Şehir + İlçe */}
