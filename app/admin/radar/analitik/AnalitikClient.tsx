@@ -307,7 +307,7 @@ export default function AnalitikClient() {
       </div>
 
       {/* ── Ana İçerik: Sol + Sağ ─────────────────────────────────────── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '280px 1fr', gap: 14, alignItems: 'start' }}>
+      <div className="analitik-main-grid">
 
         {/* ── Sol Panel: Şehir Listesi ─────────────────────────────── */}
         <div style={{ background: '#161b22', border: '1px solid #21262d', borderRadius: 12, overflow: 'hidden' }}>
