@@ -54,10 +54,21 @@ export async function GET(
   }
 }
 
+const VALID_CATEGORIES = ['park_dinlenme', 'yemek', 'konaklama', 'tamirci', 'tesis_akaryakit', 'kantar_resmi'];
+
 // ─────────────────────────────────────────────
 // PATCH /api/poi/[id]
-// Durum güncelle: approved | rejected (admin/moderatör zorunlu)
-// Body: { status: 'approved' | 'rejected' }
+// Durum ve/veya içerik güncelle (admin/moderatör zorunlu)
+// Body (hepsi opsiyonel, en az biri zorunlu):
+//   status       — 'approved' | 'rejected'
+//   name         — string
+//   category     — geçerli kategori değeri
+//   city         — string
+//   address      — string
+//   description  — string
+//   latitude     — number  (longitude ile birlikte)
+//   longitude    — number  (latitude ile birlikte)
+//   is_emergency — boolean
 // ─────────────────────────────────────────────
 export async function PATCH(
   request: NextRequest,
@@ -84,22 +95,61 @@ export async function PATCH(
     }
 
     const body = await request.json();
-    const { status } = body;
+    const { status, name, category, city, address, description, latitude, longitude, is_emergency } = body;
 
-    if (!['approved', 'rejected'].includes(status)) {
-      return NextResponse.json({ success: false, error: 'Geçersiz durum. approved veya rejected olmalı.' }, { status: 400 });
+    const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
+
+    if (status !== undefined) {
+      if (!['approved', 'rejected'].includes(status)) {
+        return NextResponse.json({ success: false, error: 'Geçersiz durum. approved veya rejected olmalı.' }, { status: 400 });
+      }
+      updates.status = status;
+    }
+
+    if (name !== undefined) {
+      if (!name || typeof name !== 'string') {
+        return NextResponse.json({ success: false, error: 'Ad boş olamaz.' }, { status: 400 });
+      }
+      updates.name = name.trim();
+    }
+
+    if (category !== undefined) {
+      if (!VALID_CATEGORIES.includes(category)) {
+        return NextResponse.json({ success: false, error: 'Geçersiz kategori.' }, { status: 400 });
+      }
+      updates.category = category;
+    }
+
+    if (city !== undefined)        updates.city        = city?.trim() || null;
+    if (address !== undefined)     updates.address     = address?.trim() || null;
+    if (description !== undefined) updates.description = description?.trim() || null;
+    if (is_emergency !== undefined) updates.is_emergency = Boolean(is_emergency);
+
+    if (latitude !== undefined || longitude !== undefined) {
+      const lat = Number(latitude);
+      const lng = Number(longitude);
+      if (isNaN(lat) || isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+        return NextResponse.json({ success: false, error: 'Geçersiz koordinat.' }, { status: 400 });
+      }
+      updates.latitude  = lat;
+      updates.longitude = lng;
+      updates.location  = `SRID=4326;POINT(${lng} ${lat})`;
+    }
+
+    if (Object.keys(updates).length === 1) {
+      return NextResponse.json({ success: false, error: 'Güncellenecek alan belirtilmedi.' }, { status: 400 });
     }
 
     const { data, error } = await supabase
       .from('pois')
-      .update({ status, updated_at: new Date().toISOString() })
+      .update(updates)
       .eq('id', id)
-      .select('id, name, status')
+      .select('id, name, category, city, address, description, latitude, longitude, is_emergency, status')
       .maybeSingle();
 
     if (error) {
       console.error('[poi/[id]/PATCH] DB error:', error);
-      return NextResponse.json({ success: false, error: 'Durum güncellenemedi.' }, { status: 500 });
+      return NextResponse.json({ success: false, error: 'Güncelleme başarısız.' }, { status: 500 });
     }
 
     if (!data) {
