@@ -116,6 +116,8 @@ export async function POST(request: NextRequest) {
         longitude,
         address,
         city,
+        district,
+        address_note,
         phone,
         website,
         tags,
