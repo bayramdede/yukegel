@@ -327,7 +327,7 @@ export default function AnalitikClient() {
             />
           </div>
 
-          <div style={{ maxHeight: 'calc(100vh - 280px)', overflowY: 'auto' }}>
+          <div className="analitik-city-scroll">
             {citiesLoading ? (
               <div style={{ padding: '32px 14px', textAlign: 'center', color: '#4b5563', fontSize: '0.82rem' }}>Yükleniyor…</div>
             ) : citiesError ? (
