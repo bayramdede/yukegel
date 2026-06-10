@@ -66,6 +66,13 @@ const KARTLAR = [
     aciklama: 'Genelden özele drill-down: hangi şehirden nereye, kaç ilan, hangi araç. Kontratlı fırsatları yüzeysel tara.',
     aktif: true,
   },
+  {
+    yol: '/admin/poi-onay',
+    ikon: '🗺️',
+    baslik: 'Yol Rehberi — POI Onay',
+    aciklama: 'Kullanıcıların eklediği park, yemek, tamirci gibi konumları onayla veya reddet.',
+    aktif: true,
+  },
 ];
 
 export default async function AdminAna() {
