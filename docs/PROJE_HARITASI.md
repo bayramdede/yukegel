@@ -66,6 +66,12 @@ yukegel/
 │   ├── araclarim/page.tsx
 │   ├── moderator/ + moderator-giris/
 │   ├── admin/ (page + kullanicilar + sistem-ayarlari + guvenlik + crm + radar)
+│   ├── yol-rehberi/                      # 🗺️ POI Modülü ✅
+│   │   ├── page.tsx                      # Server component + metadata
+│   │   ├── YolRehberiClient.tsx          # Harita + filtreler + bottom sheet
+│   │   ├── PoiHarita.tsx                 # React-Leaflet (dynamic import, SSR=false)
+│   │   ├── PoiDetay.tsx                  # Detay bottom sheet + yorum formu
+│   │   └── PoiEkleModal.tsx              # Yeni POI ekleme formu
 │   ├── cikis/
 │   └── u/[username]/page.tsx
 │
@@ -77,6 +83,9 @@ yukegel/
 │   ├── llm-parse/
 │   ├── moderator/kullanici-askiya/ + toplu-islem/
 │   ├── parse-text/                       # ✍️ Metinden ilan: LLM (Haiku) ile JSON çıkarımı ✅
+│   ├── poi/route.ts                      # GET (bbox sorgu + sıralama), POST (yeni POI) ✅
+│   ├── poi/[id]/route.ts                 # GET detay + son yorumlar ✅
+│   ├── poi/[id]/review/route.ts          # POST yorum + geo-fence doğrulama ✅
 │   └── whatsapp-parse/
 │
 ├── lib/auth.ts + supabase.ts
