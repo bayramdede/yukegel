@@ -29,8 +29,8 @@ export default function PoiEkleModal({ userLat, userLng, onKapat, onBasarili }: 
     name: '',
     description: '',
     category: '',
-    latitude: userLat?.toFixed(6) || '',
-    longitude: userLng?.toFixed(6) || '',
+    latitude: '',
+    longitude: '',
     address: '',
     city: '',
     district: '',
@@ -42,6 +42,39 @@ export default function PoiEkleModal({ userLat, userLng, onKapat, onBasarili }: 
   const [gonderiliyor, setGonderiliyor] = useState(false);
   const [hata, setHata] = useState('');
   const [adimlar] = useState(0);
+  const [konumDurum, setKonumDurum] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [konumHata, setKonumHata] = useState('');
+
+  const konumAl = () => {
+    if (!navigator.geolocation) {
+      setKonumDurum('error');
+      setKonumHata('Tarayıcınız konum özelliğini desteklemiyor.');
+      return;
+    }
+    setKonumDurum('loading');
+    setKonumHata('');
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setForm(prev => ({
+          ...prev,
+          latitude: pos.coords.latitude.toFixed(6),
+          longitude: pos.coords.longitude.toFixed(6),
+        }));
+        setKonumDurum('success');
+      },
+      (err) => {
+        setKonumDurum('error');
+        if (err.code === err.PERMISSION_DENIED) {
+          setKonumHata('Konum izni reddedildi. Tarayıcı ayarlarından konum iznini verin.');
+        } else if (err.code === err.POSITION_UNAVAILABLE) {
+          setKonumHata('Konum alınamadı. GPS sinyali yok veya cihaz desteklemiyor.');
+        } else {
+          setKonumHata('Konum alımı zaman aşımına uğradı. Tekrar deneyin.');
+        }
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  };
 
   const toggleEtiket = (e: string) => {
     setSecilenEtiketler(prev =>
