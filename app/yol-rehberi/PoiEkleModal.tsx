@@ -33,6 +33,8 @@ export default function PoiEkleModal({ userLat, userLng, onKapat, onBasarili }: 
     longitude: userLng?.toFixed(6) || '',
     address: '',
     city: '',
+    district: '',
+    address_note: '',
     phone: '',
     is_emergency: false,
   });
