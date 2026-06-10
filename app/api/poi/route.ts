@@ -82,7 +82,7 @@ export async function POST(request: NextRequest) {
     const {
       name, description, category,
       latitude, longitude,
-      address, city, phone, website,
+      address, city, district, address_note, phone, website,
       tags = [], badges = {},
       is_emergency = false,
     } = body;
