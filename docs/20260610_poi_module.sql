@@ -424,9 +424,12 @@ CREATE TABLE IF NOT EXISTS poi_stay_events (
   poi_id        uuid NOT NULL REFERENCES pois(id) ON DELETE CASCADE,
   poi_city      text,
   check_in_at   timestamptz DEFAULT now(),
-  notified_at   timestamptz,         -- NULL = bildirim henüz gönderilmedi
-  UNIQUE (user_id, poi_id, check_in_at::date) -- Aynı gün aynı POI'de bir kayıt
+  notified_at   timestamptz          -- NULL = bildirim henüz gönderilmedi
 );
+
+-- Aynı gün aynı POI'de bir kayıt (ifade içerdiği için ayrı index)
+CREATE UNIQUE INDEX IF NOT EXISTS poi_stay_events_user_poi_day_idx
+  ON poi_stay_events (user_id, poi_id, (check_in_at::date));
 
 ALTER TABLE poi_stay_events ENABLE ROW LEVEL SECURITY;
 
