@@ -20,6 +20,21 @@ function yeniUye(createdAt: string | null): boolean {
   return new Date(createdAt) > new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 }
 
+async function fetchTotalIlanCount(): Promise<number> {
+  try {
+    const serviceSupabase = createServiceClient();
+    const { count } = await serviceSupabase
+      .from('listings')
+      .select('*', { count: 'exact', head: true })
+      .in('moderation_status', ['approved', 'auto_published'])
+      .eq('is_shadow_banned', false)
+      .eq('status', 'active');
+    return count ?? 0;
+  } catch {
+    return 0;
+  }
+}
+
 async function fetchInitialIlanlar() {
   try {
     // Service role: listing_stops RLS anon'u blokluyor; joined query ile tek seferde çek
@@ -38,7 +53,8 @@ async function fetchInitialIlanlar() {
       .in('moderation_status', ['approved', 'auto_published'])
       .eq('is_shadow_banned', false)
       .eq('status', 'active')
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .limit(200);
 
     if (error || !data || data.length === 0) return [];
 
