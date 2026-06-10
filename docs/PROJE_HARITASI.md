@@ -290,6 +290,13 @@ Açık rotalar: /giris, /auth/, /profil-tamamla, /nasil-calisir, /hakkimizda,
 ## 14. GÖREV DURUMU
 
 ### ✅ Tamamlanan
+- **POI Modülü / Yol Rehberi** (10 Haziran 2026): Kamyon şoförleri için konum tabanlı harita modülü.
+  - DB: `pois`, `poi_reviews`, `poi_visit_logs`, `poi_stay_events` tabloları. PostGIS geography index.
+  - RPCs: `get_pois_in_bbox` (bounding box + akıllı sıralama), `check_poi_visit` (200m geo-fence), `get_nearby_listings_for_parked_driver`, `get_parked_drivers_for_notification`.
+  - API: `/api/poi` (GET bbox sorgu, POST ekle), `/api/poi/[id]` (detay), `/api/poi/[id]/review` (yorum + geo-fence).
+  - Frontend: `/yol-rehberi` — React-Leaflet harita, 6 kategori chip, Tier 2 alt filtreler, SOS butonu, bottom sheet liste, POI detay modalı, yorum formu (hızlı etiket + yıldız), yeni POI ekleme modalı.
+  - Contextual cross-entegrasyon: kullanıcı 3h+ parkta kalınca şehirdeki yük ilanları önerisi (pg_cron altyapısı hazır).
+  - Migration: `docs/20260610_poi_module.sql`.
 - **Radar & İstihbarat Paneli** (4 Haziran 2026): Admin satış radari — iki modül.
   - **Lead Radar** (`/admin/radar`): Rota bazlı (kalkış+varış) lead arama. `get_radar_intelligence` RPC, phone normalize, frekans+NLP sınıflandırma, WA/davet/geçmiş aksiyonları. Migration: `docs/20260604_radar_intelligence_rpc.sql`.
   - **Analitik Dashboard** (`/admin/radar/analitik`): QlikView-tarzı drill-down. Şehir listesi sol panel, varış/kalkış bar chart, araç tipi dağılımı, sparkline. `get_radar_city_overview` + `get_radar_city_detail(direction)` RPC. Migration: `docs/20260604_radar_analitik_rpc.sql`.
