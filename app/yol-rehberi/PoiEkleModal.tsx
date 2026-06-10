@@ -24,7 +24,7 @@ interface Props {
   onBasarili: () => void;
 }
 
-export default function PoiEkleModal({ userLat, userLng, onKapat, onBasarili }: Props) {
+export default function PoiEkleModal({ onKapat, onBasarili }: Props) {
   const [form, setForm] = useState({
     name: '',
     description: '',
