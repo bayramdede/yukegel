@@ -17,6 +17,7 @@ export async function GET() {
     .from('raw_posts')
     .select('id')
     .eq('processing_status', 'no_lane')
+    .is('slh_scanned_at', null)
     .order('id', { ascending: true })
     .limit(2000)
 
