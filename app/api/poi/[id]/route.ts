@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServiceSupabase } from '../../../../lib/auth';
+import { getServerSupabase, getServiceSupabase } from '../../../../lib/auth';
 
 export const runtime = 'nodejs';
 
