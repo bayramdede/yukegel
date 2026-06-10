@@ -428,7 +428,7 @@ function KesifSekme() {
       });
       const json = await res.json();
       if (json.success) {
-        setTemizMesaj(`${json.deleted} kayıt silindi (${temizGun} günden eski).`);
+        setTemizMesaj(`${json.deleted} kayıt işaretlendi — listeden çıkarıldı (${temizGun} günden eski).`);
         yukle();
       } else {
         setTemizMesaj(`Hata: ${json.error}`);
