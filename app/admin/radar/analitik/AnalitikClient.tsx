@@ -469,7 +469,7 @@ export default function AnalitikClient() {
                 ))}
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 14 }}>
+              <div className="analitik-detail-grid">
 
                 {/* ── Karşı Şehirler (bar chart) ── */}
                 <div style={{ background: '#161b22', border: '1px solid #21262d', borderRadius: 12, overflow: 'hidden' }}>
