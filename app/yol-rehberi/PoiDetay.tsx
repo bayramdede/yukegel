@@ -235,17 +235,12 @@ export default function PoiDetay({ poiId, userLat, userLng, onKapat }: Props) {
             )}
 
             {/* Adres / Telefon */}
-            {(poi.address || poi.phone) && (
+            {poi.address && (
               <div style={{
                 background: '#0d1117', borderRadius: 8, padding: '10px 12px',
                 marginBottom: 12, fontSize: 13, color: '#8b949e',
               }}>
-                {poi.address && <div style={{ marginBottom: 4 }}>📍 {poi.address}</div>}
-                {poi.phone && (
-                  <a href={`tel:${poi.phone}`} style={{ color: '#22c55e', textDecoration: 'none' }}>
-                    📞 {poi.phone}
-                  </a>
-                )}
+                📍 {poi.address}
               </div>
             )}
 
