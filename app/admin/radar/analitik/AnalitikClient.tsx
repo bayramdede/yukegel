@@ -275,7 +275,7 @@ export default function AnalitikClient() {
       </div>
 
       {/* ── Breadcrumb ────────────────────────────────────────────────── */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.82rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.82rem', flexWrap: 'wrap' }}>
         <button onClick={() => { setSelected(null); setDetail(null); setSubSelected(null); }}
           style={{ background: 'none', border: 'none', color: selected ? '#22c55e' : '#e2e8f0', cursor: selected ? 'pointer' : 'default', fontWeight: selected ? 500 : 700, padding: 0, fontSize: '0.82rem' }}>
           🗺️ Tüm Türkiye
