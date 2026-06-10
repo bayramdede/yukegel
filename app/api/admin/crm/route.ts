@@ -19,9 +19,11 @@ export async function GET(req: NextRequest) {
   const search    = searchParams.get('search')?.trim() || '';
   const offset    = (page - 1) * limit;
 
+  // count:'exact' yerine 'planned' kullan — aggregate view'da exact count
+  // tüm tabloyu tarar, listings büyüdükçe Supabase statement timeout'u (8s) aşar.
   let query = svc
     .from('shadow_profile_summary')
-    .select('*', { count: 'exact' })
+    .select('*', { count: 'planned' })
     .order('listing_count', { ascending: false })
     .range(offset, offset + limit - 1);
 
