@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
 
     const { data: pois, error } = await supabase
       .from('pois')
-      .select('id, name, category, city, latitude, longitude, is_emergency, status, added_by, created_at')
+      .select('id, name, category, city, district, address, address_note, latitude, longitude, is_emergency, status, added_by, created_at')
       .eq('status', statusFilter)
       .order('created_at', { ascending: false })
       .limit(100);
