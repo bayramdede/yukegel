@@ -182,6 +182,36 @@ function DuzenleForm({ poi, onKaydet, onIptal, kayitYukleniyor }: DuzenleFormPro
 
       </div>
 
+      {/* Adres alanları — tam genişlik */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+        <div>
+          <label style={{ color: C.muted, fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 4 }}>
+            Adres
+          </label>
+          <input
+            style={inp}
+            value={form.address}
+            onChange={e => set('address', e.target.value)}
+            placeholder="Atatürk Cad. No:12"
+          />
+        </div>
+        <div>
+          <label style={{ color: C.muted, fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 4 }}>
+            Adres Tarifi
+          </label>
+          <input
+            style={inp}
+            value={form.address_note}
+            onChange={e => set('address_note', e.target.value)}
+            placeholder="Kavşaktan sağa dön, sarı bina..."
+          />
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10, marginBottom: 12 }}>
+
+      </div>
+
       <div style={{ display: 'flex', gap: 8 }}>
         <button
           onClick={kaydet}
