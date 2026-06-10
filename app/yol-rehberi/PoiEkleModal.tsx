@@ -129,6 +129,7 @@ export default function PoiEkleModal({ userLat, userLng, onKapat, onBasarili }: 
           overflowY: 'auto', padding: '0 0 40px',
         }}
       >
+        <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
         {/* Başlık */}
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
