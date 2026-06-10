@@ -809,7 +809,7 @@ export default function Moderator() {
             )}
             {/* Tüm tab butonları — Sprint 3: riskli eklendi */}
             {(['pending', 'approved', 'rejected', 'passive', 'hepsi', 'no_lane', 'arsiv', 'riskli'] as const).map(f => (
-              <button key={f} onClick={() => { setFiltre(f); setSonraBak(new Set()); filtreTemizle(); }}
+              <button key={f} onClick={() => { setFiltre(f); setSonraBak(new Set()); filtreTemizle(); setSelectedIds(new Set()); setLastClickedIdx(null); }}
                 style={{
                   padding: '5px 12px', borderRadius: 6, border: '1px solid',
                   borderColor: filtre === f ? (f === 'arsiv' ? '#854d0e' : f === 'riskli' ? '#7f1d1d' : '#22c55e') : '#30363d',
