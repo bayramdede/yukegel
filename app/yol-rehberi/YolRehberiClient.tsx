@@ -127,9 +127,11 @@ export default function YolRehberiClient() {
     }, 300);
   }, [aktifKategori, aktifEtiketler, sosAktif, userLat, userLng]);
 
-  // Konum hazır olunca veya filtre değişince yükle
+  // Liste modunda her zaman TR_BBOX kullan — sıralama algoritması
+  // zaten mesafe+puana göre en iyi 30'u öne getirir.
+  // Harita modunda bbox haritanın görünüm alanından gelir (handleBoundsChange).
   useEffect(() => {
-    const bbox = userLat && userLng
+    const bbox = gorunum === 'harita' && userLat && userLng
       ? {
           min_lng: userLng - 0.5, min_lat: userLat - 0.3,
           max_lng: userLng + 0.5, max_lat: userLat + 0.3,
@@ -137,7 +139,7 @@ export default function YolRehberiClient() {
       : TR_BBOX;
     bboxRef.current = bbox;
     fetchPois(bbox);
-  }, [fetchPois, userLat, userLng]);
+  }, [fetchPois, userLat, userLng, gorunum]);
 
   const handleBoundsChange = useCallback((bbox: BoundingBox) => {
     bboxRef.current = bbox;
