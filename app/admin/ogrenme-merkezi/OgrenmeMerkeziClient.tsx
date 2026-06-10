@@ -723,7 +723,7 @@ function OnaySekme() {
       });
       const json = await res.json();
       if (json.success) {
-        setTemizMesaj(`${json.deleted} kayıt silindi (${temizGun} günden eski).`);
+        setTemizMesaj(`${json.deleted} kayıt işaretlendi — yeniden işleme kuyruğundan çıkarıldı (${temizGun} günden eski).`);
       } else {
         setTemizMesaj(`Hata: ${json.error}`);
       }
