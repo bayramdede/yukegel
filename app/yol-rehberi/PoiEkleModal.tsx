@@ -186,13 +186,45 @@ export default function PoiEkleModal({ userLat, userLng, onKapat, onBasarili }: 
             </button>
           )}
 
-          {/* Şehir */}
-          <label style={labelStyle}>Şehir</label>
+          {/* Şehir + İlçe */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <div>
+              <label style={labelStyle}>Şehir</label>
+              <input
+                value={form.city}
+                onChange={e => setForm({ ...form, city: e.target.value })}
+                placeholder="İzmir"
+                style={inputStyle}
+              />
+            </div>
+            <div>
+              <label style={labelStyle}>İlçe</label>
+              <input
+                value={form.district}
+                onChange={e => setForm({ ...form, district: e.target.value })}
+                placeholder="Bornova"
+                style={inputStyle}
+              />
+            </div>
+          </div>
+
+          {/* Adres */}
+          <label style={labelStyle}>Adres</label>
           <input
-            value={form.city}
-            onChange={e => setForm({ ...form, city: e.target.value })}
-            placeholder="İzmir"
+            value={form.address}
+            onChange={e => setForm({ ...form, address: e.target.value })}
+            placeholder="Atatürk Cad. No:12"
             style={inputStyle}
+          />
+
+          {/* Adres Tarifi */}
+          <label style={labelStyle}>Adres Tarifi</label>
+          <textarea
+            value={form.address_note}
+            onChange={e => setForm({ ...form, address_note: e.target.value })}
+            placeholder="Örn: Kavşaktan sağa dön, sarı bina..."
+            rows={2}
+            style={{ ...inputStyle, resize: 'vertical' }}
           />
 
           {/* Telefon */}
