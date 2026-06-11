@@ -647,10 +647,13 @@ function YeniEkleForm({ onKaydet, onIptal, kayitYukleniyor }: {
             {mapsDurum === 'loading' ? '⏳ Çekiliyor...' : '📍 Konumu Çek'}
           </button>
         </div>
-        {mapsDurum === 'success' && (
+        {mapsDurum === 'success' && !mapsHata && (
           <div style={{ color: C.green, fontSize: '0.74rem', marginTop: 6 }}>
             ✅ Koordinatlar dolduruldu — enlem/boylam alanlarını kontrol edin.
           </div>
+        )}
+        {mapsDurum === 'success' && mapsHata && (
+          <div style={{ color: C.amber, fontSize: '0.74rem', marginTop: 6 }}>{mapsHata}</div>
         )}
         {mapsDurum === 'error' && (
           <div style={{ color: C.red, fontSize: '0.74rem', marginTop: 6 }}>⚠️ {mapsHata}</div>
