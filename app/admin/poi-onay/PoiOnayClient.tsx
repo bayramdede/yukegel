@@ -14,6 +14,7 @@ const inp: React.CSSProperties = {
   background: C.bg, color: C.text, border: `1px solid ${C.border}`,
   borderRadius: 6, padding: '6px 10px', fontSize: '0.82rem',
   outline: 'none', width: '100%', boxSizing: 'border-box',
+  fontFamily: "'IBM Plex Sans', system-ui, sans-serif",
 };
 
 const lbl: React.CSSProperties = {
@@ -35,15 +36,21 @@ const KATEGORI: Record<string, string> = Object.fromEntries(
   KATEGORI_LIST.map(k => [k.value, k.label])
 );
 
-const SORT_OPTIONS = [
-  { value: 'created_at', label: 'Tarih' },
-  { value: 'name',       label: 'Ad' },
-  { value: 'avg_rating', label: 'Puan' },
-  { value: 'review_count', label: 'Yorum Sayısı' },
-  { value: 'city',       label: 'Şehir' },
+const ETIKET_ONERILERI = [
+  '7/24 Açık', 'Tır Park Yeri Var', 'Güvenlik Kameralı', 'Duş İmkanı',
+  'WC', 'Kamyoncu Dostu', 'Sulu Yemek', 'Nöbetçi', 'Çekici',
+  'Uygun Fiyat', 'Dorseyi Ayırmaya Gerek Yok',
 ];
 
-// Excel'den gelen kategori değerlerini normalize et
+const SORT_OPTIONS = [
+  { value: 'created_at',  label: 'Tarih' },
+  { value: 'name',        label: 'Ad' },
+  { value: 'avg_rating',  label: 'Puan' },
+  { value: 'review_count', label: 'Yorum Sayısı' },
+  { value: 'city',        label: 'Şehir' },
+];
+
+// Excel kategori normalize
 const KAT_NORM: Record<string, string> = {
   park_dinlenme: 'park_dinlenme', 'park & dinlenme': 'park_dinlenme', 'park ve dinlenme': 'park_dinlenme',
   yemek: 'yemek',
@@ -53,7 +60,6 @@ const KAT_NORM: Record<string, string> = {
   'tesis & akaryakit': 'tesis_akaryakit', 'tesis ve akaryakıt': 'tesis_akaryakit',
   kantar_resmi: 'kantar_resmi', 'kantar & resmi': 'kantar_resmi', 'kantar ve resmi': 'kantar_resmi',
 };
-
 function normalizeKategori(val: string): string | null {
   const clean = val.toLowerCase().replace(/[🅿️🍲🛏️🛠️⛽⚖️]/gu, '').trim();
   return KAT_NORM[clean] ?? null;
@@ -62,14 +68,12 @@ function normalizeKategori(val: string): string | null {
 async function sablonIndir() {
   const XLSX = await import('xlsx');
   const wb = XLSX.utils.book_new();
-
   const veri = [
     ['Ad', 'Kategori', 'Şehir', 'İlçe', 'Adres', 'Adres Tarifi', 'Enlem', 'Boylam', 'Acil'],
     ['Örnek Tır Parkı', 'park_dinlenme', 'İstanbul', 'Sultangazi', 'E-5 Karayolu No:1', 'E-5 üzerinde kırmızı çatılı tesis', 41.015137, 28.97953, 'HAYIR'],
     ['Şoför Sofrası', 'yemek', 'Ankara', 'Sincan', '', '', 39.9334, 32.8597, 'HAYIR'],
   ];
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(veri), 'POI Listesi');
-
   const rehber = [
     ['Kategori Kodu', 'Görünen Ad'],
     ['park_dinlenme',   '🅿️ Park & Dinlenme'],
@@ -78,12 +82,10 @@ async function sablonIndir() {
     ['tamirci',         '🛠️ Tamirci & Usta'],
     ['tesis_akaryakit', '⛽ Tesis & Akaryakıt'],
     ['kantar_resmi',    '⚖️ Kantar & Resmi'],
-    [],
-    ['Acil Sütunu', '"EVET" veya "HAYIR"'],
+    [], ['Acil Sütunu', '"EVET" veya "HAYIR"'],
     ['Koordinat', 'Ondalık derece formatı (ör: 41.015137)'],
   ];
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rehber), 'Rehber');
-
   XLSX.writeFile(wb, 'yukegel_poi_sablonu.xlsx');
 }
 
@@ -96,54 +98,45 @@ async function parseExcel(file: File): Promise<{
   const wb = XLSX.read(buffer, { type: 'array' });
   const ws = wb.Sheets[wb.SheetNames[0]];
   const rows = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1 });
-
   const valid: PoiInput[] = [];
   const errors: { satir: number; ad: string; hatalar: string[] }[] = [];
-
   for (let i = 1; i < rows.length; i++) {
     const row = rows[i] as unknown[];
     if (!row || row.every(c => c === undefined || c === null || c === '')) continue;
-
     const [ad, kat, sehir, ilce, adres, adresTarifi, enlem, boylam, acil] = row;
     const adStr = String(ad ?? '').trim();
     const hatalar: string[] = [];
-
     if (!adStr) hatalar.push('Ad zorunlu');
-
     const katNorm = normalizeKategori(String(kat ?? ''));
     if (!katNorm) hatalar.push(`Geçersiz kategori: "${kat}"`);
-
     const lat = parseFloat(String(enlem ?? ''));
     const lng = parseFloat(String(boylam ?? ''));
     if (isNaN(lat) || lat < -90  || lat > 90)  hatalar.push('Geçersiz enlem');
     if (isNaN(lng) || lng < -180 || lng > 180) hatalar.push('Geçersiz boylam');
-
     if (hatalar.length > 0) {
       errors.push({ satir: i + 1, ad: adStr, hatalar });
     } else {
       valid.push({
-        name:         adStr,
-        category:     katNorm!,
-        city:         String(sehir ?? '').trim() || null,
-        district:     String(ilce  ?? '').trim() || null,
-        address:      String(adres ?? '').trim() || null,
-        address_note: String(adresTarifi ?? '').trim() || null,
-        latitude:  lat,
-        longitude: lng,
+        name: adStr, category: katNorm!,
+        city: String(sehir ?? '').trim() || null, district: String(ilce ?? '').trim() || null,
+        address: String(adres ?? '').trim() || null, address_note: String(adresTarifi ?? '').trim() || null,
+        phone: null, website: null, description: null, tags: [],
+        latitude: lat, longitude: lng,
         is_emergency: String(acil ?? '').toUpperCase() === 'EVET',
       });
     }
   }
-
   return { valid, errors };
 }
 
 // ─── Interfaces ───────────────────────────────────────────
 
 interface PoiInput {
-  name: string; category: string;
+  name: string; description: string | null; category: string;
   city: string | null; district: string | null;
   address: string | null; address_note: string | null;
+  phone: string | null; website: string | null;
+  tags: string[];
   latitude: number; longitude: number;
   is_emergency: boolean;
 }
@@ -156,88 +149,191 @@ interface Poi extends PoiInput {
   ekleyen: { display_name: string | null; email: string | null } | null;
 }
 
-interface DuzenleFormProps {
-  poi: Poi;
-  onKaydet: (id: string, fields: Partial<Poi>) => Promise<void>;
-  onIptal: () => void;
-  kayitYukleniyor: boolean;
-}
+// Form state — tüm alanlar string | boolean | string[]
+type FormState = Record<string, string | boolean | string[]>;
 
-interface YeniEkleFormProps {
-  onKaydet: (fields: PoiInput) => Promise<void>;
-  onIptal: () => void;
-  kayitYukleniyor: boolean;
-}
-
-// ─── Yıldız gösterge ─────────────────────────────────────
-
-function StarRating({ rating, count }: { rating: number | null; count: number }) {
-  if (!rating && count === 0) {
-    return <span style={{ color: C.dim, fontSize: '0.75rem' }}>— henüz yorum yok</span>;
-  }
-  const stars = rating ? Math.round(rating * 2) / 2 : 0;
-  return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-      <span style={{ color: C.amber, fontSize: '0.78rem', letterSpacing: 1 }}>
-        {[1, 2, 3, 4, 5].map(i => (
-          <span key={i} style={{ opacity: i <= stars ? 1 : 0.25 }}>★</span>
-        ))}
-      </span>
-      {rating !== null && (
-        <span style={{ color: C.amber, fontSize: '0.78rem', fontWeight: 700 }}>{rating.toFixed(1)}</span>
-      )}
-      <span style={{ color: C.dim, fontSize: '0.75rem' }}>({count})</span>
-    </span>
-  );
-}
-
-// ─── Ortak form grid ──────────────────────────────────────
-
-function FormGrid({ form, set, showButtons, onKaydet, onIptal, kayitYukleniyor, btnLabel }: {
-  form: Record<string, string | boolean>;
-  set: (f: string, v: string | boolean) => void;
+interface FormGridProps {
+  form: FormState;
+  set: (f: string, v: string | boolean | string[]) => void;
   showButtons: boolean;
   onKaydet: () => void;
   onIptal: () => void;
   kayitYukleniyor: boolean;
   btnLabel: string;
-}) {
+}
+
+// ─── GPS hook ────────────────────────────────────────────
+
+function useGps(setLatLng: (lat: string, lng: string) => void) {
+  const [durum, setDurum] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [hata, setHata] = useState('');
+  function al() {
+    if (!navigator.geolocation) { setDurum('error'); setHata('Tarayıcı konum desteklemiyor.'); return; }
+    setDurum('loading'); setHata('');
+    navigator.geolocation.getCurrentPosition(
+      pos => { setLatLng(pos.coords.latitude.toFixed(6), pos.coords.longitude.toFixed(6)); setDurum('success'); },
+      err => {
+        setDurum('error');
+        setHata(err.code === err.PERMISSION_DENIED ? 'Konum izni reddedildi.' : 'Konum alınamadı, tekrar dene.');
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  }
+  return { durum, hata, al };
+}
+
+// ─── Yıldız gösterge ─────────────────────────────────────
+
+function StarRating({ rating, count }: { rating: number | null; count: number }) {
+  if (!rating && count === 0) return <span style={{ color: C.dim, fontSize: '0.75rem' }}>— henüz yorum yok</span>;
+  const stars = rating ? Math.round(rating * 2) / 2 : 0;
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+      <span style={{ color: C.amber, fontSize: '0.78rem', letterSpacing: 1 }}>
+        {[1, 2, 3, 4, 5].map(i => <span key={i} style={{ opacity: i <= stars ? 1 : 0.25 }}>★</span>)}
+      </span>
+      {rating !== null && <span style={{ color: C.amber, fontSize: '0.78rem', fontWeight: 700 }}>{rating.toFixed(1)}</span>}
+      <span style={{ color: C.dim, fontSize: '0.75rem' }}>({count})</span>
+    </span>
+  );
+}
+
+// ─── Ortak tam form ───────────────────────────────────────
+
+function FormGrid({ form, set, showButtons, onKaydet, onIptal, kayitYukleniyor, btnLabel }: FormGridProps) {
+  const tags = Array.isArray(form.tags) ? form.tags as string[] : [];
+  const gps = useGps((lat, lng) => { set('latitude', lat); set('longitude', lng); });
+
+  function toggleTag(t: string) {
+    set('tags', tags.includes(t) ? tags.filter(x => x !== t) : [...tags, t]);
+  }
+
   const isValid = String(form.name ?? '').trim() && form.category &&
     !isNaN(parseFloat(String(form.latitude))) && !isNaN(parseFloat(String(form.longitude)));
+
   return (
     <>
+      {/* Temel bilgiler */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(175px, 1fr))', gap: 10, marginBottom: 10 }}>
-        <div><label style={lbl}>Konum Adı *</label><input style={inp} value={String(form.name)} onChange={e => set('name', e.target.value)} placeholder="Güven Tır Parkı" /></div>
+        <div><label style={lbl}>Konum Adı *</label>
+          <input style={inp} value={String(form.name)} onChange={e => set('name', e.target.value)} placeholder="Güven Tır Parkı" />
+        </div>
         <div>
-          <label style={lbl}>Kategori *</label>
-          <select style={{ ...inp, cursor: 'pointer' }} value={String(form.category)} onChange={e => set('category', e.target.value)}>
-            <option value="">— Seçin —</option>
-            {KATEGORI_LIST.map(k => <option key={k.value} value={k.value}>{k.label}</option>)}
-          </select>
+          <label style={lbl}>Şehir</label>
+          <input style={inp} value={String(form.city)} onChange={e => set('city', e.target.value)} placeholder="İstanbul" />
         </div>
-        <div><label style={lbl}>Şehir</label><input style={inp} value={String(form.city)} onChange={e => set('city', e.target.value)} placeholder="İstanbul" /></div>
-        <div><label style={lbl}>İlçe</label><input style={inp} value={String(form.district)} onChange={e => set('district', e.target.value)} placeholder="Kadıköy" /></div>
-        <div><label style={lbl}>Enlem *</label><input style={inp} type="number" step="0.000001" value={String(form.latitude)} onChange={e => set('latitude', e.target.value)} placeholder="41.015137" /></div>
-        <div><label style={lbl}>Boylam *</label><input style={inp} type="number" step="0.000001" value={String(form.longitude)} onChange={e => set('longitude', e.target.value)} placeholder="28.979530" /></div>
-        <div style={{ display: 'flex', alignItems: 'center' }}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-            <input type="checkbox" checked={Boolean(form.is_emergency)} onChange={e => set('is_emergency', e.target.checked)} style={{ accentColor: C.red, width: 16, height: 16 }} />
-            <span style={{ color: C.muted, fontSize: '0.82rem', fontWeight: 600 }}>🆘 Acil/SOS</span>
-          </label>
+        <div>
+          <label style={lbl}>İlçe</label>
+          <input style={inp} value={String(form.district)} onChange={e => set('district', e.target.value)} placeholder="Kadıköy" />
+        </div>
+        <div>
+          <label style={lbl}>Telefon</label>
+          <input style={inp} value={String(form.phone)} onChange={e => set('phone', e.target.value)} placeholder="0555 123 4567" type="tel" />
+        </div>
+        <div>
+          <label style={lbl}>Website</label>
+          <input style={inp} value={String(form.website)} onChange={e => set('website', e.target.value)} placeholder="https://..." type="url" />
         </div>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
-        <div><label style={lbl}>Adres</label><input style={inp} value={String(form.address)} onChange={e => set('address', e.target.value)} placeholder="E-5 No:12" /></div>
-        <div><label style={lbl}>Adres Tarifi</label><input style={inp} value={String(form.address_note)} onChange={e => set('address_note', e.target.value)} placeholder="Kavşaktan sağa dön..." /></div>
+
+      {/* Kategori — chip butonlar */}
+      <div style={{ marginBottom: 12 }}>
+        <label style={lbl}>Kategori *</label>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          {KATEGORI_LIST.map(k => {
+            const aktif = form.category === k.value;
+            return (
+              <button key={k.value} type="button" onClick={() => set('category', k.value)}
+                style={{ padding: '6px 12px', borderRadius: 8, fontSize: '0.8rem', cursor: 'pointer',
+                  border: `1px solid ${aktif ? C.green : C.border}`,
+                  background: aktif ? C.greenDark : 'transparent',
+                  color: aktif ? C.green : C.muted, fontWeight: aktif ? 700 : 400 }}>
+                {k.label}
+              </button>
+            );
+          })}
+        </div>
       </div>
+
+      {/* Koordinat + GPS */}
+      <div style={{ marginBottom: 12 }}>
+        <label style={lbl}>Konum *</label>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+          <div style={{ flex: '1 1 140px' }}>
+            <input style={inp} type="number" step="0.000001" value={String(form.latitude)} onChange={e => set('latitude', e.target.value)} placeholder="Enlem (41.015137)" />
+          </div>
+          <div style={{ flex: '1 1 140px' }}>
+            <input style={inp} type="number" step="0.000001" value={String(form.longitude)} onChange={e => set('longitude', e.target.value)} placeholder="Boylam (28.979530)" />
+          </div>
+          <button type="button" onClick={gps.durum === 'loading' ? undefined : gps.al}
+            style={{ flexShrink: 0, background: gps.durum === 'success' ? C.greenDark : C.surface,
+              color: gps.durum === 'success' ? C.green : gps.durum === 'error' ? C.red : C.muted,
+              border: `1px solid ${gps.durum === 'success' ? C.green : gps.durum === 'error' ? C.red : C.border}`,
+              borderRadius: 6, padding: '6px 12px', fontSize: '0.8rem', fontWeight: 600,
+              cursor: gps.durum === 'loading' ? 'wait' : 'pointer', whiteSpace: 'nowrap' }}>
+            {gps.durum === 'loading' ? '⏳ Alınıyor...' : gps.durum === 'success' ? '✅ Alındı' : '📍 GPS\'ten Al'}
+          </button>
+        </div>
+        {gps.durum === 'error' && <div style={{ color: C.red, fontSize: '0.74rem', marginTop: 4 }}>{gps.hata}</div>}
+      </div>
+
+      {/* Adres + Adres Tarifi */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+        <div><label style={lbl}>Adres</label>
+          <input style={inp} value={String(form.address)} onChange={e => set('address', e.target.value)} placeholder="E-5 No:12" />
+        </div>
+        <div><label style={lbl}>Adres Tarifi</label>
+          <textarea style={{ ...inp, resize: 'vertical', minHeight: 56 }} value={String(form.address_note)} onChange={e => set('address_note', e.target.value)} placeholder="Kavşaktan sağa dön..." />
+        </div>
+      </div>
+
+      {/* Açıklama */}
+      <div style={{ marginBottom: 10 }}>
+        <label style={lbl}>Açıklama</label>
+        <textarea style={{ ...inp, resize: 'vertical', minHeight: 56 }} value={String(form.description)} onChange={e => set('description', e.target.value)} placeholder="Kısa bir açıklama..." />
+      </div>
+
+      {/* Etiketler */}
+      <div style={{ marginBottom: 12 }}>
+        <label style={lbl}>Özellikler / Etiketler</label>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          {ETIKET_ONERILERI.map(t => {
+            const aktif = tags.includes(t);
+            return (
+              <button key={t} type="button" onClick={() => toggleTag(t)}
+                style={{ padding: '4px 10px', borderRadius: 16, fontSize: '0.76rem', cursor: 'pointer',
+                  border: `1px solid ${aktif ? C.green : C.border}`,
+                  background: aktif ? C.greenDark : 'transparent',
+                  color: aktif ? C.green : C.muted }}>
+                {t}
+              </button>
+            );
+          })}
+        </div>
+        {tags.length > 0 && (
+          <div style={{ marginTop: 6, fontSize: '0.74rem', color: C.dim }}>
+            Seçili: {tags.join(', ')}
+          </div>
+        )}
+      </div>
+
+      {/* Acil */}
+      <div style={{ marginBottom: 14 }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+          <input type="checkbox" checked={Boolean(form.is_emergency)} onChange={e => set('is_emergency', e.target.checked)}
+            style={{ accentColor: C.red, width: 16, height: 16 }} />
+          <span style={{ color: C.muted, fontSize: '0.82rem', fontWeight: 600 }}>🆘 Nöbetçi / 7/24 Acil Destek</span>
+        </label>
+      </div>
+
       {showButtons && (
         <div style={{ display: 'flex', gap: 8 }}>
           <button onClick={onKaydet} disabled={kayitYukleniyor || !isValid}
-            style={{ background: C.greenDark, color: C.green, border: `1px solid ${C.greenBg}`, borderRadius: 6, padding: '6px 18px', fontSize: '0.82rem', fontWeight: 700, cursor: kayitYukleniyor || !isValid ? 'not-allowed' : 'pointer', opacity: kayitYukleniyor || !isValid ? 0.5 : 1 }}>
+            style={{ background: C.greenDark, color: C.green, border: `1px solid ${C.greenBg}`, borderRadius: 6, padding: '7px 20px', fontSize: '0.82rem', fontWeight: 700, cursor: kayitYukleniyor || !isValid ? 'not-allowed' : 'pointer', opacity: kayitYukleniyor || !isValid ? 0.5 : 1 }}>
             {kayitYukleniyor ? '...' : btnLabel}
           </button>
           <button onClick={onIptal} disabled={kayitYukleniyor}
-            style={{ background: 'none', color: C.muted, border: `1px solid ${C.border}`, borderRadius: 6, padding: '6px 14px', fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer' }}>
+            style={{ background: 'none', color: C.muted, border: `1px solid ${C.border}`, borderRadius: 6, padding: '7px 14px', fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer' }}>
             İptal
           </button>
         </div>
@@ -248,21 +344,38 @@ function FormGrid({ form, set, showButtons, onKaydet, onIptal, kayitYukleniyor, 
 
 // ─── DuzenleForm ─────────────────────────────────────────
 
-function DuzenleForm({ poi, onKaydet, onIptal, kayitYukleniyor }: DuzenleFormProps) {
-  const [form, setForm] = useState<Record<string, string | boolean>>({
-    name: poi.name, category: poi.category,
+function DuzenleForm({ poi, onKaydet, onIptal, kayitYukleniyor }: {
+  poi: Poi;
+  onKaydet: (id: string, fields: Partial<Poi>) => Promise<void>;
+  onIptal: () => void;
+  kayitYukleniyor: boolean;
+}) {
+  const [form, setForm] = useState<FormState>({
+    name: poi.name, description: poi.description ?? '',
+    category: poi.category,
     city: poi.city ?? '', district: poi.district ?? '',
     address: poi.address ?? '', address_note: poi.address_note ?? '',
+    phone: poi.phone ?? '', website: poi.website ?? '',
+    tags: Array.isArray(poi.tags) ? [...poi.tags] : [],
     latitude: String(poi.latitude), longitude: String(poi.longitude),
     is_emergency: poi.is_emergency,
   });
-  function set(f: string, v: string | boolean) { setForm(prev => ({ ...prev, [f]: v })); }
+  function set(f: string, v: string | boolean | string[]) { setForm(prev => ({ ...prev, [f]: v })); }
   function kaydet() {
+    const tags = Array.isArray(form.tags) ? form.tags as string[] : [];
     onKaydet(poi.id, {
-      name: String(form.name).trim(), category: String(form.category),
-      city: String(form.city).trim() || null, district: String(form.district).trim() || null,
-      address: String(form.address).trim() || null, address_note: String(form.address_note).trim() || null,
-      latitude: parseFloat(String(form.latitude)), longitude: parseFloat(String(form.longitude)),
+      name: String(form.name).trim(),
+      description: String(form.description).trim() || null,
+      category: String(form.category),
+      city: String(form.city).trim() || null,
+      district: String(form.district).trim() || null,
+      address: String(form.address).trim() || null,
+      address_note: String(form.address_note).trim() || null,
+      phone: String(form.phone).trim() || null,
+      website: String(form.website).trim() || null,
+      tags,
+      latitude: parseFloat(String(form.latitude)),
+      longitude: parseFloat(String(form.longitude)),
       is_emergency: Boolean(form.is_emergency),
     });
   }
@@ -275,18 +388,32 @@ function DuzenleForm({ poi, onKaydet, onIptal, kayitYukleniyor }: DuzenleFormPro
 
 // ─── YeniEkleForm ─────────────────────────────────────────
 
-function YeniEkleForm({ onKaydet, onIptal, kayitYukleniyor }: YeniEkleFormProps) {
-  const [form, setForm] = useState<Record<string, string | boolean>>({
-    name: '', category: '', city: '', district: '',
-    address: '', address_note: '', latitude: '', longitude: '', is_emergency: false,
+function YeniEkleForm({ onKaydet, onIptal, kayitYukleniyor }: {
+  onKaydet: (fields: PoiInput) => Promise<void>;
+  onIptal: () => void;
+  kayitYukleniyor: boolean;
+}) {
+  const [form, setForm] = useState<FormState>({
+    name: '', description: '', category: '', city: '', district: '',
+    address: '', address_note: '', phone: '', website: '',
+    tags: [], latitude: '', longitude: '', is_emergency: false,
   });
-  function set(f: string, v: string | boolean) { setForm(prev => ({ ...prev, [f]: v })); }
+  function set(f: string, v: string | boolean | string[]) { setForm(prev => ({ ...prev, [f]: v })); }
   function kaydet() {
+    const tags = Array.isArray(form.tags) ? form.tags as string[] : [];
     onKaydet({
-      name: String(form.name).trim(), category: String(form.category),
-      city: String(form.city).trim() || null, district: String(form.district).trim() || null,
-      address: String(form.address).trim() || null, address_note: String(form.address_note).trim() || null,
-      latitude: parseFloat(String(form.latitude)), longitude: parseFloat(String(form.longitude)),
+      name: String(form.name).trim(),
+      description: String(form.description).trim() || null,
+      category: String(form.category),
+      city: String(form.city).trim() || null,
+      district: String(form.district).trim() || null,
+      address: String(form.address).trim() || null,
+      address_note: String(form.address_note).trim() || null,
+      phone: String(form.phone).trim() || null,
+      website: String(form.website).trim() || null,
+      tags,
+      latitude: parseFloat(String(form.latitude)),
+      longitude: parseFloat(String(form.longitude)),
       is_emergency: Boolean(form.is_emergency),
     });
   }
@@ -312,10 +439,10 @@ export default function PoiOnayClient() {
   const [gosterilen, setGosterilen] = useState<'pending' | 'approved' | 'rejected'>('pending');
 
   // Filtre & sıralama
-  const [search, setSearch]         = useState('');
-  const [katFilter, setKatFilter]   = useState('');
-  const [sortBy, setSortBy]         = useState('created_at');
-  const [sortOrder, setSortOrder]   = useState<'desc' | 'asc'>('desc');
+  const [search, setSearch]       = useState('');
+  const [katFilter, setKatFilter] = useState('');
+  const [sortBy, setSortBy]       = useState('created_at');
+  const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
 
   // Tekil ekleme
   const [ekleAcik, setEkleAcik] = useState(false);
@@ -335,15 +462,14 @@ export default function PoiOnayClient() {
     setYukleniyor(true); setHata(''); setDuzenleId(null);
     try {
       const params = new URLSearchParams({ status });
-      const s = opts?.search ?? search;
-      const c = opts?.category ?? katFilter;
-      const sb = opts?.sort ?? sortBy;
-      const so = opts?.order ?? sortOrder;
-      if (s) params.set('search', s);
-      if (c) params.set('category', c);
+      const s  = opts?.search   ?? search;
+      const c  = opts?.category ?? katFilter;
+      const sb = opts?.sort     ?? sortBy;
+      const so = opts?.order    ?? sortOrder;
+      if (s)  params.set('search', s);
+      if (c)  params.set('category', c);
       if (sb) params.set('sort', sb);
       if (so) params.set('order', so);
-
       const res = await fetch(`/api/admin/poi?${params.toString()}`);
       const d = await res.json();
       if (d.success) setPois(d.data);
@@ -355,7 +481,6 @@ export default function PoiOnayClient() {
   useEffect(() => { yukle(gosterilen); }, [gosterilen]);
 
   function uygula() { yukle(gosterilen); }
-
   function sifirla() {
     setSearch(''); setKatFilter(''); setSortBy('created_at'); setSortOrder('desc');
     yukle(gosterilen, { search: '', category: '', sort: 'created_at', order: 'desc' });
@@ -388,12 +513,8 @@ export default function PoiOnayClient() {
     try {
       const res = await fetch(`/api/poi/${id}`, { method: 'DELETE' });
       const d = await res.json();
-      if (d.success) {
-        setPois(prev => prev.filter(p => p.id !== id));
-        if (duzenleId === id) setDuzenleId(null);
-      } else {
-        setHata(d.error || 'Silme başarısız.');
-      }
+      if (d.success) { setPois(prev => prev.filter(p => p.id !== id)); if (duzenleId === id) setDuzenleId(null); }
+      else setHata(d.error || 'Silme başarısız.');
     } catch { setHata('Bağlantı hatası.'); }
     finally { setSiliniyor(false); setSilinecekId(null); }
   }
@@ -403,12 +524,8 @@ export default function PoiOnayClient() {
     try {
       const res = await fetch('/api/admin/poi', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(fields) });
       const d = await res.json();
-      if (d.success) {
-        setEkleAcik(false);
-        if (gosterilen === 'approved') yukle('approved');
-      } else {
-        setHata(d.error || 'Ekleme başarısız.');
-      }
+      if (d.success) { setEkleAcik(false); if (gosterilen === 'approved') yukle('approved'); }
+      else setHata(d.error || 'Ekleme başarısız.');
     } catch { setHata('Bağlantı hatası.'); }
     finally { setKayitYukleniyor(false); }
   }
@@ -416,17 +533,11 @@ export default function PoiOnayClient() {
   async function handleDosyaSec(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    setExcelDosyaAdi(file.name);
-    setTopluSonuc('');
-    setHata('');
+    setExcelDosyaAdi(file.name); setTopluSonuc(''); setHata('');
     try {
       const { valid, errors } = await parseExcel(file);
-      setExcelGecerli(valid);
-      setExcelHatalar(errors);
-    } catch {
-      setHata('Excel dosyası okunamadı.');
-      setExcelGecerli([]); setExcelHatalar([]);
-    }
+      setExcelGecerli(valid); setExcelHatalar(errors);
+    } catch { setHata('Excel dosyası okunamadı.'); setExcelGecerli([]); setExcelHatalar([]); }
     e.target.value = '';
   }
 
@@ -440,16 +551,12 @@ export default function PoiOnayClient() {
         setTopluSonuc(`✅ ${d.inserted} konum eklendi.`);
         setExcelGecerli([]); setExcelHatalar([]); setExcelDosyaAdi('');
         if (gosterilen === 'approved') yukle('approved');
-      } else {
-        setHata(d.error || 'Toplu yükleme başarısız.');
-      }
+      } else setHata(d.error || 'Toplu yükleme başarısız.');
     } catch { setHata('Bağlantı hatası.'); }
     finally { setTopluYukleniyor(false); }
   }
 
-  function excelTemizle() {
-    setExcelGecerli([]); setExcelHatalar([]); setExcelDosyaAdi(''); setTopluSonuc('');
-  }
+  function excelTemizle() { setExcelGecerli([]); setExcelHatalar([]); setExcelDosyaAdi(''); setTopluSonuc(''); }
 
   const tabs = [
     { key: 'pending'  as const, label: '⏳ Bekleyenler' },
@@ -458,8 +565,6 @@ export default function PoiOnayClient() {
   ];
 
   const onizlemeVar = excelGecerli.length > 0 || excelHatalar.length > 0;
-
-  // Filtre aktif mi?
   const filtreAktif = search || katFilter || sortBy !== 'created_at' || sortOrder !== 'desc';
 
   return (
@@ -485,11 +590,7 @@ export default function PoiOnayClient() {
 
       {/* ── Tekil ekleme formu ── */}
       {ekleAcik && (
-        <YeniEkleForm
-          onKaydet={yeniPoiEkle}
-          onIptal={() => setEkleAcik(false)}
-          kayitYukleniyor={kayitYukleniyor}
-        />
+        <YeniEkleForm onKaydet={yeniPoiEkle} onIptal={() => setEkleAcik(false)} kayitYukleniyor={kayitYukleniyor} />
       )}
 
       {/* ── Excel önizleme ── */}
@@ -497,47 +598,30 @@ export default function PoiOnayClient() {
         <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: '14px 16px', marginBottom: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
             <span style={{ color: C.muted, fontSize: '0.82rem' }}>📄 {excelDosyaAdi}</span>
-            {excelGecerli.length > 0 && (
-              <span style={{ background: C.greenDark, color: C.green, fontSize: '0.75rem', fontWeight: 700, padding: '2px 8px', borderRadius: 4 }}>
-                {excelGecerli.length} geçerli satır
-              </span>
-            )}
-            {excelHatalar.length > 0 && (
-              <span style={{ background: C.redBg, color: C.red, fontSize: '0.75rem', fontWeight: 700, padding: '2px 8px', borderRadius: 4 }}>
-                {excelHatalar.length} hatalı satır
-              </span>
-            )}
+            {excelGecerli.length > 0 && <span style={{ background: C.greenDark, color: C.green, fontSize: '0.75rem', fontWeight: 700, padding: '2px 8px', borderRadius: 4 }}>{excelGecerli.length} geçerli satır</span>}
+            {excelHatalar.length > 0 && <span style={{ background: C.redBg, color: C.red, fontSize: '0.75rem', fontWeight: 700, padding: '2px 8px', borderRadius: 4 }}>{excelHatalar.length} hatalı satır</span>}
             <button onClick={excelTemizle} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: C.dim, cursor: 'pointer', fontSize: '0.82rem' }}>✕ Temizle</button>
           </div>
-
           {excelGecerli.length > 0 && (
             <>
               <div style={{ overflowX: 'auto', marginBottom: 10 }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.78rem' }}>
-                  <thead>
-                    <tr>
-                      {['Ad', 'Kategori', 'Şehir', 'İlçe', 'Enlem', 'Boylam', 'Acil'].map(h => (
-                        <th key={h} style={{ color: C.muted, fontWeight: 700, padding: '4px 8px', textAlign: 'left', borderBottom: `1px solid ${C.border}`, whiteSpace: 'nowrap' }}>{h}</th>
-                      ))}
+                  <thead><tr>{['Ad', 'Kategori', 'Şehir', 'İlçe', 'Enlem', 'Boylam', 'Acil'].map(h => (
+                    <th key={h} style={{ color: C.muted, fontWeight: 700, padding: '4px 8px', textAlign: 'left', borderBottom: `1px solid ${C.border}`, whiteSpace: 'nowrap' }}>{h}</th>
+                  ))}</tr></thead>
+                  <tbody>{excelGecerli.slice(0, 8).map((r, i) => (
+                    <tr key={i} style={{ borderBottom: `1px solid ${C.border}` }}>
+                      <td style={{ padding: '4px 8px', color: C.text }}>{r.name}</td>
+                      <td style={{ padding: '4px 8px', color: C.muted }}>{KATEGORI[r.category] ?? r.category}</td>
+                      <td style={{ padding: '4px 8px', color: C.muted }}>{r.city ?? '—'}</td>
+                      <td style={{ padding: '4px 8px', color: C.muted }}>{r.district ?? '—'}</td>
+                      <td style={{ padding: '4px 8px', color: C.dim }}>{r.latitude}</td>
+                      <td style={{ padding: '4px 8px', color: C.dim }}>{r.longitude}</td>
+                      <td style={{ padding: '4px 8px', color: r.is_emergency ? C.red : C.dim }}>{r.is_emergency ? 'Evet' : '—'}</td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {excelGecerli.slice(0, 8).map((r, i) => (
-                      <tr key={i} style={{ borderBottom: `1px solid ${C.border}` }}>
-                        <td style={{ padding: '4px 8px', color: C.text }}>{r.name}</td>
-                        <td style={{ padding: '4px 8px', color: C.muted }}>{KATEGORI[r.category] ?? r.category}</td>
-                        <td style={{ padding: '4px 8px', color: C.muted }}>{r.city ?? '—'}</td>
-                        <td style={{ padding: '4px 8px', color: C.muted }}>{r.district ?? '—'}</td>
-                        <td style={{ padding: '4px 8px', color: C.dim }}>{r.latitude}</td>
-                        <td style={{ padding: '4px 8px', color: C.dim }}>{r.longitude}</td>
-                        <td style={{ padding: '4px 8px', color: r.is_emergency ? C.red : C.dim }}>{r.is_emergency ? 'Evet' : '—'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
+                  ))}</tbody>
                 </table>
-                {excelGecerli.length > 8 && (
-                  <div style={{ color: C.dim, fontSize: '0.75rem', padding: '4px 8px' }}>… ve {excelGecerli.length - 8} satır daha</div>
-                )}
+                {excelGecerli.length > 8 && <div style={{ color: C.dim, fontSize: '0.75rem', padding: '4px 8px' }}>… ve {excelGecerli.length - 8} satır daha</div>}
               </div>
               <button onClick={topluYukle} disabled={topluYukleniyor}
                 style={{ background: C.greenDark, color: C.green, border: `1px solid ${C.greenBg}`, borderRadius: 6, padding: '8px 20px', fontSize: '0.85rem', fontWeight: 700, cursor: topluYukleniyor ? 'wait' : 'pointer', opacity: topluYukleniyor ? 0.6 : 1 }}>
@@ -545,7 +629,6 @@ export default function PoiOnayClient() {
               </button>
             </>
           )}
-
           {excelHatalar.length > 0 && (
             <div style={{ marginTop: 12 }}>
               <div style={{ color: C.red, fontSize: '0.78rem', fontWeight: 700, marginBottom: 6 }}>Hatalı satırlar:</div>
@@ -558,10 +641,7 @@ export default function PoiOnayClient() {
               ))}
             </div>
           )}
-
-          {topluSonuc && (
-            <div style={{ color: C.green, fontSize: '0.85rem', fontWeight: 700, marginTop: 10 }}>{topluSonuc}</div>
-          )}
+          {topluSonuc && <div style={{ color: C.green, fontSize: '0.85rem', fontWeight: 700, marginTop: 10 }}>{topluSonuc}</div>}
         </div>
       )}
 
@@ -588,19 +668,10 @@ export default function PoiOnayClient() {
 
       {/* ── Filtre & Sıralama çubuğu ── */}
       <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderTop: 'none', borderRadius: '0 0 8px 8px', padding: '12px 14px', marginBottom: 16, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end' }}>
-        {/* Arama */}
         <div style={{ flex: '1 1 180px', minWidth: 140 }}>
           <label style={lbl}>Ad Ara</label>
-          <input
-            style={inp}
-            placeholder="Konum adı..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && uygula()}
-          />
+          <input style={inp} placeholder="Konum adı..." value={search} onChange={e => setSearch(e.target.value)} onKeyDown={e => e.key === 'Enter' && uygula()} />
         </div>
-
-        {/* Kategori */}
         <div style={{ flex: '1 1 160px', minWidth: 140 }}>
           <label style={lbl}>Kategori</label>
           <select style={{ ...inp, cursor: 'pointer' }} value={katFilter} onChange={e => setKatFilter(e.target.value)}>
@@ -608,27 +679,19 @@ export default function PoiOnayClient() {
             {KATEGORI_LIST.map(k => <option key={k.value} value={k.value}>{k.label}</option>)}
           </select>
         </div>
-
-        {/* Sırala */}
         <div style={{ flex: '1 1 140px', minWidth: 120 }}>
           <label style={lbl}>Sırala</label>
           <select style={{ ...inp, cursor: 'pointer' }} value={sortBy} onChange={e => setSortBy(e.target.value)}>
             {SORT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
         </div>
-
-        {/* Yön */}
         <div style={{ flex: '0 0 auto' }}>
           <label style={lbl}>Yön</label>
-          <button
-            onClick={() => setSortOrder(o => o === 'desc' ? 'asc' : 'desc')}
-            style={{ background: C.bg, color: C.muted, border: `1px solid ${C.border}`, borderRadius: 6, padding: '6px 14px', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}
-          >
+          <button onClick={() => setSortOrder(o => o === 'desc' ? 'asc' : 'desc')}
+            style={{ background: C.bg, color: C.muted, border: `1px solid ${C.border}`, borderRadius: 6, padding: '6px 14px', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
             {sortOrder === 'desc' ? '↓ Azalan' : '↑ Artan'}
           </button>
         </div>
-
-        {/* Uygula / Sıfırla */}
         <div style={{ flex: '0 0 auto', display: 'flex', gap: 6, alignItems: 'flex-end' }}>
           <button onClick={uygula}
             style={{ background: C.greenDark, color: C.green, border: `1px solid ${C.greenBg}`, borderRadius: 6, padding: '6px 16px', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}>
@@ -664,9 +727,16 @@ export default function PoiOnayClient() {
                   <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 4, alignItems: 'center' }}>
                     <span style={{ color: C.muted, fontSize: '0.8rem' }}>{KATEGORI[poi.category] ?? poi.category}</span>
                     {poi.city && <span style={{ color: C.dim, fontSize: '0.8rem' }}>📍 {poi.city}{poi.district ? ` / ${poi.district}` : ''}</span>}
+                    {poi.phone && <span style={{ color: C.dim, fontSize: '0.78rem' }}>📞 {poi.phone}</span>}
                     <span style={{ color: C.dim, fontSize: '0.78rem' }}>{poi.latitude.toFixed(5)}, {poi.longitude.toFixed(5)}</span>
                     <StarRating rating={poi.avg_rating} count={poi.review_count ?? 0} />
                   </div>
+                  {poi.description && <div style={{ color: C.muted, fontSize: '0.78rem', marginBottom: 3, fontStyle: 'italic' }}>{poi.description}</div>}
+                  {Array.isArray(poi.tags) && poi.tags.length > 0 && (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 3 }}>
+                      {poi.tags.map(t => <span key={t} style={{ background: C.bg, border: `1px solid ${C.border}`, color: C.muted, fontSize: '0.7rem', padding: '1px 7px', borderRadius: 10 }}>{t}</span>)}
+                    </div>
+                  )}
                   <div style={{ color: C.dim, fontSize: '0.75rem' }}>
                     Ekleyen: <span style={{ color: C.muted }}>{poi.ekleyen?.display_name || poi.ekleyen?.email || (poi.added_by ? 'Kayıtlı kullanıcı' : 'Anonim')}</span>
                     {' · '}
