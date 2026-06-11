@@ -75,6 +75,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    console.info('[resolve-url] input:', url, '→ resolved:', res.url);
     return NextResponse.json({ success: true, url: res.url });
   } catch (err) {
     const mesaj = err instanceof Error ? err.message : '';
