@@ -272,6 +272,8 @@ export default function PoiOnayClient() {
   const [pois, setPois] = useState<Poi[]>([]);
   const [yukleniyor, setYukleniyor] = useState(true);
   const [islem, setIslem] = useState<Record<string, 'onay' | 'ret'>>({});
+  const [silinecekId, setSilinecekId] = useState<string | null>(null);
+  const [siliniyor, setSiliniyor] = useState(false);
   const [duzenleId, setDuzenleId] = useState<string | null>(null);
   const [kayitYukleniyor, setKayitYukleniyor] = useState(false);
   const [hata, setHata] = useState('');
