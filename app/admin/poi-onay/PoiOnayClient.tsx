@@ -420,20 +420,46 @@ function DuzenleForm({ poi, onKaydet, onIptal, kayitYukleniyor }: {
 
 // URL'den koordinat ve yer adı parse et
 function parseGoogleMapsUrl(url: string): { lat: string; lng: string; name: string } | null {
-  // /@lat,lng,zoom veya /@lat,lng (virgülden sonra başka şey olabilir)
-  let m = url.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
-  if (!m) {
-    // ?q=lat,lng veya &q=lat,lng
-    m = url.match(/[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)/);
-  }
-  if (!m) return null;
+  let lat: string | null = null;
+  let lng: string | null = null;
 
-  // /place/Ad/ → URL decode + "+" → boşluk
-  const placeM = url.match(/\/place\/([^/@?#]+)\//);
+  // 1. !3dLAT!4dLNG — data encoding içindeki kesin POI koordinatı (en hassas, öncelikli)
+  //    Örn: data=!4m6!3m5!1s0x...!8m2!3d37.065435!4d36.987245!16s...
+  const dataM = url.match(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/);
+  if (dataM) { lat = dataM[1]; lng = dataM[2]; }
+
+  // 2. /@lat,lng — harita merkezi (fallback; iOS linklerinde bazen eksik olabilir)
+  if (!lat) {
+    const atM = url.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+    if (atM) { lat = atM[1]; lng = atM[2]; }
+  }
+
+  // 3. ?q=lat,lng veya &q=lat,lng
+  if (!lat) {
+    const qM = url.match(/[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)/);
+    if (qM) { lat = qM[1]; lng = qM[2]; }
+  }
+
+  // 4. ?ll=lat,lng veya &ll=lat,lng
+  if (!lat) {
+    const llM = url.match(/[?&]ll=(-?\d+\.\d+),(-?\d+\.\d+)/);
+    if (llM) { lat = llM[1]; lng = llM[2]; }
+  }
+
+  // 5. center=lat,lng (nadir ama mevcut)
+  if (!lat) {
+    const cM = url.match(/[?&]center=(-?\d+\.\d+),(-?\d+\.\d+)/);
+    if (cM) { lat = cM[1]; lng = cM[2]; }
+  }
+
+  if (!lat || !lng) return null;
+
+  // /place/Ad/ veya /search/Ad/ → URL decode + "+" → boşluk
+  const placeM = url.match(/\/(?:place|search)\/([^/@?#]+)\//);
   const rawName = placeM ? placeM[1] : '';
   const name = rawName ? decodeURIComponent(rawName.replace(/\+/g, ' ')) : '';
 
-  return { lat: m[1], lng: m[2], name };
+  return { lat, lng, name };
 }
 
 function YeniEkleForm({ onKaydet, onIptal, kayitYukleniyor }: {
