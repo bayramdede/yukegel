@@ -154,11 +154,15 @@ export async function POST(request: NextRequest) {
 
       insertable.push({
         name:         String(r.name).trim(),
+        description:  r.description?.trim()  || null,
         category:     r.category,
         city:         r.city?.trim()         || null,
         district:     r.district?.trim()     || null,
         address:      r.address?.trim()      || null,
         address_note: r.address_note?.trim() || null,
+        phone:        r.phone?.trim()        || null,
+        website:      r.website?.trim()      || null,
+        tags:         Array.isArray(r.tags) ? r.tags : [],
         latitude:  lat,
         longitude: lng,
         location:  `SRID=4326;POINT(${lng} ${lat})`,
