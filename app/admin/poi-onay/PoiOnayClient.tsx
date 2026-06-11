@@ -529,9 +529,11 @@ function YeniEkleForm({ onKaydet, onIptal, kayitYukleniyor }: {
           return;
         }
         hedefUrl = d.url;
+        console.debug('[maps] resolved URL:', hedefUrl);
       }
 
       const parsed = parseGoogleMapsUrl(hedefUrl);
+      console.debug('[maps] parse result:', parsed, 'from:', hedefUrl.slice(0, 120));
       if (!parsed) {
         setMapsDurum('error');
         setMapsHata('Koordinat bulunamadı. Tam Google Maps linki yapıştırın veya kısa linki deneyin.');
