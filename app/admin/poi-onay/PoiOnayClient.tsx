@@ -558,10 +558,28 @@ export default function PoiOnayClient() {
                   style={{ color: C.muted, fontSize: '0.78rem', textDecoration: 'none', whiteSpace: 'nowrap' }}>
                   🗺️ Haritada gör
                 </a>
-                <button onClick={() => setDuzenleId(duzenleId === poi.id ? null : poi.id)}
+                <button onClick={() => { setDuzenleId(duzenleId === poi.id ? null : poi.id); setSilinecekId(null); }}
                   style={{ background: duzenleId === poi.id ? C.blueBg : 'transparent', color: C.blue, border: `1px solid ${C.blueBg}`, borderRadius: 6, padding: '6px 14px', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
                   {duzenleId === poi.id ? '✕ Kapat' : '✏️ Düzenle'}
                 </button>
+                {silinecekId === poi.id ? (
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
+                    <span style={{ color: C.red, fontSize: '0.78rem', fontWeight: 600 }}>Emin misin?</span>
+                    <button onClick={() => poiSil(poi.id)} disabled={siliniyor}
+                      style={{ background: C.redBg, color: C.red, border: `1px solid ${C.red}`, borderRadius: 6, padding: '6px 14px', fontSize: '0.82rem', fontWeight: 700, cursor: siliniyor ? 'wait' : 'pointer', opacity: siliniyor ? 0.6 : 1 }}>
+                      {siliniyor ? '...' : '🗑️ Evet, Sil'}
+                    </button>
+                    <button onClick={() => setSilinecekId(null)} disabled={siliniyor}
+                      style={{ background: 'none', color: C.muted, border: `1px solid ${C.border}`, borderRadius: 6, padding: '6px 10px', fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer' }}>
+                      İptal
+                    </button>
+                  </div>
+                ) : (
+                  <button onClick={() => { setSilinecekId(poi.id); setDuzenleId(null); }}
+                    style={{ background: 'transparent', color: C.red, border: `1px solid ${C.redBg}`, borderRadius: 6, padding: '6px 14px', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                    🗑️ Sil
+                  </button>
+                )}
                 {gosterilen === 'pending' && (
                   <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
                     <button onClick={() => durumGuncelle(poi.id, 'approved')} disabled={!!islem[poi.id]}
