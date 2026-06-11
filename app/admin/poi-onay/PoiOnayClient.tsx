@@ -1,5 +1,19 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
+import dynamic from 'next/dynamic';
+
+const PinHarita = dynamic(() => import('./PinHarita'), {
+  ssr: false,
+  loading: () => (
+    <div style={{
+      height: 300, background: '#0d1117', borderRadius: 8,
+      border: '1px solid #30363d', display: 'flex', alignItems: 'center',
+      justifyContent: 'center', color: '#4b5563', fontSize: '0.82rem',
+    }}>
+      Harita yükleniyor...
+    </div>
+  ),
+});
 
 const C = {
   bg: '#0d1117', surface: '#161b22', border: '#30363d',
