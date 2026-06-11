@@ -325,6 +325,21 @@ export default function PoiOnayClient() {
     finally { setKayitYukleniyor(false); }
   }
 
+  async function poiSil(id: string) {
+    setSiliniyor(true); setHata('');
+    try {
+      const res = await fetch(`/api/poi/${id}`, { method: 'DELETE' });
+      const d = await res.json();
+      if (d.success) {
+        setPois(prev => prev.filter(p => p.id !== id));
+        if (duzenleId === id) setDuzenleId(null);
+      } else {
+        setHata(d.error || 'Silme başarısız.');
+      }
+    } catch { setHata('Bağlantı hatası.'); }
+    finally { setSiliniyor(false); setSilinecekId(null); }
+  }
+
   async function yeniPoiEkle(fields: PoiInput) {
     setKayitYukleniyor(true); setHata('');
     try {
