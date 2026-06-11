@@ -35,6 +35,14 @@ const KATEGORI: Record<string, string> = Object.fromEntries(
   KATEGORI_LIST.map(k => [k.value, k.label])
 );
 
+const SORT_OPTIONS = [
+  { value: 'created_at', label: 'Tarih' },
+  { value: 'name',       label: 'Ad' },
+  { value: 'avg_rating', label: 'Puan' },
+  { value: 'review_count', label: 'Yorum Sayısı' },
+  { value: 'city',       label: 'Şehir' },
+];
+
 // Excel'den gelen kategori değerlerini normalize et
 const KAT_NORM: Record<string, string> = {
   park_dinlenme: 'park_dinlenme', 'park & dinlenme': 'park_dinlenme', 'park ve dinlenme': 'park_dinlenme',
@@ -143,6 +151,8 @@ interface PoiInput {
 interface Poi extends PoiInput {
   id: string; status: string; added_by: string | null;
   created_at: string;
+  avg_rating: number | null;
+  review_count: number;
   ekleyen: { display_name: string | null; email: string | null } | null;
 }
 
@@ -157,6 +167,28 @@ interface YeniEkleFormProps {
   onKaydet: (fields: PoiInput) => Promise<void>;
   onIptal: () => void;
   kayitYukleniyor: boolean;
+}
+
+// ─── Yıldız gösterge ─────────────────────────────────────
+
+function StarRating({ rating, count }: { rating: number | null; count: number }) {
+  if (!rating && count === 0) {
+    return <span style={{ color: C.dim, fontSize: '0.75rem' }}>— henüz yorum yok</span>;
+  }
+  const stars = rating ? Math.round(rating * 2) / 2 : 0;
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+      <span style={{ color: C.amber, fontSize: '0.78rem', letterSpacing: 1 }}>
+        {[1, 2, 3, 4, 5].map(i => (
+          <span key={i} style={{ opacity: i <= stars ? 1 : 0.25 }}>★</span>
+        ))}
+      </span>
+      {rating !== null && (
+        <span style={{ color: C.amber, fontSize: '0.78rem', fontWeight: 700 }}>{rating.toFixed(1)}</span>
+      )}
+      <span style={{ color: C.dim, fontSize: '0.75rem' }}>({count})</span>
+    </span>
+  );
 }
 
 // ─── Ortak form grid ──────────────────────────────────────
@@ -279,6 +311,12 @@ export default function PoiOnayClient() {
   const [hata, setHata] = useState('');
   const [gosterilen, setGosterilen] = useState<'pending' | 'approved' | 'rejected'>('pending');
 
+  // Filtre & sıralama
+  const [search, setSearch]         = useState('');
+  const [katFilter, setKatFilter]   = useState('');
+  const [sortBy, setSortBy]         = useState('created_at');
+  const [sortOrder, setSortOrder]   = useState<'desc' | 'asc'>('desc');
+
   // Tekil ekleme
   const [ekleAcik, setEkleAcik] = useState(false);
 
@@ -290,10 +328,23 @@ export default function PoiOnayClient() {
   const [topluYukleniyor, setTopluYukleniyor] = useState(false);
   const [topluSonuc, setTopluSonuc] = useState('');
 
-  async function yukle(status: 'pending' | 'approved' | 'rejected') {
+  async function yukle(
+    status: 'pending' | 'approved' | 'rejected',
+    opts?: { search?: string; category?: string; sort?: string; order?: string }
+  ) {
     setYukleniyor(true); setHata(''); setDuzenleId(null);
     try {
-      const res = await fetch(`/api/admin/poi?status=${status}`);
+      const params = new URLSearchParams({ status });
+      const s = opts?.search ?? search;
+      const c = opts?.category ?? katFilter;
+      const sb = opts?.sort ?? sortBy;
+      const so = opts?.order ?? sortOrder;
+      if (s) params.set('search', s);
+      if (c) params.set('category', c);
+      if (sb) params.set('sort', sb);
+      if (so) params.set('order', so);
+
+      const res = await fetch(`/api/admin/poi?${params.toString()}`);
       const d = await res.json();
       if (d.success) setPois(d.data);
       else setHata(d.error || 'Veriler alınamadı.');
@@ -302,6 +353,13 @@ export default function PoiOnayClient() {
   }
 
   useEffect(() => { yukle(gosterilen); }, [gosterilen]);
+
+  function uygula() { yukle(gosterilen); }
+
+  function sifirla() {
+    setSearch(''); setKatFilter(''); setSortBy('created_at'); setSortOrder('desc');
+    yukle(gosterilen, { search: '', category: '', sort: 'created_at', order: 'desc' });
+  }
 
   async function durumGuncelle(id: string, status: 'approved' | 'rejected') {
     setIslem(prev => ({ ...prev, [id]: status === 'approved' ? 'onay' : 'ret' }));
@@ -400,6 +458,9 @@ export default function PoiOnayClient() {
   ];
 
   const onizlemeVar = excelGecerli.length > 0 || excelHatalar.length > 0;
+
+  // Filtre aktif mi?
+  const filtreAktif = search || katFilter || sortBy !== 'created_at' || sortOrder !== 'desc';
 
   return (
     <div>
@@ -512,7 +573,7 @@ export default function PoiOnayClient() {
       )}
 
       {/* ── Sekme çubuğu ── */}
-      <div style={{ display: 'flex', gap: 4, marginBottom: 20, borderBottom: `1px solid ${C.border}` }}>
+      <div style={{ display: 'flex', gap: 4, marginBottom: 0, borderBottom: `1px solid ${C.border}` }}>
         {tabs.map(t => (
           <button key={t.key} onClick={() => setGosterilen(t.key)}
             style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '8px 16px', fontSize: '0.85rem', fontWeight: 700, color: gosterilen === t.key ? C.green : C.muted, borderBottom: gosterilen === t.key ? `2px solid ${C.green}` : '2px solid transparent', marginBottom: -1 }}>
@@ -523,6 +584,63 @@ export default function PoiOnayClient() {
           style={{ marginLeft: 'auto', background: 'none', border: `1px solid ${C.border}`, color: C.muted, borderRadius: 6, padding: '4px 12px', fontSize: '0.78rem', cursor: 'pointer' }}>
           🔄 Yenile
         </button>
+      </div>
+
+      {/* ── Filtre & Sıralama çubuğu ── */}
+      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderTop: 'none', borderRadius: '0 0 8px 8px', padding: '12px 14px', marginBottom: 16, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+        {/* Arama */}
+        <div style={{ flex: '1 1 180px', minWidth: 140 }}>
+          <label style={lbl}>Ad Ara</label>
+          <input
+            style={inp}
+            placeholder="Konum adı..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && uygula()}
+          />
+        </div>
+
+        {/* Kategori */}
+        <div style={{ flex: '1 1 160px', minWidth: 140 }}>
+          <label style={lbl}>Kategori</label>
+          <select style={{ ...inp, cursor: 'pointer' }} value={katFilter} onChange={e => setKatFilter(e.target.value)}>
+            <option value="">Tümü</option>
+            {KATEGORI_LIST.map(k => <option key={k.value} value={k.value}>{k.label}</option>)}
+          </select>
+        </div>
+
+        {/* Sırala */}
+        <div style={{ flex: '1 1 140px', minWidth: 120 }}>
+          <label style={lbl}>Sırala</label>
+          <select style={{ ...inp, cursor: 'pointer' }} value={sortBy} onChange={e => setSortBy(e.target.value)}>
+            {SORT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+        </div>
+
+        {/* Yön */}
+        <div style={{ flex: '0 0 auto' }}>
+          <label style={lbl}>Yön</label>
+          <button
+            onClick={() => setSortOrder(o => o === 'desc' ? 'asc' : 'desc')}
+            style={{ background: C.bg, color: C.muted, border: `1px solid ${C.border}`, borderRadius: 6, padding: '6px 14px', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}
+          >
+            {sortOrder === 'desc' ? '↓ Azalan' : '↑ Artan'}
+          </button>
+        </div>
+
+        {/* Uygula / Sıfırla */}
+        <div style={{ flex: '0 0 auto', display: 'flex', gap: 6, alignItems: 'flex-end' }}>
+          <button onClick={uygula}
+            style={{ background: C.greenDark, color: C.green, border: `1px solid ${C.greenBg}`, borderRadius: 6, padding: '6px 16px', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}>
+            Uygula
+          </button>
+          {filtreAktif && (
+            <button onClick={sifirla}
+              style={{ background: 'none', color: C.dim, border: `1px solid ${C.border}`, borderRadius: 6, padding: '6px 12px', fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer' }}>
+              Sıfırla
+            </button>
+          )}
+        </div>
       </div>
 
       {/* ── Liste ── */}
@@ -543,10 +661,11 @@ export default function PoiOnayClient() {
                     <span style={{ color: C.text, fontWeight: 700, fontSize: '0.95rem' }}>{poi.name}</span>
                     {poi.is_emergency && <span style={{ background: C.redBg, color: C.red, fontSize: '0.65rem', fontWeight: 700, padding: '1px 6px', borderRadius: 4 }}>🆘 ACİL</span>}
                   </div>
-                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 4 }}>
+                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 4, alignItems: 'center' }}>
                     <span style={{ color: C.muted, fontSize: '0.8rem' }}>{KATEGORI[poi.category] ?? poi.category}</span>
-                    {poi.city && <span style={{ color: C.dim, fontSize: '0.8rem' }}>📍 {poi.city}</span>}
+                    {poi.city && <span style={{ color: C.dim, fontSize: '0.8rem' }}>📍 {poi.city}{poi.district ? ` / ${poi.district}` : ''}</span>}
                     <span style={{ color: C.dim, fontSize: '0.78rem' }}>{poi.latitude.toFixed(5)}, {poi.longitude.toFixed(5)}</span>
+                    <StarRating rating={poi.avg_rating} count={poi.review_count ?? 0} />
                   </div>
                   <div style={{ color: C.dim, fontSize: '0.75rem' }}>
                     Ekleyen: <span style={{ color: C.muted }}>{poi.ekleyen?.display_name || poi.ekleyen?.email || (poi.added_by ? 'Kayıtlı kullanıcı' : 'Anonim')}</span>
