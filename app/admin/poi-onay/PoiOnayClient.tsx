@@ -210,9 +210,12 @@ function StarRating({ rating, count }: { rating: number | null; count: number })
 
 // ─── Ortak tam form ───────────────────────────────────────
 
-function FormGrid({ form, set, showButtons, onKaydet, onIptal, kayitYukleniyor, btnLabel }: FormGridProps) {
+function FormGrid({ form, set, showButtons, onKaydet, onIptal, kayitYukleniyor, btnLabel, onCoordinatesSet }: FormGridProps) {
   const tags = Array.isArray(form.tags) ? form.tags as string[] : [];
-  const gps = useGps((lat, lng) => { set('latitude', lat); set('longitude', lng); });
+  const gps = useGps(
+    (lat, lng) => { set('latitude', lat); set('longitude', lng); },
+    onCoordinatesSet,
+  );
 
   function toggleTag(t: string) {
     set('tags', tags.includes(t) ? tags.filter(x => x !== t) : [...tags, t]);
