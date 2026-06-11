@@ -95,7 +95,7 @@ export async function PATCH(
     }
 
     const body = await request.json();
-    const { status, name, category, city, district, address, address_note, description, latitude, longitude, is_emergency } = body;
+    const { status, name, category, city, district, address, address_note, description, phone, website, tags, latitude, longitude, is_emergency } = body;
 
     const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
 
