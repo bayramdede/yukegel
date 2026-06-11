@@ -164,3 +164,45 @@ export async function PATCH(
     return NextResponse.json({ success: false, error: 'Beklenmeyen bir hata oluştu.' }, { status: 500 });
   }
 }
+
+// ─────────────────────────────────────────────
+// DELETE /api/poi/[id]
+// POI kalıcı olarak sil (admin/moderatör zorunlu)
+// ─────────────────────────────────────────────
+export async function DELETE(
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+
+    const ssrClient = await getServerSupabase();
+    const { data: { user } } = await ssrClient.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ success: false, error: 'Giriş gerekli.' }, { status: 401 });
+    }
+
+    const supabase = getServiceSupabase();
+    const { data: profil } = await supabase
+      .from('users')
+      .select('role')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    if (!profil || !['admin', 'moderator'].includes(profil.role)) {
+      return NextResponse.json({ success: false, error: 'Yetersiz yetki.' }, { status: 403 });
+    }
+
+    const { error } = await supabase.from('pois').delete().eq('id', id);
+
+    if (error) {
+      console.error('[poi/[id]/DELETE] DB error:', error);
+      return NextResponse.json({ success: false, error: 'Silme başarısız.' }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (err) {
+    console.error('[poi/[id]/DELETE] Unexpected error:', err);
+    return NextResponse.json({ success: false, error: 'Beklenmeyen bir hata oluştu.' }, { status: 500 });
+  }
+}
