@@ -530,13 +530,27 @@ function YeniEkleForm({ onKaydet, onIptal, kayitYukleniyor }: {
         }
         hedefUrl = d.url;
         console.debug('[maps] resolved URL:', hedefUrl);
+
+        // resolve-url koordinatı doğrudan döndürdüyse (Nominatim veya URL'den)
+        if (d.lat != null && d.lng != null) {
+          const lat = String(d.lat);
+          const lng = String(d.lng);
+          console.debug('[maps] coords from resolve-url:', lat, lng, d.geocodedFromSearch ? '(Nominatim)' : '(URL)');
+          set('latitude', lat);
+          set('longitude', lng);
+          setMapsDurum('success');
+          setMapsLink('');
+          enrichirPoi(lat, lng, d.name || undefined);
+          return;
+        }
       }
 
+      // Fallback: URL'den regex ile koordinat çıkarmayı dene
       const parsed = parseGoogleMapsUrl(hedefUrl);
       console.debug('[maps] parse result:', parsed, 'from:', hedefUrl.slice(0, 120));
       if (!parsed) {
         setMapsDurum('error');
-        setMapsHata('Koordinat bulunamadı. Tam Google Maps linki yapıştırın veya kısa linki deneyin.');
+        setMapsHata('Koordinat bulunamadı. Farklı bir link deneyin veya koordinatları manuel girin.');
         return;
       }
 
