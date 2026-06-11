@@ -405,6 +405,24 @@ function DuzenleForm({ poi, onKaydet, onIptal, kayitYukleniyor }: {
 
 // ─── YeniEkleForm ─────────────────────────────────────────
 
+// URL'den koordinat ve yer adı parse et
+function parseGoogleMapsUrl(url: string): { lat: string; lng: string; name: string } | null {
+  // /@lat,lng,zoom veya /@lat,lng (virgülden sonra başka şey olabilir)
+  let m = url.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+  if (!m) {
+    // ?q=lat,lng veya &q=lat,lng
+    m = url.match(/[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)/);
+  }
+  if (!m) return null;
+
+  // /place/Ad/ → URL decode + "+" → boşluk
+  const placeM = url.match(/\/place\/([^/@?#]+)\//);
+  const rawName = placeM ? placeM[1] : '';
+  const name = rawName ? decodeURIComponent(rawName.replace(/\+/g, ' ')) : '';
+
+  return { lat: m[1], lng: m[2], name };
+}
+
 function YeniEkleForm({ onKaydet, onIptal, kayitYukleniyor }: {
   onKaydet: (fields: PoiInput) => Promise<void>;
   onIptal: () => void;
@@ -415,7 +433,60 @@ function YeniEkleForm({ onKaydet, onIptal, kayitYukleniyor }: {
     address: '', address_note: '', phone: '', website: '',
     tags: [], latitude: '', longitude: '', is_emergency: false,
   });
+  const [mapsLink, setMapsLink] = useState('');
+  const [mapsDurum, setMapsDurum] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [mapsHata, setMapsHata] = useState('');
+
   function set(f: string, v: string | boolean | string[]) { setForm(prev => ({ ...prev, [f]: v })); }
+
+  async function konumuCek() {
+    const url = mapsLink.trim();
+    if (!url) return;
+    setMapsDurum('loading');
+    setMapsHata('');
+    try {
+      let hedefUrl = url;
+
+      // Kısa link mi? → server'a resolve ettir
+      const kısaLink = url.includes('goo.gl/') || url.includes('maps.app.goo.gl');
+      if (kısaLink) {
+        const res = await fetch('/api/admin/resolve-url', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url }),
+        });
+        const d = await res.json();
+        if (!d.success) {
+          setMapsDurum('error');
+          setMapsHata(d.error || 'Link çözülemedi.');
+          return;
+        }
+        hedefUrl = d.url;
+      }
+
+      const parsed = parseGoogleMapsUrl(hedefUrl);
+      if (!parsed) {
+        setMapsDurum('error');
+        setMapsHata('Koordinat bulunamadı. Tam Google Maps linki yapıştırın veya kısa linki deneyin.');
+        return;
+      }
+
+      set('latitude', parsed.lat);
+      set('longitude', parsed.lng);
+
+      // Yer adı yalnızca form henüz boşsa öner
+      if (parsed.name && !String(form.name).trim()) {
+        set('name', parsed.name);
+      }
+
+      setMapsDurum('success');
+      setMapsLink('');
+    } catch {
+      setMapsDurum('error');
+      setMapsHata('Bağlantı hatası. Tekrar deneyin.');
+    }
+  }
+
   function kaydet() {
     const tags = Array.isArray(form.tags) ? form.tags as string[] : [];
     onKaydet({
@@ -434,9 +505,49 @@ function YeniEkleForm({ onKaydet, onIptal, kayitYukleniyor }: {
       is_emergency: Boolean(form.is_emergency),
     });
   }
+
   return (
     <div style={{ background: C.surface, border: `1px solid ${C.green}`, borderRadius: 8, padding: '16px 18px', marginBottom: 16 }}>
       <div style={{ color: C.green, fontWeight: 700, fontSize: '0.88rem', marginBottom: 14 }}>➕ Yeni Konum (Direkt Onaylı)</div>
+
+      {/* Google Maps linki */}
+      <div style={{ background: C.bg, border: `1px dashed ${C.border}`, borderRadius: 8, padding: '12px 14px', marginBottom: 16 }}>
+        <label style={lbl}>Google Maps'ten Çek</label>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <input
+            style={{ ...inp, flex: 1 }}
+            value={mapsLink}
+            onChange={e => { setMapsLink(e.target.value); if (mapsDurum !== 'idle') setMapsDurum('idle'); }}
+            placeholder="https://maps.app.goo.gl/... veya google.com/maps/place/..."
+            onKeyDown={e => e.key === 'Enter' && mapsLink.trim() && konumuCek()}
+          />
+          <button
+            type="button"
+            onClick={mapsDurum === 'loading' ? undefined : konumuCek}
+            disabled={!mapsLink.trim() || mapsDurum === 'loading'}
+            style={{
+              flexShrink: 0, borderRadius: 6, padding: '6px 14px',
+              fontSize: '0.82rem', fontWeight: 700, whiteSpace: 'nowrap',
+              border: `1px solid ${mapsDurum === 'success' ? C.green : mapsDurum === 'error' ? C.red : C.blueBg}`,
+              background: mapsDurum === 'success' ? C.greenDark : mapsDurum === 'error' ? C.redBg : C.blueBg,
+              color: mapsDurum === 'success' ? C.green : mapsDurum === 'error' ? C.red : C.blue,
+              cursor: !mapsLink.trim() || mapsDurum === 'loading' ? 'not-allowed' : 'pointer',
+              opacity: !mapsLink.trim() ? 0.5 : 1,
+            }}
+          >
+            {mapsDurum === 'loading' ? '⏳ Çekiliyor...' : '📍 Konumu Çek'}
+          </button>
+        </div>
+        {mapsDurum === 'success' && (
+          <div style={{ color: C.green, fontSize: '0.74rem', marginTop: 6 }}>
+            ✅ Koordinatlar dolduruldu — enlem/boylam alanlarını kontrol edin.
+          </div>
+        )}
+        {mapsDurum === 'error' && (
+          <div style={{ color: C.red, fontSize: '0.74rem', marginTop: 6 }}>⚠️ {mapsHata}</div>
+        )}
+      </div>
+
       <FormGrid form={form} set={set} showButtons onKaydet={kaydet} onIptal={onIptal} kayitYukleniyor={kayitYukleniyor} btnLabel="✅ Ekle" />
     </div>
   );
