@@ -146,14 +146,27 @@ export async function POST(request: NextRequest) {
     } catch { /* URL parse failed */ }
 
     if (qText) {
-      // Yer adı: virgülden önceki ilk parça (adres kısmını atla, sadece ismi gönder)
-      const placeName = qText.split(',')[0].trim();
+      // Yer adı: virgülden önceki ilk parça; adres: geri kalanı
+      // Örn: "Adana gümrük Tır Parkı, Yıldırım Beyazıt, 01250 Sarıçam/Adana"
+      //  → placeName = "Adana gümrük Tır Parkı"
+      //  → adresPart  = "Yıldırım Beyazıt, 01250 Sarıçam/Adana"
+      const qParts = qText.split(',').map((p: string) => p.trim()).filter(Boolean);
+      const placeName  = qParts[0] || qText;
+      const adresPart  = qParts.slice(1).join(', ');
+
       console.info('[resolve-url] no coords in URL, geocoding q:', qText);
 
-      // Önce tam sorgu ile dene, bulamazsa sadece yer adıyla dene
+      // Adım 1: Tam sorgu
       let geocoded = await nominatimGeocode(qText);
-      if (!geocoded && placeName !== qText) {
-        geocoded = await nominatimGeocode(placeName);
+
+      // Adım 2: Sadece adres kısmı (yer adını atla — OSM bilmiyor olabilir)
+      if (!geocoded && adresPart) {
+        geocoded = await nominatimGeocode(adresPart);
+      }
+
+      // Adım 3: Son parça (şehir/ilçe)
+      if (!geocoded && qParts.length > 1) {
+        geocoded = await nominatimGeocode(qParts[qParts.length - 1]);
       }
 
       if (geocoded) {
