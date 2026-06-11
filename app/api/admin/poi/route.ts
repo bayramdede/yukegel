@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
 
     let query = supabase
       .from('pois')
-      .select('id, name, category, city, district, address, address_note, latitude, longitude, is_emergency, status, added_by, created_at, avg_rating, review_count')
+      .select('id, name, description, category, city, district, address, address_note, phone, website, tags, latitude, longitude, is_emergency, status, added_by, created_at, avg_rating, review_count')
       .eq('status', statusFilter);
 
     if (search) query = query.ilike('name', `%${search}%`);
