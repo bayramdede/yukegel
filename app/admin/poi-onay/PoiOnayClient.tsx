@@ -449,8 +449,36 @@ function YeniEkleForm({ onKaydet, onIptal, kayitYukleniyor }: {
   const [mapsLink, setMapsLink] = useState('');
   const [mapsDurum, setMapsDurum] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [mapsHata, setMapsHata] = useState('');
+  const [enrichDurum, setEnrichDurum] = useState<'idle' | 'loading' | 'done' | 'error'>('idle');
 
   function set(f: string, v: string | boolean | string[]) { setForm(prev => ({ ...prev, [f]: v })); }
+
+  async function enrichirPoi(lat: string, lng: string, slug?: string) {
+    setEnrichDurum('loading');
+    try {
+      const res = await fetch('/api/admin/enrich-poi', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lat: parseFloat(lat), lng: parseFloat(lng), slug }),
+      });
+      const d = await res.json();
+      if (!d.success) { setEnrichDurum('error'); return; }
+      const r = d.data;
+      setForm(prev => ({
+        ...prev,
+        ...(r.name         && { name:         r.name }),
+        ...(r.city         && { city:         r.city }),
+        ...(r.district     && { district:     r.district }),
+        ...(r.address      && { address:      r.address }),
+        ...(r.address_note && { address_note: r.address_note }),
+        ...(r.category     && { category:     r.category }),
+        ...(r.description  && { description:  r.description }),
+      }));
+      setEnrichDurum('done');
+    } catch {
+      setEnrichDurum('error');
+    }
+  }
 
   async function konumuCek() {
     const url = mapsLink.trim();
