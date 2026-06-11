@@ -535,10 +535,13 @@ function YeniEkleForm({ onKaydet, onIptal, kayitYukleniyor }: {
         if (d.lat != null && d.lng != null) {
           const lat = String(d.lat);
           const lng = String(d.lng);
-          console.debug('[maps] coords from resolve-url:', lat, lng, d.geocodedFromSearch ? '(Nominatim)' : '(URL)');
+          const yaklasik = Boolean(d.geocodedFromSearch);
+          console.debug('[maps] coords from resolve-url:', lat, lng, yaklasik ? '(Nominatim yaklaşık)' : '(URL kesin)');
           set('latitude', lat);
           set('longitude', lng);
           setMapsDurum('success');
+          // Yaklaşık koordinat ise kullanıcıya uyar
+          setMapsHata(yaklasik ? '⚠️ Koordinat adres üzerinden yaklaşık olarak bulundu — enlem/boylamı haritadan doğrulayın.' : '');
           setMapsLink('');
           enrichirPoi(lat, lng, d.name || undefined);
           return;
