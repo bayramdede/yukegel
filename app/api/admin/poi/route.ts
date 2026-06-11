@@ -29,13 +29,25 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const statusFilter = searchParams.get('status') || 'pending';
+    const search       = searchParams.get('search')?.trim() || '';
+    const categoryFilter = searchParams.get('category') || '';
+    const sortBy       = searchParams.get('sort') || 'created_at';
+    const sortOrder    = searchParams.get('order') === 'asc';
 
-    const { data: pois, error } = await supabase
+    const VALID_SORT = ['created_at', 'name', 'avg_rating', 'review_count', 'city'];
+    const sortCol = VALID_SORT.includes(sortBy) ? sortBy : 'created_at';
+
+    let query = supabase
       .from('pois')
-      .select('id, name, category, city, district, address, address_note, latitude, longitude, is_emergency, status, added_by, created_at')
-      .eq('status', statusFilter)
-      .order('created_at', { ascending: false })
-      .limit(100);
+      .select('id, name, category, city, district, address, address_note, latitude, longitude, is_emergency, status, added_by, created_at, avg_rating, review_count')
+      .eq('status', statusFilter);
+
+    if (search) query = query.ilike('name', `%${search}%`);
+    if (categoryFilter) query = query.eq('category', categoryFilter);
+
+    query = query.order(sortCol, { ascending: sortOrder });
+
+    const { data: pois, error } = await query;
 
     if (error) {
       console.error('[admin/poi/GET] DB error:', error);
