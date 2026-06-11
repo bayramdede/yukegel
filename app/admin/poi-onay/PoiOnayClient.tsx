@@ -160,6 +160,7 @@ interface FormGridProps {
   onIptal: () => void;
   kayitYukleniyor: boolean;
   btnLabel: string;
+  onCoordinatesSet?: (lat: string, lng: string) => void;
 }
 
 // ─── GPS hook ────────────────────────────────────────────
