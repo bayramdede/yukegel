@@ -681,6 +681,33 @@ function YeniEkleForm({ onKaydet, onIptal, kayitYukleniyor }: {
         btnLabel="✅ Ekle"
         onCoordinatesSet={(lat, lng) => enrichirPoi(lat, lng)}
       />
+
+      {/* Sürüklenebilir pin haritası — koordinatlar geçerliyse göster */}
+      {(() => {
+        const lat = parseFloat(String(form.latitude));
+        const lng = parseFloat(String(form.longitude));
+        const gecerli = !isNaN(lat) && !isNaN(lng)
+          && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
+        if (!gecerli) return null;
+        return (
+          <div style={{ marginTop: 12 }}>
+            <label style={{ color: '#8b949e', fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 6 }}>
+              Konumu Haritada Doğrula
+            </label>
+            <PinHarita
+              lat={lat}
+              lng={lng}
+              onChange={(newLat, newLng) => {
+                set('latitude', String(newLat));
+                set('longitude', String(newLng));
+              }}
+            />
+            <div style={{ color: '#4b5563', fontSize: '0.72rem', marginTop: 4 }}>
+              {lat.toFixed(6)}, {lng.toFixed(6)}
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
