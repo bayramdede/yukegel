@@ -164,14 +164,23 @@ interface FormGridProps {
 
 // ─── GPS hook ────────────────────────────────────────────
 
-function useGps(setLatLng: (lat: string, lng: string) => void) {
+function useGps(
+  setLatLng: (lat: string, lng: string) => void,
+  onSuccess?: (lat: string, lng: string) => void,
+) {
   const [durum, setDurum] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [hata, setHata] = useState('');
   function al() {
     if (!navigator.geolocation) { setDurum('error'); setHata('Tarayıcı konum desteklemiyor.'); return; }
     setDurum('loading'); setHata('');
     navigator.geolocation.getCurrentPosition(
-      pos => { setLatLng(pos.coords.latitude.toFixed(6), pos.coords.longitude.toFixed(6)); setDurum('success'); },
+      pos => {
+        const lat = pos.coords.latitude.toFixed(6);
+        const lng = pos.coords.longitude.toFixed(6);
+        setLatLng(lat, lng);
+        setDurum('success');
+        onSuccess?.(lat, lng);
+      },
       err => {
         setDurum('error');
         setHata(err.code === err.PERMISSION_DENIED ? 'Konum izni reddedildi.' : 'Konum alınamadı, tekrar dene.');
