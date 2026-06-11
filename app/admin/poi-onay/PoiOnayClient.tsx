@@ -514,14 +514,11 @@ function YeniEkleForm({ onKaydet, onIptal, kayitYukleniyor }: {
 
       set('latitude', parsed.lat);
       set('longitude', parsed.lng);
-
-      // Yer adı yalnızca form henüz boşsa öner
-      if (parsed.name && !String(form.name).trim()) {
-        set('name', parsed.name);
-      }
-
       setMapsDurum('success');
       setMapsLink('');
+
+      // Koordinatlar hazır — LLM ile alanları zenginleştir
+      enrichirPoi(parsed.lat, parsed.lng, parsed.name || undefined);
     } catch {
       setMapsDurum('error');
       setMapsHata('Bağlantı hatası. Tekrar deneyin.');
