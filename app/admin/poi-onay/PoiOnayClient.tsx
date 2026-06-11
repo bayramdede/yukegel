@@ -546,7 +546,33 @@ function YeniEkleForm({ onKaydet, onIptal, kayitYukleniyor }: {
 
   return (
     <div style={{ background: C.surface, border: `1px solid ${C.green}`, borderRadius: 8, padding: '16px 18px', marginBottom: 16 }}>
-      <div style={{ color: C.green, fontWeight: 700, fontSize: '0.88rem', marginBottom: 14 }}>➕ Yeni Konum (Direkt Onaylı)</div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
+        <span style={{ color: C.green, fontWeight: 700, fontSize: '0.88rem' }}>➕ Yeni Konum (Direkt Onaylı)</span>
+        {enrichDurum === 'loading' && (
+          <span style={{ color: C.amber, fontSize: '0.74rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
+            <span style={{ display: 'inline-block', width: 10, height: 10, border: `2px solid ${C.amber}`, borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
+            Yapay zeka dolduruyor...
+          </span>
+        )}
+        {enrichDurum === 'done' && (
+          <span style={{ background: '#1e1b4b', color: '#a5b4fc', fontSize: '0.72rem', fontWeight: 700, padding: '2px 8px', borderRadius: 4 }}>
+            ✨ YZ tarafından önerildi
+          </span>
+        )}
+        {(enrichDurum === 'done' || enrichDurum === 'error') && (
+          <button
+            type="button"
+            onClick={() => {
+              const lat = String(form.latitude);
+              const lng = String(form.longitude);
+              if (lat && lng) enrichirPoi(lat, lng);
+            }}
+            style={{ background: 'none', color: C.muted, border: `1px solid ${C.border}`, borderRadius: 4, padding: '2px 8px', fontSize: '0.72rem', cursor: 'pointer' }}>
+            🔄 Yeniden Sorgula
+          </button>
+        )}
+      </div>
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
 
       {/* Google Maps linki */}
       <div style={{ background: C.bg, border: `1px dashed ${C.border}`, borderRadius: 8, padding: '12px 14px', marginBottom: 16 }}>
