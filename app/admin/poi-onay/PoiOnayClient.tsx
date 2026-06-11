@@ -612,7 +612,13 @@ function YeniEkleForm({ onKaydet, onIptal, kayitYukleniyor }: {
         )}
       </div>
 
-      <FormGrid form={form} set={set} showButtons onKaydet={kaydet} onIptal={onIptal} kayitYukleniyor={kayitYukleniyor} btnLabel="✅ Ekle" />
+      <FormGrid
+        form={form} set={set} showButtons
+        onKaydet={kaydet} onIptal={onIptal}
+        kayitYukleniyor={kayitYukleniyor}
+        btnLabel="✅ Ekle"
+        onCoordinatesSet={(lat, lng) => enrichirPoi(lat, lng)}
+      />
     </div>
   );
 }
