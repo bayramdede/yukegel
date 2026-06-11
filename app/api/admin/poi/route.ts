@@ -87,11 +87,15 @@ export async function GET(request: NextRequest) {
 // ─────────────────────────────────────────────
 interface PoiInput {
   name: string;
+  description?: string | null;
   category: string;
   city?: string | null;
   district?: string | null;
   address?: string | null;
   address_note?: string | null;
+  phone?: string | null;
+  website?: string | null;
+  tags?: string[];
   latitude: number;
   longitude: number;
   is_emergency?: boolean;
