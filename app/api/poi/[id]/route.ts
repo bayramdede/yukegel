@@ -121,10 +121,13 @@ export async function PATCH(
     }
 
     if (city !== undefined)         updates.city         = city?.trim() || null;
-    if (district !== undefined)    updates.district     = district?.trim() || null;
-    if (address !== undefined)     updates.address      = address?.trim() || null;
+    if (district !== undefined)     updates.district     = district?.trim() || null;
+    if (address !== undefined)      updates.address      = address?.trim() || null;
     if (address_note !== undefined) updates.address_note = address_note?.trim() || null;
-    if (description !== undefined) updates.description  = description?.trim() || null;
+    if (description !== undefined)  updates.description  = description?.trim() || null;
+    if (phone !== undefined)        updates.phone        = phone?.trim() || null;
+    if (website !== undefined)      updates.website      = website?.trim() || null;
+    if (tags !== undefined)         updates.tags         = Array.isArray(tags) ? tags : [];
     if (is_emergency !== undefined) updates.is_emergency = Boolean(is_emergency);
 
     if (latitude !== undefined || longitude !== undefined) {
