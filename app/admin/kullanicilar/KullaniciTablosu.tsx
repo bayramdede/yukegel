@@ -12,8 +12,16 @@ type Kullanici = {
   moderator_sources: string[] | null;
   ai_listing_quota_daily: number | null;
   created_at: string;
+  last_sign_in_at: string | null;
   auth_providers: string[] | null;
 };
+
+function tarihFormat(iso: string | null | undefined): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return d.toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    + ' ' + d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+}
 
 async function guncelle(id: string, alan: string, deger: unknown) {
   const res = await fetch('/api/admin/kullanici', {
@@ -103,6 +111,7 @@ export default function KullaniciTablosu({ kullanicilar: ilk, aiQuotaDefault }: 
               <th style={th}>İletişim</th>
               <th style={th}>Üye Türü</th>
               <th style={th}>Giriş Yöntemi</th>
+              <th style={th}>Kayıt / Son Giriş</th>
               <th style={th}>Rol</th>
               <th style={th}>Mod. Kaynağı</th>
               <th style={th} title={`Boş = sistem default (${aiQuotaDefault}/gün). 0 = AI özelliği kapalı.`}>AI Limit / Gün</th>
@@ -125,28 +134,57 @@ export default function KullaniciTablosu({ kullanicilar: ilk, aiQuotaDefault }: 
 
               return (
                 <tr key={u.id} style={{ opacity: u.is_active ? 1 : 0.45 }}>
+                  {/* Kullanıcı adı */}
                   <td style={td}>
                     <div style={{ fontWeight: 600 }}>
                       {u.display_name || <span style={{ color: '#4b5563' }}>—</span>}
+                    </div>
+                    <div style={{ color: '#4b5563', fontSize: '0.68rem', marginTop: 2, fontFamily: 'monospace' }}>
+                      {u.id.slice(0, 8)}…
                     </div>
                     {hata[u.id] && (
                       <div style={{ color: '#ef4444', fontSize: '0.7rem', marginTop: 2 }}>⚠️ {hata[u.id]}</div>
                     )}
                   </td>
 
-                  <td style={{ ...td, maxWidth: 200 }}>
-                    <div style={{ color: '#8b949e', fontSize: '0.8rem', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {u.email || '—'}
-                    </div>
-                    <div style={{ color: '#6b7280', fontSize: '0.78rem' }}>{u.phone || '—'}</div>
+                  {/* İletişim */}
+                  <td style={{ ...td, maxWidth: 220 }}>
+                    {u.email ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 3 }}>
+                        <span style={{ color: '#4b5563', fontSize: '0.7rem' }}>✉</span>
+                        <a
+                          href={`mailto:${u.email}`}
+                          style={{ color: '#93c5fd', fontSize: '0.8rem', textDecoration: 'none', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 180, display: 'inline-block' }}
+                          title={u.email}
+                        >
+                          {u.email}
+                        </a>
+                      </div>
+                    ) : (
+                      <div style={{ color: '#374151', fontSize: '0.78rem', marginBottom: 3 }}>✉ —</div>
+                    )}
+                    {u.phone ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                        <span style={{ color: '#4b5563', fontSize: '0.7rem' }}>📞</span>
+                        <span style={{ color: '#d1d5db', fontSize: '0.8rem' }}>{u.phone}</span>
+                      </div>
+                    ) : (
+                      <div style={{ color: '#374151', fontSize: '0.78rem' }}>📞 —</div>
+                    )}
                   </td>
 
+                  {/* Üye türü */}
                   <td style={td}>
-                    <span style={{ background: '#1e3a5f', color: '#60a5fa', fontSize: '0.68rem', fontWeight: 700, padding: '2px 7px', borderRadius: 4 }}>
-                      {u.user_type || '—'}
-                    </span>
+                    {u.user_type ? (
+                      <span style={{ background: '#1e3a5f', color: '#60a5fa', fontSize: '0.68rem', fontWeight: 700, padding: '2px 7px', borderRadius: 4 }}>
+                        {u.user_type}
+                      </span>
+                    ) : (
+                      <span style={{ color: '#374151', fontSize: '0.75rem' }}>—</span>
+                    )}
                   </td>
 
+                  {/* Giriş yöntemi */}
                   <td style={td}>
                     <div style={{ display: 'flex', gap: 4 }}>
                       {providers.includes('google') && (
@@ -159,6 +197,19 @@ export default function KullaniciTablosu({ kullanicilar: ilk, aiQuotaDefault }: 
                     </div>
                   </td>
 
+                  {/* Kayıt / Son giriş */}
+                  <td style={{ ...td, minWidth: 150 }}>
+                    <div style={{ fontSize: '0.75rem', color: '#8b949e' }}>
+                      <span style={{ color: '#4b5563', fontSize: '0.68rem' }}>Kayıt: </span>
+                      {tarihFormat(u.created_at)}
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: 3 }}>
+                      <span style={{ color: '#374151', fontSize: '0.68rem' }}>Giriş: </span>
+                      {tarihFormat(u.last_sign_in_at)}
+                    </div>
+                  </td>
+
+                  {/* Rol */}
                   <td style={td}>
                     <select
                       value={u.role}
@@ -177,6 +228,7 @@ export default function KullaniciTablosu({ kullanicilar: ilk, aiQuotaDefault }: 
                     </select>
                   </td>
 
+                  {/* Mod. kaynağı */}
                   <td style={td}>
                     {u.role === 'moderator' ? (
                       <select
@@ -202,6 +254,7 @@ export default function KullaniciTablosu({ kullanicilar: ilk, aiQuotaDefault }: 
                     )}
                   </td>
 
+                  {/* AI limit */}
                   <td style={td}>
                     <AiQuotaCell
                       kullaniciId={u.id}
@@ -212,6 +265,7 @@ export default function KullaniciTablosu({ kullanicilar: ilk, aiQuotaDefault }: 
                     />
                   </td>
 
+                  {/* Aktif toggle */}
                   <td style={td}>
                     <button
                       disabled={aktifYukleniyor}
@@ -267,7 +321,6 @@ function AiQuotaCell({
   const [duzenleniyor, setDuzenleniyor] = useState(false);
   const [taslak, setTaslak] = useState<string>(mevcutDeger === null ? '' : String(mevcutDeger));
 
-  // mevcutDeger dışardan güncellenirse (kaydet sonrası) taslakı senkronla
   useEffect(() => {
     if (!duzenleniyor) {
       setTaslak(mevcutDeger === null ? '' : String(mevcutDeger));
@@ -283,7 +336,6 @@ function AiQuotaCell({
     }
     const n = Number(trimli);
     if (!Number.isFinite(n) || n < 0 || !Number.isInteger(n)) {
-      // Geçersiz → eski değeri restore et
       setTaslak(mevcutDeger === null ? '' : String(mevcutDeger));
       return;
     }
@@ -318,7 +370,6 @@ function AiQuotaCell({
     );
   }
 
-  // Görünüm modu
   let rozet: React.ReactNode;
   if (mevcutDeger === null) {
     rozet = (
