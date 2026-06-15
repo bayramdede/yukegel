@@ -38,12 +38,24 @@ const lbl: React.CSSProperties = {
 };
 
 const KATEGORI_LIST = [
-  { value: 'park_dinlenme',   label: '🅿️ Park & Dinlenme' },
-  { value: 'yemek',           label: '🍲 Yemek' },
-  { value: 'konaklama',       label: '🛏️ Konaklama' },
-  { value: 'tamirci',         label: '🛠️ Tamirci & Usta' },
-  { value: 'tesis_akaryakit', label: '⛽ Tesis & Akaryakıt' },
-  { value: 'kantar_resmi',    label: '⚖️ Kantar & Resmi' },
+  // Yeni TIR/Kamyon kategorileri
+  { value: 'motorcu',       label: '🔧 Motorcu' },
+  { value: 'elektrikci',    label: '⚡ Elektrikçi' },
+  { value: 'kaportaci',     label: '🔨 Kaportacı' },
+  { value: 'lastikci',      label: '🔄 Lastikçi' },
+  { value: 'dorse_branda',  label: '🚛 Dorse / Branda' },
+  { value: 'frigo_ustasi',  label: '❄️ Frigo Ustası' },
+  { value: 'tir_parki',     label: '🅿️ Tır Parkı' },
+  { value: 'lokanta',       label: '🍲 Kamyoncu Lokantası' },
+  { value: 'konaklama',     label: '🛏️ Konaklama' },
+  { value: 'kantar',        label: '⚖️ Kantar' },
+  { value: 'yikama',        label: '🚿 Yıkama / Yağlama' },
+  // Eski kategoriler (geriye uyumluluk)
+  { value: 'park_dinlenme',   label: '🅿️ Park & Dinlenme (eski)' },
+  { value: 'yemek',           label: '🍲 Yemek (eski)' },
+  { value: 'tamirci',         label: '🛠️ Tamirci & Usta (eski)' },
+  { value: 'tesis_akaryakit', label: '⛽ Tesis & Akaryakıt (eski)' },
+  { value: 'kantar_resmi',    label: '⚖️ Kantar & Resmi (eski)' },
 ];
 
 const KATEGORI: Record<string, string> = Object.fromEntries(
