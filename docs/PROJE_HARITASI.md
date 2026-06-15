@@ -102,13 +102,25 @@ yukegel/
 
 ### `pois` — POI Modülü (Yol Rehberi)
 ```
-category: 'park_dinlenme'|'yemek'|'konaklama'|'tamirci'|'tesis_akaryakit'|'kantar_resmi'
+category: 'motorcu'|'elektrikci'|'kaportaci'|'lastikci'|'dorse_branda'|'frigo_ustasi'|
+          'tir_parki'|'lokanta'|'konaklama'|'kantar'|'yikama'
+          + eski: 'park_dinlenme'|'yemek'|'tamirci'|'tesis_akaryakit'|'kantar_resmi'
 location: geography(Point,4326) — PostGIS
 tags: text[] — özellik etiketleri
 badges: jsonb — tır uygunluk rozetleri
 status: 'pending'|'approved'|'rejected'
 avg_rating, review_count — trigger ile güncellenir
+-- Google Places entegrasyonu (15 Haz 2026):
+google_place_id: text UNIQUE — mükerrer kayıt engeli
+google_maps_url, google_rating, google_review_count
+reviews_summary: text — Claude API Türkçe özet (maks 3 cümle)
+verified: bool — admin onayı (default false)
+verified_at, verified_by
+satellite_confirmed: bool — uydu görüntüsü teyidi
+last_synced_at: timestamptz — son Places API sync
+is_active: bool — kullanıcıya gösterim (default true)
 ```
+Migration: `docs/20260615_poi_google_integration.sql`
 
 ### `poi_reviews`
 ```
