@@ -95,7 +95,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const validCategories = ['park_dinlenme', 'yemek', 'konaklama', 'tamirci', 'tesis_akaryakit', 'kantar_resmi'];
+    const validCategories = [
+      'motorcu', 'elektrikci', 'kaportaci', 'lastikci', 'dorse_branda', 'frigo_ustasi',
+      'tir_parki', 'lokanta', 'konaklama', 'kantar', 'yikama',
+      'park_dinlenme', 'yemek', 'tamirci', 'tesis_akaryakit', 'kantar_resmi',
+    ];
     if (!validCategories.includes(category)) {
       return NextResponse.json({ success: false, error: 'Geçersiz kategori.' }, { status: 400 });
     }
