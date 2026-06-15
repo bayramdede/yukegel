@@ -1237,9 +1237,51 @@ export default function PoiOnayClient() {
                     {new Date(poi.created_at).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                   </div>
                 </div>
+                {/* Google bilgisi */}
+                {poi.google_place_id && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 3, flexShrink: 0 }}>
+                    {poi.google_rating != null && (
+                      <span style={{ fontSize: '0.75rem', color: C.amber }}>
+                        ★ {poi.google_rating.toFixed(1)} ({poi.google_review_count ?? 0} G yorum)
+                      </span>
+                    )}
+                    <span style={{ fontSize: '0.72rem', color: C.dim }}>🌐 Google Places</span>
+                  </div>
+                )}
+
+                {/* Uydu onayı */}
+                <label style={{ display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer', flexShrink: 0 }}>
+                  <input
+                    type="checkbox"
+                    checked={Boolean(poi.satellite_confirmed)}
+                    onChange={async (e) => {
+                      const checked = e.target.checked;
+                      await fetch(`/api/poi/${poi.id}`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ satellite_confirmed: checked }),
+                      });
+                      setPois(prev => prev.map(p => p.id === poi.id ? { ...p, satellite_confirmed: checked } : p));
+                    }}
+                    style={{ accentColor: C.green, width: 14, height: 14 }}
+                  />
+                  <span style={{ fontSize: '0.74rem', color: poi.satellite_confirmed ? C.green : C.dim, fontWeight: 600 }}>
+                    🛰️ Uydu
+                  </span>
+                </label>
+
+                {/* Uydu görüntüsü linki */}
+                <a
+                  href={`https://www.google.com/maps/@${poi.latitude},${poi.longitude},100m/data=!3m1!1e3`}
+                  target="_blank" rel="noopener noreferrer"
+                  style={{ color: C.muted, fontSize: '0.78rem', textDecoration: 'none', whiteSpace: 'nowrap' }}
+                >
+                  🛰️ Uydu Gör
+                </a>
+
                 <a href={`https://maps.google.com/?q=${poi.latitude},${poi.longitude}`} target="_blank" rel="noopener noreferrer"
                   style={{ color: C.muted, fontSize: '0.78rem', textDecoration: 'none', whiteSpace: 'nowrap' }}>
-                  🗺️ Haritada gör
+                  🗺️ Harita
                 </a>
                 <button onClick={() => { setDuzenleId(duzenleId === poi.id ? null : poi.id); setSilinecekId(null); }}
                   style={{ background: duzenleId === poi.id ? C.blueBg : 'transparent', color: C.blue, border: `1px solid ${C.blueBg}`, borderRadius: 6, padding: '6px 14px', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
