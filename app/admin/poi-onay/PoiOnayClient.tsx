@@ -1317,6 +1317,17 @@ export default function PoiOnayClient() {
                     </button>
                   </div>
                 )}
+
+                {/* Yorum özeti butonu — Google Place ID varsa göster */}
+                {poi.google_place_id && (
+                  <OzetButonu
+                    poiId={poi.id}
+                    mevcutOzet={poi.reviews_summary || null}
+                    onOzetGuncellendi={(ozet) => {
+                      setPois(prev => prev.map(p => p.id === poi.id ? { ...p, reviews_summary: ozet } : p));
+                    }}
+                  />
+                )}
               </div>
               {duzenleId === poi.id && (
                 <DuzenleForm poi={poi} onKaydet={icerikGuncelle} onIptal={() => setDuzenleId(null)} kayitYukleniyor={kayitYukleniyor} />
