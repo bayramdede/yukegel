@@ -40,13 +40,25 @@ export interface BoundingBox {
 }
 
 export const KATEGORILER = [
-  { key: 'hepsi',           label: 'Hepsi',           icon: '🗺️',  pinColor: '#8b949e' },
-  { key: 'park_dinlenme',   label: 'Park & Dinlenme', icon: '🅿️',  pinColor: '#3b82f6' },
-  { key: 'yemek',           label: 'Yemek',           icon: '🍲',  pinColor: '#f97316' },
-  { key: 'konaklama',       label: 'Konaklama',       icon: '🛏️',  pinColor: '#8b5cf6' },
-  { key: 'tamirci',         label: 'Tamirci & Usta',  icon: '🛠️',  pinColor: '#ef4444' },
-  { key: 'tesis_akaryakit', label: 'Tesis & Yakıt',   icon: '⛽',  pinColor: '#eab308' },
-  { key: 'kantar_resmi',    label: 'Kantar & Resmi',  icon: '⚖️',  pinColor: '#6b7280' },
+  { key: 'hepsi',         label: 'Hepsi',          icon: '🗺️', pinColor: '#8b949e' },
+  // Yeni TIR/Kamyon kategorileri
+  { key: 'tir_parki',     label: 'Tır Parkı',      icon: '🅿️', pinColor: '#3b82f6' },
+  { key: 'lokanta',       label: 'Lokanta',        icon: '🍲', pinColor: '#f97316' },
+  { key: 'konaklama',     label: 'Konaklama',      icon: '🛏️', pinColor: '#8b5cf6' },
+  { key: 'lastikci',      label: 'Lastikçi',       icon: '🔄', pinColor: '#ef4444' },
+  { key: 'motorcu',       label: 'Motorcu',        icon: '🔧', pinColor: '#dc2626' },
+  { key: 'elektrikci',    label: 'Elektrikçi',     icon: '⚡', pinColor: '#eab308' },
+  { key: 'kaportaci',     label: 'Kaportacı',      icon: '🔨', pinColor: '#f59e0b' },
+  { key: 'dorse_branda',  label: 'Dorse/Branda',   icon: '🚛', pinColor: '#0ea5e9' },
+  { key: 'frigo_ustasi',  label: 'Frigo Ustası',   icon: '❄️', pinColor: '#06b6d4' },
+  { key: 'kantar',        label: 'Kantar',         icon: '⚖️', pinColor: '#6b7280' },
+  { key: 'yikama',        label: 'Yıkama',         icon: '🚿', pinColor: '#10b981' },
+  // Eski kategoriler (geriye uyumluluk — gizlenmez, varsa gösterilir)
+  { key: 'park_dinlenme',   label: 'Park & Dinlenme', icon: '🅿️', pinColor: '#2563eb' },
+  { key: 'yemek',           label: 'Yemek',           icon: '🍲', pinColor: '#ea580c' },
+  { key: 'tamirci',         label: 'Tamirci',          icon: '🛠️', pinColor: '#b91c1c' },
+  { key: 'tesis_akaryakit', label: 'Tesis & Yakıt',    icon: '⛽', pinColor: '#ca8a04' },
+  { key: 'kantar_resmi',    label: 'Kantar (Resmi)',    icon: '⚖️', pinColor: '#4b5563' },
 ];
 
 const ALT_ETIKETLER: Record<string, string[]> = {
