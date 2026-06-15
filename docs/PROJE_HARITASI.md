@@ -1,6 +1,6 @@
 # Yükegel — Proje Haritası
 > **Kullanım:** Her sohbet başında sadece bu dosyayı oku. Kaynak dosyaları sadece o dosyada değişiklik yapacaksan oku.  
-> Son güncelleme: 21 Mayıs 2026 — `lib/auth.ts` temizliği: `requireModerator` ve `landingForRole` kaldırıldı (proxy.ts + service_role'e taşınmıştı); `lib/logger.ts` maskeleme fonksiyonları KVKK fazı için bilerek korunuyor
+> Son güncelleme: 15 Haziran 2026 — POI modülüne Google Places entegrasyonu: yeni kategoriler (11 TIR-spesifik), google_place_id/rating/reviews_summary/satellite_confirmed/is_active kolonları, admin import paneli, Claude yorum özeti
 
 **Referans Dökümanlar:**
 - `docs/LOG_VE_GUVENLIK_SPECLERI.md` — Log format standartları, audit trail, SecurityLogger kontrol listesi
