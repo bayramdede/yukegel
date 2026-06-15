@@ -1061,6 +1061,9 @@ export default function PoiOnayClient() {
   return (
     <div>
 
+      {/* ── Google Places Import ── */}
+      <GoogleImportBolumu onTamamlandi={() => yukle('pending')} />
+
       {/* ── Aksiyon çubuğu ── */}
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
         <button onClick={() => { setEkleAcik(v => !v); excelTemizle(); }}
