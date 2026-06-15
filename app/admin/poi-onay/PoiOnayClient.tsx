@@ -197,6 +197,18 @@ interface Poi extends PoiInput {
   avg_rating: number | null;
   review_count: number;
   ekleyen: { display_name: string | null; email: string | null } | null;
+  // Google Places alanları
+  google_place_id?: string | null;
+  google_maps_url?: string | null;
+  google_rating?: number | null;
+  google_review_count?: number | null;
+  reviews_summary?: string | null;
+  verified?: boolean;
+  verified_at?: string | null;
+  verified_by?: string | null;
+  satellite_confirmed?: boolean;
+  is_active?: boolean;
+  last_synced_at?: string | null;
 }
 
 // Form state — tüm alanlar string | boolean | string[]
