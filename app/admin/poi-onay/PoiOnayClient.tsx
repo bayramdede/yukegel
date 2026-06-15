@@ -762,6 +762,162 @@ function YeniEkleForm({ onKaydet, onIptal, kayitYukleniyor }: {
 
 // ─── Ana bileşen ──────────────────────────────────────────
 
+// ─── Google Import Bölümü ────────────────────────────────────
+
+const YENİ_KATEGORILER = KATEGORI_LIST.slice(0, 11); // sadece yeni TIR kategorileri
+
+function GoogleImportBolumu({ onTamamlandi }: { onTamamlandi: () => void }) {
+  const [il, setIl] = useState('İstanbul');
+  const [seciliKats, setSeciliKats] = useState<string[]>([]);
+  const [yukleniyor, setYukleniyor] = useState(false);
+  const [sonuc, setSonuc] = useState<{ eklenen: number; atlanan: number; hatali: number } | null>(null);
+  const [hata, setHata] = useState('');
+  const [acik, setAcik] = useState(false);
+
+  function toggleKat(kat: string) {
+    setSeciliKats(prev => prev.includes(kat) ? prev.filter(k => k !== kat) : [...prev, kat]);
+  }
+
+  async function cek() {
+    if (!il || seciliKats.length === 0) return;
+    setYukleniyor(true); setHata(''); setSonuc(null);
+    try {
+      const res = await fetch('/api/admin/poi-import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ province: il, categories: seciliKats, limit_per_query: 5 }),
+      });
+      const d = await res.json();
+      if (d.success) {
+        setSonuc(d.data);
+        onTamamlandi();
+      } else {
+        setHata(d.error || 'Veri çekme başarısız.');
+      }
+    } catch {
+      setHata('Bağlantı hatası.');
+    }
+    setYukleniyor(false);
+  }
+
+  return (
+    <div style={{ background: C.surface, border: `1px solid #1e3a5f`, borderRadius: 8, marginBottom: 16 }}>
+      <button
+        onClick={() => setAcik(v => !v)}
+        style={{
+          width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          background: 'none', border: 'none', padding: '12px 16px',
+          color: C.blue, fontWeight: 700, fontSize: '0.88rem', cursor: 'pointer',
+        }}
+      >
+        <span>🌐 Google Places'ten Veri Çek</span>
+        <span style={{ fontSize: '0.75rem', color: C.muted }}>{acik ? '▲ Kapat' : '▼ Aç'}</span>
+      </button>
+
+      {acik && (
+        <div style={{ padding: '0 16px 16px' }}>
+          {/* İl seçici */}
+          <div style={{ marginBottom: 12 }}>
+            <label style={lbl}>İl</label>
+            <select
+              style={{ ...inp, cursor: 'pointer' }}
+              value={il}
+              onChange={e => setIl(e.target.value)}
+            >
+              {ILLER.map(i => <option key={i} value={i}>{i}</option>)}
+            </select>
+          </div>
+
+          {/* Kategori seçici */}
+          <div style={{ marginBottom: 12 }}>
+            <label style={lbl}>
+              Kategoriler ({seciliKats.length} seçili)
+              {seciliKats.length === 0 && <span style={{ color: C.red, marginLeft: 4 }}>— en az 1 seçin</span>}
+            </label>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {YENİ_KATEGORILER.map(k => {
+                const aktif = seciliKats.includes(k.value);
+                return (
+                  <button
+                    key={k.value} type="button" onClick={() => toggleKat(k.value)}
+                    style={{
+                      padding: '5px 11px', borderRadius: 8, fontSize: '0.78rem', cursor: 'pointer',
+                      border: `1px solid ${aktif ? C.blue : C.border}`,
+                      background: aktif ? C.blueBg : 'transparent',
+                      color: aktif ? C.blue : C.muted, fontWeight: aktif ? 700 : 400,
+                    }}
+                  >
+                    {k.label}
+                  </button>
+                );
+              })}
+            </div>
+            <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
+              <button
+                type="button"
+                onClick={() => setSeciliKats(YENİ_KATEGORILER.map(k => k.value))}
+                style={{ background: 'none', color: C.muted, border: `1px solid ${C.border}`, borderRadius: 4, padding: '3px 10px', fontSize: '0.74rem', cursor: 'pointer' }}
+              >
+                Tümünü Seç
+              </button>
+              <button
+                type="button"
+                onClick={() => setSeciliKats([])}
+                style={{ background: 'none', color: C.dim, border: `1px solid ${C.border}`, borderRadius: 4, padding: '3px 10px', fontSize: '0.74rem', cursor: 'pointer' }}
+              >
+                Temizle
+              </button>
+            </div>
+          </div>
+
+          {/* Uyarı */}
+          <div style={{ background: '#1c1b0e', border: `1px solid ${C.amber}30`, borderRadius: 6, padding: '8px 12px', marginBottom: 12, fontSize: '0.76rem', color: C.amber }}>
+            ⚠️ Her kategori için 2-3 arama terimi kullanılır. Kategori başına ~5 sonuç çekilir.
+            Her çekme işlemi Google API kredisi tüketir (~$0.10–0.30).
+          </div>
+
+          {/* Çek butonu */}
+          <button
+            onClick={cek}
+            disabled={yukleniyor || !il || seciliKats.length === 0}
+            style={{
+              background: yukleniyor ? C.surface : C.blueBg,
+              color: C.blue, border: `1px solid ${C.blueBg}`,
+              borderRadius: 6, padding: '8px 20px', fontSize: '0.85rem', fontWeight: 700,
+              cursor: yukleniyor || !il || seciliKats.length === 0 ? 'not-allowed' : 'pointer',
+              opacity: !il || seciliKats.length === 0 ? 0.5 : 1,
+            }}
+          >
+            {yukleniyor ? '⏳ Çekiliyor...' : `🌐 ${il} — ${seciliKats.length} Kategori Çek`}
+          </button>
+
+          {/* Sonuç */}
+          {sonuc && (
+            <div style={{ marginTop: 12, padding: '10px 14px', background: C.greenDark, border: `1px solid ${C.greenBg}`, borderRadius: 6 }}>
+              <div style={{ color: C.green, fontWeight: 700, fontSize: '0.85rem' }}>
+                ✅ İşlem tamamlandı
+              </div>
+              <div style={{ color: C.muted, fontSize: '0.8rem', marginTop: 4 }}>
+                <span style={{ color: C.green }}>{sonuc.eklenen} yeni kayıt</span>
+                {' · '}
+                <span>{sonuc.atlanan} zaten vardı</span>
+                {sonuc.hatali > 0 && <span style={{ color: C.red }}>{' · '}{sonuc.hatali} hata</span>}
+              </div>
+              <div style={{ color: C.dim, fontSize: '0.74rem', marginTop: 4 }}>
+                Yeni kayıtlar Bekleyenler sekmesinde görünecektir.
+              </div>
+            </div>
+          )}
+
+          {hata && (
+            <div style={{ marginTop: 10, color: C.red, fontSize: '0.82rem' }}>⚠️ {hata}</div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function PoiOnayClient() {
   const [pois, setPois] = useState<Poi[]>([]);
   const [yukleniyor, setYukleniyor] = useState(true);
