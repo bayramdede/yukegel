@@ -62,9 +62,21 @@ export const KATEGORILER = [
 ];
 
 const ALT_ETIKETLER: Record<string, string[]> = {
+  // Yeni kategoriler
+  tir_parki:     ['7/24 Açık', 'Güvenlik Kameralı', 'Duş İmkanı', 'WC', 'Bekçi Var'],
+  lokanta:       ['Sulu Yemek', 'Uygun Fiyat', '7/24 Açık', 'Paket Servis', 'Kamyoncu Dostu'],
+  konaklama:     ['Tır Park Yeri Var', 'Duş İmkanı', 'Dorseyi Ayırmaya Gerek Yok', '7/24 Resepsiyon'],
+  lastikci:      ['Nöbetçi', '7/24 Açık', 'Çekici', 'Balans', 'Rot Balans'],
+  motorcu:       ['Nöbetçi', 'Çekici Var', '7/24 Açık', 'Garantili İş', 'Parça Depolu'],
+  elektrikci:    ['Nöbetçi', '7/24 Açık', 'Akü Satışı', 'Takometre'],
+  kaportaci:     ['Alüminyum', 'Paslanmaz', 'Boya', 'Sigorta İşi'],
+  dorse_branda:  ['Branda Değişimi', 'Tenteci', 'Dorse Kaynak', 'Yan Perde'],
+  frigo_ustasi:  ['Thermo King', 'Carrier', 'Yedek Parça', 'Soğutucu Gaz'],
+  kantar:        ['Vezneli', 'Resmi Tartı', 'CMR', 'Geçiş Belgesi'],
+  yikama:        ['Tır Yıkama', 'Motor Yıkama', 'Yağlama', 'Kabin Yıkama'],
+  // Eski kategoriler
   park_dinlenme:   ['Tır Park Yeri Var', '7/24 Açık', 'Güvenlik Kameralı', 'Duş İmkanı', 'WC'],
   yemek:           ['Sulu Yemek', 'Kamyoncu Dostu', 'Uygun Fiyat', '7/24 Açık', 'Paket Servis'],
-  konaklama:       ['Tır Park Yeri Var', 'Duş İmkanı', 'Dorseyi Ayırmaya Gerek Yok', '7/24 Resepsiyon'],
   tamirci:         ['Nöbetçi', '7/24 Açık', 'Çekici', 'Lastik', 'Elektrik', 'Usta Dürüst'],
   tesis_akaryakit: ['Tır Girişine Uygun', 'Akaryakıt', 'Otopark', 'Duş', 'Kafe'],
   kantar_resmi:    ['Vezneli Kantar', 'Resmi Tartı', 'CMR', 'Geçiş Belgesi'],
