@@ -762,6 +762,53 @@ function YeniEkleForm({ onKaydet, onIptal, kayitYukleniyor }: {
 
 // ─── Ana bileşen ──────────────────────────────────────────
 
+// ─── Yorum Özeti Butonu ──────────────────────────────────────
+
+function OzetButonu({
+  poiId,
+  mevcutOzet,
+  onOzetGuncellendi,
+}: {
+  poiId: string;
+  mevcutOzet: string | null;
+  onOzetGuncellendi: (ozet: string) => void;
+}) {
+  const [durum, setDurum] = useState<'idle' | 'loading' | 'done' | 'error'>('idle');
+
+  async function ozetUret() {
+    setDurum('loading');
+    try {
+      const res = await fetch(`/api/admin/poi-import/${poiId}/summarize`, { method: 'POST' });
+      const d = await res.json();
+      if (d.success) {
+        onOzetGuncellendi(d.data.reviews_summary);
+        setDurum('done');
+      } else {
+        setDurum('error');
+      }
+    } catch {
+      setDurum('error');
+    }
+  }
+
+  return (
+    <button
+      onClick={ozetUret}
+      disabled={durum === 'loading'}
+      title={mevcutOzet ? 'Özeti Yenile' : 'Claude ile Yorum Özeti Üret'}
+      style={{
+        background: durum === 'done' ? C.greenDark : '#1e1b4b',
+        color: durum === 'done' ? C.green : '#a5b4fc',
+        border: `1px solid ${durum === 'done' ? C.greenBg : '#4338ca40'}`,
+        borderRadius: 6, padding: '5px 12px', fontSize: '0.78rem', fontWeight: 700,
+        cursor: durum === 'loading' ? 'wait' : 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
+      }}
+    >
+      {durum === 'loading' ? '⏳ Özet...' : durum === 'error' ? '⚠️ Hata' : mevcutOzet ? '🔄 Yenile' : '✨ Özet'}
+    </button>
+  );
+}
+
 // ─── Google Import Bölümü ────────────────────────────────────
 
 const YENİ_KATEGORILER = KATEGORI_LIST.slice(0, 11); // sadece yeni TIR kategorileri
