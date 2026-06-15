@@ -140,7 +140,10 @@ export async function PATCH(
     if (phone !== undefined)        updates.phone        = phone?.trim() || null;
     if (website !== undefined)      updates.website      = website?.trim() || null;
     if (tags !== undefined)         updates.tags         = Array.isArray(tags) ? tags : [];
-    if (is_emergency !== undefined) updates.is_emergency = Boolean(is_emergency);
+    if (is_emergency !== undefined)        updates.is_emergency        = Boolean(is_emergency);
+    if (satellite_confirmed !== undefined) updates.satellite_confirmed = Boolean(satellite_confirmed);
+    if (is_active !== undefined)           updates.is_active           = Boolean(is_active);
+    if (reviews_summary !== undefined)     updates.reviews_summary     = reviews_summary?.trim() || null;
 
     if (latitude !== undefined || longitude !== undefined) {
       const lat = Number(latitude);
