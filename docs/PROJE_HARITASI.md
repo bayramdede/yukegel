@@ -226,9 +226,11 @@ ZIP/TXT → raw_posts → DB trigger → parse-listing Edge Fn → listings → 
 | `/api/admin/crm` | Shadow Profile listesi (GET) + güncelle (PATCH) |
 | `/api/admin/crm/[id]` | Shadow Profile detay + ilan geçmişi (GET) |
 | `/api/admin/radar` | Radar Intelligence: rota tarama, lead listesi, phone history (GET) |
-| `/api/poi` | POI listele (GET: bbox + filtre + sıralama), yeni POI ekle (POST) |
-| `/api/poi/[id]` | POI detay + son 10 yorum (GET) |
+| `/api/poi` | POI listele (GET: bbox + filtre + sıralama + is_active), yeni POI ekle (POST) |
+| `/api/poi/[id]` | POI detay + son 10 yorum (GET), güncelle (PATCH: +satellite_confirmed, is_active, reviews_summary) |
 | `/api/poi/[id]/review` | Yorum ekle + geo-fence doğrulama (POST) |
+| `/api/admin/poi-import` | Google Places'ten il+kategori bazlı veri çek (POST), kategori listesi (GET) |
+| `/api/admin/poi-import/[id]/summarize` | POI için Claude yorum özeti üret (POST) |
 
 ---
 
