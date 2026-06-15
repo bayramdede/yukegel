@@ -1226,6 +1226,12 @@ export default function PoiOnayClient() {
                     <StarRating rating={poi.avg_rating} count={poi.review_count ?? 0} />
                   </div>
                   {poi.description && <div style={{ color: C.muted, fontSize: '0.78rem', marginBottom: 3, fontStyle: 'italic' }}>{poi.description}</div>}
+                  {poi.reviews_summary && (
+                    <div style={{ background: '#1e1b4b', border: '1px solid #4338ca30', borderRadius: 6, padding: '6px 10px', marginBottom: 4 }}>
+                      <div style={{ color: '#a5b4fc', fontSize: '0.7rem', fontWeight: 700, marginBottom: 2 }}>✨ Claude Özeti</div>
+                      <div style={{ color: '#c7d2fe', fontSize: '0.78rem', lineHeight: 1.5 }}>{poi.reviews_summary}</div>
+                    </div>
+                  )}
                   {Array.isArray(poi.tags) && poi.tags.length > 0 && (
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 3 }}>
                       {poi.tags.map(t => <span key={t} style={{ background: C.bg, border: `1px solid ${C.border}`, color: C.muted, fontSize: '0.7rem', padding: '1px 7px', borderRadius: 10 }}>{t}</span>)}
