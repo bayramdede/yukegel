@@ -561,6 +561,8 @@ function YeniEkleForm({ onKaydet, onIptal, kayitYukleniyor }: {
         ...(r.address_note && { address_note: r.address_note }),
         ...(r.category     && { category:     r.category }),
         ...(r.description  && { description:  r.description }),
+        ...(r.phone        && { phone:        r.phone }),
+        ...(r.website      && { website:      r.website }),
       }));
       setEnrichDurum('done');
     } catch {
