@@ -563,7 +563,8 @@ export async function POST(request: NextRequest) {
       success: true,
       data: { eklenen, atlanan, filtrelenen, hatali },
       filtreSayac,
-      message: `${eklenen} yeni kayıt eklendi. ${filtrelenen} elendi (heuristic: ${filtreSayac.heuristic}, il eşleşmesi: ${filtreSayac.il_eslesme}, yorum: ${filtreSayac.min_reviews}, claude: ${filtreSayac.claude}). ${atlanan} zaten vardı.`,
+      elenenler,
+      message: `${eklenen} yeni kayıt eklendi. ${filtrelenen} elendi. ${atlanan} zaten vardı.`,
       ...(hatalar.length > 0 && { hatalar }),
     });
 
