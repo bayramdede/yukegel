@@ -221,7 +221,7 @@ name için slug'ı düzelt/normalize et (varsa), Nominatim bağlamına göre ger
       parsed = JSON.parse(m[0]);
     }
 
-    const result: EnrichResult = {
+    const claudeResult = {
       name:         typeof parsed.name        === 'string' ? parsed.name.trim()         || null : null,
       city:         typeof parsed.city        === 'string' ? parsed.city.trim()         || null : null,
       district:     typeof parsed.district    === 'string' ? parsed.district.trim()     || null : null,
@@ -229,6 +229,28 @@ name için slug'ı düzelt/normalize et (varsa), Nominatim bağlamına göre ger
       address_note: typeof parsed.address_note === 'string' ? parsed.address_note.trim() || null : null,
       category:     typeof parsed.category    === 'string' && VALID_CATS.includes(parsed.category) ? parsed.category : null,
       description:  typeof parsed.description === 'string' ? parsed.description.trim()  || null : null,
+    };
+
+    // ── 3. Google Places API — telefon, website, kesin ad ve adres ────────────
+    const googleKey = process.env.GOOGLE_PLACES_API_KEY;
+    const googleResult = googleKey
+      ? await googlePlacesEnrich(latN, lngN, slug, googleKey)
+      : { phone: null, website: null, google_place_id: null, google_rating: null, google_review_count: null, name: null, address: null };
+
+    const result: EnrichResult = {
+      // Google Places daha güvenilir — varsa üstün tut, yoksa Claude/Nominatim'e düş
+      name:                googleResult.name    || claudeResult.name,
+      address:             googleResult.address || claudeResult.address,
+      city:                claudeResult.city,
+      district:            claudeResult.district,
+      address_note:        claudeResult.address_note,
+      category:            claudeResult.category,
+      description:         claudeResult.description,
+      phone:               googleResult.phone,
+      website:             googleResult.website,
+      google_place_id:     googleResult.google_place_id,
+      google_rating:       googleResult.google_rating,
+      google_review_count: googleResult.google_review_count,
     };
 
     return NextResponse.json({ success: true, data: result });
