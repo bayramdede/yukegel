@@ -244,16 +244,16 @@ async function claudeOnEleme(
 ): Promise<boolean[]> {
   const kategoriAciklama: Record<string, string> = {
     tir_parki:     'TIR, kamyon veya ağır araç park edebilecek alan (otopark, garaj, akaryakıt istasyonu yanındaki alan dahil). Yalnızca çocuk parkı, millet bahçesi, botanik bahçe gibi kesinlikle araç park yeri olmayan yerler elenir.',
-    yikama:        'Sadece TIR/kamyon yıkama veya yağlama tesisi (araba yıkama veya restoran değil)',
-    kantar:        'Sadece kamyon/TIR için çalışan ağırlık tartı istasyonu (baskül satıcısı veya üreticisi değil)',
-    konaklama:     'Sadece kamyoncu/şoför için motel veya pansiyon (lüks otel, butik otel, apart otel değil)',
-    lokanta:       'Sadece kamyoncu/şoför için uygun yemek yeri (fast food, kafe, pastane değil)',
-    motorcu:       'TIR/kamyon motor tamiri veya ustası',
-    elektrikci:    'TIR/kamyon elektrik tamircisi',
-    kaportaci:     'TIR/kamyon kaportacı veya boya',
-    lastikci:      'TIR/kamyon lastikçisi',
-    dorse_branda:  'Dorse veya branda/tente tamircisi',
-    frigo_ustasi:  'Soğutuculu araç (frigo/thermo king) ustası',
+    yikama:        'Araç yıkama veya yağlama yeri (araba yıkama dahil — TIR da girebiliyorsa uygun). Yalnızca açıkça restoran veya yemek yeri olanlar elenir.',
+    kantar:        'Ağırlık ölçüm noktası veya tartı istasyonu. Yalnızca baskül/tartı aleti satan ya da üreten firmalar elenir.',
+    konaklama:     'Motel, pansiyon, han veya otel (kamyoncuların geceleme yapabileceği her türlü yer). Çok açık lüks resort veya tatil köyleri elenir.',
+    lokanta:       'Yemek yenebilecek her türlü yer: lokanta, restoran, kafe, fast food — kamyon şoförleri girebiliyorsa uygun. Yalnızca bar, gece kulübü veya içki yeri olanlar elenir.',
+    motorcu:       'Araç motor tamiri, bakımı veya ustası (TIR/kamyon da gelen tamirhaneler dahil).',
+    elektrikci:    'Araç elektrik tamiri (TIR/kamyon da kabul eden yerler dahil).',
+    kaportaci:     'Araç kaporta, boya veya karoser tamiri.',
+    lastikci:      'Lastik satış, tamiri veya değiştirme (TIR lastiği de yapılan yerler dahil).',
+    dorse_branda:  'Dorse tamiri, branda veya tente yapımı/tamiri.',
+    frigo_ustasi:  'Soğutuculu araç (frigorifik, thermo king) tamiri veya bakımı.',
   };
 
   const aciklama = kategoriAciklama[kategori] || kategori;
