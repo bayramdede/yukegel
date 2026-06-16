@@ -243,7 +243,7 @@ async function claudeOnEleme(
   anthropicKey: string,
 ): Promise<boolean[]> {
   const kategoriAciklama: Record<string, string> = {
-    tir_parki:     'Sadece TIR ve ağır vasıta kamyon park alanı (şehir parkı, otopark değil)',
+    tir_parki:     'TIR, kamyon veya ağır araç park edebilecek alan (otopark, garaj, akaryakıt istasyonu yanındaki alan dahil). Yalnızca çocuk parkı, millet bahçesi, botanik bahçe gibi kesinlikle araç park yeri olmayan yerler elenir.',
     yikama:        'Sadece TIR/kamyon yıkama veya yağlama tesisi (araba yıkama veya restoran değil)',
     kantar:        'Sadece kamyon/TIR için çalışan ağırlık tartı istasyonu (baskül satıcısı veya üreticisi değil)',
     konaklama:     'Sadece kamyoncu/şoför için motel veya pansiyon (lüks otel, butik otel, apart otel değil)',
