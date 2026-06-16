@@ -1106,9 +1106,9 @@ export default function PoiOnayClient() {
   async function yeniPoiEkle(fields: PoiInput) {
     setKayitYukleniyor(true); setHata('');
     try {
-      const res = await fetch('/api/admin/poi', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(fields) });
+      const res = await fetch('/api/poi', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(fields) });
       const d = await res.json();
-      if (d.success) { setEkleAcik(false); if (gosterilen === 'approved') yukle('approved'); }
+      if (d.success) { setEkleAcik(false); yukle(gosterilen); }
       else setHata(d.error || 'Ekleme başarısız.');
     } catch { setHata('Bağlantı hatası.'); }
     finally { setKayitYukleniyor(false); }
