@@ -3,7 +3,11 @@ import { getServerSupabase, getServiceSupabase } from '../../../../lib/auth';
 
 export const runtime = 'nodejs';
 
-const VALID_CATS = ['park_dinlenme', 'yemek', 'konaklama', 'tamirci', 'tesis_akaryakit', 'kantar_resmi'];
+const VALID_CATS = [
+  'park_dinlenme', 'yemek', 'konaklama', 'tamirci', 'tesis_akaryakit', 'kantar_resmi',
+  'motorcu', 'elektrikci', 'kaportaci', 'lastikci', 'dorse_branda', 'frigo_ustasi',
+  'tir_parki', 'lokanta', 'kantar', 'yikama',
+];
 
 interface EnrichResult {
   name: string | null;
@@ -13,6 +17,61 @@ interface EnrichResult {
   address_note: string | null;
   category: string | null;
   description: string | null;
+  // Google Places alanları
+  phone: string | null;
+  website: string | null;
+  google_place_id: string | null;
+  google_rating: number | null;
+  google_review_count: number | null;
+}
+
+// ─────────────────────────────────────────────────────────────
+// Google Places ile yer detaylarını çek
+// ─────────────────────────────────────────────────────────────
+async function googlePlacesEnrich(
+  lat: number, lng: number, slug: string | undefined, apiKey: string,
+): Promise<Pick<EnrichResult, 'phone' | 'website' | 'google_place_id' | 'google_rating' | 'google_review_count' | 'name' | 'address'>> {
+  const bos = { phone: null, website: null, google_place_id: null, google_rating: null, google_review_count: null, name: null, address: null };
+  try {
+    // 1. Text Search: slug + koordinat bias ile en yakın eşleşmeyi bul
+    const tsUrl = new URL('https://maps.googleapis.com/maps/api/place/textsearch/json');
+    tsUrl.searchParams.set('query', slug || `${lat},${lng}`);
+    tsUrl.searchParams.set('location', `${lat},${lng}`);
+    tsUrl.searchParams.set('radius', '100');  // 100m — çok kesin konum
+    tsUrl.searchParams.set('language', 'tr');
+    tsUrl.searchParams.set('key', apiKey);
+
+    const tsRes = await fetch(tsUrl.toString(), { signal: AbortSignal.timeout(6000) });
+    if (!tsRes.ok) return bos;
+    const tsData = await tsRes.json();
+    const place = tsData.results?.[0];
+    if (!place?.place_id) return bos;
+
+    // 2. Place Details: telefon, website, rating
+    const detUrl = new URL('https://maps.googleapis.com/maps/api/place/details/json');
+    detUrl.searchParams.set('place_id', place.place_id);
+    detUrl.searchParams.set('fields', 'place_id,name,formatted_address,formatted_phone_number,website,rating,user_ratings_total');
+    detUrl.searchParams.set('language', 'tr');
+    detUrl.searchParams.set('key', apiKey);
+
+    const detRes = await fetch(detUrl.toString(), { signal: AbortSignal.timeout(6000) });
+    if (!detRes.ok) return bos;
+    const detData = await detRes.json();
+    if (detData.status !== 'OK') return bos;
+
+    const r = detData.result;
+    return {
+      phone:               r.formatted_phone_number ?? null,
+      website:             r.website ?? null,
+      google_place_id:     r.place_id ?? null,
+      google_rating:       r.rating ?? null,
+      google_review_count: r.user_ratings_total ?? null,
+      name:                r.name ?? null,
+      address:             r.formatted_address ?? null,
+    };
+  } catch {
+    return bos;
+  }
 }
 
 // ─────────────────────────────────────────────
