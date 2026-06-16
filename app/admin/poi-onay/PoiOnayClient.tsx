@@ -817,7 +817,7 @@ function GoogleImportBolumu({ onTamamlandi }: { onTamamlandi: () => void }) {
   const [il, setIl] = useState('İstanbul');
   const [seciliKats, setSeciliKats] = useState<string[]>([]);
   const [yukleniyor, setYukleniyor] = useState(false);
-  const [sonuc, setSonuc] = useState<{ eklenen: number; atlanan: number; hatali: number } | null>(null);
+  const [sonuc, setSonuc] = useState<{ eklenen: number; atlanan: number; filtrelenen: number; hatali: number } | null>(null);
   const [hata, setHata] = useState('');
   const [acik, setAcik] = useState(false);
 
