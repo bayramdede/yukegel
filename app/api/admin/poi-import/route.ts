@@ -518,6 +518,7 @@ export async function POST(request: NextRequest) {
           if (!ilDogrula(detay.address_components || [], il)) {
             filtrelenen++;
             filtreSayac.il_eslesme++;
+            elenenler.push({ ad: detay.name, adres: detay.formatted_address || '', kategori, sebep: `İl eşleşmedi (aranan: ${il})` });
             continue;
           }
 
