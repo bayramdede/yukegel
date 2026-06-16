@@ -943,13 +943,22 @@ function GoogleImportBolumu({ onTamamlandi }: { onTamamlandi: () => void }) {
 
           {/* Sonuç */}
           {sonuc && (
-            <div style={{ marginTop: 12, padding: '10px 14px', background: C.greenDark, border: `1px solid ${C.greenBg}`, borderRadius: 6 }}>
+            <div style={{ marginTop: 12 }}>
+              <div style={{ padding: '10px 14px', background: C.greenDark, border: `1px solid ${C.greenBg}`, borderRadius: 6 }}>
               <div style={{ color: C.green, fontWeight: 700, fontSize: '0.85rem' }}>
                 ✅ İşlem tamamlandı
               </div>
               <div style={{ color: C.muted, fontSize: '0.8rem', marginTop: 4 }}>
                 <span style={{ color: C.green }}>{sonuc.eklenen} yeni kayıt</span>
-                {sonuc.filtrelenen > 0 && <span style={{ color: C.amber }}>{' · '}{sonuc.filtrelenen} Claude filtresiyle elendi</span>}
+                {sonuc.filtrelenen > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setElenenGoster(v => !v)}
+                    style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: C.amber, fontSize: '0.8rem' }}
+                  >
+                    {' · '}{sonuc.filtrelenen} elendi {elenenenGoster ? '▲' : '▼'}
+                  </button>
+                )}
                 {' · '}
                 <span>{sonuc.atlanan} zaten vardı</span>
                 {sonuc.hatali > 0 && <span style={{ color: C.red }}>{' · '}{sonuc.hatali} hata</span>}
