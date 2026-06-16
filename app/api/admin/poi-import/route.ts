@@ -493,11 +493,15 @@ export async function POST(request: NextRequest) {
 
         try {
           const sonuclar = await claudeOnEleme(girdi, kategori, il, anthropicKey);
-          const onceki = katman1.length;
-          katman3 = katman1.filter((_, i) => sonuclar[i]);
-          const elenen = onceki - katman3.length;
-          filtrelenen += elenen;
-          filtreSayac.claude += elenen;
+          katman3 = katman1.filter((y, i) => {
+            if (!sonuclar[i]) {
+              filtrelenen++;
+              filtreSayac.claude++;
+              elenenler.push({ ad: y.name, adres: y.formatted_address || '', kategori, sebep: 'Claude: kategori dışı' });
+              return false;
+            }
+            return true;
+          });
         } catch {
           // Claude hatası → tüm sonuçları geç
         }
