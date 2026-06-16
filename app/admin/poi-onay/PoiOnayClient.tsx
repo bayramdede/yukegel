@@ -967,6 +967,39 @@ function GoogleImportBolumu({ onTamamlandi }: { onTamamlandi: () => void }) {
                 Yeni kayıtlar Bekleyenler sekmesinde görünecektir.
               </div>
             </div>
+
+            {/* Elenenler detay tablosu */}
+            {elenenenGoster && elenenler.length > 0 && (
+              <div style={{ marginTop: 8, border: `1px solid #3d2200`, borderRadius: 6, overflow: 'hidden' }}>
+                <div style={{ background: '#1c1400', padding: '6px 12px', fontSize: '0.74rem', color: C.amber, fontWeight: 700 }}>
+                  🚫 Elenen yerler — neden?
+                </div>
+                <div style={{ maxHeight: 280, overflowY: 'auto' }}>
+                  {elenenler.map((e, i) => (
+                    <div key={i} style={{
+                      padding: '7px 12px',
+                      borderTop: i > 0 ? `1px solid #2a1a00` : undefined,
+                      display: 'grid', gridTemplateColumns: '1fr auto',
+                      gap: 8, alignItems: 'start',
+                    }}>
+                      <div>
+                        <div style={{ fontSize: '0.8rem', color: C.text, fontWeight: 600 }}>{e.ad}</div>
+                        <div style={{ fontSize: '0.72rem', color: C.dim }}>{e.adres}</div>
+                      </div>
+                      <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                        <div style={{ fontSize: '0.7rem', color: C.amber, background: '#2a1400', borderRadius: 4, padding: '2px 6px', whiteSpace: 'nowrap' }}>
+                          {e.sebep}
+                        </div>
+                        <div style={{ fontSize: '0.67rem', color: C.dim, marginTop: 2 }}>
+                          {KATEGORI[e.kategori] || e.kategori}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            </div>
           )}
 
           {hata && (
