@@ -290,6 +290,7 @@ Tamamı uygunsuzsa "-" yaz.`;
 
     const data = await res.json();
     const yanit = (data.content?.[0]?.text ?? '').trim();
+    console.log(`[claudeOnEleme] kategori=${kategori} yanit="${yanit}"`);
     // Boş veya sadece tire → hepsi geç (Claude yanıt veremedi)
     if (!yanit) return yerler.map(() => true);
     // Açıkça "hiçbiri yok" sinyali
