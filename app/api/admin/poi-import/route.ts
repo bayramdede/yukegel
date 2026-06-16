@@ -130,32 +130,31 @@ const KATEGORI_CONFIG: Record<string, {
   tir_parki: {
     terms: ['tır parkı', 'kamyon parkı'],
     type: 'parking',
-    exclude: ['çocuk', 'millet', 'botanik', 'olimpiyat', 'avm', 'alışveriş', 'rezidans', 'site', 'konut'],
-    min_reviews: 2,
+    // Sadece kesinlikle yanlış olanlar — Claude asıl kararı verir
+    exclude: ['çocuk parkı', 'millet bahçesi', 'botanik', 'olimpiyat parkı', 'avm otoparkı'],
   },
   lokanta: {
     terms: ['kamyoncu lokantası', 'şoför lokantası'],
     type: 'restaurant',
-    exclude: ['cafe', 'kafe', 'pastane', 'pizza', 'burger', 'sushi', 'bistro', 'pub', 'bar', 'dönerci'],
-    min_reviews: 5,
+    exclude: ['sushi', 'pub', 'bar ', 'nightclub'],
   },
   konaklama: {
     terms: ['kamyoncu moteli', 'şoför moteli'],
     type: 'lodging',
-    exclude: ['hilton', 'sheraton', 'marriott', 'hyatt', 'radisson', 'sofitel', 'intercontinental',
-              'kempinski', 'four seasons', 'ritz', 'palace', 'resort', 'boutique', 'butik', 'suite otel'],
-    min_reviews: 3,
+    // Sadece büyük zincir lüks oteller — orta sınıf oteller Claude'a bırakılır
+    exclude: ['hilton', 'sheraton', 'marriott', 'hyatt', 'radisson', 'sofitel',
+              'intercontinental', 'kempinski', 'four seasons', 'ritz-carlton'],
   },
   kantar: {
     terms: ['tır kantarı', 'kamyon tartı istasyonu'],
-    exclude: ['satış', 'üretici', 'imalat', 'mühendislik', 'sistemleri', 'cihazı', 'Ltd', 'A.Ş.', 'Şti'],
-    min_reviews: 1,
+    // Sadece açıkça üretici/satıcı olanlar — taşıt kantarı olabilecekler Claude'a bırakılır
+    exclude: ['baskül üretici', 'baskül imalat', 'tartı sistemleri san.', 'terazi satış'],
   },
   yikama: {
     terms: ['tır yıkama', 'kamyon yıkama'],
     type: 'car_wash',
-    exclude: ['mutfak', 'restoran', 'lokanta', 'yemek', 'oto kuaför', 'kuaför'],
-    min_reviews: 2,
+    // Açıkça yemek yeri olanlar
+    exclude: ['mutfak', 'restoran', 'lokanta', 'yemek'],
   },
   // Eski kategoriler
   park_dinlenme:   { terms: ['tır parkı'], type: 'parking', exclude: ['çocuk', 'millet', 'avm'] },
