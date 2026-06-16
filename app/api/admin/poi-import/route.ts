@@ -267,9 +267,9 @@ async function claudeOnEleme(
 
 ${liste}
 
-Her biri gerçekten bu kategoriye uygun bir yer mi? Şüpheli veya alakasız olanları ele.
-Sadece UYGUN olanların numaralarını virgülle yaz. Örnek: "1,3"
-Hiçbiri uygun değilse sadece boş sat yaz.`;
+Her biri gerçekten bu kategoriye uygun bir yer midir? Yalnızca kesinlikle yanlış kategoride olanları ele. Emin olamadığında UYGUN kabul et.
+Sadece UYGUN olanların numaralarını virgülle yaz. Örnek: "1,3,5"
+Hiçbiri uygun değilse sadece "-" yaz.`;
 
   try {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
