@@ -946,6 +946,7 @@ function GoogleImportBolumu({ onTamamlandi }: { onTamamlandi: () => void }) {
               </div>
               <div style={{ color: C.muted, fontSize: '0.8rem', marginTop: 4 }}>
                 <span style={{ color: C.green }}>{sonuc.eklenen} yeni kayıt</span>
+                {sonuc.filtrelenen > 0 && <span style={{ color: C.amber }}>{' · '}{sonuc.filtrelenen} Claude filtresiyle elendi</span>}
                 {' · '}
                 <span>{sonuc.atlanan} zaten vardı</span>
                 {sonuc.hatali > 0 && <span style={{ color: C.red }}>{' · '}{sonuc.hatali} hata</span>}
