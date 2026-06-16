@@ -4,140 +4,276 @@ import { getServerSupabase, getServiceSupabase } from '../../../../lib/auth';
 export const runtime = 'nodejs';
 
 // ─────────────────────────────────────────────────────────────
+// Türkiye 81 il merkez koordinatları — coğrafi kısıtlama için
+// ─────────────────────────────────────────────────────────────
+const IL_KOORDINAT: Record<string, { lat: number; lng: number; radius: number }> = {
+  'Adana':          { lat: 37.0000, lng: 35.3213, radius: 80000 },
+  'Adıyaman':       { lat: 37.7648, lng: 38.2786, radius: 60000 },
+  'Afyonkarahisar': { lat: 38.7507, lng: 30.5567, radius: 80000 },
+  'Ağrı':           { lat: 39.7191, lng: 43.0503, radius: 80000 },
+  'Amasya':         { lat: 40.6499, lng: 35.8353, radius: 60000 },
+  'Ankara':         { lat: 39.9334, lng: 32.8597, radius: 80000 },
+  'Antalya':        { lat: 36.8969, lng: 30.7133, radius: 80000 },
+  'Artvin':         { lat: 41.1828, lng: 41.8183, radius: 50000 },
+  'Aydın':          { lat: 37.8444, lng: 27.8458, radius: 70000 },
+  'Balıkesir':      { lat: 39.6484, lng: 27.8826, radius: 80000 },
+  'Bilecik':        { lat: 40.1508, lng: 29.9792, radius: 50000 },
+  'Bingöl':         { lat: 38.8847, lng: 40.4983, radius: 60000 },
+  'Bitlis':         { lat: 38.4006, lng: 42.1095, radius: 60000 },
+  'Bolu':           { lat: 40.5760, lng: 31.5788, radius: 60000 },
+  'Burdur':         { lat: 37.7203, lng: 30.2906, radius: 60000 },
+  'Bursa':          { lat: 40.1826, lng: 29.0665, radius: 70000 },
+  'Çanakkale':      { lat: 40.1553, lng: 26.4142, radius: 70000 },
+  'Çankırı':        { lat: 40.6013, lng: 33.6134, radius: 60000 },
+  'Çorum':          { lat: 40.5506, lng: 34.9556, radius: 70000 },
+  'Denizli':        { lat: 37.7765, lng: 29.0864, radius: 70000 },
+  'Diyarbakır':     { lat: 37.9144, lng: 40.2306, radius: 80000 },
+  'Edirne':         { lat: 41.6818, lng: 26.5623, radius: 60000 },
+  'Elazığ':         { lat: 38.6810, lng: 39.2264, radius: 60000 },
+  'Erzincan':       { lat: 39.7500, lng: 39.5000, radius: 70000 },
+  'Erzurum':        { lat: 39.9000, lng: 41.2700, radius: 80000 },
+  'Eskişehir':      { lat: 39.7767, lng: 30.5206, radius: 70000 },
+  'Gaziantep':      { lat: 37.0662, lng: 37.3833, radius: 70000 },
+  'Giresun':        { lat: 40.9128, lng: 38.3895, radius: 60000 },
+  'Gümüşhane':      { lat: 40.4386, lng: 39.4814, radius: 60000 },
+  'Hakkari':        { lat: 37.5744, lng: 43.7408, radius: 50000 },
+  'Hatay':          { lat: 36.4018, lng: 36.3498, radius: 70000 },
+  'Isparta':        { lat: 37.7648, lng: 30.5566, radius: 60000 },
+  'Mersin':         { lat: 36.8000, lng: 34.6333, radius: 80000 },
+  'İstanbul':       { lat: 41.0082, lng: 28.9784, radius: 50000 },
+  'İzmir':          { lat: 38.4192, lng: 27.1287, radius: 70000 },
+  'Kars':           { lat: 40.6013, lng: 43.0975, radius: 60000 },
+  'Kastamonu':      { lat: 41.3887, lng: 33.7827, radius: 70000 },
+  'Kayseri':        { lat: 38.7312, lng: 35.4787, radius: 70000 },
+  'Kırklareli':     { lat: 41.7333, lng: 27.2167, radius: 60000 },
+  'Kırşehir':       { lat: 39.1425, lng: 34.1709, radius: 60000 },
+  'Kocaeli':        { lat: 40.8533, lng: 29.8815, radius: 50000 },
+  'Konya':          { lat: 37.8714, lng: 32.4846, radius: 100000 },
+  'Kütahya':        { lat: 39.4242, lng: 29.9833, radius: 70000 },
+  'Malatya':        { lat: 38.3552, lng: 38.3095, radius: 70000 },
+  'Manisa':         { lat: 38.6191, lng: 27.4289, radius: 70000 },
+  'Kahramanmaraş':  { lat: 37.5858, lng: 36.9371, radius: 70000 },
+  'Mardin':         { lat: 37.3212, lng: 40.7245, radius: 70000 },
+  'Muğla':          { lat: 37.2153, lng: 28.3636, radius: 80000 },
+  'Muş':            { lat: 38.7462, lng: 41.5064, radius: 60000 },
+  'Nevşehir':       { lat: 38.6939, lng: 34.6857, radius: 60000 },
+  'Niğde':          { lat: 37.9667, lng: 34.6833, radius: 60000 },
+  'Ordu':           { lat: 40.9839, lng: 37.8764, radius: 60000 },
+  'Rize':           { lat: 41.0201, lng: 40.5234, radius: 50000 },
+  'Sakarya':        { lat: 40.6940, lng: 30.4358, radius: 60000 },
+  'Samsun':         { lat: 41.2867, lng: 36.3300, radius: 70000 },
+  'Siirt':          { lat: 37.9333, lng: 41.9500, radius: 60000 },
+  'Sinop':          { lat: 42.0231, lng: 35.1531, radius: 50000 },
+  'Sivas':          { lat: 39.7477, lng: 37.0179, radius: 80000 },
+  'Tekirdağ':       { lat: 40.9833, lng: 27.5167, radius: 70000 },
+  'Tokat':          { lat: 40.3167, lng: 36.5500, radius: 70000 },
+  'Trabzon':        { lat: 41.0015, lng: 39.7178, radius: 60000 },
+  'Tunceli':        { lat: 39.1079, lng: 39.5482, radius: 50000 },
+  'Şanlıurfa':      { lat: 37.1591, lng: 38.7969, radius: 80000 },
+  'Uşak':           { lat: 38.6823, lng: 29.4082, radius: 60000 },
+  'Van':            { lat: 38.4942, lng: 43.3800, radius: 80000 },
+  'Yozgat':         { lat: 39.8181, lng: 34.8147, radius: 70000 },
+  'Zonguldak':      { lat: 41.4564, lng: 31.7987, radius: 60000 },
+  'Aksaray':        { lat: 38.3687, lng: 34.0370, radius: 60000 },
+  'Bayburt':        { lat: 40.2552, lng: 40.2249, radius: 50000 },
+  'Karaman':        { lat: 37.1759, lng: 33.2287, radius: 60000 },
+  'Kırıkkale':      { lat: 39.8468, lng: 33.5153, radius: 50000 },
+  'Batman':         { lat: 37.8812, lng: 41.1351, radius: 60000 },
+  'Şırnak':         { lat: 37.5164, lng: 42.4611, radius: 60000 },
+  'Bartın':         { lat: 41.6344, lng: 32.3375, radius: 50000 },
+  'Ardahan':        { lat: 41.1105, lng: 42.7022, radius: 50000 },
+  'Iğdır':          { lat: 39.9167, lng: 44.0450, radius: 50000 },
+  'Yalova':         { lat: 40.6500, lng: 29.2667, radius: 40000 },
+  'Karabük':        { lat: 41.2061, lng: 32.6204, radius: 50000 },
+  'Kilis':          { lat: 36.7184, lng: 37.1212, radius: 40000 },
+  'Osmaniye':       { lat: 37.0742, lng: 36.2461, radius: 50000 },
+  'Düzce':          { lat: 40.8438, lng: 31.1565, radius: 50000 },
+};
+
+// ─────────────────────────────────────────────────────────────
 // Kategori yapılandırması
-// terms: arama terimleri (Google'a gönderilir)
-// type: Places API type filtresi (sonuç kalitesini artırır)
-// exclude: bu kelimeleri içeren yer adları atlanır
 // ─────────────────────────────────────────────────────────────
 const KATEGORI_CONFIG: Record<string, {
   terms: string[];
   type?: string;
   exclude?: string[];
+  min_reviews?: number;   // minimum yorum sayısı (yoksa bu eşiğin altı atlanır)
 }> = {
   motorcu: {
     terms: ['tır motor ustası', 'kamyon motor tamiri'],
     type: 'car_repair',
-    exclude: ['lastik', 'elektrik', 'kaporta', 'boya'],
+    exclude: ['lastik', 'elektrik', 'kaporta', 'boya', 'yıkama'],
   },
   elektrikci: {
     terms: ['tır elektrikçi', 'kamyon elektrik tamiri'],
     type: 'car_repair',
-    exclude: ['lastik', 'motor', 'kaporta'],
+    exclude: ['lastik', 'motor', 'kaporta', 'yıkama'],
   },
   kaportaci: {
     terms: ['tır kaportacı', 'kamyon kaporta boya'],
     type: 'car_repair',
+    exclude: ['lastik', 'motor', 'elektrik'],
   },
   lastikci: {
     terms: ['tır lastikçi', 'kamyon lastik tamiri'],
     type: 'car_repair',
-    exclude: ['motor', 'elektrik', 'kaporta'],
+    exclude: ['motor', 'elektrik', 'kaporta', 'yıkama'],
   },
   dorse_branda: {
-    terms: ['dorse tamiri', 'branda tenteci'],
+    terms: ['dorse tamircisi', 'tır branda tenteci'],
     type: 'car_repair',
   },
   frigo_ustasi: {
-    terms: ['frigo tamir', 'thermo king servis', 'carrier soğutucu tamir'],
+    terms: ['frigo tamir', 'thermo king servis'],
     type: 'car_repair',
   },
   tir_parki: {
     terms: ['tır parkı', 'kamyon parkı'],
     type: 'parking',
-    // Sadece kelimesiyle "park" olan şehir parklarını ve genel otoparkları hariç tut
-    exclude: ['çocuk', 'millet', 'olimpiyat', 'botanik', 'alışveriş', 'avm', 'rezidans', 'site'],
+    exclude: ['çocuk', 'millet', 'botanik', 'olimpiyat', 'avm', 'alışveriş', 'rezidans', 'site', 'konut'],
+    min_reviews: 2,
   },
   lokanta: {
     terms: ['kamyoncu lokantası', 'şoför lokantası'],
     type: 'restaurant',
-    exclude: ['cafe', 'kafe', 'pastane', 'pizza', 'burger', 'sushi', 'kebap sarayı'],
+    exclude: ['cafe', 'kafe', 'pastane', 'pizza', 'burger', 'sushi', 'bistro', 'pub', 'bar', 'dönerci'],
+    min_reviews: 5,
   },
   konaklama: {
-    terms: ['kamyoncu moteli', 'şoför moteli', 'tır moteli'],
+    terms: ['kamyoncu moteli', 'şoför moteli'],
     type: 'lodging',
-    // 4-5 yıldız lüks otelleri hariç tut
-    exclude: ['hilton', 'sheraton', 'marriott', 'hyatt', 'radisson', 'sofitel', 'intercontinental', 'kempinski', 'four seasons', 'ritz', 'palace', 'resort'],
+    exclude: ['hilton', 'sheraton', 'marriott', 'hyatt', 'radisson', 'sofitel', 'intercontinental',
+              'kempinski', 'four seasons', 'ritz', 'palace', 'resort', 'boutique', 'butik', 'suite otel'],
+    min_reviews: 3,
   },
   kantar: {
     terms: ['tır kantarı', 'kamyon tartı istasyonu'],
-    // "baskül" kelimesi kantar satıcılarını getirir, doğrudan tartı noktalarını değil
-    exclude: ['baskül satış', 'baskül üretici', 'baskül imalat', 'terazi', 'tartı sistemleri', 'tartı cihazı'],
+    exclude: ['satış', 'üretici', 'imalat', 'mühendislik', 'sistemleri', 'cihazı', 'Ltd', 'A.Ş.', 'Şti'],
+    min_reviews: 1,
   },
   yikama: {
     terms: ['tır yıkama', 'kamyon yıkama'],
     type: 'car_wash',
-    exclude: ['mutfak', 'restoran', 'lokanta', 'yemek', 'oto kuaför'],
+    exclude: ['mutfak', 'restoran', 'lokanta', 'yemek', 'oto kuaför', 'kuaför'],
+    min_reviews: 2,
   },
   // Eski kategoriler
-  park_dinlenme:   { terms: ['tır parkı dinlenme'], type: 'parking' },
-  yemek:           { terms: ['kamyoncu lokantası'], type: 'restaurant' },
+  park_dinlenme:   { terms: ['tır parkı'], type: 'parking', exclude: ['çocuk', 'millet', 'avm'] },
+  yemek:           { terms: ['kamyoncu lokantası'], type: 'restaurant', min_reviews: 5 },
   tamirci:         { terms: ['tır tamircisi'], type: 'car_repair' },
-  tesis_akaryakit: { terms: ['tır yıkama akaryakıt'], type: 'car_wash' },
-  kantar_resmi:    { terms: ['kamyon tartı istasyonu'] },
+  tesis_akaryakit: { terms: ['tır yıkama'], type: 'car_wash' },
+  kantar_resmi:    { terms: ['kamyon tartı istasyonu'], min_reviews: 1 },
 };
 
 const GECERLI_KATEGORILER = Object.keys(KATEGORI_CONFIG);
 
 // ─────────────────────────────────────────────────────────────
-// Yer adı kalite filtresi (basit heuristic)
+// Kalite katmanı 1: Ad + adres bazlı heuristic filtre
 // ─────────────────────────────────────────────────────────────
-function kaliteFiltresi(ad: string, kategori: string): boolean {
-  const adKucuk = ad.toLowerCase();
-  const config = KATEGORI_CONFIG[kategori];
+function heuristicFiltre(
+  ad: string,
+  adres: string,
+  kategori: string,
+  reviewCount: number,
+): { gecti: boolean; sebep?: string } {
+  const adKucuk   = ad.toLowerCase();
+  const adresKucuk = adres.toLowerCase();
+  const config    = KATEGORI_CONFIG[kategori];
 
-  // Kategori bazlı exclude listesi
+  // Exclude listesi kontrolü
   if (config?.exclude) {
     for (const kelime of config.exclude) {
-      if (adKucuk.includes(kelime.toLowerCase())) return false;
+      if (adKucuk.includes(kelime.toLowerCase())) {
+        return { gecti: false, sebep: `exclude: "${kelime}"` };
+      }
     }
   }
 
-  // Tır parkı için: sadece "park" kelimesi olan ve spesifik tır/kamyon içermeyen yerleri atla
-  if (kategori === 'tir_parki' || kategori === 'park_dinlenme') {
-    const tirKelime = ['tır', 'tir', 'kamyon', 'araç', 'truck', 'ağır vasıta', 'agir vasita'];
-    const iceriyorMu = tirKelime.some(k => adKucuk.includes(k));
-    // Çok kısa ve generik isimler (sadece "park") atla
-    if (ad.trim().length <= 5) return false;
-    // "Garaj" da geçerliyse kabul et
-    if (adKucuk.includes('garaj')) return true;
-    if (!iceriyorMu) return false;
+  // Minimum yorum sayısı
+  const minReviews = config?.min_reviews ?? 0;
+  if (reviewCount < minReviews) {
+    return { gecti: false, sebep: `yorum sayısı yetersiz (${reviewCount} < ${minReviews})` };
   }
 
-  return true;
+  // Tır parkı özel: kamyon/tır kelimesi veya "garaj" içermeli
+  if (kategori === 'tir_parki' || kategori === 'park_dinlenme') {
+    if (ad.trim().length <= 5) return { gecti: false, sebep: 'çok kısa isim' };
+    const tirKelime = ['tır', 'tir', 'kamyon', 'garaj', 'truck', 'ağır vasıta'];
+    const gecerli = tirKelime.some(k => adKucuk.includes(k) || adresKucuk.includes(k));
+    if (!gecerli) return { gecti: false, sebep: 'tır/kamyon kelimesi yok' };
+  }
+
+  // Kantar özel: baskül satıcısı değil, tartı noktası olmalı
+  if (kategori === 'kantar' || kategori === 'kantar_resmi') {
+    const saticiKelime = ['ltd', 'a.ş', 'sti.', 'şti.', 'sanayi', 'ticaret', 'san.', 'tic.'];
+    const saticiMi = saticiKelime.some(k => adKucuk.includes(k));
+    const kantarKelime = ['kantar', 'tartı', 'baskül istasyon', 'tartım'];
+    const kantarMi = kantarKelime.some(k => adKucuk.includes(k));
+    // Sadece "satıcı" olan ve "kantar/tartı" adında geçmeyen yerler atla
+    if (saticiMi && !kantarMi) {
+      return { gecti: false, sebep: 'baskül satıcısı (tartı noktası değil)' };
+    }
+  }
+
+  return { gecti: true };
 }
 
 // ─────────────────────────────────────────────────────────────
-// Claude ile toplu ön-eleme (opsiyonel, büyük batch'lerde)
-// Bir seferde max 10 yer için çağrılır
+// Kalite katmanı 2: Adres → il doğrulama
+// ─────────────────────────────────────────────────────────────
+function ilDogrula(adresComponents: AddressComponent[], istenenIl: string): boolean {
+  for (const c of adresComponents) {
+    if (c.types.includes('administrative_area_level_1')) {
+      const gelen = c.long_name
+        .replace(/\s*(Province|İl|İli)$/i, '')
+        .trim()
+        .toLowerCase();
+      const istenen = istenenIl.toLowerCase();
+      // Tam eşleşme veya içerme (ör: "İstanbul" vs "istanbul")
+      return gelen === istenen || gelen.includes(istenen) || istenen.includes(gelen);
+    }
+  }
+  return true; // adres bileşeni yoksa geç (belirsizlik durumu)
+}
+
+// ─────────────────────────────────────────────────────────────
+// Kalite katmanı 3: Claude toplu ön-eleme
+// Batch başına max 10 yer; kesin "EVET/HAYIR" formatı
 // ─────────────────────────────────────────────────────────────
 async function claudeOnEleme(
-  yerler: { ad: string; adres: string }[],
+  yerler: { ad: string; adres: string; rating?: number; reviewCount: number }[],
   kategori: string,
+  il: string,
   anthropicKey: string,
 ): Promise<boolean[]> {
   const kategoriAciklama: Record<string, string> = {
-    tir_parki:     'TIR ve kamyon parkı (ağır vasıta park alanı)',
-    yikama:        'TIR/kamyon yıkama veya yağlama tesisi',
-    kantar:        'Kamyon/TIR ağırlık tartı noktası (istasyon, damga)',
-    konaklama:     'Kamyoncu/şoför moteli veya pansiyonu (lüks otel değil)',
-    lokanta:       'Kamyoncu/şoför lokantası veya yemekhanesi',
-    motorcu:       'TIR/kamyon motor ustası veya tamirhanesi',
+    tir_parki:     'Sadece TIR ve ağır vasıta kamyon park alanı (şehir parkı, otopark değil)',
+    yikama:        'Sadece TIR/kamyon yıkama veya yağlama tesisi (araba yıkama veya restoran değil)',
+    kantar:        'Sadece kamyon/TIR için çalışan ağırlık tartı istasyonu (baskül satıcısı veya üreticisi değil)',
+    konaklama:     'Sadece kamyoncu/şoför için motel veya pansiyon (lüks otel, butik otel, apart otel değil)',
+    lokanta:       'Sadece kamyoncu/şoför için uygun yemek yeri (fast food, kafe, pastane değil)',
+    motorcu:       'TIR/kamyon motor tamiri veya ustası',
     elektrikci:    'TIR/kamyon elektrik tamircisi',
-    kaportaci:     'TIR/kamyon kaportacı veya boyacı',
+    kaportaci:     'TIR/kamyon kaportacı veya boya',
     lastikci:      'TIR/kamyon lastikçisi',
     dorse_branda:  'Dorse veya branda/tente tamircisi',
-    frigo_ustasi:  'Frigo (soğutuculu araç) ustası',
+    frigo_ustasi:  'Soğutuculu araç (frigo/thermo king) ustası',
   };
 
   const aciklama = kategoriAciklama[kategori] || kategori;
-  const liste = yerler.map((y, i) => `${i + 1}. "${y.ad}" — ${y.adres}`).join('\n');
+  const liste = yerler
+    .map((y, i) =>
+      `${i + 1}. Ad: "${y.ad}" | Adres: ${y.adres} | Puan: ${y.rating ?? '—'}/5 (${y.reviewCount} yorum)`
+    )
+    .join('\n');
 
-  const prompt = `Aşağıdaki Google Maps sonuçları "${aciklama}" kategorisinde arandı. Her biri gerçekten bu kategoriye uygun mu?
+  const prompt = `Aşağıdaki Google Maps yerleri "${il}" ilinde "${aciklama}" kategorisi için arandı.
 
 ${liste}
 
-Sadece uygun olanların numaralarını virgülle yaz. Uygun değilse sayma. Örnek: "1,3,4"
-Eğer hiçbiri uygun değilse boş bırak.`;
+Her biri gerçekten bu kategoriye uygun bir yer mi? Şüpheli veya alakasız olanları ele.
+Sadece UYGUN olanların numaralarını virgülle yaz. Örnek: "1,3"
+Hiçbiri uygun değilse sadece boş sat yaz.`;
 
   try {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
@@ -154,16 +290,18 @@ Eğer hiçbiri uygun değilse boş bırak.`;
       }),
     });
 
-    if (!res.ok) return yerler.map(() => true); // hata varsa hepsini geç
+    if (!res.ok) return yerler.map(() => true);
 
     const data = await res.json();
-    const yanit = data.content?.[0]?.text?.trim() || '';
+    const yanit = (data.content?.[0]?.text ?? '').trim();
     if (!yanit) return yerler.map(() => false);
 
     const uygunlar = new Set(
-      yanit.split(',').map((s: string) => parseInt(s.trim(), 10)).filter((n: number) => !isNaN(n))
+      yanit
+        .split(',')
+        .map((s: string) => parseInt(s.trim(), 10))
+        .filter((n: number) => !isNaN(n))
     );
-
     return yerler.map((_, i) => uygunlar.has(i + 1));
   } catch {
     return yerler.map(() => true); // hata varsa hepsini geç
@@ -171,24 +309,32 @@ Eğer hiçbiri uygun değilse boş bırak.`;
 }
 
 // ─────────────────────────────────────────────────────────────
-// Google Places Text Search
+// Google Places Text Search — location bias ile
 // ─────────────────────────────────────────────────────────────
-async function textSearch(query: string, type: string | undefined, apiKey: string): Promise<GooglePlace[]> {
+async function textSearch(
+  query: string,
+  type: string | undefined,
+  ilKoordinat: { lat: number; lng: number; radius: number } | undefined,
+  apiKey: string,
+): Promise<GooglePlace[]> {
   const url = new URL('https://maps.googleapis.com/maps/api/place/textsearch/json');
   url.searchParams.set('query', query);
   url.searchParams.set('language', 'tr');
   url.searchParams.set('region', 'tr');
   if (type) url.searchParams.set('type', type);
+  // İl merkezi + yarıçap ile coğrafi kısıt — yanlış il sonuçlarını engeller
+  if (ilKoordinat) {
+    url.searchParams.set('location', `${ilKoordinat.lat},${ilKoordinat.lng}`);
+    url.searchParams.set('radius', String(ilKoordinat.radius));
+  }
   url.searchParams.set('key', apiKey);
 
   const res = await fetch(url.toString());
   if (!res.ok) throw new Error(`Places Text Search HTTP ${res.status}`);
   const data = await res.json();
-
   if (data.status === 'REQUEST_DENIED') {
-    throw new Error(`Google Places API hatası: ${data.error_message || data.status}`);
+    throw new Error(`Google Places API: ${data.error_message || data.status}`);
   }
-
   return (data.results || []) as GooglePlace[];
 }
 
@@ -198,7 +344,9 @@ async function textSearch(query: string, type: string | undefined, apiKey: strin
 async function placeDetails(placeId: string, apiKey: string): Promise<GooglePlaceDetails | null> {
   const url = new URL('https://maps.googleapis.com/maps/api/place/details/json');
   url.searchParams.set('place_id', placeId);
-  url.searchParams.set('fields', 'place_id,name,formatted_address,formatted_phone_number,geometry,rating,user_ratings_total,url,address_components,reviews');
+  url.searchParams.set('fields',
+    'place_id,name,formatted_address,formatted_phone_number,geometry,rating,user_ratings_total,url,address_components,reviews'
+  );
   url.searchParams.set('language', 'tr');
   url.searchParams.set('key', apiKey);
 
@@ -209,22 +357,15 @@ async function placeDetails(placeId: string, apiKey: string): Promise<GooglePlac
   return data.result as GooglePlaceDetails;
 }
 
-// ─────────────────────────────────────────────────────────────
-// Adres bileşeninden il/ilçe çıkar
-// ─────────────────────────────────────────────────────────────
 function parseAdresComponents(components: AddressComponent[]): { il: string | null; ilce: string | null } {
   let il: string | null = null;
   let ilce: string | null = null;
-
   for (const c of components) {
-    if (c.types.includes('administrative_area_level_1')) {
+    if (c.types.includes('administrative_area_level_1'))
       il = c.long_name.replace(/\s*(Province|İl|İli)$/i, '').trim();
-    }
-    if (c.types.includes('administrative_area_level_2')) {
+    if (c.types.includes('administrative_area_level_2'))
       ilce = c.long_name.replace(/\s*(District|İlçesi)$/i, '').trim();
-    }
   }
-
   return { il, ilce };
 }
 
@@ -260,7 +401,7 @@ export async function POST(request: NextRequest) {
       province,
       categories,
       limit_per_query = 5,
-      claude_filter = true, // varsayılan: Claude filtresi aktif
+      claude_filter = true,
     } = body as {
       province: string;
       categories: string[];
@@ -268,43 +409,39 @@ export async function POST(request: NextRequest) {
       claude_filter?: boolean;
     };
 
-    if (!province?.trim()) {
-      return NextResponse.json({ success: false, error: 'province zorunludur.' }, { status: 400 });
-    }
-    if (!Array.isArray(categories) || categories.length === 0) {
+    if (!province?.trim()) return NextResponse.json({ success: false, error: 'province zorunludur.' }, { status: 400 });
+    if (!Array.isArray(categories) || categories.length === 0)
       return NextResponse.json({ success: false, error: 'En az bir kategori seçilmeli.' }, { status: 400 });
-    }
 
     const gecersizKat = categories.filter(k => !GECERLI_KATEGORILER.includes(k));
-    if (gecersizKat.length > 0) {
+    if (gecersizKat.length > 0)
       return NextResponse.json({ success: false, error: `Geçersiz kategoriler: ${gecersizKat.join(', ')}` }, { status: 400 });
-    }
 
     const il = province.trim();
-    let eklenen = 0;
-    let atlanan = 0;
-    let filtrelenen = 0;
-    let hatali = 0;
+    const ilKoordinat = IL_KOORDINAT[il]; // undefined ise location bias uygulanmaz
+
+    let eklenen = 0, atlanan = 0, filtrelenen = 0, hatali = 0;
     const hatalar: string[] = [];
+
+    // Filtre sebebi sayaçları (debug için)
+    const filtreSayac: Record<string, number> = {
+      heuristic: 0,
+      il_eslesme: 0,
+      claude: 0,
+      min_reviews: 0,
+    };
 
     for (const kategori of categories) {
       const config = KATEGORI_CONFIG[kategori];
       if (!config) continue;
 
-      // Her arama terimi için Places API'yi çağır — term başına yalnızca 1 en iyi sonuç al
-      // (limit_per_query tüm sorgularda toplanarak uygulanır)
       const bulunanYerler: GooglePlace[] = [];
 
       for (const terim of config.terms) {
         const sorgu = `${terim} ${il}`;
-
         try {
-          const sonuclar = await textSearch(sorgu, config.type, apiKey);
-
-          // Heuristic filtre: yer adına göre eleme
-          const filtreliSonuclar = sonuclar.filter(s => kaliteFiltresi(s.name, kategori));
-
-          bulunanYerler.push(...filtreliSonuclar);
+          const sonuclar = await textSearch(sorgu, config.type, ilKoordinat, apiKey);
+          bulunanYerler.push(...sonuclar);
           await sleep(200);
         } catch (err) {
           const mesaj = err instanceof Error ? err.message : String(err);
@@ -312,63 +449,93 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // google_place_id'ye göre deduplikasyon
+      // google_place_id bazlı dedup
       const tekYerler = Array.from(
         new Map(bulunanYerler.map(y => [y.place_id, y])).values()
-      ).slice(0, limit_per_query * config.terms.length);
+      );
 
       if (tekYerler.length === 0) continue;
 
-      // Claude ön-eleme (opsiyonel)
-      let gececekler = tekYerler;
-      if (claude_filter && anthropicKey && tekYerler.length > 0) {
-        const elemeGirdisi = tekYerler.map(y => ({
+      // ── Katman 1: Heuristic filtre (yer adı + review count) ──
+      const katman1 = tekYerler.filter(y => {
+        const { gecti, sebep } = heuristicFiltre(
+          y.name,
+          y.formatted_address || '',
+          kategori,
+          y.user_ratings_total ?? 0,
+        );
+        if (!gecti) {
+          filtrelenen++;
+          if (sebep?.includes('yorum')) filtreSayac.min_reviews++;
+          else filtreSayac.heuristic++;
+        }
+        return gecti;
+      });
+
+      // ── Katman 2: İl doğrulama (Text Search sonuçlarında address_components yoksa atla) ──
+      // Bu aşamada address_components mevcut olmayabilir; Place Details'de doğrulama yapılır
+
+      if (katman1.length === 0) continue;
+
+      // ── Katman 3: Claude ön-eleme ──
+      let katman3 = katman1;
+      if (claude_filter && anthropicKey && katman1.length > 0) {
+        const girdi = katman1.map(y => ({
           ad: y.name,
           adres: y.formatted_address || '',
+          rating: y.rating,
+          reviewCount: y.user_ratings_total ?? 0,
         }));
 
         try {
-          const sonuclar = await claudeOnEleme(elemeGirdisi, kategori, anthropicKey);
-          const onceki = tekYerler.length;
-          gececekler = tekYerler.filter((_, i) => sonuclar[i]);
-          filtrelenen += onceki - gececekler.length;
+          const sonuclar = await claudeOnEleme(girdi, kategori, il, anthropicKey);
+          const onceki = katman1.length;
+          katman3 = katman1.filter((_, i) => sonuclar[i]);
+          const elenen = onceki - katman3.length;
+          filtrelenen += elenen;
+          filtreSayac.claude += elenen;
         } catch {
-          // Claude hatası → tümünü geç
+          // Claude hatası → tüm sonuçları geç
         }
       }
 
-      // Geçen yerleri Place Details ile zenginleştirip kaydet
-      for (const yer of gececekler.slice(0, limit_per_query)) {
+      // ── Place Details + Katman 4: il adres doğrulama ──
+      for (const yer of katman3.slice(0, limit_per_query)) {
         try {
           await sleep(120);
           const detay = await placeDetails(yer.place_id, apiKey);
           if (!detay) continue;
 
-          const { il: adresIl, ilce } = parseAdresComponents(detay.address_components || []);
+          // Katman 4: Dönen adresin ili istenen ile eşleşiyor mu?
+          if (!ilDogrula(detay.address_components || [], il)) {
+            filtrelenen++;
+            filtreSayac.il_eslesme++;
+            continue;
+          }
 
-          const kayit = {
-            google_place_id:     detay.place_id,
-            name:                detay.name,
-            category:            kategori,
-            latitude:            detay.geometry.location.lat,
-            longitude:           detay.geometry.location.lng,
-            location:            `SRID=4326;POINT(${detay.geometry.location.lng} ${detay.geometry.location.lat})`,
-            address:             detay.formatted_address || null,
-            city:                adresIl || il,
-            district:            ilce || null,
-            phone:               detay.formatted_phone_number || null,
-            google_maps_url:     detay.url || null,
-            google_rating:       detay.rating || null,
-            google_review_count: detay.user_ratings_total || 0,
-            status:              'pending',
-            verified:            false,
-            is_active:           true,
-            last_synced_at:      new Date().toISOString(),
-          };
+          const { il: adresIl, ilce } = parseAdresComponents(detay.address_components || []);
 
           const { error } = await supabase
             .from('pois')
-            .upsert(kayit, { onConflict: 'google_place_id', ignoreDuplicates: true });
+            .upsert({
+              google_place_id:     detay.place_id,
+              name:                detay.name,
+              category:            kategori,
+              latitude:            detay.geometry.location.lat,
+              longitude:           detay.geometry.location.lng,
+              location:            `SRID=4326;POINT(${detay.geometry.location.lng} ${detay.geometry.location.lat})`,
+              address:             detay.formatted_address || null,
+              city:                adresIl || il,
+              district:            ilce || null,
+              phone:               detay.formatted_phone_number || null,
+              google_maps_url:     detay.url || null,
+              google_rating:       detay.rating || null,
+              google_review_count: detay.user_ratings_total || 0,
+              status:              'pending',
+              verified:            false,
+              is_active:           true,
+              last_synced_at:      new Date().toISOString(),
+            }, { onConflict: 'google_place_id', ignoreDuplicates: true });
 
           if (error) {
             if (error.code === '23505') { atlanan++; }
@@ -386,7 +553,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       data: { eklenen, atlanan, filtrelenen, hatali },
-      message: `${eklenen} yeni kayıt eklendi, ${filtrelenen} Claude filtresiyle elendi, ${atlanan} zaten vardı.`,
+      filtreSayac,
+      message: `${eklenen} yeni kayıt eklendi. ${filtrelenen} elendi (heuristic: ${filtreSayac.heuristic}, il eşleşmesi: ${filtreSayac.il_eslesme}, yorum: ${filtreSayac.min_reviews}, claude: ${filtreSayac.claude}). ${atlanan} zaten vardı.`,
       ...(hatalar.length > 0 && { hatalar }),
     });
 
@@ -396,14 +564,12 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// GET — desteklenen kategoriler
+// GET — desteklenen kategoriler ve yapılandırma
 export async function GET() {
   return NextResponse.json({
     success: true,
     kategoriler: GECERLI_KATEGORILER,
-    config: Object.fromEntries(
-      Object.entries(KATEGORI_CONFIG).map(([k, v]) => [k, { terms: v.terms, type: v.type }])
-    ),
+    illerDestekleniyor: Object.keys(IL_KOORDINAT),
   });
 }
 
@@ -413,6 +579,8 @@ interface GooglePlace {
   place_id: string;
   name: string;
   formatted_address?: string;
+  rating?: number;
+  user_ratings_total?: number;
   geometry: { location: { lat: number; lng: number } };
 }
 
