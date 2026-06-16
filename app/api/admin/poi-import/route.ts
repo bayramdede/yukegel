@@ -97,35 +97,42 @@ const KATEGORI_CONFIG: Record<string, {
   terms: string[];
   type?: string;
   exclude?: string[];
-  min_reviews?: number;   // minimum yorum sayısı (yoksa bu eşiğin altı atlanır)
+  min_reviews?: number;
+  skip_claude?: boolean;  // true → Claude filtresi atlanır, heuristic + il doğrulama yeterli
 }> = {
   motorcu: {
     terms: ['tır motor ustası', 'kamyon motor tamiri'],
     type: 'car_repair',
     exclude: ['lastik', 'elektrik', 'kaporta', 'boya', 'yıkama'],
+    skip_claude: true,  // "Kamyon Motor Ustası" gibi adlar zaten açık
   },
   elektrikci: {
     terms: ['tır elektrikçi', 'kamyon elektrik tamiri'],
     type: 'car_repair',
     exclude: ['lastik', 'motor', 'kaporta', 'yıkama'],
+    skip_claude: true,  // "Mercedes Kamyon Elektrik", "LKW Elektrik" gibi
   },
   kaportaci: {
     terms: ['tır kaportacı', 'kamyon kaporta boya'],
     type: 'car_repair',
     exclude: ['lastik', 'motor', 'elektrik'],
+    skip_claude: true,
   },
   lastikci: {
     terms: ['tır lastikçi', 'kamyon lastik tamiri'],
     type: 'car_repair',
     exclude: ['motor', 'elektrik', 'kaporta', 'yıkama'],
+    skip_claude: true,
   },
   dorse_branda: {
     terms: ['dorse tamircisi', 'tır branda tenteci'],
     type: 'car_repair',
+    skip_claude: true,
   },
   frigo_ustasi: {
     terms: ['frigo tamir', 'thermo king servis'],
     type: 'car_repair',
+    skip_claude: true,
   },
   tir_parki: {
     terms: ['tır parkı', 'kamyon parkı'],
