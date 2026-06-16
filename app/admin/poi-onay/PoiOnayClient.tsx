@@ -829,7 +829,7 @@ function GoogleImportBolumu({ onTamamlandi }: { onTamamlandi: () => void }) {
 
   async function cek() {
     if (!il || seciliKats.length === 0) return;
-    setYukleniyor(true); setHata(''); setSonuc(null);
+    setYukleniyor(true); setHata(''); setSonuc(null); setElenenler([]); setElenenGoster(false);
     try {
       const res = await fetch('/api/admin/poi-import', {
         method: 'POST',
@@ -839,6 +839,7 @@ function GoogleImportBolumu({ onTamamlandi }: { onTamamlandi: () => void }) {
       const d = await res.json();
       if (d.success) {
         setSonuc(d.data);
+        setElenenler(d.elenenler || []);
         onTamamlandi();
       } else {
         setHata(d.error || 'Veri çekme başarısız.');
