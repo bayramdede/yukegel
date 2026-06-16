@@ -194,12 +194,9 @@ function heuristicFiltre(
     return { gecti: false, sebep: `yorum sayısı yetersiz (${reviewCount} < ${minReviews})` };
   }
 
-  // Tır parkı özel: kamyon/tır kelimesi veya "garaj" içermeli
+  // Tır parkı özel: çok kısa isimler atla
   if (kategori === 'tir_parki' || kategori === 'park_dinlenme') {
-    if (ad.trim().length <= 5) return { gecti: false, sebep: 'çok kısa isim' };
-    const tirKelime = ['tır', 'tir', 'kamyon', 'garaj', 'truck', 'ağır vasıta'];
-    const gecerli = tirKelime.some(k => adKucuk.includes(k) || adresKucuk.includes(k));
-    if (!gecerli) return { gecti: false, sebep: 'tır/kamyon kelimesi yok' };
+    if (ad.trim().length <= 3) return { gecti: false, sebep: 'çok kısa isim' };
   }
 
   // Kantar özel: baskül satıcısı değil, tartı noktası olmalı
