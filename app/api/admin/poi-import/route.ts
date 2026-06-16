@@ -490,7 +490,7 @@ export async function POST(request: NextRequest) {
 
       // ── Katman 3: Claude ön-eleme ──
       let katman3 = katman1;
-      if (claude_filter && anthropicKey && katman1.length > 0) {
+      if (claude_filter && anthropicKey && katman1.length > 0 && !config.skip_claude) {
         const girdi = katman1.map(y => ({
           ad: y.name,
           adres: y.formatted_address || '',
