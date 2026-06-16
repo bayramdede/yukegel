@@ -52,9 +52,16 @@ const KATEGORI_LIST = [
   // Eski kategoriler — sadece mevcut kayıtlarda görüntüleme için (seçim listesinde gösterilmez)
 ];
 
-const KATEGORI: Record<string, string> = Object.fromEntries(
-  KATEGORI_LIST.map(k => [k.value, k.label])
-);
+const KATEGORI: Record<string, string> = {
+  ...Object.fromEntries(KATEGORI_LIST.map(k => [k.value, k.label])),
+  // Eski kategoriler — kart görüntüsü için
+  park_dinlenme:   '🅿️ Tır Parkı',
+  yemek:           '🍲 Kamyoncu Lokantası',
+  konaklama:       '🛏️ Konaklama',
+  tamirci:         '🛠️ Tamirci',
+  tesis_akaryakit: '⛽ Tesis / Akaryakıt',
+  kantar_resmi:    '⚖️ Kantar',
+};
 
 const ETIKET_ONERILERI = [
   '7/24 Açık', 'Tır Park Yeri Var', 'Güvenlik Kameralı', 'Duş İmkanı',
