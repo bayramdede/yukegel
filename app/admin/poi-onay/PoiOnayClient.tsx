@@ -38,7 +38,6 @@ const lbl: React.CSSProperties = {
 };
 
 const KATEGORI_LIST = [
-  // Yeni TIR/Kamyon kategorileri
   { value: 'motorcu',       label: '🔧 Motorcu' },
   { value: 'elektrikci',    label: '⚡ Elektrikçi' },
   { value: 'kaportaci',     label: '🔨 Kaportacı' },
@@ -50,12 +49,7 @@ const KATEGORI_LIST = [
   { value: 'konaklama',     label: '🛏️ Konaklama' },
   { value: 'kantar',        label: '⚖️ Kantar' },
   { value: 'yikama',        label: '🚿 Yıkama / Yağlama' },
-  // Eski kategoriler (geriye uyumluluk)
-  { value: 'park_dinlenme',   label: '🅿️ Park & Dinlenme (eski)' },
-  { value: 'yemek',           label: '🍲 Yemek (eski)' },
-  { value: 'tamirci',         label: '🛠️ Tamirci & Usta (eski)' },
-  { value: 'tesis_akaryakit', label: '⛽ Tesis & Akaryakıt (eski)' },
-  { value: 'kantar_resmi',    label: '⚖️ Kantar & Resmi (eski)' },
+  // Eski kategoriler — sadece mevcut kayıtlarda görüntüleme için (seçim listesinde gösterilmez)
 ];
 
 const KATEGORI: Record<string, string> = Object.fromEntries(
