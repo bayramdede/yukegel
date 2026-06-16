@@ -263,13 +263,13 @@ async function claudeOnEleme(
     )
     .join('\n');
 
-  const prompt = `Aşağıdaki Google Maps yerleri "${il}" ilinde "${aciklama}" kategorisi için arandı.
+  const prompt = `Aşağıdaki Google Maps yerleri "${il}" ilinde şu amaçla arandı: "${aciklama}"
 
 ${liste}
 
-Her biri gerçekten bu kategoriye uygun bir yer midir? Yalnızca kesinlikle yanlış kategoride olanları ele. Emin olamadığında UYGUN kabul et.
-Sadece UYGUN olanların numaralarını virgülle yaz. Örnek: "1,3,5"
-Hiçbiri uygun değilse sadece "-" yaz.`;
+Bu yerlerden KESİNLİKLE alakasız olanları ele. Şüphe durumunda UYGUN say — admin zaten onay aşamasında görecek.
+Uygun olan yerlerin numaralarını virgülle yaz. Örnek: "1,2,3,4"
+Tamamı uygunsuzsa "-" yaz.`;
 
   try {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
