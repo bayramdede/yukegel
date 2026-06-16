@@ -290,14 +290,19 @@ Tamamı uygunsuzsa "-" yaz.`;
 
     const data = await res.json();
     const yanit = (data.content?.[0]?.text ?? '').trim();
-    if (!yanit || yanit === '-') return yanit === '-' ? yerler.map(() => false) : yerler.map(() => true);
+    // Boş veya sadece tire → hepsi geç (Claude yanıt veremedi)
+    if (!yanit) return yerler.map(() => true);
+    // Açıkça "hiçbiri yok" sinyali
+    if (yanit === '-') return yerler.map(() => false);
 
     const uygunlar = new Set(
       yanit
-        .split(',')
-        .map((s: string) => parseInt(s.trim(), 10))
-        .filter((n: number) => !isNaN(n))
+        .split(/[,\s]+/)
+        .map((s: string) => parseInt(s.replace(/\D/g, ''), 10))
+        .filter((n: number) => !isNaN(n) && n >= 1 && n <= yerler.length)
     );
+    // Hiç sayı parse edilemeyen prose yanıt → tümünü geçir (filtre edemedi)
+    if (uygunlar.size === 0) return yerler.map(() => true);
     return yerler.map((_, i) => uygunlar.has(i + 1));
   } catch {
     return yerler.map(() => true); // hata varsa hepsini geç
