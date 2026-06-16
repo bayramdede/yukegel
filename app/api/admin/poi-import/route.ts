@@ -290,7 +290,7 @@ Hiçbiri uygun değilse sadece "-" yaz.`;
 
     const data = await res.json();
     const yanit = (data.content?.[0]?.text ?? '').trim();
-    if (!yanit) return yerler.map(() => false);
+    if (!yanit || yanit === '-') return yanit === '-' ? yerler.map(() => false) : yerler.map(() => true);
 
     const uygunlar = new Set(
       yanit
