@@ -2,9 +2,11 @@
 import { useState, useEffect, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import {
-  POI_KATEGORILER,
+  POI_HIYERARSI,
+  POI_ALT_KATEGORILER,
   POI_KATEGORI_ETIKET,
   POI_KAT_NORM,
+  POI_ALT_ETIKETLER,
   POI_GENEL_ETIKETLER,
 } from '../../../lib/poi-constants';
 
