@@ -1314,7 +1314,13 @@ export default function PoiOnayClient() {
           <label style={lbl}>Kategori</label>
           <select style={{ ...inp, cursor: 'pointer' }} value={katFilter} onChange={e => setKatFilter(e.target.value)}>
             <option value="">Tümü</option>
-            {KATEGORI_LIST.map(k => <option key={k.value} value={k.value}>{k.label}</option>)}
+            {POI_HIYERARSI.map(ana => (
+              <optgroup key={ana.value} label={`${ana.icon} ${ana.label}`}>
+                {ana.altlar.map(alt => (
+                  <option key={alt.value} value={alt.value}>{alt.icon} {alt.label}</option>
+                ))}
+              </optgroup>
+            ))}
           </select>
         </div>
         <div style={{ flex: '1 1 140px', minWidth: 120 }}>
