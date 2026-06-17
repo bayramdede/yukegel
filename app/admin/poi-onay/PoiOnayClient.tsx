@@ -268,7 +268,9 @@ function FormGrid({ form, set, showButtons, onKaydet, onIptal, kayitYukleniyor, 
     set('tags', tags.includes(t) ? tags.filter(x => x !== t) : [...tags, t]);
   }
 
-  const isValid = String(form.name ?? '').trim() && form.category &&
+  const formCats = Array.isArray(form.categories) ? form.categories as string[]
+    : (form.category ? [String(form.category)] : []);
+  const isValid = String(form.name ?? '').trim() && formCats.length > 0 &&
     !isNaN(parseFloat(String(form.latitude))) && !isNaN(parseFloat(String(form.longitude)));
 
   return (
