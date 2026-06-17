@@ -254,6 +254,12 @@ function FormGrid({ form, set, showButtons, onKaydet, onIptal, kayitYukleniyor, 
     onCoordinatesSet,
   );
 
+  // Mevcut kategori değerinden ana kategoriyi bul (düzenleme modu için)
+  const mevcutAnaKat = POI_HIYERARSI.find(a =>
+    a.altlar.some(alt => alt.value === String(form.category))
+  )?.value ?? '';
+  const [aktifAnaKat, setAktifAnaKat] = useState(mevcutAnaKat);
+
   function toggleTag(t: string) {
     set('tags', tags.includes(t) ? tags.filter(x => x !== t) : [...tags, t]);
   }
