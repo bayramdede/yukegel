@@ -61,7 +61,12 @@ export default function YolRehberiClient() {
   const [pois, setPois] = useState<PoiItem[]>([]);
   const [poiTotal, setPoiTotal] = useState<number | null>(null);
   const [yukleniyor, setYukleniyor] = useState(false);
-  const [aktifKategori, setAktifKategori] = useState('hepsi');
+  // Ana kategori seçimi ('hepsi' | ana kategori value)
+  const [aktifAnaKat, setAktifAnaKat] = useState('hepsi');
+  // Seçili alt kategoriler (çoklu veya tekli — ana kategorinin cokluSecim'ine göre)
+  const [aktifAltKatlar, setAktifAltKatlar] = useState<string[]>([]);
+  // Backward-compat: tek kategori filtresi için
+  const aktifKategori = aktifAltKatlar.length === 1 ? aktifAltKatlar[0] : aktifAltKatlar.length === 0 ? aktifAnaKat : 'hepsi';
   const [aktifEtiketler, setAktifEtiketler] = useState<string[]>([]);
   const [sosAktif, setSosAktif] = useState(false);
   const [secilenPoi, setSecilenPoi] = useState<string | null>(null);
