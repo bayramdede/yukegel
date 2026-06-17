@@ -58,24 +58,30 @@ export async function GET(request: NextRequest) {
       .lte('latitude', maxLat)
       .gte('longitude', minLng)
       .lte('longitude', maxLng);
-    if (category) countQuery = countQuery.eq('category', category);
+    if (categories?.length === 1) countQuery = countQuery.eq('category', categories[0]);
+    else if (categories && categories.length > 1) countQuery = countQuery.in('category', categories);
     if (emergency) countQuery = countQuery.eq('is_emergency', true);
 
-    const [{ data, error }, { count }] = await Promise.all([
+    const [{ data: rpcData, error }, { count }] = await Promise.all([
       supabase.rpc('get_pois_in_bbox', {
-        p_min_lng:       minLng,
-        p_min_lat:       minLat,
-        p_max_lng:       maxLng,
-        p_max_lat:       maxLat,
-        p_category:      category,
-        p_tags:          tags,
+        p_min_lng:        minLng,
+        p_min_lat:        minLat,
+        p_max_lng:        maxLng,
+        p_max_lat:        maxLat,
+        p_category:       categoryForRpc,
+        p_tags:           tags,
         p_emergency_only: emergency,
-        p_user_lat:      userLat,
-        p_user_lng:      userLng,
-        p_limit:         limit,
+        p_user_lat:       userLat,
+        p_user_lng:       userLng,
+        p_limit:          categories && categories.length > 1 ? limit * 3 : limit,
       }),
       countQuery,
     ]);
+
+    // Çoklu kategori seçiminde RPC'nin döndürdüğü sonuçları post-filter et
+    const data = (categories && categories.length > 1)
+      ? (rpcData || []).filter((p: { category: string }) => categories.includes(p.category)).slice(0, limit)
+      : rpcData;
 
     if (error) {
       console.error('[poi/GET] RPC error:', error);
