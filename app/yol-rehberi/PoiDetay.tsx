@@ -207,8 +207,24 @@ export default function PoiDetay({ poiId, userLat, userLng, onKapat }: Props) {
     }
   };
 
+  // Birincil kategori için görüntüleme bilgileri
   const kat = KATEGORILER.find(k => k.key === poi?.category);
-  const hizliEtiketler = poi ? HIZLI_ETIKETLER[poi.category] : null;
+  // Tüm seçili kategorilerin hızlı etiketlerini birleştir
+  const hizliEtiketler = poi ? (() => {
+    const cats = poi.categories?.length ? poi.categories : [poi.category];
+    const tum = cats.reduce<{ pozitif: string[]; negatif: string[] }>(
+      (acc, c) => {
+        const h = HIZLI_ETIKETLER[c];
+        if (h) {
+          acc.pozitif = [...new Set([...acc.pozitif, ...h.pozitif])];
+          acc.negatif = [...new Set([...acc.negatif, ...h.negatif])];
+        }
+        return acc;
+      },
+      { pozitif: [], negatif: [] }
+    );
+    return tum.pozitif.length > 0 || tum.negatif.length > 0 ? tum : null;
+  })() : null;
 
   return (
     // Overlay
