@@ -43,37 +43,10 @@ const lbl: React.CSSProperties = {
   display: 'block', marginBottom: 4,
 };
 
-const KATEGORI_LIST = [
-  { value: 'motorcu',       label: '🔧 Motorcu' },
-  { value: 'elektrikci',    label: '⚡ Elektrikçi' },
-  { value: 'kaportaci',     label: '🔨 Kaportacı' },
-  { value: 'lastikci',      label: '🔄 Lastikçi' },
-  { value: 'dorse_branda',  label: '🚛 Dorse / Branda' },
-  { value: 'frigo_ustasi',  label: '❄️ Frigo Ustası' },
-  { value: 'tir_parki',     label: '🅿️ Tır Parkı' },
-  { value: 'lokanta',       label: '🍲 Kamyoncu Lokantası' },
-  { value: 'konaklama',     label: '🛏️ Konaklama' },
-  { value: 'kantar',        label: '⚖️ Kantar' },
-  { value: 'yikama',        label: '🚿 Yıkama / Yağlama' },
-  // Eski kategoriler — sadece mevcut kayıtlarda görüntüleme için (seçim listesinde gösterilmez)
-];
-
-const KATEGORI: Record<string, string> = {
-  ...Object.fromEntries(KATEGORI_LIST.map(k => [k.value, k.label])),
-  // Eski kategoriler — kart görüntüsü için
-  park_dinlenme:   '🅿️ Tır Parkı',
-  yemek:           '🍲 Kamyoncu Lokantası',
-  konaklama:       '🛏️ Konaklama',
-  tamirci:         '🛠️ Tamirci',
-  tesis_akaryakit: '⛽ Tesis / Akaryakıt',
-  kantar_resmi:    '⚖️ Kantar',
-};
-
-const ETIKET_ONERILERI = [
-  '7/24 Açık', 'Tır Park Yeri Var', 'Güvenlik Kameralı', 'Duş İmkanı',
-  'WC', 'Kamyoncu Dostu', 'Sulu Yemek', 'Nöbetçi', 'Çekici',
-  'Uygun Fiyat', 'Dorseyi Ayırmaya Gerek Yok',
-];
+// poi-constants.ts'den import ediliyor — buraya ekleme yapma
+const KATEGORI_LIST = POI_KATEGORILER.map(k => ({ value: k.value, label: `${k.icon} ${k.label}` }));
+const KATEGORI: Record<string, string> = POI_KATEGORI_ETIKET;
+const ETIKET_ONERILERI = POI_GENEL_ETIKETLER;
 
 const SORT_OPTIONS = [
   { value: 'created_at',  label: 'Tarih' },
