@@ -79,6 +79,42 @@ WHERE category NOT IN (
 )
 LIMIT 20;
 
+-- 3b. Yeni constraint ekle (yeni + eski backward-compat değerler)
+ALTER TABLE pois ADD CONSTRAINT pois_category_check
+  CHECK (category IN (
+    -- Yeni (17 Haz 2026)
+    'akaryakit_istasyonu',
+    'elektrik_sarj',
+    'tir_parki',
+    'otel_pansiyon',
+    'motor_mekanik',
+    'lastikci',
+    'elektrik_takograf',
+    'branda_dorse',
+    'yikama_yaglama',
+    'acil_yol_yardim',
+    'dinlenme_tesisi',
+    'esnaf_lokantasi',
+    'kantar',
+    'nakliyeciler_sitesi',
+    'gumruk_sinir',
+    'antrepo_depo',
+    -- Eski (backward compat — DB'de kalan kayıtlar varsa)
+    'motorcu',
+    'elektrikci',
+    'kaportaci',
+    'dorse_branda',
+    'frigo_ustasi',
+    'lokanta',
+    'konaklama',
+    'yikama',
+    'park_dinlenme',
+    'yemek',
+    'tamirci',
+    'tesis_akaryakit',
+    'kantar_resmi'
+  ));
+
 COMMIT;
 
 -- ─────────────────────────────────────────────────────────────
