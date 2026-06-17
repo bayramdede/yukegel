@@ -287,17 +287,32 @@ async function claudeOnEleme(
   anthropicKey: string,
 ): Promise<boolean[]> {
   const kategoriAciklama: Record<string, string> = {
-    tir_parki:     'TIR, kamyon veya ağır araç park edebilecek alan (otopark, garaj, akaryakıt istasyonu yanındaki alan dahil). Yalnızca çocuk parkı, millet bahçesi, botanik bahçe gibi kesinlikle araç park yeri olmayan yerler elenir.',
-    yikama:        'Araç yıkama veya yağlama yeri (araba yıkama dahil — TIR da girebiliyorsa uygun). Yalnızca açıkça restoran veya yemek yeri olanlar elenir.',
-    kantar:        'Ağırlık ölçüm noktası veya tartı istasyonu. Yalnızca baskül/tartı aleti satan ya da üreten firmalar elenir.',
-    konaklama:     'Motel, pansiyon, han veya otel (kamyoncuların geceleme yapabileceği her türlü yer). Çok açık lüks resort veya tatil köyleri elenir.',
-    lokanta:       'Yemek yenebilecek her türlü yer: lokanta, restoran, kafe, fast food — kamyon şoförleri girebiliyorsa uygun. Yalnızca bar, gece kulübü veya içki yeri olanlar elenir.',
+    // Yeni
+    akaryakit_istasyonu: 'Akaryakıt (mazot/dizel) satan tesis veya istasyon. TIR ve kamyonların girebileceği yerler dahil.',
+    elektrik_sarj:       'Elektrikli araç şarj istasyonu veya noktası.',
+    tir_parki:           'TIR, kamyon veya ağır araç park edebilecek alan. Yalnızca çocuk parkı, millet bahçesi, botanik bahçe gibi kesinlikle araç park yeri olmayan yerler elenir.',
+    otel_pansiyon:       'Motel, pansiyon, han veya otel (kamyoncuların geceleme yapabileceği her türlü yer). Açık lüks resort veya tatil köyleri elenir.',
+    motor_mekanik:       'Araç motor tamiri, bakımı veya mekanik usta (TIR/kamyon da gelen tamirhaneler dahil).',
+    lastikci:            'Lastik satış, tamiri veya değiştirme (TIR lastiği de yapılan yerler dahil).',
+    elektrik_takograf:   'Araç elektrik veya takograf tamiri (TIR/kamyon da kabul eden yerler dahil).',
+    branda_dorse:        'Dorse tamiri, branda veya tente yapımı/tamiri.',
+    yikama_yaglama:      'Araç yıkama veya yağlama yeri (araba yıkama dahil — TIR da girebiliyorsa uygun).',
+    acil_yol_yardim:     'Yol yardım, çekici hizmeti veya acil araç kurtarma.',
+    dinlenme_tesisi:     'Kamyoncu dinlenme tesisi: kafe, yemek, WC, duş imkânı olan yol tesisleri.',
+    esnaf_lokantasi:     'Yemek yenebilecek her türlü yer: lokanta, restoran, esnaf lokantası — kamyon şoförleri girebiliyorsa uygun.',
+    kantar:              'Ağırlık ölçüm noktası veya tartı istasyonu. Yalnızca baskül/tartı aleti satan ya da üreten firmalar elenir.',
+    nakliyeciler_sitesi: 'Nakliyeciler sitesi, kamyon garajı veya lojistik merkez.',
+    gumruk_sinir:        'Gümrük kapısı veya sınır geçiş noktası.',
+    antrepo_depo:        'Antrepo, lojistik depo veya soğuk depo.',
+    // Eski
     motorcu:       'Araç motor tamiri, bakımı veya ustası (TIR/kamyon da gelen tamirhaneler dahil).',
     elektrikci:    'Araç elektrik tamiri (TIR/kamyon da kabul eden yerler dahil).',
     kaportaci:     'Araç kaporta, boya veya karoser tamiri.',
-    lastikci:      'Lastik satış, tamiri veya değiştirme (TIR lastiği de yapılan yerler dahil).',
     dorse_branda:  'Dorse tamiri, branda veya tente yapımı/tamiri.',
     frigo_ustasi:  'Soğutuculu araç (frigorifik, thermo king) tamiri veya bakımı.',
+    lokanta:       'Yemek yenebilecek her türlü yer — kamyon şoförleri girebiliyorsa uygun.',
+    konaklama:     'Motel, pansiyon, han veya otel (kamyoncuların geceleme yapabileceği yer).',
+    yikama:        'Araç yıkama veya yağlama yeri.',
   };
 
   const aciklama = kategoriAciklama[kategori] || kategori;
