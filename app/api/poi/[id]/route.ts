@@ -97,7 +97,7 @@ export async function PATCH(
 
     const body = await request.json();
     const {
-      status, name, category, city, district, address, address_note,
+      status, name, category, categories: categoriesInput, city, district, address, address_note,
       description, phone, website, tags, latitude, longitude, is_emergency,
       // Google Places alanları
       satellite_confirmed, is_active, reviews_summary,
