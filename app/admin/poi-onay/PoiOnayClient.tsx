@@ -898,34 +898,63 @@ function GoogleImportBolumu({ onTamamlandi }: { onTamamlandi: () => void }) {
             </select>
           </div>
 
-          {/* Kategori seçici */}
+          {/* Kategori seçici — 2 kademeli */}
           <div style={{ marginBottom: 12 }}>
             <label style={lbl}>
               Kategoriler ({seciliKats.length} seçili)
               {seciliKats.length === 0 && <span style={{ color: C.red, marginLeft: 4 }}>— en az 1 seçin</span>}
             </label>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-              {YENİ_KATEGORILER.map(k => {
-                const aktif = seciliKats.includes(k.value);
-                return (
+            {POI_HIYERARSI.map(ana => {
+              const altValues = ana.altlar.map(a => a.value);
+              const hepsiSecili = altValues.every(v => seciliKats.includes(v));
+              const bazisecili = altValues.some(v => seciliKats.includes(v));
+              return (
+                <div key={ana.value} style={{ marginBottom: 8 }}>
+                  {/* Ana kategori başlığı */}
                   <button
-                    key={k.value} type="button" onClick={() => toggleKat(k.value)}
+                    type="button"
+                    onClick={() => toggleAnaKat(ana.value)}
                     style={{
-                      padding: '5px 11px', borderRadius: 8, fontSize: '0.78rem', cursor: 'pointer',
-                      border: `1px solid ${aktif ? C.blue : C.border}`,
-                      background: aktif ? C.blueBg : 'transparent',
-                      color: aktif ? C.blue : C.muted, fontWeight: aktif ? 700 : 400,
+                      display: 'flex', alignItems: 'center', gap: 5,
+                      padding: '4px 10px', borderRadius: 6, fontSize: '0.76rem', cursor: 'pointer',
+                      border: `1px solid ${hepsiSecili ? ana.pinColor : bazisecili ? ana.pinColor + '88' : C.border}`,
+                      background: hepsiSecili ? ana.pinColor + '22' : bazisecili ? ana.pinColor + '11' : 'transparent',
+                      color: hepsiSecili || bazisecili ? ana.pinColor : C.muted,
+                      fontWeight: 700, marginBottom: 4,
                     }}
                   >
-                    {k.label}
+                    <span>{ana.icon}</span>
+                    <span>{ana.label}</span>
+                    {hepsiSecili && <span style={{ fontSize: '0.68rem' }}>✓ Tümü</span>}
+                    {bazisecili && !hepsiSecili && <span style={{ fontSize: '0.68rem' }}>({altValues.filter(v => seciliKats.includes(v)).length}/{altValues.length})</span>}
                   </button>
-                );
-              })}
-            </div>
+                  {/* Alt kategoriler */}
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, paddingLeft: 10 }}>
+                    {ana.altlar.map(alt => {
+                      const aktif = seciliKats.includes(alt.value);
+                      return (
+                        <button
+                          key={alt.value} type="button" onClick={() => toggleKat(alt.value)}
+                          style={{
+                            padding: '4px 9px', borderRadius: 7, fontSize: '0.74rem', cursor: 'pointer',
+                            border: `1px solid ${aktif ? C.blue : C.border}`,
+                            background: aktif ? C.blueBg : 'transparent',
+                            color: aktif ? C.blue : C.muted, fontWeight: aktif ? 700 : 400,
+                            display: 'flex', alignItems: 'center', gap: 3,
+                          }}
+                        >
+                          <span>{alt.icon}</span><span>{alt.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
             <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
               <button
                 type="button"
-                onClick={() => setSeciliKats(YENİ_KATEGORILER.map(k => k.value))}
+                onClick={() => setSeciliKats(POI_ALT_KATEGORILER.map(k => k.value))}
                 style={{ background: 'none', color: C.muted, border: `1px solid ${C.border}`, borderRadius: 4, padding: '3px 10px', fontSize: '0.74rem', cursor: 'pointer' }}
               >
                 Tümünü Seç
