@@ -155,25 +155,63 @@ export default function PoiEkleModal({ onKapat, onBasarili }: Props) {
             style={inputStyle}
           />
 
-          {/* Kategori */}
+          {/* Kategori — 2 kademeli */}
           <label style={labelStyle}>Kategori *</label>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
-            {KATEGORILER.map(k => (
-              <button
-                key={k.key}
-                onClick={() => setForm({ ...form, category: k.key })}
-                style={{
-                  padding: '8px 12px', borderRadius: 8, fontSize: 13,
-                  border: `1px solid ${form.category === k.key ? '#22c55e' : '#30363d'}`,
-                  background: form.category === k.key ? '#14532d' : 'transparent',
-                  color: form.category === k.key ? '#22c55e' : '#8b949e',
-                  cursor: 'pointer',
-                }}
-              >
-                {k.label}
-              </button>
-            ))}
+
+          {/* 1. Adım: Ana kategori */}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7, marginBottom: 10 }}>
+            {POI_HIYERARSI.map(ana => {
+              const secili = aktifAnaKat === ana.value;
+              return (
+                <button
+                  key={ana.value}
+                  type="button"
+                  onClick={() => { setAktifAnaKat(ana.value); setForm({ ...form, category: '' }); }}
+                  style={{
+                    padding: '7px 12px', borderRadius: 8, fontSize: 13,
+                    border: `1px solid ${secili ? ana.pinColor : '#30363d'}`,
+                    background: secili ? ana.pinColor + '22' : 'transparent',
+                    color: secili ? ana.pinColor : '#8b949e',
+                    cursor: 'pointer', fontWeight: secili ? 600 : 400,
+                    display: 'flex', alignItems: 'center', gap: 5,
+                  }}
+                >
+                  <span>{ana.icon}</span><span>{ana.label}</span>
+                </button>
+              );
+            })}
           </div>
+
+          {/* 2. Adım: Alt kategori */}
+          {aktifAnaKat && (
+            <>
+              <div style={{ fontSize: 11, color: '#4b5563', marginBottom: 6, paddingLeft: 2 }}>
+                Alt kategori seçin:
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 16 }}>
+                {POI_HIYERARSI.find(a => a.value === aktifAnaKat)?.altlar.map(alt => {
+                  const secili = form.category === alt.value;
+                  return (
+                    <button
+                      key={alt.value}
+                      type="button"
+                      onClick={() => setForm({ ...form, category: alt.value })}
+                      style={{
+                        padding: '6px 11px', borderRadius: 8, fontSize: 12,
+                        border: `1px solid ${secili ? '#22c55e' : '#30363d'}`,
+                        background: secili ? '#14532d' : 'transparent',
+                        color: secili ? '#22c55e' : '#8b949e',
+                        cursor: 'pointer', fontWeight: secili ? 600 : 400,
+                        display: 'flex', alignItems: 'center', gap: 4,
+                      }}
+                    >
+                      <span>{alt.icon}</span><span>{alt.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
 
           {/* Koordinat — GPS butonu */}
           <label style={labelStyle}>Konum *</label>
