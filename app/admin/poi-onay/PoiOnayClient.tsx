@@ -264,6 +264,14 @@ function FormGrid({ form, set, showButtons, onKaydet, onIptal, kayitYukleniyor, 
   )?.value ?? '';
   const [aktifAnaKat, setAktifAnaKat] = useState(mevcutAnaKat);
 
+  // Enrich (LLM/Google Maps) form.categories'i güncellediğinde ana kategoriyi otomatik seç
+  useEffect(() => {
+    if (mevcutAnaKat && aktifAnaKat !== mevcutAnaKat) {
+      setAktifAnaKat(mevcutAnaKat);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mevcutAnaKat]);
+
   function toggleTag(t: string) {
     set('tags', tags.includes(t) ? tags.filter(x => x !== t) : [...tags, t]);
   }
