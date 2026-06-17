@@ -340,10 +340,12 @@ function FormGrid({ form, set, showButtons, onKaydet, onIptal, kayitYukleniyor, 
             })}
           </div>
         )}
-        {/* Seçili kategori gösterimi */}
-        {form.category && (
-          <div style={{ marginTop: 6, fontSize: '0.72rem', color: C.green }}>
-            ✓ {KATEGORI[String(form.category)] ?? String(form.category)}
+        {/* Seçili kategoriler gösterimi */}
+        {formCats.length > 0 && (
+          <div style={{ marginTop: 6, fontSize: '0.72rem', color: C.green, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {formCats.map(c => (
+              <span key={c}>✓ {KATEGORI[c] ?? c}</span>
+            ))}
           </div>
         )}
       </div>
