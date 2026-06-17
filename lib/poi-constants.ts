@@ -243,7 +243,6 @@ export const POI_KAT_NORM: Record<string, string> = {
 
   // Eski değerler → yeni karşılıkları
   motorcu:                    'motor_mekanik',
-  'motorcu':                  'motor_mekanik',
   elektrikci:                 'elektrik_takograf',
   elektrikçi:                 'elektrik_takograf',
   kaportaci:                  'motor_mekanik',
