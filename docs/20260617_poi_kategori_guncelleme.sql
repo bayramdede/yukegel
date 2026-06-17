@@ -16,6 +16,9 @@
 
 BEGIN;
 
+-- 0. CHECK constraint'i önce kaldır — yeni değerler eski listede yok
+ALTER TABLE pois DROP CONSTRAINT IF EXISTS pois_category_check;
+
 -- 1. Eski kategorileri yeni karşılıklarına güncelle
 UPDATE pois SET category = 'motor_mekanik'
   WHERE category IN ('motorcu', 'kaportaci', 'frigo_ustasi', 'tamirci');
