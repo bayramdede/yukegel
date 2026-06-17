@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSupabase, getServiceSupabase } from '../../../lib/auth';
+import { POI_GECERLI_KATEGORILER } from '../../../lib/poi-constants';
 
 export const runtime = 'nodejs';
 
@@ -68,7 +69,13 @@ export async function GET(request: NextRequest) {
 // ─────────────────────────────────────────────
 // POST /api/poi
 // Yeni POI ekle (giriş zorunlu, pending olarak eklenir)
-// Body: { name, description, category, latitude, longitude, address, city, phone, website, tags, badges, is_emergency }
+// Body: { name, description, category, latitude, longitude, address, city, phone, website,
+//         tags, badges, is_emergency, google_place_id? }
+//
+// Duplicate engeli:
+//   1. google_place_id varsa UNIQUE constraint (DB seviyesi)
+//   2. Yoksa: ~100m yarıçapında aynı isim (case-insensitive) → 409
+//   3. ~50m yarıçapında herhangi bir POI (pending dahil) → 409
 // ─────────────────────────────────────────────
 export async function POST(request: NextRequest) {
   try {
@@ -85,6 +92,7 @@ export async function POST(request: NextRequest) {
       address, city, district, address_note, phone, website,
       tags = [], badges = {},
       is_emergency = false,
+      google_place_id,
     } = body;
 
     // Temel validasyon
@@ -95,16 +103,61 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const validCategories = [
-      'motorcu', 'elektrikci', 'kaportaci', 'lastikci', 'dorse_branda', 'frigo_ustasi',
-      'tir_parki', 'lokanta', 'konaklama', 'kantar', 'yikama',
-      'park_dinlenme', 'yemek', 'tamirci', 'tesis_akaryakit', 'kantar_resmi',
-    ];
-    if (!validCategories.includes(category)) {
+    if (!POI_GECERLI_KATEGORILER.includes(category)) {
       return NextResponse.json({ success: false, error: 'Geçersiz kategori.' }, { status: 400 });
     }
 
     const supabase = getServiceSupabase();
+
+    // ── Duplicate check ────────────────────────────────────────────────
+    // ~0.001° ≈ 100m bounding box — proximity sorgusu
+    const DELTA_100M = 0.001; // ~100m
+    const DELTA_50M  = 0.0005; // ~50m
+
+    const { data: yakın } = await supabase
+      .from('pois')
+      .select('id, name, category, status, google_place_id')
+      .neq('status', 'rejected')
+      .gte('latitude', latitude - DELTA_100M)
+      .lte('latitude', latitude + DELTA_100M)
+      .gte('longitude', longitude - DELTA_100M)
+      .lte('longitude', longitude + DELTA_100M)
+      .limit(10);
+
+    if (yakın && yakın.length > 0) {
+      const nameLower = name.trim().toLowerCase();
+
+      // 1. Aynı isim → 100m içinde kesin tekrar
+      const aynıIsim = yakın.find(
+        p => p.name.trim().toLowerCase() === nameLower
+      );
+      if (aynıIsim) {
+        return NextResponse.json({
+          success: false,
+          duplicate: true,
+          error: `"${aynıIsim.name}" adıyla bu konuma yakın bir yer zaten mevcut (${aynıIsim.status === 'pending' ? 'onay bekliyor' : 'yayında'}).`,
+          existing_id: aynıIsim.id,
+        }, { status: 409 });
+      }
+
+      // 2. 50m içinde herhangi bir POI → muhtemelen aynı yer
+      const cokYakın = yakın.find(p => {
+        const dlat = Math.abs(p.latitude ?? latitude - latitude);
+        const dlng = Math.abs(p.longitude ?? longitude - longitude);
+        // p.latitude/longitude'un select'te gelmesi gerekiyor
+        return dlat < DELTA_50M && dlng < DELTA_50M;
+      });
+
+      if (cokYakın) {
+        return NextResponse.json({
+          success: false,
+          duplicate: true,
+          error: `50 metre içinde "${cokYakın.name}" adlı bir yer zaten kayıtlı. Aynı yeri tekrar eklemek ister misiniz?`,
+          existing_id: cokYakın.id,
+        }, { status: 409 });
+      }
+    }
+    // ─────────────────────────────────────────────────────────────────
 
     // PostGIS geography point formatı
     const locationWkt = `SRID=4326;POINT(${longitude} ${latitude})`;
@@ -129,11 +182,20 @@ export async function POST(request: NextRequest) {
         is_emergency,
         status: 'pending',
         added_by: user.id,
+        ...(google_place_id ? { google_place_id } : {}),
       })
       .select('id, name, status')
       .single();
 
     if (error) {
+      // google_place_id UNIQUE constraint ihlali
+      if (error.code === '23505' && error.message?.includes('google_place_id')) {
+        return NextResponse.json({
+          success: false,
+          duplicate: true,
+          error: 'Bu Google Places konumu zaten kayıtlı.',
+        }, { status: 409 });
+      }
       console.error('[poi/POST] Insert error:', error);
       return NextResponse.json({ success: false, error: 'Konum eklenemedi.' }, { status: 500 });
     }
