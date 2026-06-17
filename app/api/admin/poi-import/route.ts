@@ -100,22 +100,37 @@ const KATEGORI_CONFIG: Record<string, {
   min_reviews?: number;
   skip_claude?: boolean;  // true → Claude filtresi atlanır, heuristic + il doğrulama yeterli
 }> = {
-  motorcu: {
-    terms: ['tır motor ustası', 'kamyon motor tamiri'],
+  // ── Akaryakıt & Enerji ─────────────────────────────────────
+  akaryakit_istasyonu: {
+    terms: ['tır yakıt istasyonu', 'kamyon akaryakıt istasyonu'],
+    type: 'gas_station',
+    exclude: ['çocuk', 'market', 'büfe'],
+    skip_claude: true,
+  },
+  elektrik_sarj: {
+    terms: ['elektrikli araç şarj istasyonu', 'EV şarj noktası'],
+    type: 'electric_vehicle_charging_station',
+    skip_claude: true,
+  },
+
+  // ── Park & Konaklama ────────────────────────────────────────
+  tir_parki: {
+    terms: ['tır parkı', 'kamyon parkı'],
+    type: 'parking',
+    exclude: ['çocuk parkı', 'millet bahçesi', 'botanik', 'olimpiyat parkı', 'avm otoparkı'],
+  },
+  otel_pansiyon: {
+    terms: ['kamyoncu moteli', 'şoför moteli', 'yol moteli'],
+    type: 'lodging',
+    exclude: ['hilton', 'sheraton', 'marriott', 'hyatt', 'radisson', 'sofitel',
+              'intercontinental', 'kempinski', 'four seasons', 'ritz-carlton'],
+  },
+
+  // ── Tamir & Bakım ───────────────────────────────────────────
+  motor_mekanik: {
+    terms: ['tır motor ustası', 'kamyon motor tamiri', 'tır mekanik tamirhanesi'],
     type: 'car_repair',
     exclude: ['lastik', 'elektrik', 'kaporta', 'boya', 'yıkama'],
-    skip_claude: true,  // "Kamyon Motor Ustası" gibi adlar zaten açık
-  },
-  elektrikci: {
-    terms: ['tır elektrikçi', 'kamyon elektrik tamiri'],
-    type: 'car_repair',
-    exclude: ['lastik', 'motor', 'kaporta', 'yıkama'],
-    skip_claude: true,  // "Mercedes Kamyon Elektrik", "LKW Elektrik" gibi
-  },
-  kaportaci: {
-    terms: ['tır kaportacı', 'kamyon kaporta boya'],
-    type: 'car_repair',
-    exclude: ['lastik', 'motor', 'elektrik'],
     skip_claude: true,
   },
   lastikci: {
@@ -124,50 +139,72 @@ const KATEGORI_CONFIG: Record<string, {
     exclude: ['motor', 'elektrik', 'kaporta', 'yıkama'],
     skip_claude: true,
   },
-  dorse_branda: {
-    terms: ['dorse tamircisi', 'tır branda tenteci'],
+  elektrik_takograf: {
+    terms: ['tır elektrikçi', 'kamyon elektrik tamiri', 'takograf servisi'],
+    type: 'car_repair',
+    exclude: ['lastik', 'motor', 'kaporta', 'yıkama'],
+    skip_claude: true,
+  },
+  branda_dorse: {
+    terms: ['dorse tamircisi', 'tır branda tenteci', 'dorse branda tamiri'],
     type: 'car_repair',
     skip_claude: true,
   },
-  frigo_ustasi: {
-    terms: ['frigo tamir', 'thermo king servis'],
+  yikama_yaglama: {
+    terms: ['tır yıkama', 'kamyon yıkama', 'tır yağlama'],
+    type: 'car_wash',
+    exclude: ['mutfak', 'restoran', 'lokanta', 'yemek'],
+    skip_claude: true,
+  },
+  acil_yol_yardim: {
+    terms: ['tır yol yardım', 'kamyon acil yardım', 'çekici yol yardım'],
     type: 'car_repair',
     skip_claude: true,
   },
-  tir_parki: {
-    terms: ['tır parkı', 'kamyon parkı'],
-    type: 'parking',
-    // Sadece kesinlikle yanlış olanlar — Claude asıl kararı verir
-    exclude: ['çocuk parkı', 'millet bahçesi', 'botanik', 'olimpiyat parkı', 'avm otoparkı'],
-  },
-  lokanta: {
-    terms: ['kamyoncu lokantası', 'şoför lokantası'],
+
+  // ── Yeme & İçme ─────────────────────────────────────────────
+  dinlenme_tesisi: {
+    terms: ['kamyoncu dinlenme tesisi', 'şoför dinlenme yeri', 'otoyol tesisi'],
     type: 'restaurant',
     exclude: ['sushi', 'pub', 'bar ', 'nightclub'],
   },
-  konaklama: {
-    terms: ['kamyoncu moteli', 'şoför moteli'],
-    type: 'lodging',
-    // Sadece büyük zincir lüks oteller — orta sınıf oteller Claude'a bırakılır
-    exclude: ['hilton', 'sheraton', 'marriott', 'hyatt', 'radisson', 'sofitel',
-              'intercontinental', 'kempinski', 'four seasons', 'ritz-carlton'],
+  esnaf_lokantasi: {
+    terms: ['kamyoncu lokantası', 'şoför lokantası', 'esnaf lokantası'],
+    type: 'restaurant',
+    exclude: ['sushi', 'pub', 'bar ', 'nightclub', 'fine dining'],
   },
+
+  // ── Operasyon Noktaları ─────────────────────────────────────
   kantar: {
-    terms: ['tır kantarı', 'kamyon tartı istasyonu'],
-    // Sadece açıkça üretici/satıcı olanlar — taşıt kantarı olabilecekler Claude'a bırakılır
+    terms: ['tır kantarı', 'kamyon tartı istasyonu', 'taşıt kantarı'],
     exclude: ['baskül üretici', 'baskül imalat', 'tartı sistemleri san.', 'terazi satış'],
   },
-  yikama: {
-    terms: ['tır yıkama', 'kamyon yıkama'],
-    type: 'car_wash',
-    // Açıkça yemek yeri olanlar
-    exclude: ['mutfak', 'restoran', 'lokanta', 'yemek'],
+  nakliyeciler_sitesi: {
+    terms: ['nakliyeciler sitesi', 'taşıyıcılar sitesi', 'kamyon garajı'],
+    skip_claude: true,
   },
-  // Eski kategoriler
+  gumruk_sinir: {
+    terms: ['gümrük kapısı', 'sınır kapısı', 'gümrük müdürlüğü'],
+    skip_claude: true,
+  },
+  antrepo_depo: {
+    terms: ['antrepo', 'lojistik depo', 'soğuk depo'],
+    skip_claude: true,
+  },
+
+  // ── Eski kategoriler (backward compat) ──────────────────────
+  motorcu:         { terms: ['tır motor ustası'], type: 'car_repair', skip_claude: true },
+  elektrikci:      { terms: ['tır elektrikçi'], type: 'car_repair', skip_claude: true },
+  kaportaci:       { terms: ['tır kaportacı', 'kamyon kaporta boya'], type: 'car_repair', skip_claude: true },
+  dorse_branda:    { terms: ['dorse tamircisi', 'tır branda tenteci'], type: 'car_repair', skip_claude: true },
+  frigo_ustasi:    { terms: ['frigo tamir', 'thermo king servis'], type: 'car_repair', skip_claude: true },
+  lokanta:         { terms: ['kamyoncu lokantası'], type: 'restaurant', exclude: ['sushi', 'pub'] },
+  konaklama:       { terms: ['kamyoncu moteli'], type: 'lodging' },
+  yikama:          { terms: ['tır yıkama', 'kamyon yıkama'], type: 'car_wash', skip_claude: true },
   park_dinlenme:   { terms: ['tır parkı'], type: 'parking', exclude: ['çocuk', 'millet', 'avm'] },
   yemek:           { terms: ['kamyoncu lokantası'], type: 'restaurant', min_reviews: 5 },
   tamirci:         { terms: ['tır tamircisi'], type: 'car_repair' },
-  tesis_akaryakit: { terms: ['tır yıkama'], type: 'car_wash' },
+  tesis_akaryakit: { terms: ['akaryakıt istasyonu'], type: 'gas_station' },
   kantar_resmi:    { terms: ['kamyon tartı istasyonu'], min_reviews: 1 },
 };
 
