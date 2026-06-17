@@ -127,9 +127,9 @@ export async function POST(request: NextRequest) {
     if (yakın && yakın.length > 0) {
       const nameLower = name.trim().toLowerCase();
 
-      // 1. Aynı isim → 100m içinde kesin tekrar
+      // 1. Aynı isim + aynı kategori → 100m içinde kesin tekrar
       const aynıIsim = yakın.find(
-        p => p.name.trim().toLowerCase() === nameLower
+        p => p.category === category && p.name.trim().toLowerCase() === nameLower
       );
       if (aynıIsim) {
         return NextResponse.json({
