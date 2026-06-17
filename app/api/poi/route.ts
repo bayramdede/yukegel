@@ -116,7 +116,9 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const {
-      name, description, category,
+      name, description,
+      category: categoryInput,
+      categories: categoriesInput,
       latitude, longitude,
       address, city, district, address_note, phone, website,
       tags = [], badges = {},
@@ -124,16 +126,23 @@ export async function POST(request: NextRequest) {
       google_place_id,
     } = body;
 
+    // categories[] öncelikli; yoksa category tekil alana bak
+    const categoriesRaw: string[] = Array.isArray(categoriesInput) && categoriesInput.length > 0
+      ? categoriesInput
+      : (categoryInput ? [categoryInput] : []);
+    const category = categoriesRaw[0] ?? null;
+
     // Temel validasyon
-    if (!name || !category || latitude == null || longitude == null) {
+    if (!name || categoriesRaw.length === 0 || latitude == null || longitude == null) {
       return NextResponse.json(
-        { success: false, error: 'name, category, latitude ve longitude zorunludur.' },
+        { success: false, error: 'name, category (veya categories), latitude ve longitude zorunludur.' },
         { status: 400 }
       );
     }
 
-    if (!POI_GECERLI_KATEGORILER.includes(category)) {
-      return NextResponse.json({ success: false, error: 'Geçersiz kategori.' }, { status: 400 });
+    const invalidCat = categoriesRaw.find(c => !POI_GECERLI_KATEGORILER.includes(c));
+    if (invalidCat) {
+      return NextResponse.json({ success: false, error: `Geçersiz kategori: ${invalidCat}` }, { status: 400 });
     }
 
     const supabase = getServiceSupabase();
