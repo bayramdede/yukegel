@@ -58,8 +58,13 @@ export async function GET(request: NextRequest) {
       .lte('latitude', maxLat)
       .gte('longitude', minLng)
       .lte('longitude', maxLng);
-    // categories dizisi varsa DB'deki categories[] kolonuyla örtüşenleri say
-    if (categories && categories.length > 0) countQuery = (countQuery as any).overlaps('categories', categories);
+    // categories dizisi varsa: hem yeni (categories[]) hem eski (category tekil) kayıtları say
+    if (categories && categories.length > 0) {
+      const inList = categories.join(',');
+      countQuery = (countQuery as any).or(
+        `category.in.(${inList}),categories.ov.{${inList}}`
+      );
+    }
     if (emergency) countQuery = countQuery.eq('is_emergency', true);
 
     const [{ data: rpcData, error }, { count }] = await Promise.all([
