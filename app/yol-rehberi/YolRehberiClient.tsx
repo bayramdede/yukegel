@@ -269,36 +269,96 @@ export default function YolRehberiClient() {
         </div>
       </header>
 
-      {/* ── Kategori Chips ── */}
+      {/* ── Ana Kategori Chips ── */}
       <div style={{
         display: 'flex', gap: 8, padding: '10px 14px',
         overflowX: 'auto', flexShrink: 0,
         background: '#161b22', borderBottom: '1px solid #21262d',
         scrollbarWidth: 'none',
       }}>
-        {KATEGORILER.map(k => (
+        {/* Hepsi */}
+        <button
+          onClick={() => handleAnaKat('hepsi')}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 5,
+            padding: '6px 12px', borderRadius: 20, border: 'none',
+            background: aktifAnaKat === 'hepsi' ? '#8b949e' : '#21262d',
+            color: aktifAnaKat === 'hepsi' ? '#fff' : '#8b949e',
+            fontWeight: aktifAnaKat === 'hepsi' ? 600 : 400,
+            fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap',
+            flexShrink: 0, transition: 'all 0.12s',
+          }}
+        >
+          <span>🗺️</span><span>Hepsi</span>
+        </button>
+
+        {/* Ana kategoriler */}
+        {POI_HIYERARSI.map(ana => (
           <button
-            key={k.key}
-            onClick={() => handleKategori(k.key)}
+            key={ana.value}
+            onClick={() => handleAnaKat(ana.value)}
             style={{
               display: 'flex', alignItems: 'center', gap: 5,
               padding: '6px 12px', borderRadius: 20, border: 'none',
-              background: aktifKategori === k.key ? k.pinColor : '#21262d',
-              color: aktifKategori === k.key ? '#fff' : '#8b949e',
-              fontWeight: aktifKategori === k.key ? 600 : 400,
+              background: aktifAnaKat === ana.value ? ana.pinColor : '#21262d',
+              color: aktifAnaKat === ana.value ? '#fff' : '#8b949e',
+              fontWeight: aktifAnaKat === ana.value ? 600 : 400,
               fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap',
               flexShrink: 0, transition: 'all 0.12s',
             }}
           >
-            <span>{k.icon}</span><span>{k.label}</span>
+            <span>{ana.icon}</span><span>{ana.label}</span>
           </button>
         ))}
       </div>
 
-      {/* ── Alt Etiketler ── */}
-      {altEtiketler.length > 0 && (
+      {/* ── Alt Kategori Chips (ana kategori seçiliyse) ── */}
+      {aktifAnaKatConfig && (
         <div style={{
           display: 'flex', gap: 6, padding: '8px 14px',
+          overflowX: 'auto', flexShrink: 0,
+          background: '#0d1117', borderBottom: '1px solid #21262d',
+          scrollbarWidth: 'none', alignItems: 'center',
+        }}>
+          {aktifAnaKatConfig.altlar.map(alt => {
+            const secili = aktifAltKatlar.includes(alt.value);
+            return (
+              <button
+                key={alt.value}
+                onClick={() => toggleAltKat(alt.value)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 4,
+                  padding: '5px 11px', borderRadius: 16,
+                  border: `1px solid ${secili ? alt.pinColor : '#30363d'}`,
+                  background: secili ? alt.pinColor + '22' : 'transparent',
+                  color: secili ? alt.pinColor : '#8b949e',
+                  fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap',
+                  flexShrink: 0, fontWeight: secili ? 600 : 400,
+                }}
+              >
+                <span>{alt.icon}</span><span>{alt.label}</span>
+              </button>
+            );
+          })}
+          {aktifAltKatlar.length > 0 && (
+            <button
+              onClick={() => setAktifAltKatlar([])}
+              style={{
+                padding: '4px 9px', borderRadius: 12, border: '1px solid #30363d',
+                background: 'transparent', color: '#4b5563', fontSize: 11, cursor: 'pointer',
+                flexShrink: 0, whiteSpace: 'nowrap',
+              }}
+            >
+              ✕ Temizle
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* ── Özellik Etiketleri (tek alt kategori seçiliyse) ── */}
+      {altEtiketler.length > 0 && (
+        <div style={{
+          display: 'flex', gap: 6, padding: '6px 14px',
           overflowX: 'auto', flexShrink: 0,
           background: '#0d1117', borderBottom: '1px solid #21262d',
           scrollbarWidth: 'none',
@@ -308,11 +368,11 @@ export default function YolRehberiClient() {
               key={etiket}
               onClick={() => toggleEtiket(etiket)}
               style={{
-                padding: '4px 11px', borderRadius: 16,
+                padding: '4px 10px', borderRadius: 16,
                 border: `1px solid ${aktifEtiketler.includes(etiket) ? '#22c55e' : '#30363d'}`,
                 background: aktifEtiketler.includes(etiket) ? '#14532d' : 'transparent',
                 color: aktifEtiketler.includes(etiket) ? '#22c55e' : '#8b949e',
-                fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap',
+                fontSize: 11, cursor: 'pointer', whiteSpace: 'nowrap',
                 flexShrink: 0,
               }}
             >
