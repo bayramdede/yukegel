@@ -883,7 +883,7 @@ function GoogleImportBolumu({ onTamamlandi }: { onTamamlandi: () => void }) {
 
   async function cek() {
     if (!il || seciliKats.length === 0) return;
-    setYukleniyor(true); setHata(''); setSonuc(null); setElenenler([]); setElenenGoster(false);
+    setYukleniyor(true); setHata(''); setSonuc(null); setElenenler([]); setElenenGoster(false); setEklenenPlaceIds(new Set()); setEklemeYukleniyor(null);
     try {
       const res = await fetch('/api/admin/poi-import', {
         method: 'POST',
