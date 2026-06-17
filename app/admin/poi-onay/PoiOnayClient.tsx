@@ -307,7 +307,7 @@ function FormGrid({ form, set, showButtons, onKaydet, onIptal, kayitYukleniyor, 
             const secili = aktifAnaKat === ana.value;
             return (
               <button key={ana.value} type="button"
-                onClick={() => { setAktifAnaKat(ana.value); set('category', ''); }}
+                onClick={() => { setAktifAnaKat(ana.value); set('categories', []); set('category', ''); }}
                 style={{ padding: '5px 11px', borderRadius: 8, fontSize: '0.78rem', cursor: 'pointer',
                   border: `1px solid ${secili ? ana.pinColor : C.border}`,
                   background: secili ? ana.pinColor + '22' : 'transparent',
