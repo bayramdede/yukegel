@@ -558,7 +558,8 @@ function YeniEkleForm({ onKaydet, onIptal, kayitYukleniyor }: {
   kayitYukleniyor: boolean;
 }) {
   const [form, setForm] = useState<FormState>({
-    name: '', description: '', category: '', city: '', district: '',
+    name: '', description: '', category: '', categories: [],
+    city: '', district: '',
     address: '', address_note: '', phone: '', website: '',
     tags: [], latitude: '', longitude: '', is_emergency: false,
   });
