@@ -166,6 +166,7 @@ const KATEGORI_CONFIG: Record<string, {
     terms: ['kamyoncu dinlenme tesisi', 'şoför dinlenme yeri', 'otoyol tesisi'],
     type: 'restaurant',
     exclude: ['sushi', 'pub', 'bar ', 'nightclub'],
+    skip_claude: true,
   },
   esnaf_lokantasi: {
     terms: ['kamyoncu lokantası', 'şoför lokantası', 'esnaf lokantası'],
