@@ -116,7 +116,7 @@ export async function POST(request: NextRequest) {
 
     const { data: yakın } = await supabase
       .from('pois')
-      .select('id, name, category, status, google_place_id')
+      .select('id, name, category, status, latitude, longitude, google_place_id')
       .neq('status', 'rejected')
       .gte('latitude', latitude - DELTA_100M)
       .lte('latitude', latitude + DELTA_100M)
@@ -142,9 +142,8 @@ export async function POST(request: NextRequest) {
 
       // 2. 50m içinde herhangi bir POI → muhtemelen aynı yer
       const cokYakın = yakın.find(p => {
-        const dlat = Math.abs(p.latitude ?? latitude - latitude);
-        const dlng = Math.abs(p.longitude ?? longitude - longitude);
-        // p.latitude/longitude'un select'te gelmesi gerekiyor
+        const dlat = Math.abs((p.latitude ?? latitude) - latitude);
+        const dlng = Math.abs((p.longitude ?? longitude) - longitude);
         return dlat < DELTA_50M && dlng < DELTA_50M;
       });
 
