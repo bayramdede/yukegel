@@ -191,12 +191,17 @@ export default function PoiEkleModal({ onKapat, onBasarili }: Props) {
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 16 }}>
                 {POI_HIYERARSI.find(a => a.value === aktifAnaKat)?.altlar.map(alt => {
-                  const secili = form.category === alt.value;
+                  const secili = form.categories.includes(alt.value);
                   return (
                     <button
                       key={alt.value}
                       type="button"
-                      onClick={() => setForm({ ...form, category: alt.value })}
+                      onClick={() => {
+                        const cats = secili
+                          ? form.categories.filter(c => c !== alt.value)
+                          : [...form.categories, alt.value];
+                        setForm({ ...form, categories: cats });
+                      }}
                       style={{
                         padding: '6px 11px', borderRadius: 8, fontSize: 12,
                         border: `1px solid ${secili ? '#22c55e' : '#30363d'}`,
