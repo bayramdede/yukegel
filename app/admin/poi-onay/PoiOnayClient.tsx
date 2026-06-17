@@ -70,26 +70,8 @@ const ILLER = [
   'Iğdır','Yalova','Karabük','Kilis','Osmaniye','Düzce',
 ];
 
-// Excel kategori normalize
-const KAT_NORM: Record<string, string> = {
-  park_dinlenme: 'park_dinlenme', 'park & dinlenme': 'park_dinlenme', 'park ve dinlenme': 'park_dinlenme',
-  yemek: 'yemek',
-  konaklama: 'konaklama',
-  tamirci: 'tamirci', 'tamirci & usta': 'tamirci', 'tamirci ve usta': 'tamirci',
-  tesis_akaryakit: 'tesis_akaryakit', 'tesis & akaryakıt': 'tesis_akaryakit',
-  'tesis & akaryakit': 'tesis_akaryakit', 'tesis ve akaryakıt': 'tesis_akaryakit',
-  kantar_resmi: 'kantar_resmi', 'kantar & resmi': 'kantar_resmi', 'kantar ve resmi': 'kantar_resmi',
-  motorcu: 'motorcu',
-  elektrikci: 'elektrikci',
-  kaportaci: 'kaportaci',
-  lastikci: 'lastikci',
-  dorse_branda: 'dorse_branda', 'dorse / branda': 'dorse_branda',
-  frigo_ustasi: 'frigo_ustasi', 'frigo ustası': 'frigo_ustasi',
-  tir_parki: 'tir_parki', 'tır parkı': 'tir_parki',
-  lokanta: 'lokanta',
-  kantar: 'kantar',
-  yikama: 'yikama',
-};
+// Excel kategori normalize — poi-constants.ts'den alınıyor
+const KAT_NORM: Record<string, string> = POI_KAT_NORM;
 function normalizeKategori(val: string): string | null {
   const clean = val.toLowerCase().replace(/[🅿️🍲🛏️🛠️⛽⚖️]/gu, '').trim();
   return KAT_NORM[clean] ?? null;
