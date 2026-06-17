@@ -153,8 +153,7 @@ const KATEGORI_CONFIG: Record<string, {
   yikama_yaglama: {
     terms: ['tır yıkama', 'kamyon yıkama', 'tır yağlama'],
     type: 'car_wash',
-    exclude: ['mutfak', 'restoran', 'lokanta', 'yemek'],
-    skip_claude: true,
+    exclude: ['mutfak', 'restoran', 'lokanta', 'yemek', 'oto yıkama', 'araba yıkama', 'binek', 'detailing', 'car wash'],
   },
   acil_yol_yardim: {
     terms: ['tır yol yardım', 'kamyon acil yardım', 'çekici yol yardım'],
