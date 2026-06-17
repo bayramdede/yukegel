@@ -372,31 +372,59 @@ Tamamı uygunsuzsa "-" yaz.`;
 // ─────────────────────────────────────────────────────────────
 // Google Places Text Search — location bias ile
 // ─────────────────────────────────────────────────────────────
+// Google Places Text Search — sayfalama ile max 3 sayfa (60 sonuç)
+// next_page_token token üretiminden 2s sonra geçerli olduğu için sleep zorunlu
+// ─────────────────────────────────────────────────────────────
 async function textSearch(
   query: string,
   type: string | undefined,
   ilKoordinat: { lat: number; lng: number; radius: number } | undefined,
   apiKey: string,
+  maxPages = 3,
 ): Promise<GooglePlace[]> {
-  const url = new URL('https://maps.googleapis.com/maps/api/place/textsearch/json');
-  url.searchParams.set('query', query);
-  url.searchParams.set('language', 'tr');
-  url.searchParams.set('region', 'tr');
-  if (type) url.searchParams.set('type', type);
-  // İl merkezi + yarıçap ile coğrafi kısıt — yanlış il sonuçlarını engeller
-  if (ilKoordinat) {
-    url.searchParams.set('location', `${ilKoordinat.lat},${ilKoordinat.lng}`);
-    url.searchParams.set('radius', String(ilKoordinat.radius));
-  }
-  url.searchParams.set('key', apiKey);
+  const tumSonuclar: GooglePlace[] = [];
 
-  const res = await fetch(url.toString());
-  if (!res.ok) throw new Error(`Places Text Search HTTP ${res.status}`);
-  const data = await res.json();
-  if (data.status === 'REQUEST_DENIED') {
-    throw new Error(`Google Places API: ${data.error_message || data.status}`);
+  const baseUrl = new URL('https://maps.googleapis.com/maps/api/place/textsearch/json');
+  baseUrl.searchParams.set('query', query);
+  baseUrl.searchParams.set('language', 'tr');
+  baseUrl.searchParams.set('region', 'tr');
+  if (type) baseUrl.searchParams.set('type', type);
+  if (ilKoordinat) {
+    baseUrl.searchParams.set('location', `${ilKoordinat.lat},${ilKoordinat.lng}`);
+    baseUrl.searchParams.set('radius', String(ilKoordinat.radius));
   }
-  return (data.results || []) as GooglePlace[];
+  baseUrl.searchParams.set('key', apiKey);
+
+  let fetchUrl = baseUrl.toString();
+  let nextPageToken: string | undefined;
+
+  for (let sayfa = 0; sayfa < maxPages; sayfa++) {
+    // 2. ve 3. sayfa için token URL'si kullan
+    if (sayfa > 0 && nextPageToken) {
+      const tokenUrl = new URL('https://maps.googleapis.com/maps/api/place/textsearch/json');
+      tokenUrl.searchParams.set('pagetoken', nextPageToken);
+      tokenUrl.searchParams.set('key', apiKey);
+      fetchUrl = tokenUrl.toString();
+      // Token aktifleşmesi için 2s bekle (Google zorunluluğu)
+      await sleep(2000);
+    }
+
+    const res = await fetch(fetchUrl);
+    if (!res.ok) throw new Error(`Places Text Search HTTP ${res.status}`);
+    const data = await res.json();
+
+    if (data.status === 'REQUEST_DENIED') {
+      throw new Error(`Google Places API: ${data.error_message || data.status}`);
+    }
+    // INVALID_REQUEST token henüz hazır değil — dur
+    if (data.status === 'INVALID_REQUEST') break;
+
+    tumSonuclar.push(...((data.results || []) as GooglePlace[]));
+    nextPageToken = data.next_page_token;
+    if (!nextPageToken) break; // Son sayfa
+  }
+
+  return tumSonuclar;
 }
 
 // ─────────────────────────────────────────────────────────────
