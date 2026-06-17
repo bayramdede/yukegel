@@ -31,8 +31,9 @@ export async function GET(request: NextRequest) {
     const categories: string[] | null = categoriesRaw
       ? categoriesRaw.split(',').map(c => c.trim()).filter(Boolean)
       : categorySingle ? [categorySingle] : null;
-    // RPC tek kategori alıyor — çoklu varsa null gönder, post-filter uygula
+    // Tekli → p_category, çoklu → p_categories (RPC'de = ANY ile IN mantığı)
     const categoryForRpc = categories?.length === 1 ? categories[0] : null;
+    const categoriesForRpc = categories && categories.length > 1 ? categories : null;
     const tagsRaw  = searchParams.get('tags');
     const tags     = tagsRaw ? tagsRaw.split(',').map(t => t.trim()).filter(Boolean) : null;
     const emergency = searchParams.get('emergency') === 'true';
