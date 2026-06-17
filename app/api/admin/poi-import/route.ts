@@ -295,7 +295,7 @@ async function claudeOnEleme(
     lastikci:            'Lastik satış, tamiri veya değiştirme (TIR lastiği de yapılan yerler dahil).',
     elektrik_takograf:   'Araç elektrik veya takograf tamiri (TIR/kamyon da kabul eden yerler dahil).',
     branda_dorse:        'Dorse tamiri, branda veya tente yapımı/tamiri.',
-    yikama_yaglama:      'Araç yıkama veya yağlama yeri (araba yıkama dahil — TIR da girebiliyorsa uygun).',
+    yikama_yaglama:      'Sadece TIR, kamyon veya ağır araç yıkama ve yağlama yerleri. Normal oto yıkama, araba yıkama veya binek araç servisleri elenir.',
     acil_yol_yardim:     'Yol yardım, çekici hizmeti veya acil araç kurtarma.',
     dinlenme_tesisi:     'Kamyoncu dinlenme tesisi: kafe, yemek, WC, duş imkânı olan yol tesisleri.',
     esnaf_lokantasi:     'Yemek yenebilecek her türlü yer: lokanta, restoran, esnaf lokantası — kamyon şoförleri girebiliyorsa uygun.',
