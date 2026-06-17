@@ -528,11 +528,11 @@ function PoiListeKart({ poi, rank, onClick }: { poi: PoiItem; rank: number; onCl
       <div style={{ position: 'relative', flexShrink: 0 }}>
         <div style={{
           width: 44, height: 44, borderRadius: 10,
-          background: kat?.pinColor || '#8b949e',
+          background: kat.pinColor,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           fontSize: 20,
         }}>
-          {kat?.icon || '📍'}
+          {kat.icon}
         </div>
         {rank <= 3 && (
           <div style={{
