@@ -82,6 +82,7 @@ export default function PoiEkleModal({ onKapat, onBasarili }: Props) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...form,
+          category: form.categories[0],      // birincil kategori (backward compat)
           latitude: parseFloat(form.latitude),
           longitude: parseFloat(form.longitude),
           tags: secilenEtiketler,
