@@ -112,7 +112,6 @@ export async function POST(request: NextRequest) {
     // ── Duplicate check ────────────────────────────────────────────────
     // ~0.001° ≈ 100m bounding box — proximity sorgusu
     const DELTA_100M = 0.001; // ~100m
-    const DELTA_50M  = 0.0005; // ~50m
 
     const { data: yakın } = await supabase
       .from('pois')
