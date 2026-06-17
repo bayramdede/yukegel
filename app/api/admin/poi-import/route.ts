@@ -528,7 +528,7 @@ export async function POST(request: NextRequest) {
         );
         if (!gecti) {
           filtrelenen++;
-          elenenler.push({ ad: y.name, adres: y.formatted_address || '', kategori, sebep: `Heuristic: ${sebep}` });
+          elenenler.push({ ad: y.name, adres: y.formatted_address || '', kategori, sebep: `Heuristic: ${sebep}`, place_id: y.place_id });
           if (sebep?.includes('yorum')) filtreSayac.min_reviews++;
           else filtreSayac.heuristic++;
         }
