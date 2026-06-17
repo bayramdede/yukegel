@@ -149,10 +149,25 @@ export default function YolRehberiClient() {
     fetchPois(bbox);
   }, [fetchPois]);
 
-  const handleKategori = (key: string) => {
-    setAktifKategori(key);
+  const handleAnaKat = (anaKey: string) => {
+    setAktifAnaKat(anaKey);
+    setAktifAltKatlar([]);
     setAktifEtiketler([]);
     setSosAktif(false);
+  };
+
+  const toggleAltKat = (altKey: string) => {
+    const anaKat = POI_HIYERARSI.find(a => a.value === aktifAnaKat);
+    if (!anaKat) return;
+    if (anaKat.cokluSecim) {
+      setAktifAltKatlar(prev =>
+        prev.includes(altKey) ? prev.filter(k => k !== altKey) : [...prev, altKey]
+      );
+    } else {
+      // Tekli seçim (Operasyon Noktaları)
+      setAktifAltKatlar(prev => prev.includes(altKey) ? [] : [altKey]);
+    }
+    setAktifEtiketler([]);
   };
 
   const toggleEtiket = (etiket: string) => {
@@ -162,12 +177,15 @@ export default function YolRehberiClient() {
   };
 
   const handleSos = () => {
-    setSosAktif(!sosAktif);
-    setAktifKategori('hepsi');
+    setSosAktif(prev => !prev);
+    setAktifAnaKat('hepsi');
+    setAktifAltKatlar([]);
     setAktifEtiketler([]);
   };
 
-  const altEtiketler = aktifKategori !== 'hepsi' ? (ALT_ETIKETLER[aktifKategori] || []) : [];
+  const aktifAnaKatConfig = POI_HIYERARSI.find(a => a.value === aktifAnaKat);
+  // Tek alt kategori seçiliyse onun tag önerilerini göster
+  const altEtiketler = aktifAltKatlar.length === 1 ? (ALT_ETIKETLER[aktifAltKatlar[0]] || []) : [];
 
   return (
     <div style={{
