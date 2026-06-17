@@ -189,6 +189,7 @@ export async function POST(request: NextRequest) {
         name,
         description,
         category,
+        categories: categoriesRaw,
         location: locationWkt,
         latitude,
         longitude,
