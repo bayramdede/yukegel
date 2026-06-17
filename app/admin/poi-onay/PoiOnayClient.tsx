@@ -858,8 +858,10 @@ function GoogleImportBolumu({ onTamamlandi }: { onTamamlandi: () => void }) {
   const [seciliKats, setSeciliKats] = useState<string[]>([]);
   const [yukleniyor, setYukleniyor] = useState(false);
   const [sonuc, setSonuc] = useState<{ eklenen: number; atlanan: number; filtrelenen: number; hatali: number } | null>(null);
-  const [elenenler, setElenenler] = useState<{ ad: string; adres: string; kategori: string; sebep: string }[]>([]);
+  const [elenenler, setElenenler] = useState<{ ad: string; adres: string; kategori: string; sebep: string; place_id: string }[]>([]);
   const [elenenenGoster, setElenenGoster] = useState(false);
+  const [eklenenPlaceIds, setEklenenPlaceIds] = useState<Set<string>>(new Set());
+  const [eklemeYukleniyor, setEklemeYukleniyor] = useState<string | null>(null); // place_id
   const [hata, setHata] = useState('');
   const [acik, setAcik] = useState(false);
 
