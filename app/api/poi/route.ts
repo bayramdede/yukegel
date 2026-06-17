@@ -41,25 +41,41 @@ export async function GET(request: NextRequest) {
 
     const supabase = getServiceSupabase();
 
-    const { data, error } = await supabase.rpc('get_pois_in_bbox', {
-      p_min_lng:       minLng,
-      p_min_lat:       minLat,
-      p_max_lng:       maxLng,
-      p_max_lat:       maxLat,
-      p_category:      category,
-      p_tags:          tags,
-      p_emergency_only: emergency,
-      p_user_lat:      userLat,
-      p_user_lng:      userLng,
-      p_limit:         limit,
-    });
+    // Toplam sayı (limit'ten bağımsız) + veri sorgusunu paralel çalıştır
+    let countQuery = supabase
+      .from('pois')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'approved')
+      .eq('is_active', true)
+      .gte('latitude', minLat)
+      .lte('latitude', maxLat)
+      .gte('longitude', minLng)
+      .lte('longitude', maxLng);
+    if (category) countQuery = countQuery.eq('category', category);
+    if (emergency) countQuery = countQuery.eq('is_emergency', true);
+
+    const [{ data, error }, { count }] = await Promise.all([
+      supabase.rpc('get_pois_in_bbox', {
+        p_min_lng:       minLng,
+        p_min_lat:       minLat,
+        p_max_lng:       maxLng,
+        p_max_lat:       maxLat,
+        p_category:      category,
+        p_tags:          tags,
+        p_emergency_only: emergency,
+        p_user_lat:      userLat,
+        p_user_lng:      userLng,
+        p_limit:         limit,
+      }),
+      countQuery,
+    ]);
 
     if (error) {
       console.error('[poi/GET] RPC error:', error);
       return NextResponse.json({ success: false, error: 'Konum verileri alınamadı.' }, { status: 500 });
     }
 
-    return NextResponse.json({ success: true, data: data || [] });
+    return NextResponse.json({ success: true, data: data || [], total: count ?? (data?.length ?? 0) });
   } catch (err) {
     console.error('[poi/GET] Unexpected error:', err);
     return NextResponse.json({ success: false, error: 'Beklenmeyen bir hata oluştu.' }, { status: 500 });
