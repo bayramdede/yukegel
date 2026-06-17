@@ -14,7 +14,7 @@ export default function PoiEkleModal({ onKapat, onBasarili }: Props) {
   const [form, setForm] = useState({
     name: '',
     description: '',
-    category: '',
+    category: '',       // alt kategori value
     latitude: '',
     longitude: '',
     address: '',
@@ -24,6 +24,7 @@ export default function PoiEkleModal({ onKapat, onBasarili }: Props) {
     phone: '',
     is_emergency: false,
   });
+  const [aktifAnaKat, setAktifAnaKat] = useState('');
   const [secilenEtiketler, setSecilenEtiketler] = useState<string[]>([]);
   const [gonderiliyor, setGonderiliyor] = useState(false);
   const [hata, setHata] = useState('');
