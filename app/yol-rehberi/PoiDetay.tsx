@@ -278,7 +278,14 @@ export default function PoiDetay({ poiId, userLat, userLng, onKapat }: Props) {
                   )}
                 </div>
                 <div style={{ fontSize: 13, color: '#8b949e' }}>
-                  {kat?.label}
+                  {/* Tüm kategorileri göster */}
+                  {(poi.categories?.length ? poi.categories : [poi.category]).map((c, i) => (
+                    <span key={c} style={{ display: 'inline-flex', alignItems: 'center', gap: 3, marginRight: i < (poi.categories?.length ?? 1) - 1 ? 6 : 0 }}>
+                      <span>{POI_KATEGORI_IKON[c] || '📍'}</span>
+                      <span>{POI_KATEGORI_ETIKET[c] || c}</span>
+                      {i < (poi.categories?.length ?? 1) - 1 && <span style={{ color: '#4b5563' }}> · </span>}
+                    </span>
+                  ))}
                   {poi.city && ` · ${poi.city}`}
                 </div>
               </div>
