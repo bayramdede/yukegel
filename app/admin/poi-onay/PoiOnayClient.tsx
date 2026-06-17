@@ -256,9 +256,11 @@ function FormGrid({ form, set, showButtons, onKaydet, onIptal, kayitYukleniyor, 
     onCoordinatesSet,
   );
 
-  // Mevcut kategori değerinden ana kategoriyi bul (düzenleme modu için)
+  // Mevcut kategorilerden ana kategoriyi bul (düzenleme modu için)
+  const currentCats = Array.isArray(form.categories) ? form.categories as string[]
+    : (form.category ? [String(form.category)] : []);
   const mevcutAnaKat = POI_HIYERARSI.find(a =>
-    a.altlar.some(alt => alt.value === String(form.category))
+    a.altlar.some(alt => currentCats.includes(alt.value))
   )?.value ?? '';
   const [aktifAnaKat, setAktifAnaKat] = useState(mevcutAnaKat);
 
