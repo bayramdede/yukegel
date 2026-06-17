@@ -70,7 +70,7 @@ export default function PoiEkleModal({ onKapat, onBasarili }: Props) {
   };
 
   const handleGonder = async () => {
-    if (!form.name || !form.category || !form.latitude || !form.longitude) {
+    if (!form.name || form.categories.length === 0 || !form.latitude || !form.longitude) {
       setHata('İsim, kategori ve koordinat zorunludur.');
       return;
     }
