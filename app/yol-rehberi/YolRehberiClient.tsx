@@ -505,7 +505,7 @@ export default function YolRehberiClient() {
 
 // ── POI Liste Kartı ───────────────────────────────────────────
 function PoiListeKart({ poi, rank, onClick }: { poi: PoiItem; rank: number; onClick: () => void }) {
-  const kat = KATEGORILER.find(k => k.key === poi.category);
+  const kat = KATEGORILER.find(k => k.key === poi.category) ?? { icon: '📍', pinColor: '#8b949e', label: poi.category };
 
   const mesafeStr = poi.distance_m == null
     ? null
