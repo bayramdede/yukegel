@@ -168,6 +168,7 @@ interface PoiInput {
 }
 
 interface Poi extends PoiInput {
+  categories: string[];  // çoklu alt kategori (DB'den geliyor)
   id: string; status: string; added_by: string | null;
   created_at: string;
   avg_rating: number | null;
