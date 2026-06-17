@@ -1,21 +1,12 @@
 'use client';
 
 import { useState } from 'react';
+import { POI_KATEGORILER, POI_GENEL_ETIKETLER } from '../../lib/poi-constants';
 
-const KATEGORILER = [
-  { key: 'park_dinlenme',   label: '🅿️ Park & Dinlenme' },
-  { key: 'yemek',           label: '🍲 Yemek' },
-  { key: 'konaklama',       label: '🛏️ Konaklama' },
-  { key: 'tamirci',         label: '🛠️ Tamirci & Usta' },
-  { key: 'tesis_akaryakit', label: '⛽ Tesis & Akaryakıt' },
-  { key: 'kantar_resmi',    label: '⚖️ Kantar & Resmi' },
-];
+// POI_KATEGORILER'i PoiEkleModal için key/label formatına dönüştür
+const KATEGORILER = POI_KATEGORILER.map(k => ({ key: k.value, label: `${k.icon} ${k.label}` }));
 
-const ETIKET_ONERILERI = [
-  '7/24 Açık', 'Tır Park Yeri Var', 'Güvenlik Kameralı', 'Duş İmkanı',
-  'WC', 'Kamyoncu Dostu', 'Sulu Yemek', 'Nöbetçi', 'Çekici',
-  'Uygun Fiyat', 'Dorseyi Ayırmaya Gerek Yok',
-];
+const ETIKET_ONERILERI = POI_GENEL_ETIKETLER;
 
 interface Props {
   userLat: number | null;
