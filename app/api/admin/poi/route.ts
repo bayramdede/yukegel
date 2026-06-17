@@ -164,7 +164,8 @@ export async function POST(request: NextRequest) {
       insertable.push({
         name:         String(r.name).trim(),
         description:  r.description?.trim()  || null,
-        category:     r.category,
+        category:     rowCategory,
+        categories:   rowCats,
         city:         r.city?.trim()         || null,
         district:     r.district?.trim()     || null,
         address:      r.address?.trim()      || null,
