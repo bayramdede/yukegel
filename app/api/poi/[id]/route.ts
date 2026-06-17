@@ -119,11 +119,21 @@ export async function PATCH(
       updates.name = name.trim();
     }
 
-    if (category !== undefined) {
+    // categories[] desteği: dizi gelirse, her birini doğrula ve category = categories[0] yap
+    if (categoriesInput !== undefined) {
+      const cats: string[] = Array.isArray(categoriesInput) ? categoriesInput : [categoriesInput];
+      const invalidCat = cats.find(c => !VALID_CATEGORIES.includes(c));
+      if (invalidCat) {
+        return NextResponse.json({ success: false, error: `Geçersiz kategori: ${invalidCat}` }, { status: 400 });
+      }
+      updates.categories = cats;
+      updates.category   = cats[0] ?? null;
+    } else if (category !== undefined) {
       if (!VALID_CATEGORIES.includes(category)) {
         return NextResponse.json({ success: false, error: 'Geçersiz kategori.' }, { status: 400 });
       }
-      updates.category = category;
+      updates.category   = category;
+      updates.categories = [category];
     }
 
     if (city !== undefined)         updates.city         = city?.trim() || null;
