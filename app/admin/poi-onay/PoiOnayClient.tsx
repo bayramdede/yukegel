@@ -1058,27 +1058,70 @@ function GoogleImportBolumu({ onTamamlandi }: { onTamamlandi: () => void }) {
                   🚫 Elenen yerler — neden?
                 </div>
                 <div style={{ maxHeight: 280, overflowY: 'auto' }}>
-                  {elenenler.map((e, i) => (
-                    <div key={i} style={{
-                      padding: '7px 12px',
-                      borderTop: i > 0 ? `1px solid #2a1a00` : undefined,
-                      display: 'grid', gridTemplateColumns: '1fr auto',
-                      gap: 8, alignItems: 'start',
-                    }}>
-                      <div>
-                        <div style={{ fontSize: '0.8rem', color: C.text, fontWeight: 600 }}>{e.ad}</div>
-                        <div style={{ fontSize: '0.72rem', color: C.dim }}>{e.adres}</div>
-                      </div>
-                      <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                        <div style={{ fontSize: '0.7rem', color: C.amber, background: '#2a1400', borderRadius: 4, padding: '2px 6px', whiteSpace: 'nowrap' }}>
-                          {e.sebep}
+                  {elenenler.map((e, i) => {
+                    const eklendi = eklenenPlaceIds.has(e.place_id);
+                    const yukleniyorBu = eklemeYukleniyor === e.place_id;
+                    return (
+                      <div key={i} style={{
+                        padding: '7px 12px',
+                        borderTop: i > 0 ? `1px solid #2a1a00` : undefined,
+                        display: 'grid', gridTemplateColumns: '1fr auto',
+                        gap: 8, alignItems: 'start',
+                        opacity: eklendi ? 0.5 : 1,
+                      }}>
+                        <div>
+                          <div style={{ fontSize: '0.8rem', color: C.text, fontWeight: 600 }}>{e.ad}</div>
+                          <div style={{ fontSize: '0.72rem', color: C.dim }}>{e.adres}</div>
                         </div>
-                        <div style={{ fontSize: '0.67rem', color: C.dim, marginTop: 2 }}>
-                          {KATEGORI[e.kategori] || e.kategori}
+                        <div style={{ textAlign: 'right', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-end' }}>
+                          <div style={{ fontSize: '0.7rem', color: C.amber, background: '#2a1400', borderRadius: 4, padding: '2px 6px', whiteSpace: 'nowrap' }}>
+                            {e.sebep}
+                          </div>
+                          <div style={{ fontSize: '0.67rem', color: C.dim }}>
+                            {KATEGORI[e.kategori] || e.kategori}
+                          </div>
+                          {eklendi ? (
+                            <div style={{ fontSize: '0.7rem', color: C.green }}>✓ Eklendi</div>
+                          ) : (
+                            <button
+                              type="button"
+                              disabled={yukleniyorBu}
+                              onClick={async () => {
+                                setEklemeYukleniyor(e.place_id);
+                                try {
+                                  const res = await fetch('/api/admin/poi-import', {
+                                    method: 'PUT',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ place_id: e.place_id, kategori: e.kategori, il }),
+                                  });
+                                  const d = await res.json();
+                                  if (d.success) {
+                                    setEklenenPlaceIds(prev => new Set([...prev, e.place_id]));
+                                    onTamamlandi();
+                                  } else {
+                                    alert(d.error || 'Eklenemedi.');
+                                  }
+                                } catch {
+                                  alert('Bağlantı hatası.');
+                                } finally {
+                                  setEklemeYukleniyor(null);
+                                }
+                              }}
+                              style={{
+                                fontSize: '0.7rem', cursor: 'pointer',
+                                background: '#003820', color: C.green,
+                                border: `1px solid ${C.green}`, borderRadius: 4,
+                                padding: '2px 8px', whiteSpace: 'nowrap',
+                                opacity: yukleniyorBu ? 0.6 : 1,
+                              }}
+                            >
+                              {yukleniyorBu ? '⏳' : '+ Ekle'}
+                            </button>
+                          )}
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}
