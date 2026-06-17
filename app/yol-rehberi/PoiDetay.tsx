@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { KATEGORILER } from './YolRehberiClient';
+import { POI_KATEGORI_ETIKET, POI_KATEGORI_IKON, POI_KATEGORI_RENK } from '../../lib/poi-constants';
 
 interface Review {
   id: string;
