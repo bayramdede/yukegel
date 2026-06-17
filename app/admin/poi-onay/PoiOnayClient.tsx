@@ -588,7 +588,7 @@ function YeniEkleForm({ onKaydet, onIptal, kayitYukleniyor }: {
         ...(r.district     && { district:     r.district }),
         ...(r.address      && { address:      r.address }),
         ...(r.address_note && { address_note: r.address_note }),
-        ...(r.category     && { category:     r.category }),
+        ...(r.category     && { category: r.category, categories: [r.category] }),
         ...(r.description  && { description:  r.description }),
         ...(r.phone        && { phone:        r.phone }),
         ...(r.website      && { website:      r.website }),
