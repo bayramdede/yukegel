@@ -41,9 +41,10 @@ export interface BoundingBox {
 }
 
 // poi-constants.ts'den türetiliyor — burada değişiklik yapma
+// PoiHarita pin ikonu için düzleştirilmiş tam liste (eski kategoriler dahil)
 export const KATEGORILER = [
   { key: 'hepsi', label: 'Hepsi', icon: '🗺️', pinColor: '#8b949e' },
-  ...POI_TUM_KATEGORILER.map(k => ({ key: k.value, label: k.label, icon: k.icon, pinColor: k.pinColor })),
+  ...POI_TUM_ALT_KATEGORILER.map(k => ({ key: k.value, label: k.label, icon: k.icon, pinColor: k.pinColor })),
 ];
 
 const ALT_ETIKETLER: Record<string, string[]> = POI_ALT_ETIKETLER;
