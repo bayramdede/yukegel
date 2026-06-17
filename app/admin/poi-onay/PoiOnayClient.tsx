@@ -292,23 +292,50 @@ function FormGrid({ form, set, showButtons, onKaydet, onIptal, kayitYukleniyor, 
         </div>
       </div>
 
-      {/* Kategori — chip butonlar */}
+      {/* Kategori — 2 kademeli chip seçici */}
       <div style={{ marginBottom: 12 }}>
         <label style={lbl}>Kategori *</label>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-          {KATEGORI_LIST.map(k => {
-            const aktif = form.category === k.value;
+        {/* Ana kategori satırı */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+          {POI_HIYERARSI.map(ana => {
+            const secili = aktifAnaKat === ana.value;
             return (
-              <button key={k.value} type="button" onClick={() => set('category', k.value)}
-                style={{ padding: '6px 12px', borderRadius: 8, fontSize: '0.8rem', cursor: 'pointer',
-                  border: `1px solid ${aktif ? C.green : C.border}`,
-                  background: aktif ? C.greenDark : 'transparent',
-                  color: aktif ? C.green : C.muted, fontWeight: aktif ? 700 : 400 }}>
-                {k.label}
+              <button key={ana.value} type="button"
+                onClick={() => { setAktifAnaKat(ana.value); set('category', ''); }}
+                style={{ padding: '5px 11px', borderRadius: 8, fontSize: '0.78rem', cursor: 'pointer',
+                  border: `1px solid ${secili ? ana.pinColor : C.border}`,
+                  background: secili ? ana.pinColor + '22' : 'transparent',
+                  color: secili ? ana.pinColor : C.muted, fontWeight: secili ? 700 : 400,
+                  display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span>{ana.icon}</span><span>{ana.label}</span>
               </button>
             );
           })}
         </div>
+        {/* Alt kategori satırı */}
+        {aktifAnaKat && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, paddingLeft: 8, borderLeft: `2px solid ${C.border}` }}>
+            {POI_HIYERARSI.find(a => a.value === aktifAnaKat)?.altlar.map(alt => {
+              const secili = form.category === alt.value;
+              return (
+                <button key={alt.value} type="button" onClick={() => set('category', alt.value)}
+                  style={{ padding: '5px 11px', borderRadius: 8, fontSize: '0.78rem', cursor: 'pointer',
+                    border: `1px solid ${secili ? C.green : C.border}`,
+                    background: secili ? C.greenDark : 'transparent',
+                    color: secili ? C.green : C.muted, fontWeight: secili ? 700 : 400,
+                    display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span>{alt.icon}</span><span>{alt.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+        {/* Seçili kategori gösterimi */}
+        {form.category && (
+          <div style={{ marginTop: 6, fontSize: '0.72rem', color: C.green }}>
+            ✓ {KATEGORI[String(form.category)] ?? String(form.category)}
+          </div>
+        )}
       </div>
 
       {/* Koordinat + GPS */}
