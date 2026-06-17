@@ -20,6 +20,7 @@ interface PoiDetay {
   name: string;
   description: string | null;
   category: string;
+  categories?: string[];   // çoklu alt kategori
   latitude: number;
   longitude: number;
   address: string | null;
