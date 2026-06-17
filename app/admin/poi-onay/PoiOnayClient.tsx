@@ -46,7 +46,7 @@ const lbl: React.CSSProperties = {
 };
 
 // poi-constants.ts'den import ediliyor — buraya ekleme yapma
-const KATEGORI_LIST = POI_KATEGORILER.map(k => ({ value: k.value, label: `${k.icon} ${k.label}` }));
+const KATEGORI_LIST = POI_ALT_KATEGORILER.map(k => ({ value: k.value, label: `${k.icon} ${k.label}` }));
 const KATEGORI: Record<string, string> = POI_KATEGORI_ETIKET;
 const ETIKET_ONERILERI = POI_GENEL_ETIKETLER;
 
