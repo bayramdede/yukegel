@@ -90,6 +90,7 @@ interface PoiInput {
   name: string;
   description?: string | null;
   category: string;
+  categories?: string[];  // çoklu alt kategori desteği
   city?: string | null;
   district?: string | null;
   address?: string | null;
@@ -102,7 +103,7 @@ interface PoiInput {
   is_emergency?: boolean;
 }
 
-const VALID_CATS = ['park_dinlenme', 'yemek', 'konaklama', 'tamirci', 'tesis_akaryakit', 'kantar_resmi'];
+const VALID_CATS = POI_GECERLI_KATEGORILER;
 
 export async function POST(request: NextRequest) {
   try {
