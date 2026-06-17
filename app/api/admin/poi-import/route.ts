@@ -483,7 +483,7 @@ export async function POST(request: NextRequest) {
 
     let eklenen = 0, atlanan = 0, filtrelenen = 0, hatali = 0;
     const hatalar: string[] = [];
-    const elenenler: { ad: string; adres: string; kategori: string; sebep: string }[] = [];
+    const elenenler: { ad: string; adres: string; kategori: string; sebep: string; place_id: string }[] = [];
 
     // Filtre sebebi sayaçları (debug için)
     const filtreSayac: Record<string, number> = {
