@@ -440,15 +440,22 @@ export default function YolRehberiClient() {
               </div>
             )}
 
-            {/* POI listesi */}
-            {pois.map((poi, index) => (
-              <PoiListeKart
-                key={poi.id}
-                poi={poi}
-                rank={index + 1}
-                onClick={() => setSecilenPoi(poi.id)}
-              />
-            ))}
+            {/* POI listesi — yakından uzağa */}
+            {[...pois]
+              .sort((a, b) => {
+                if (a.distance_m == null && b.distance_m == null) return 0;
+                if (a.distance_m == null) return 1;
+                if (b.distance_m == null) return -1;
+                return a.distance_m - b.distance_m;
+              })
+              .map((poi, index) => (
+                <PoiListeKart
+                  key={poi.id}
+                  poi={poi}
+                  rank={index + 1}
+                  onClick={() => setSecilenPoi(poi.id)}
+                />
+              ))}
           </div>
         )}
 
