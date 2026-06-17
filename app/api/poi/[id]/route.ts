@@ -20,7 +20,7 @@ export async function GET(
     const [poiResult, reviewsResult] = await Promise.all([
       supabase
         .from('pois')
-        .select('id, name, description, category, latitude, longitude, address, city, phone, website, photos, tags, badges, estimated_wait_minutes, is_emergency, avg_rating, review_count, created_at')
+        .select('id, name, description, category, categories, latitude, longitude, address, city, phone, website, photos, tags, badges, estimated_wait_minutes, is_emergency, avg_rating, review_count, created_at')
         .eq('id', id)
         .eq('status', 'approved')
         .maybeSingle(),
