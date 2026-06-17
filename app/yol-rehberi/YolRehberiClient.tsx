@@ -58,6 +58,7 @@ type Gorunum = 'liste' | 'harita';
 
 export default function YolRehberiClient() {
   const [pois, setPois] = useState<PoiItem[]>([]);
+  const [poiTotal, setPoiTotal] = useState<number | null>(null);
   const [yukleniyor, setYukleniyor] = useState(false);
   const [aktifKategori, setAktifKategori] = useState('hepsi');
   const [aktifEtiketler, setAktifEtiketler] = useState<string[]>([]);
