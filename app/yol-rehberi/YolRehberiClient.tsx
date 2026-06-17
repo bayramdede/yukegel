@@ -109,7 +109,7 @@ export default function YolRehberiClient() {
 
         const res = await fetch(`/api/poi?${params.toString()}`);
         const json = await res.json();
-        if (json.success) setPois(json.data);
+        if (json.success) { setPois(json.data); setPoiTotal(json.total ?? json.data.length); }
       } catch (err) {
         console.error('POI fetch hatası:', err);
       } finally {
