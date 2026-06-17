@@ -141,8 +141,15 @@ export async function POST(request: NextRequest) {
       const r = rows[i];
       const rowErrors: string[] = [];
 
+      // categories[] öncelikli; yoksa category tekline bak
+      const rowCats: string[] = Array.isArray(r.categories) && r.categories.length > 0
+        ? r.categories : (r.category ? [r.category] : []);
+      const rowCategory = rowCats[0] ?? '';
+
       if (!r.name || !String(r.name).trim()) rowErrors.push('Ad zorunlu');
-      if (!VALID_CATS.includes(r.category))    rowErrors.push('Geçersiz kategori');
+      if (rowCats.length === 0) rowErrors.push('Kategori zorunlu');
+      const invalidRowCat = rowCats.find(c => !VALID_CATS.includes(c));
+      if (invalidRowCat) rowErrors.push(`Geçersiz kategori: ${invalidRowCat}`);
 
       const lat = Number(r.latitude);
       const lng = Number(r.longitude);
