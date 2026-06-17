@@ -140,22 +140,6 @@ export async function POST(request: NextRequest) {
         }, { status: 409 });
       }
 
-      // 2. Aynı kategori + 50m içinde → muhtemelen aynı yer
-      const cokYakın = yakın.find(p => {
-        if (p.category !== category) return false;
-        const dlat = Math.abs((p.latitude ?? latitude) - latitude);
-        const dlng = Math.abs((p.longitude ?? longitude) - longitude);
-        return dlat < DELTA_50M && dlng < DELTA_50M;
-      });
-
-      if (cokYakın) {
-        return NextResponse.json({
-          success: false,
-          duplicate: true,
-          error: `50 metre içinde aynı kategoride "${cokYakın.name}" adlı bir yer zaten kayıtlı (${cokYakın.status === 'pending' ? 'onay bekliyor' : 'yayında'}).`,
-          existing_id: cokYakın.id,
-        }, { status: 409 });
-      }
     }
     // ─────────────────────────────────────────────────────────────────
 
