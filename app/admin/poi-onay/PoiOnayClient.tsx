@@ -665,10 +665,13 @@ function YeniEkleForm({ onKaydet, onIptal, kayitYukleniyor }: {
 
   function kaydet() {
     const tags = Array.isArray(form.tags) ? form.tags as string[] : [];
+    const categories = Array.isArray(form.categories) && (form.categories as string[]).length > 0
+      ? form.categories as string[] : [String(form.category)].filter(Boolean);
     onKaydet({
       name: String(form.name).trim(),
       description: String(form.description).trim() || null,
-      category: String(form.category),
+      category: categories[0] || String(form.category),
+      categories,
       city: String(form.city).trim() || null,
       district: String(form.district).trim() || null,
       address: String(form.address).trim() || null,
