@@ -158,6 +158,7 @@ async function parseExcel(file: File): Promise<{
 
 interface PoiInput {
   name: string; description: string | null; category: string;
+  categories?: string[];   // çoklu alt kategori
   city: string | null; district: string | null;
   address: string | null; address_note: string | null;
   phone: string | null; website: string | null;
