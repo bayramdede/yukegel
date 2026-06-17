@@ -888,7 +888,7 @@ function GoogleImportBolumu({ onTamamlandi }: { onTamamlandi: () => void }) {
       const res = await fetch('/api/admin/poi-import', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ province: il, categories: seciliKats, limit_per_query: 5 }),
+        body: JSON.stringify({ province: il, categories: seciliKats, limit_per_query: 10 }),
       });
       const d = await res.json();
       if (d.success) {
