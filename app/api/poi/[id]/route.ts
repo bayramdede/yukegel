@@ -55,14 +55,7 @@ export async function GET(
   }
 }
 
-const VALID_CATEGORIES = [
-  // Yeni TIR kategorileri
-  'motorcu', 'elektrikci', 'kaportaci', 'lastikci',
-  'dorse_branda', 'frigo_ustasi', 'tir_parki', 'lokanta',
-  'kantar', 'yikama',
-  // Eski kategoriler (geriye uyumluluk)
-  'park_dinlenme', 'yemek', 'konaklama', 'tamirci', 'tesis_akaryakit', 'kantar_resmi',
-];
+const VALID_CATEGORIES = POI_GECERLI_KATEGORILER;
 
 // ─────────────────────────────────────────────
 // PATCH /api/poi/[id]
