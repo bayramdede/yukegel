@@ -4,6 +4,7 @@ import dynamic from 'next/dynamic';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import PoiDetay from './PoiDetay';
 import PoiEkleModal from './PoiEkleModal';
+import { POI_TUM_KATEGORILER, POI_ALT_ETIKETLER } from '../../lib/poi-constants';
 
 const PoiHarita = dynamic(() => import('./PoiHarita'), {
   ssr: false,
