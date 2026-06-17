@@ -633,6 +633,67 @@ export async function POST(request: NextRequest) {
   }
 }
 
+// ─────────────────────────────────────────────────────────────
+// PUT /api/admin/poi-import
+// Elenen bir yeri zorla ekle — body: { place_id, kategori, il }
+// ─────────────────────────────────────────────────────────────
+export async function PUT(request: NextRequest) {
+  try {
+    const ssrClient = await getServerSupabase();
+    const { data: { user } } = await ssrClient.auth.getUser();
+    if (!user) return NextResponse.json({ success: false, error: 'Giriş gerekli.' }, { status: 401 });
+
+    const supabase = getServiceSupabase();
+    const { data: profil } = await supabase.from('users').select('role').eq('id', user.id).maybeSingle();
+    if (!profil || profil.role !== 'admin') {
+      return NextResponse.json({ success: false, error: 'Sadece admin kullanabilir.' }, { status: 403 });
+    }
+
+    const apiKey = process.env.GOOGLE_PLACES_API_KEY;
+    if (!apiKey) return NextResponse.json({ success: false, error: 'GOOGLE_PLACES_API_KEY tanımlı değil.' }, { status: 500 });
+
+    const { place_id, kategori, il } = await request.json() as { place_id: string; kategori: string; il: string };
+    if (!place_id || !kategori) return NextResponse.json({ success: false, error: 'place_id ve kategori zorunludur.' }, { status: 400 });
+
+    const detay = await placeDetails(place_id, apiKey);
+    if (!detay) return NextResponse.json({ success: false, error: 'Google Places detay alınamadı.' }, { status: 502 });
+
+    const { il: adresIl, ilce } = parseAdresComponents(detay.address_components || []);
+
+    const { error } = await supabase
+      .from('pois')
+      .upsert({
+        google_place_id:     detay.place_id,
+        name:                detay.name,
+        category:            kategori,
+        latitude:            detay.geometry.location.lat,
+        longitude:           detay.geometry.location.lng,
+        location:            `SRID=4326;POINT(${detay.geometry.location.lng} ${detay.geometry.location.lat})`,
+        address:             detay.formatted_address || null,
+        city:                adresIl || il || null,
+        district:            ilce || null,
+        phone:               detay.formatted_phone_number || null,
+        google_maps_url:     detay.url || null,
+        google_rating:       detay.rating || null,
+        google_review_count: detay.user_ratings_total || 0,
+        status:              'pending',
+        verified:            false,
+        is_active:           true,
+        last_synced_at:      new Date().toISOString(),
+      }, { onConflict: 'google_place_id', ignoreDuplicates: false });
+
+    if (error) {
+      console.error('[poi-import/PUT] Upsert error:', error);
+      return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true, message: `"${detay.name}" eklendi.` });
+  } catch (err) {
+    console.error('[poi-import/PUT] Unexpected error:', err);
+    return NextResponse.json({ success: false, error: 'Beklenmeyen bir hata oluştu.' }, { status: 500 });
+  }
+}
+
 // GET — desteklenen kategoriler ve yapılandırma
 export async function GET() {
   return NextResponse.json({
