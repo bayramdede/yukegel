@@ -113,7 +113,7 @@ export default function YolRehberiClient() {
           max_lat: bbox.max_lat.toString(),
           limit: '30',
         });
-        if (aktifKategori !== 'hepsi') params.set('category', aktifKategori);
+        if (gonderilecekKatlar.length > 0) params.set('categories', gonderilecekKatlar.join(','));
         if (aktifEtiketler.length) params.set('tags', aktifEtiketler.join(','));
         if (sosAktif) params.set('emergency', 'true');
         if (userLat) params.set('lat', userLat.toString());
