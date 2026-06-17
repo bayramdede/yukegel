@@ -102,9 +102,16 @@ yukegel/
 
 ### `pois` — POI Modülü (Yol Rehberi)
 ```
-category: 'motorcu'|'elektrikci'|'kaportaci'|'lastikci'|'dorse_branda'|'frigo_ustasi'|
-          'tir_parki'|'lokanta'|'konaklama'|'kantar'|'yikama'
-          + eski: 'park_dinlenme'|'yemek'|'tamirci'|'tesis_akaryakit'|'kantar_resmi'
+-- Yeni (17 Haz 2026) 2 kademeli yapı:
+Ana Kategori           | Alt Kategoriler (category değeri)
+Akaryakıt & Enerji     | akaryakit_istasyonu, elektrik_sarj
+Park & Konaklama       | tir_parki, otel_pansiyon
+Tamir & Bakım          | motor_mekanik, lastikci, elektrik_takograf, branda_dorse, yikama_yaglama, acil_yol_yardim
+Yeme & İçme            | dinlenme_tesisi, esnaf_lokantasi
+Operasyon Noktaları    | kantar, nakliyeciler_sitesi, gumruk_sinir, antrepo_depo
+-- Eski (backward compat): motorcu, elektrikci, kaportaci, dorse_branda, frigo_ustasi,
+--   lokanta, konaklama, yikama, park_dinlenme, yemek, tamirci, tesis_akaryakit, kantar_resmi
+-- Migration: docs/20260617_poi_kategori_guncelleme.sql
 location: geography(Point,4326) — PostGIS
 tags: text[] — özellik etiketleri
 badges: jsonb — tır uygunluk rozetleri
