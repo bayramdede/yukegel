@@ -25,7 +25,14 @@ export async function GET(request: NextRequest) {
     const maxLat  = parseFloat(searchParams.get('max_lat') || '');
     const userLat = searchParams.get('lat') ? parseFloat(searchParams.get('lat')!) : null;
     const userLng = searchParams.get('lng') ? parseFloat(searchParams.get('lng')!) : null;
-    const category = searchParams.get('category') || null;
+    // categories: virgülle ayrılmış çoklu kategori (yeni), category: tekli (eski compat)
+    const categoriesRaw = searchParams.get('categories');
+    const categorySingle = searchParams.get('category') || null;
+    const categories: string[] | null = categoriesRaw
+      ? categoriesRaw.split(',').map(c => c.trim()).filter(Boolean)
+      : categorySingle ? [categorySingle] : null;
+    // RPC tek kategori alıyor — çoklu varsa null gönder, post-filter uygula
+    const categoryForRpc = categories?.length === 1 ? categories[0] : null;
     const tagsRaw  = searchParams.get('tags');
     const tags     = tagsRaw ? tagsRaw.split(',').map(t => t.trim()).filter(Boolean) : null;
     const emergency = searchParams.get('emergency') === 'true';
