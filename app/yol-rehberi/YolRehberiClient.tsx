@@ -325,7 +325,7 @@ export default function YolRehberiClient() {
               </span>
               {yukleniyor
                 ? <span style={{ fontSize: 12, color: '#8b949e' }}>Güncelleniyor...</span>
-                : <span style={{ fontSize: 12, color: '#30363d' }}>{pois.length} sonuç</span>
+                : <span style={{ fontSize: 12, color: '#30363d' }}>{poiTotal ?? pois.length} sonuç</span>
               }
             </div>
 
