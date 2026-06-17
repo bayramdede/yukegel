@@ -461,7 +461,7 @@ export async function POST(request: NextRequest) {
     const {
       province,
       categories,
-      limit_per_query = 5,
+      limit_per_query = 10,
       claude_filter = true,
     } = body as {
       province: string;
