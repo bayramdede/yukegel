@@ -310,7 +310,7 @@ export default function PoiEkleModal({ onKapat, onBasarili }: Props) {
           {/* Özellikler */}
           <label style={labelStyle}>Özellikler</label>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 16 }}>
-            {ETIKET_ONERILERI.map(e => (
+            {(form.category ? (POI_ALT_ETIKETLER[form.category] ?? POI_GENEL_ETIKETLER) : POI_GENEL_ETIKETLER).map(e => (
               <button
                 key={e}
                 onClick={() => toggleEtiket(e)}
