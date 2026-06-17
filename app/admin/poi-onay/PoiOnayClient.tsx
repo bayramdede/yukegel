@@ -84,20 +84,31 @@ async function sablonIndir() {
   const wb = XLSX.utils.book_new();
   const veri = [
     ['Ad', 'Kategori', 'Şehir', 'İlçe', 'Adres', 'Adres Tarifi', 'Enlem', 'Boylam', 'Acil'],
-    ['Örnek Tır Parkı', 'park_dinlenme', 'İstanbul', 'Sultangazi', 'E-5 Karayolu No:1', 'E-5 üzerinde kırmızı çatılı tesis', 41.015137, 28.97953, 'HAYIR'],
-    ['Şoför Sofrası', 'yemek', 'Ankara', 'Sincan', '', '', 39.9334, 32.8597, 'HAYIR'],
+    ['Örnek Tır Parkı',     'tir_parki',         'İstanbul', 'Sultangazi', 'E-5 Karayolu No:1', 'E-5 üzerinde kırmızı çatılı tesis', 41.015137, 28.97953, 'HAYIR'],
+    ['Şoför Sofrası',       'esnaf_lokantasi',   'Ankara',   'Sincan',     '', '', 39.9334, 32.8597, 'HAYIR'],
+    ['Akpet Akaryakıt',     'akaryakit_istasyonu', 'İzmir',  'Torbalı',    '', '', 38.1545, 27.3589, 'HAYIR'],
   ];
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(veri), 'POI Listesi');
   const rehber = [
-    ['Kategori Kodu', 'Görünen Ad'],
-    ['park_dinlenme',   '🅿️ Park & Dinlenme'],
-    ['yemek',           '🍲 Yemek'],
-    ['konaklama',       '🛏️ Konaklama'],
-    ['tamirci',         '🛠️ Tamirci & Usta'],
-    ['tesis_akaryakit', '⛽ Tesis & Akaryakıt'],
-    ['kantar_resmi',    '⚖️ Kantar & Resmi'],
-    [], ['Acil Sütunu', '"EVET" veya "HAYIR"'],
-    ['Koordinat', 'Ondalık derece formatı (ör: 41.015137)'],
+    ['Ana Kategori', 'Kategori Kodu', 'Görünen Ad'],
+    ['Akaryakıt & Enerji', 'akaryakit_istasyonu', '⛽ Akaryakıt İstasyonu'],
+    ['Akaryakıt & Enerji', 'elektrik_sarj',       '🔋 Elektrik Şarj Noktası'],
+    ['Park & Konaklama',   'tir_parki',            '🅿️ TIR Parkı'],
+    ['Park & Konaklama',   'otel_pansiyon',        '🛏️ Otel & Pansiyon'],
+    ['Tamir & Bakım',      'motor_mekanik',        '🔧 Motor & Mekanik'],
+    ['Tamir & Bakım',      'lastikci',             '🔄 Lastikçi'],
+    ['Tamir & Bakım',      'elektrik_takograf',    '⚡ Elektrik & Takograf'],
+    ['Tamir & Bakım',      'branda_dorse',         '🚛 Branda & Dorse'],
+    ['Tamir & Bakım',      'yikama_yaglama',       '🚿 Yıkama & Yağlama'],
+    ['Tamir & Bakım',      'acil_yol_yardim',      '🆘 Acil Yol Yardım'],
+    ['Yeme & İçme',        'dinlenme_tesisi',      '☕ Dinlenme Tesisi'],
+    ['Yeme & İçme',        'esnaf_lokantasi',      '🍲 Esnaf Lokantası'],
+    ['Operasyon Noktaları','kantar',               '⚖️ Kantar'],
+    ['Operasyon Noktaları','nakliyeciler_sitesi',  '🏢 Nakliyeciler Sitesi / Garaj'],
+    ['Operasyon Noktaları','gumruk_sinir',         '🛃 Gümrük & Sınır Kapısı'],
+    ['Operasyon Noktaları','antrepo_depo',         '🏗️ Antrepo & Depo'],
+    [], ['Acil Sütunu', '', '"EVET" veya "HAYIR"'],
+    ['Koordinat', '', 'Ondalık derece formatı (ör: 41.015137)'],
   ];
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rehber), 'Rehber');
   XLSX.writeFile(wb, 'yukegel_poi_sablonu.xlsx');
