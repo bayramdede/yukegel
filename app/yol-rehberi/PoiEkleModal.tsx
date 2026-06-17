@@ -94,6 +94,8 @@ export default function PoiEkleModal({ onKapat, onBasarili }: Props) {
       const json = await res.json();
       if (json.success) {
         onBasarili();
+      } else if (res.status === 409 && json.duplicate) {
+        setHata(`⚠️ ${json.error}`);
       } else {
         setHata(json.error || 'Bir hata oluştu.');
       }
