@@ -37,8 +37,74 @@ interface PoiDetay {
   reviews: Review[];
 }
 
-// Kategori bazlı hızlı etiket seçenekleri
+// Kategori bazlı hızlı etiket seçenekleri (yeni + eski backward compat)
 const HIZLI_ETIKETLER: Record<string, { pozitif: string[]; negatif: string[] }> = {
+  // Yeni kategoriler
+  akaryakit_istasyonu: {
+    pozitif: ['Temiz', 'Hızlı Servis', 'Geniş Alan', 'Duş İyi', 'TIR Girişi Uygun'],
+    negatif: ['Sıra Uzun', 'Kirli WC', 'Pahalı'],
+  },
+  elektrik_sarj: {
+    pozitif: ['Hızlı Şarj', 'Çalışıyor', 'Gölgelik Var'],
+    negatif: ['Arızalı', 'Yavaş Şarj', 'Bekleme Var'],
+  },
+  tir_parki: {
+    pozitif: ['Temiz', 'Güvenli', 'Geniş Park Yeri', 'Aydınlık', 'Bekçi Var'],
+    negatif: ['Kirli', 'Park Yeri Dar', 'Güvensiz'],
+  },
+  otel_pansiyon: {
+    pozitif: ['Temiz Oda', 'Sessiz', 'Yardımsever', 'Güvenli Park'],
+    negatif: ['Gürültülü', 'Oda Kirli', 'Fiyat Yüksek'],
+  },
+  motor_mekanik: {
+    pozitif: ['Usta Dürüst', 'Hızlı', 'Kaliteli İş', 'Uygun Fiyat'],
+    negatif: ['Pahalı', 'Yavaş', 'Şüpheli Fiyat'],
+  },
+  lastikci: {
+    pozitif: ['Hızlı', 'Uygun Fiyat', 'İyi Malzeme'],
+    negatif: ['Pahalı', 'Yavaş', 'Kalitesiz'],
+  },
+  elektrik_takograf: {
+    pozitif: ['Uzman', 'Hızlı', 'Sertifikalı'],
+    negatif: ['Pahalı', 'Yavaş', 'Yetersiz Ekipman'],
+  },
+  branda_dorse: {
+    pozitif: ['Kaliteli İş', 'Hızlı', 'Uygun Fiyat'],
+    negatif: ['Pahalı', 'Yavaş', 'Malzeme Kalitesiz'],
+  },
+  yikama_yaglama: {
+    pozitif: ['Temiz', 'Hızlı', 'Uygun Fiyat'],
+    negatif: ['Kirli', 'Yavaş', 'Pahalı'],
+  },
+  acil_yol_yardim: {
+    pozitif: ['Hızlı Müdahale', '7/24 Açık', 'Güvenilir'],
+    negatif: ['Geç Geldi', 'Pahalı', 'Yetersiz Ekipman'],
+  },
+  dinlenme_tesisi: {
+    pozitif: ['Lezzetli', 'Temiz', 'Doyurucu', 'Uygun Fiyat', 'Rahat Ortam'],
+    negatif: ['Pahalı', 'Servis Yavaş', 'Hijyen Sorunu'],
+  },
+  esnaf_lokantasi: {
+    pozitif: ['Lezzetli', 'Temiz', 'Doyurucu', 'Uygun Fiyat', 'Kamyoncu Dostu'],
+    negatif: ['Pahalı', 'Servis Yavaş', 'Hijyen Sorunu'],
+  },
+  kantar: {
+    pozitif: ['Hızlı', 'Güvenilir Tartı', 'Personel Yardımsever'],
+    negatif: ['Uzun Bekleme', 'Bürokratik'],
+  },
+  nakliyeciler_sitesi: {
+    pozitif: ['Güvenli', 'Geniş Alan', 'Hizmetler Mevcut'],
+    negatif: ['Kalabalık', 'Pahalı', 'Güvensiz'],
+  },
+  gumruk_sinir: {
+    pozitif: ['Hızlı Geçiş', 'Organizeli', 'Yardımsever'],
+    negatif: ['Uzun Kuyruk', 'Bürokratik', 'Yavaş'],
+  },
+  antrepo_depo: {
+    pozitif: ['Güvenli', 'Temiz', 'Forklift Mevcut'],
+    negatif: ['Pahalı', 'Yer Yok', 'Yavaş'],
+  },
+  // Eski kategoriler (backward compat)
   park_dinlenme: {
     pozitif: ['Temiz', 'Güvenli', 'Geniş Park Yeri', 'Aydınlık'],
     negatif: ['Kirli', 'Park Yeri Dar', 'Güvensiz'],
