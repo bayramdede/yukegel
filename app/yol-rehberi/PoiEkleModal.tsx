@@ -167,7 +167,7 @@ export default function PoiEkleModal({ onKapat, onBasarili }: Props) {
                 <button
                   key={ana.value}
                   type="button"
-                  onClick={() => { setAktifAnaKat(ana.value); setForm({ ...form, category: '' }); }}
+                  onClick={() => { setAktifAnaKat(ana.value); setForm({ ...form, categories: [] }); }}
                   style={{
                     padding: '7px 12px', borderRadius: 8, fontSize: 13,
                     border: `1px solid ${secili ? ana.pinColor : '#30363d'}`,
