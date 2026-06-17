@@ -142,7 +142,7 @@ async function parseExcel(file: File): Promise<{
       errors.push({ satir: i + 1, ad: adStr, hatalar });
     } else {
       valid.push({
-        name: adStr, category: katNorm!,
+        name: adStr, category: katNorm!, categories: [katNorm!],
         city: String(sehir ?? '').trim() || null, district: String(ilce ?? '').trim() || null,
         address: String(adres ?? '').trim() || null, address_note: String(adresTarifi ?? '').trim() || null,
         phone: null, website: null, description: null, tags: [],
