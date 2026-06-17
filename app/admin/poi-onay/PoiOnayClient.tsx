@@ -322,9 +322,13 @@ function FormGrid({ form, set, showButtons, onKaydet, onIptal, kayitYukleniyor, 
         {aktifAnaKat && (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, paddingLeft: 8, borderLeft: `2px solid ${C.border}` }}>
             {POI_HIYERARSI.find(a => a.value === aktifAnaKat)?.altlar.map(alt => {
-              const secili = form.category === alt.value;
+              const cats = Array.isArray(form.categories) ? form.categories as string[] : [];
+              const secili = cats.includes(alt.value);
               return (
-                <button key={alt.value} type="button" onClick={() => set('category', alt.value)}
+                <button key={alt.value} type="button" onClick={() => {
+                  const newCats = secili ? cats.filter(c => c !== alt.value) : [...cats, alt.value];
+                  set('categories', newCats); set('category', newCats[0] || '');
+                }}
                   style={{ padding: '5px 11px', borderRadius: 8, fontSize: '0.78rem', cursor: 'pointer',
                     border: `1px solid ${secili ? C.green : C.border}`,
                     background: secili ? C.greenDark : 'transparent',
