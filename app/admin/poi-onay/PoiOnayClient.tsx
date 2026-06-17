@@ -468,6 +468,8 @@ function DuzenleForm({ poi, onKaydet, onIptal, kayitYukleniyor }: {
   const [form, setForm] = useState<FormState>({
     name: poi.name, description: poi.description ?? '',
     category: poi.category,
+    categories: Array.isArray(poi.categories) && poi.categories.length > 0
+      ? [...poi.categories] : [poi.category].filter(Boolean),
     city: poi.city ?? '', district: poi.district ?? '',
     address: poi.address ?? '', address_note: poi.address_note ?? '',
     phone: poi.phone ?? '', website: poi.website ?? '',
@@ -478,10 +480,13 @@ function DuzenleForm({ poi, onKaydet, onIptal, kayitYukleniyor }: {
   function set(f: string, v: string | boolean | string[]) { setForm(prev => ({ ...prev, [f]: v })); }
   function kaydet() {
     const tags = Array.isArray(form.tags) ? form.tags as string[] : [];
+    const categories = Array.isArray(form.categories) && (form.categories as string[]).length > 0
+      ? form.categories as string[] : [String(form.category)].filter(Boolean);
     onKaydet(poi.id, {
       name: String(form.name).trim(),
       description: String(form.description).trim() || null,
-      category: String(form.category),
+      category: categories[0] || String(form.category),
+      categories,
       city: String(form.city).trim() || null,
       district: String(form.district).trim() || null,
       address: String(form.address).trim() || null,
