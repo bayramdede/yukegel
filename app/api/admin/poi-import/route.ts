@@ -199,7 +199,7 @@ const KATEGORI_CONFIG: Record<string, {
   frigo_ustasi:    { terms: ['frigo tamir', 'thermo king servis'], type: 'car_repair', skip_claude: true },
   lokanta:         { terms: ['kamyoncu lokantası'], type: 'restaurant', exclude: ['sushi', 'pub'] },
   konaklama:       { terms: ['kamyoncu moteli'], type: 'lodging' },
-  yikama:          { terms: ['tır yıkama', 'kamyon yıkama'], type: 'car_wash', skip_claude: true },
+  yikama:          { terms: ['tır yıkama', 'kamyon yıkama'], type: 'car_wash', exclude: ['oto yıkama', 'araba yıkama', 'binek', 'detailing'] },
   park_dinlenme:   { terms: ['tır parkı'], type: 'parking', exclude: ['çocuk', 'millet', 'avm'] },
   yemek:           { terms: ['kamyoncu lokantası'], type: 'restaurant', min_reviews: 5 },
   tamirci:         { terms: ['tır tamircisi'], type: 'car_repair' },
