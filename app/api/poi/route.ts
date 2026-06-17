@@ -68,30 +68,22 @@ export async function GET(request: NextRequest) {
     }
     if (emergency) countQuery = countQuery.eq('is_emergency', true);
 
-    const [{ data: rpcData, error }, { count }] = await Promise.all([
+    const [{ data, error }, { count }] = await Promise.all([
       supabase.rpc('get_pois_in_bbox', {
         p_min_lng:        minLng,
         p_min_lat:        minLat,
         p_max_lng:        maxLng,
         p_max_lat:        maxLat,
         p_category:       categoryForRpc,
+        p_categories:     categoriesForRpc,
         p_tags:           tags,
         p_emergency_only: emergency,
         p_user_lat:       userLat,
         p_user_lng:       userLng,
-        p_limit:          categories && categories.length > 1 ? limit * 3 : limit,
+        p_limit:          limit,
       }),
       countQuery,
     ]);
-
-    // Kategori filtresi varsa: RPC sonuçlarını categories[] dizisine göre post-filter et
-    // (categories[0] zaten RPC'ye gönderildi; burada secondary kategoriler de dahil edilir)
-    const data = (categories && categories.length > 0)
-      ? (rpcData || []).filter((p: { category: string; categories?: string[] }) => {
-          const poiCats = p.categories?.length ? p.categories : [p.category];
-          return categories.some(c => poiCats.includes(c));
-        }).slice(0, limit)
-      : rpcData;
 
     if (error) {
       console.error('[poi/GET] RPC error:', error);
