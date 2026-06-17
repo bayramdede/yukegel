@@ -397,7 +397,7 @@ function FormGrid({ form, set, showButtons, onKaydet, onIptal, kayitYukleniyor, 
       <div style={{ marginBottom: 12 }}>
         <label style={lbl}>Özellikler / Etiketler</label>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-          {ETIKET_ONERILERI.map(t => {
+          {(form.category ? (POI_ALT_ETIKETLER[String(form.category)] ?? ETIKET_ONERILERI) : ETIKET_ONERILERI).map(t => {
             const aktif = tags.includes(t);
             return (
               <button key={t} type="button" onClick={() => toggleTag(t)}
