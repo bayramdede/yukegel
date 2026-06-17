@@ -1,12 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { POI_KATEGORILER, POI_GENEL_ETIKETLER } from '../../lib/poi-constants';
-
-// POI_KATEGORILER'i PoiEkleModal için key/label formatına dönüştür
-const KATEGORILER = POI_KATEGORILER.map(k => ({ key: k.value, label: `${k.icon} ${k.label}` }));
-
-const ETIKET_ONERILERI = POI_GENEL_ETIKETLER;
+import { POI_HIYERARSI, POI_ALT_ETIKETLER, POI_GENEL_ETIKETLER } from '../../lib/poi-constants';
 
 interface Props {
   userLat: number | null;
