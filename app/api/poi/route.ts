@@ -78,9 +78,13 @@ export async function GET(request: NextRequest) {
       countQuery,
     ]);
 
-    // Çoklu kategori seçiminde RPC'nin döndürdüğü sonuçları post-filter et
-    const data = (categories && categories.length > 1)
-      ? (rpcData || []).filter((p: { category: string }) => categories.includes(p.category)).slice(0, limit)
+    // Kategori filtresi varsa: RPC sonuçlarını categories[] dizisine göre post-filter et
+    // (categories[0] zaten RPC'ye gönderildi; burada secondary kategoriler de dahil edilir)
+    const data = (categories && categories.length > 0)
+      ? (rpcData || []).filter((p: { category: string; categories?: string[] }) => {
+          const poiCats = p.categories?.length ? p.categories : [p.category];
+          return categories.some(c => poiCats.includes(c));
+        }).slice(0, limit)
       : rpcData;
 
     if (error) {
