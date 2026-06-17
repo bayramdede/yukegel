@@ -821,8 +821,6 @@ function OzetButonu({
 
 // ─── Google Import Bölümü ────────────────────────────────────
 
-const YENİ_KATEGORILER = KATEGORI_LIST.slice(0, 11); // sadece yeni TIR kategorileri
-
 function GoogleImportBolumu({ onTamamlandi }: { onTamamlandi: () => void }) {
   const [il, setIl] = useState('İstanbul');
   const [seciliKats, setSeciliKats] = useState<string[]>([]);
@@ -835,6 +833,18 @@ function GoogleImportBolumu({ onTamamlandi }: { onTamamlandi: () => void }) {
 
   function toggleKat(kat: string) {
     setSeciliKats(prev => prev.includes(kat) ? prev.filter(k => k !== kat) : [...prev, kat]);
+  }
+
+  function toggleAnaKat(anaValue: string) {
+    const ana = POI_HIYERARSI.find(a => a.value === anaValue);
+    if (!ana) return;
+    const altValues = ana.altlar.map(a => a.value);
+    const hepsiSecili = altValues.every(v => seciliKats.includes(v));
+    if (hepsiSecili) {
+      setSeciliKats(prev => prev.filter(k => !altValues.includes(k)));
+    } else {
+      setSeciliKats(prev => [...new Set([...prev, ...altValues])]);
+    }
   }
 
   async function cek() {
