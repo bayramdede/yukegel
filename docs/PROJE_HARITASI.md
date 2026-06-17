@@ -1,6 +1,6 @@
 # Yükegel — Proje Haritası
 > **Kullanım:** Her sohbet başında sadece bu dosyayı oku. Kaynak dosyaları sadece o dosyada değişiklik yapacaksan oku.  
-> Son güncelleme: 15 Haziran 2026 — POI modülüne Google Places entegrasyonu: yeni kategoriler (11 TIR-spesifik), google_place_id/rating/reviews_summary/satellite_confirmed/is_active kolonları, admin import paneli, Claude yorum özeti
+> Son güncelleme: 17 Haziran 2026 — POI kategorileri 2 kademeli yapıya geçirildi: 5 Ana Kategori × 16 Alt Kategori (Akaryakıt&Enerji, Park&Konaklama, Tamir&Bakım, Yeme&İçme, Operasyon Noktaları). Tüm POI UI'ları güncellendi.
 
 **Referans Dökümanlar:**
 - `docs/LOG_VE_GUVENLIK_SPECLERI.md` — Log format standartları, audit trail, SecurityLogger kontrol listesi
