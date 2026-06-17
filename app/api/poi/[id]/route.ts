@@ -168,7 +168,7 @@ export async function PATCH(
       .from('pois')
       .update(updates)
       .eq('id', id)
-      .select('id, name, description, category, city, district, address, address_note, phone, website, tags, latitude, longitude, is_emergency, status')
+      .select('id, name, description, category, categories, city, district, address, address_note, phone, website, tags, latitude, longitude, is_emergency, status')
       .maybeSingle();
 
     if (error) {
