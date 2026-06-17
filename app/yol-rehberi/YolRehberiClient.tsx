@@ -100,6 +100,12 @@ export default function YolRehberiClient() {
     fetchTimerRef.current = setTimeout(async () => {
       setYukleniyor(true);
       try {
+        // Kategori parametresi hesapla
+        const anaKatAltlar = aktifAnaKat !== 'hepsi'
+          ? (POI_HIYERARSI.find(a => a.value === aktifAnaKat)?.altlar.map(a => a.value) ?? [])
+          : [];
+        const gonderilecekKatlar = aktifAltKatlar.length > 0 ? aktifAltKatlar : anaKatAltlar;
+
         const params = new URLSearchParams({
           min_lng: bbox.min_lng.toString(),
           min_lat: bbox.min_lat.toString(),
