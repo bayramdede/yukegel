@@ -193,10 +193,26 @@ export default function WhatsappYukle() {
               )}
             </div>
 
-            <button onClick={yukle} disabled={yukleniyor || dosyalar.length === 0}
-              style={{ background: dosyalar.length > 0 ? '#22c55e' : '#1f2937', color: '#000', border: 'none', borderRadius: 6, padding: '7px 16px', fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer' }}>
-              {yukleniyor ? 'Yükleniyor...' : `Yükle (${dosyalar.length} dosya)`}
-            </button>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <button onClick={yukle} disabled={yukleniyor || dosyalar.length === 0}
+                style={{ background: dosyalar.length > 0 ? '#22c55e' : '#1f2937', color: '#000', border: 'none', borderRadius: 6, padding: '7px 16px', fontSize: '0.85rem', fontWeight: 700, cursor: yukleniyor ? 'not-allowed' : 'pointer', opacity: yukleniyor ? 0.8 : 1 }}>
+                {yukleniyor && progress
+                  ? `⏳ Grup ${progress.current}/${progress.total}...`
+                  : yukleniyor
+                  ? 'Yükleniyor...'
+                  : `Yükle (${dosyalar.length} dosya)`}
+              </button>
+              {yukleniyor && progress && progress.total > 1 && (
+                <div style={{ background: '#1f2937', borderRadius: 4, height: 4, overflow: 'hidden' }}>
+                  <div style={{
+                    background: '#22c55e',
+                    height: '100%',
+                    width: `${(progress.current / progress.total) * 100}%`,
+                    transition: 'width 0.3s ease',
+                  }} />
+                </div>
+              )}
+            </div>
 
             {sonuc && (
               <div style={{ width: '100%', marginTop: 4 }}>
