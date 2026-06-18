@@ -43,7 +43,8 @@ function createColorPin(color: string, emoji: string) {
 }
 
 // Cluster ikonu — sayı balonu
-function createClusterIcon(cluster: L.MarkerCluster) {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function createClusterIcon(cluster: any) {
   const count = cluster.getChildCount();
   const size = count < 10 ? 36 : count < 100 ? 44 : 52;
   return L.divIcon({
