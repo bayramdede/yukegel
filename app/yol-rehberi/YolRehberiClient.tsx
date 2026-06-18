@@ -111,7 +111,7 @@ export default function YolRehberiClient() {
           min_lat: bbox.min_lat.toString(),
           max_lng: bbox.max_lng.toString(),
           max_lat: bbox.max_lat.toString(),
-          limit: '30',
+          limit: gorunum === 'harita' ? '300' : '30',
         });
         if (gonderilecekKatlar.length > 0) params.set('categories', gonderilecekKatlar.join(','));
         if (aktifEtiketler.length) params.set('tags', aktifEtiketler.join(','));
