@@ -4,10 +4,35 @@ import { getServerSupabase, getServiceSupabase } from '../../../../lib/auth';
 export const runtime = 'nodejs';
 
 const VALID_CATS = [
+  // Yeni 16 kategori
+  'akaryakit_istasyonu', 'elektrik_sarj',
+  'tir_parki', 'otel_pansiyon',
+  'motor_mekanik', 'lastikci', 'elektrik_takograf', 'branda_dorse', 'yikama_yaglama', 'acil_yol_yardim',
+  'dinlenme_tesisi', 'esnaf_lokantasi',
+  'kantar', 'nakliyeciler_sitesi', 'gumruk_sinir', 'antrepo_depo',
+  // Eski (backward compat)
   'park_dinlenme', 'yemek', 'konaklama', 'tamirci', 'tesis_akaryakit', 'kantar_resmi',
-  'motorcu', 'elektrikci', 'kaportaci', 'lastikci', 'dorse_branda', 'frigo_ustasi',
-  'tir_parki', 'lokanta', 'kantar', 'yikama',
+  'motorcu', 'elektrikci', 'kaportaci', 'dorse_branda', 'frigo_ustasi', 'lokanta', 'yikama',
 ];
+
+const VALID_CATS_LABELS: Record<string, string> = {
+  akaryakit_istasyonu: 'Akaryakıt İstasyonu',
+  elektrik_sarj:       'Elektrik Şarj Noktası',
+  tir_parki:           'TIR Parkı',
+  otel_pansiyon:       'Otel & Pansiyon',
+  motor_mekanik:       'Motor & Mekanik',
+  lastikci:            'Lastikçi',
+  elektrik_takograf:   'Elektrik & Takograf',
+  branda_dorse:        'Branda & Dorse',
+  yikama_yaglama:      'Yıkama & Yağlama',
+  acil_yol_yardim:     'Acil Yol Yardım',
+  dinlenme_tesisi:     'Dinlenme Tesisi',
+  esnaf_lokantasi:     'Esnaf Lokantası',
+  kantar:              'Kantar',
+  nakliyeciler_sitesi: 'Nakliyeciler Sitesi',
+  gumruk_sinir:        'Gümrük & Sınır',
+  antrepo_depo:        'Antrepo & Depo',
+};
 
 interface EnrichResult {
   name: string | null;
