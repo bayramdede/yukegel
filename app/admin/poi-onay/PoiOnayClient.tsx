@@ -1289,6 +1289,21 @@ export default function PoiOnayClient() {
     finally { setKayitYukleniyor(false); }
   }
 
+  async function icerikGuncelleVeOnayla(id: string, fields: Partial<Poi>) {
+    setKayitYukleniyor(true); setHata('');
+    try {
+      const res = await fetch(`/api/poi/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(fields) });
+      let d: { success: boolean; error?: string; data?: Partial<Poi> };
+      try { d = await res.json(); }
+      catch { setHata(`Sunucu yanıtı okunamadı (HTTP ${res.status}).`); return; }
+      if (!d.success) { setHata(d.error || `Güncelleme başarısız.`); return; }
+      setPois(prev => prev.map(p => p.id === id ? { ...p, ...d.data } : p));
+      setDuzenleId(null);
+      await durumGuncelle(id, 'approved');
+    } catch (e) { setHata(`Bağlantı hatası: ${e instanceof Error ? e.message : String(e)}`); }
+    finally { setKayitYukleniyor(false); }
+  }
+
   async function poiSil(id: string) {
     setSiliniyor(true); setHata('');
     try {
