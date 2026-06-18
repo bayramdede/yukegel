@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
     const tagsRaw  = searchParams.get('tags');
     const tags     = tagsRaw ? tagsRaw.split(',').map(t => t.trim()).filter(Boolean) : null;
     const emergency = searchParams.get('emergency') === 'true';
-    const limit    = Math.min(parseInt(searchParams.get('limit') || '50'), 100);
+    const limit    = Math.min(parseInt(searchParams.get('limit') || '50'), 500);
 
     // Bounding box zorunlu
     if (isNaN(minLng) || isNaN(minLat) || isNaN(maxLng) || isNaN(maxLat)) {
