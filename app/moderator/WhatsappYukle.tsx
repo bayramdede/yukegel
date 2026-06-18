@@ -13,22 +13,65 @@ export default function WhatsappYukle() {
   const klasorRef = useRef<HTMLInputElement>(null);
 
   const [debugAcik, setDebugAcik] = useState(false);
+  const [progress, setProgress] = useState<{ current: number; total: number } | null>(null);
+
+  const CHUNK_SIZE = 5; // Her istekte kaç dosya
 
   async function yukle() {
     if (dosyalar.length === 0) return;
     setYukleniyor(true);
     setSonuc(null);
 
-    const formData = new FormData();
-    dosyalar.forEach(f => formData.append('files', f));
-    formData.append('group_name', grupAdi || 'Bilinmiyor');
-    formData.append('saat_filtre', saatFiltre.toString());
+    const chunks: File[][] = [];
+    for (let i = 0; i < dosyalar.length; i += CHUNK_SIZE)
+      chunks.push(dosyalar.slice(i, i + CHUNK_SIZE));
 
-    const res = await fetch('/api/whatsapp-parse', { method: 'POST', body: formData });
-    const data = await res.json();
-    setSonuc(data);
+    const toplamSonuc = {
+      success: true,
+      total_messages: 0,
+      saved_to_db: 0,
+      skipped: 0,
+      spam_blocked: 0,
+      reposted: 0,
+      aliases_count: 0,
+      debug: [] as string[],
+      error: '',
+    };
+
+    for (let ci = 0; ci < chunks.length; ci++) {
+      setProgress({ current: ci + 1, total: chunks.length });
+
+      const formData = new FormData();
+      chunks[ci].forEach(f => formData.append('files', f));
+      formData.append('group_name', grupAdi || 'Bilinmiyor');
+      formData.append('saat_filtre', saatFiltre.toString());
+
+      try {
+        const res = await fetch('/api/whatsapp-parse', { method: 'POST', body: formData });
+        const data = await res.json();
+        if (!data.success) {
+          toplamSonuc.success = false;
+          toplamSonuc.error = data.error || 'Bilinmeyen hata';
+          break;
+        }
+        toplamSonuc.total_messages += data.total_messages || 0;
+        toplamSonuc.saved_to_db   += data.saved_to_db   || 0;
+        toplamSonuc.skipped       += data.skipped       || 0;
+        toplamSonuc.spam_blocked  += data.spam_blocked  || 0;
+        toplamSonuc.reposted      += data.reposted      || 0;
+        toplamSonuc.aliases_count  = data.aliases_count || toplamSonuc.aliases_count;
+        if (data.debug) toplamSonuc.debug.push(...data.debug);
+      } catch (e: any) {
+        toplamSonuc.success = false;
+        toplamSonuc.error = e.message || 'Ağ hatası';
+        break;
+      }
+    }
+
+    setSonuc(toplamSonuc);
+    setProgress(null);
     setYukleniyor(false);
-    if (data.success) setDosyalar([]);
+    if (toplamSonuc.success) setDosyalar([]);
   }
 
   function dosyaAdiTemizle(ad: string) {
