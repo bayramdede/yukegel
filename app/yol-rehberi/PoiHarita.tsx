@@ -1,9 +1,12 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMapEvents, useMap } from 'react-leaflet';
+import MarkerClusterGroup from 'react-leaflet-cluster';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import 'react-leaflet-cluster/dist/assets/MarkerCluster.css';
+import 'react-leaflet-cluster/dist/assets/MarkerCluster.Default.css';
 import type { PoiItem, BoundingBox } from './YolRehberiClient';
 import { KATEGORILER } from './YolRehberiClient';
 
@@ -36,6 +39,27 @@ function createColorPin(color: string, emoji: string) {
     iconSize: [36, 44],
     iconAnchor: [18, 44],
     popupAnchor: [0, -44],
+  });
+}
+
+// Cluster ikonu — sayı balonu
+function createClusterIcon(cluster: L.MarkerCluster) {
+  const count = cluster.getChildCount();
+  const size = count < 10 ? 36 : count < 100 ? 44 : 52;
+  return L.divIcon({
+    className: '',
+    html: `<div style="
+      width:${size}px;height:${size}px;
+      background:#22c55e;
+      border:3px solid rgba(255,255,255,0.5);
+      border-radius:50%;
+      display:flex;align-items:center;justify-content:center;
+      box-shadow:0 2px 8px rgba(0,0,0,0.5);
+      font-weight:700;font-size:${count < 100 ? 14 : 12}px;
+      color:#0d1117;
+    ">${count}</div>`,
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2],
   });
 }
 
@@ -98,8 +122,6 @@ interface Props {
 }
 
 export default function PoiHarita({ pois, userLat, userLng, onBoundsChange, onPoiClick }: Props) {
-  const [mapReady, setMapReady] = useState(false);
-
   // Türkiye merkezi — kullanıcı konumu yoksa
   const baslangicLat = userLat ?? 39.0;
   const baslangicLng = userLng ?? 35.0;
@@ -111,82 +133,83 @@ export default function PoiHarita({ pois, userLat, userLng, onBoundsChange, onPo
       zoom={baslangicZoom}
       style={{ width: '100%', height: '100%' }}
       zoomControl={false}
-      whenReady={() => setMapReady(true)}
     >
-      {/* OpenStreetMap tile — dark */}
+      {/* OpenStreetMap tile */}
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
 
-      {mapReady && (
+      <BoundsListener onBoundsChange={onBoundsChange} />
+
+      {/* Kullanıcı konumu — cluster dışında */}
+      {userLat && userLng && (
         <>
-          <BoundsListener onBoundsChange={onBoundsChange} />
-
-          {/* Kullanıcı konumu */}
-          {userLat && userLng && (
-            <>
-              <KonumaGit lat={userLat} lng={userLng} />
-              <Marker
-                position={[userLat, userLng]}
-                icon={USER_IKON}
-              >
-                <Popup>
-                  <div style={{ fontSize: 13, fontWeight: 600 }}>📍 Konumunuz</div>
-                </Popup>
-              </Marker>
-            </>
-          )}
-
-          {/* POI pinleri */}
-          {pois.map(poi => {
-            const ikon = poi.is_emergency
-              ? SOS_IKON
-              : (KAT_IKONLAR[poi.category] || KAT_IKONLAR['park_dinlenme']);
-            const kat = KATEGORILER.find(k => k.key === poi.category);
-
-            return (
-              <Marker
-                key={poi.id}
-                position={[poi.latitude, poi.longitude]}
-                icon={ikon}
-                eventHandlers={{ click: () => onPoiClick(poi.id) }}
-              >
-                <Popup>
-                  <div style={{ minWidth: 180 }}>
-                    <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4 }}>
-                      {kat?.icon} {poi.name}
-                    </div>
-                    {poi.avg_rating > 0 && (
-                      <div style={{ fontSize: 12, color: '#d97706', marginBottom: 4 }}>
-                        ★ {poi.avg_rating.toFixed(1)} · {poi.review_count} yorum
-                      </div>
-                    )}
-                    {poi.distance_m != null && (
-                      <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 6 }}>
-                        {poi.distance_m < 1000
-                          ? `${Math.round(poi.distance_m)} metre uzakta`
-                          : `${(poi.distance_m / 1000).toFixed(1)} km uzakta`}
-                      </div>
-                    )}
-                    <button
-                      onClick={() => onPoiClick(poi.id)}
-                      style={{
-                        background: '#22c55e', color: '#0d1117',
-                        border: 'none', borderRadius: 6,
-                        padding: '5px 12px', fontSize: 12,
-                        fontWeight: 600, cursor: 'pointer', width: '100%',
-                      }}
-                    >
-                      Detay Gör
-                    </button>
-                  </div>
-                </Popup>
-              </Marker>
-            );
-          })}
+          <KonumaGit lat={userLat} lng={userLng} />
+          <Marker position={[userLat, userLng]} icon={USER_IKON}>
+            <Popup>
+              <div style={{ fontSize: 13, fontWeight: 600 }}>📍 Konumunuz</div>
+            </Popup>
+          </Marker>
         </>
       )}
+
+      {/* POI pinleri — cluster içinde */}
+      <MarkerClusterGroup
+        iconCreateFunction={createClusterIcon}
+        maxClusterRadius={60}
+        spiderfyOnMaxZoom
+        showCoverageOnHover={false}
+        zoomToBoundsOnClick
+        chunkedLoading
+      >
+        {pois.map(poi => {
+          const ikon = poi.is_emergency
+            ? SOS_IKON
+            : (KAT_IKONLAR[poi.category] || KAT_IKONLAR['park_dinlenme']);
+          const kat = KATEGORILER.find(k => k.key === poi.category);
+
+          return (
+            <Marker
+              key={poi.id}
+              position={[poi.latitude, poi.longitude]}
+              icon={ikon}
+              eventHandlers={{ click: () => onPoiClick(poi.id) }}
+            >
+              <Popup>
+                <div style={{ minWidth: 180 }}>
+                  <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4 }}>
+                    {kat?.icon} {poi.name}
+                  </div>
+                  {poi.avg_rating > 0 && (
+                    <div style={{ fontSize: 12, color: '#d97706', marginBottom: 4 }}>
+                      ★ {poi.avg_rating.toFixed(1)} · {poi.review_count} yorum
+                    </div>
+                  )}
+                  {poi.distance_m != null && (
+                    <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 6 }}>
+                      {poi.distance_m < 1000
+                        ? `${Math.round(poi.distance_m)} metre uzakta`
+                        : `${(poi.distance_m / 1000).toFixed(1)} km uzakta`}
+                    </div>
+                  )}
+                  <button
+                    onClick={() => onPoiClick(poi.id)}
+                    style={{
+                      background: '#22c55e', color: '#0d1117',
+                      border: 'none', borderRadius: 6,
+                      padding: '5px 12px', fontSize: 12,
+                      fontWeight: 600, cursor: 'pointer', width: '100%',
+                    }}
+                  >
+                    Detay Gör
+                  </button>
+                </div>
+              </Popup>
+            </Marker>
+          );
+        })}
+      </MarkerClusterGroup>
     </MapContainer>
   );
 }
