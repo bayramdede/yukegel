@@ -1647,7 +1647,13 @@ export default function PoiOnayClient() {
                 )}
               </div>
               {duzenleId === poi.id && (
-                <DuzenleForm poi={poi} onKaydet={icerikGuncelle} onIptal={() => setDuzenleId(null)} kayitYukleniyor={kayitYukleniyor} />
+                <DuzenleForm
+                  poi={poi}
+                  onKaydet={icerikGuncelle}
+                  onIptal={() => setDuzenleId(null)}
+                  kayitYukleniyor={kayitYukleniyor}
+                  onKaydetVeOnayla={gosterilen === 'pending' ? icerikGuncelleVeOnayla : undefined}
+                />
               )}
             </div>
           ))}
