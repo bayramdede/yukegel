@@ -547,8 +547,8 @@ function DuzenleForm({ poi, onKaydet, onIptal, kayitYukleniyor, onKaydetVeOnayla
 
   return (
     <div style={{ borderTop: `1px solid ${C.border}`, marginTop: 12, paddingTop: 14 }}>
-      {/* AI Doldur */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+      {/* Üst araç çubuğu: AI Doldur + kaydet butonları */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
         <button onClick={enrichirMevcut} disabled={enrichDurum === 'loading'}
           style={{ background: enrichDurum === 'done' ? C.greenDark : '#1e1b4b',
             color: enrichDurum === 'done' ? C.green : '#818cf8',
@@ -559,10 +559,26 @@ function DuzenleForm({ poi, onKaydet, onIptal, kayitYukleniyor, onKaydetVeOnayla
             ? <><span style={{ display: 'inline-block', width: 9, height: 9, border: '2px solid #818cf8', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />Dolduruluyor...</>
             : enrichDurum === 'done' ? '✅ Dolduruldu' : '🤖 AI Doldur'}
         </button>
-        {enrichDurum === 'done' && <span style={{ color: C.muted, fontSize: '0.74rem' }}>Açıklama, adres tarifi ve kategoriler güncellendi — kontrol edin</span>}
+        {enrichDurum === 'done' && <span style={{ color: C.muted, fontSize: '0.74rem' }}>Açıklama, adres tarifi ve kategoriler güncellendi</span>}
         {enrichDurum === 'error' && <span style={{ color: C.red, fontSize: '0.74rem' }}>Hata oluştu, tekrar deneyin</span>}
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+          {onKaydetVeOnayla && (
+            <button onClick={kaydetVeOnayla} disabled={kayitYukleniyor || !isValid}
+              style={{ background: C.greenBg, color: C.green, border: `1px solid ${C.green}`, borderRadius: 6, padding: '7px 18px', fontSize: '0.82rem', fontWeight: 700, cursor: kayitYukleniyor || !isValid ? 'not-allowed' : 'pointer', opacity: kayitYukleniyor || !isValid ? 0.5 : 1 }}>
+              {kayitYukleniyor ? '...' : '✅ Kaydet & Onayla'}
+            </button>
+          )}
+          <button onClick={kaydet} disabled={kayitYukleniyor || !isValid}
+            style={{ background: C.greenDark, color: C.green, border: `1px solid ${C.greenBg}`, borderRadius: 6, padding: '7px 18px', fontSize: '0.82rem', fontWeight: 700, cursor: kayitYukleniyor || !isValid ? 'not-allowed' : 'pointer', opacity: kayitYukleniyor || !isValid ? 0.5 : 1 }}>
+            {kayitYukleniyor ? '...' : '💾 Kaydet'}
+          </button>
+          <button onClick={onIptal} disabled={kayitYukleniyor}
+            style={{ background: 'none', color: C.muted, border: `1px solid ${C.border}`, borderRadius: 6, padding: '7px 14px', fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer' }}>
+            İptal
+          </button>
+        </div>
       </div>
-      <FormGrid form={form} set={set} showButtons onKaydet={kaydet} onIptal={onIptal} kayitYukleniyor={kayitYukleniyor} btnLabel="💾 Kaydet" />
+      <FormGrid form={form} set={set} showButtons={false} onKaydet={kaydet} onIptal={onIptal} kayitYukleniyor={kayitYukleniyor} btnLabel="💾 Kaydet" />
     </div>
   );
 }
