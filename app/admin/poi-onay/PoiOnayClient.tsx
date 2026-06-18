@@ -467,11 +467,12 @@ function FormGrid({ form, set, showButtons, onKaydet, onIptal, kayitYukleniyor, 
 
 // ─── DuzenleForm ─────────────────────────────────────────
 
-function DuzenleForm({ poi, onKaydet, onIptal, kayitYukleniyor }: {
+function DuzenleForm({ poi, onKaydet, onIptal, kayitYukleniyor, onKaydetVeOnayla }: {
   poi: Poi;
   onKaydet: (id: string, fields: Partial<Poi>) => Promise<void>;
   onIptal: () => void;
   kayitYukleniyor: boolean;
+  onKaydetVeOnayla?: (id: string, fields: Partial<Poi>) => Promise<void>;
 }) {
   const [form, setForm] = useState<FormState>({
     name: poi.name, description: poi.description ?? '',
