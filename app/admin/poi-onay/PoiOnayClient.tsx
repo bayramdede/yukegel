@@ -516,11 +516,11 @@ function DuzenleForm({ poi, onKaydet, onIptal, kayitYukleniyor, onKaydetVeOnayla
     }
   }
 
-  function kaydet() {
+  function topla() {
     const tags = Array.isArray(form.tags) ? form.tags as string[] : [];
     const categories = Array.isArray(form.categories) && (form.categories as string[]).length > 0
       ? form.categories as string[] : [String(form.category)].filter(Boolean);
-    onKaydet(poi.id, {
+    return {
       name: String(form.name).trim(),
       description: String(form.description).trim() || null,
       category: categories[0] || String(form.category),
@@ -535,8 +535,16 @@ function DuzenleForm({ poi, onKaydet, onIptal, kayitYukleniyor, onKaydetVeOnayla
       latitude: parseFloat(String(form.latitude)),
       longitude: parseFloat(String(form.longitude)),
       is_emergency: Boolean(form.is_emergency),
-    });
+    };
   }
+  function kaydet() { onKaydet(poi.id, topla()); }
+  function kaydetVeOnayla() { onKaydetVeOnayla?.(poi.id, topla()); }
+
+  const formCats = Array.isArray(form.categories) ? form.categories as string[]
+    : (form.category ? [String(form.category)] : []);
+  const isValid = String(form.name ?? '').trim() && formCats.length > 0 &&
+    !isNaN(parseFloat(String(form.latitude))) && !isNaN(parseFloat(String(form.longitude)));
+
   return (
     <div style={{ borderTop: `1px solid ${C.border}`, marginTop: 12, paddingTop: 14 }}>
       {/* AI Doldur */}
