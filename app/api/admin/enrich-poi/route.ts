@@ -130,7 +130,114 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { lat, lng, slug } = body;
+    const { lat, lng, slug, poi_id } = body;
+
+    // ── poi_id branch: mevcut Google Maps POI için LLM zenginleştirme ───────
+    if (poi_id) {
+      const googleKey = process.env.GOOGLE_PLACES_API_KEY;
+
+      // 1. POI'yi DB'den çek
+      const { data: poi, error: poiErr } = await supabase
+        .from('pois')
+        .select('id, name, category, categories, address, city, district, google_place_id, google_rating, google_review_count')
+        .eq('id', poi_id)
+        .maybeSingle();
+
+      if (poiErr || !poi) {
+        return NextResponse.json({ success: false, error: 'POI bulunamadı.' }, { status: 404 });
+      }
+
+      // 2. Google Places editorial summary (varsa)
+      let editorialSummary = '';
+      if (googleKey && poi.google_place_id) {
+        try {
+          const detUrl = new URL('https://maps.googleapis.com/maps/api/place/details/json');
+          detUrl.searchParams.set('place_id', poi.google_place_id);
+          detUrl.searchParams.set('fields', 'editorial_summary,types');
+          detUrl.searchParams.set('language', 'tr');
+          detUrl.searchParams.set('key', googleKey);
+          const res = await fetch(detUrl.toString(), { signal: AbortSignal.timeout(6000) });
+          if (res.ok) {
+            const data = await res.json();
+            editorialSummary = data.result?.editorial_summary?.overview || '';
+          }
+        } catch { /* skip */ }
+      }
+
+      // 3. Kategori listesi metni
+      const newCatLabels = Object.entries(VALID_CATS_LABELS)
+        .map(([k, v]) => `- ${k}: ${v}`)
+        .join('\n');
+
+      // 4. LLM prompt
+      const prompt = `Sen Türkiye'de kamyon şoförlerine yönelik bir POI veri tabanı doldurma asistanısın.
+
+MEVCUT POI BİLGİLERİ:
+Ad: ${poi.name}
+Adres: ${poi.address || '(yok)'}
+Şehir: ${poi.city || '(yok)'}, İlçe: ${poi.district || '(yok)'}
+Mevcut kategori: ${poi.category || '(yok)'}
+Google puanı: ${poi.google_rating ? `${poi.google_rating}/5 (${poi.google_review_count} yorum)` : '(yok)'}
+${editorialSummary ? `Google açıklaması: ${editorialSummary}` : ''}
+
+GEÇERLİ KATEGORİLER (birden fazla seçilebilir):
+${newCatLabels}
+
+GÖREV — aşağıdaki JSON alanlarını doldur. Bilmiyorsan null bırak, UYDURMA:
+{
+  "description": "Kamyon şoförlerine yönelik 1-2 cümle açıklama (Türkçe)",
+  "address_note": "Nasıl bulunur, ne dikkat edilmeli — 1-2 cümle kısa yol tarifi (Türkçe)",
+  "categories": ["kategori_kodu_1", "kategori_kodu_2"]
+}
+
+Notlar:
+- description: yerin ne sunduğunu, avantajlarını anlat
+- address_note: şoföre pratik yol tarifi (varsa mevcut adres bilgisini kullan)
+- categories: bu yer birden fazla hizmet veriyorsa (örn. lastikçi + yol yardım), tüm uygun kategorileri ekle
+
+ÇIKTI: Yalnızca JSON nesnesi, başka metin yok.`;
+
+      const aiRes = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+        },
+        body: JSON.stringify({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 512,
+          messages: [{ role: 'user', content: prompt }],
+        }),
+        signal: AbortSignal.timeout(15000),
+      });
+
+      if (!aiRes.ok) {
+        return NextResponse.json({ success: false, error: 'AI servisi hatası.' }, { status: 502 });
+      }
+
+      const aiData = await aiRes.json();
+      const rawText = aiData.content?.[0]?.text || '';
+      const clean = rawText.replace(/```json|```/g, '').trim();
+
+      let parsed: Record<string, unknown>;
+      try {
+        parsed = JSON.parse(clean);
+      } catch {
+        const m = clean.match(/\{[\s\S]*\}/);
+        if (!m) return NextResponse.json({ success: false, error: 'AI yanıtı ayrıştırılamadı.' }, { status: 502 });
+        parsed = JSON.parse(m[0]);
+      }
+
+      const description  = typeof parsed.description  === 'string' ? parsed.description.trim()  || null : null;
+      const address_note = typeof parsed.address_note === 'string' ? parsed.address_note.trim() || null : null;
+      const categories   = Array.isArray(parsed.categories)
+        ? (parsed.categories as unknown[]).filter((c): c is string => typeof c === 'string' && VALID_CATS.includes(c))
+        : [];
+
+      return NextResponse.json({ success: true, data: { description, address_note, categories } });
+    }
+    // ── /poi_id branch ────────────────────────────────────────────────────────
 
     const latN = Number(lat);
     const lngN = Number(lng);
