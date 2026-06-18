@@ -31,6 +31,18 @@ export default function WhatsappYukle() {
     if (data.success) setDosyalar([]);
   }
 
+  function dosyaAdiTemizle(ad: string) {
+    return ad
+      .replace('.zip', '').replace('.txt', '')
+      .replace('WhatsApp Sohbeti - ', '')
+      .replace('WhatsApp Chat - ', '')
+      .replace(/[\u{1F000}-\u{1FFFF}]/gu, '')
+      .replace(/[‎‪‬‏​]/g, '')
+      .replace(/[^\w\s\-À-ɏ]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
   return (
     <div style={{ background: '#161b22', borderBottom: '1px solid #30363d' }}>
       <div style={{ maxWidth: 1400, margin: '0 auto', padding: '8px 16px' }}>
@@ -49,37 +61,93 @@ export default function WhatsappYukle() {
             </div>
 
             <div>
-            <div style={{ color: '#8b949e', fontSize: '0.72rem', marginBottom: 4 }}>SON KAÇ SAAT</div>
-                <select value={saatFiltre} onChange={e => setSaatFiltre(Number(e.target.value))}
-                    style={{ background: '#0d1117', color: '#e2e8f0', border: '1px solid #30363d', borderRadius: 6, padding: '6px 10px', fontSize: '0.85rem', outline: 'none' }}>
-                    <option value={6}>6 saat</option>
-                    <option value={12}>12 saat</option>
-                    <option value={24}>24 saat</option>
-                    <option value={48}>48 saat</option>
-                    <option value={72}>72 saat</option>
-                    <option value={168}>7 gün</option>
-                </select>
+              <div style={{ color: '#8b949e', fontSize: '0.72rem', marginBottom: 4 }}>SON KAÇ SAAT</div>
+              <select value={saatFiltre} onChange={e => setSaatFiltre(Number(e.target.value))}
+                style={{ background: '#0d1117', color: '#e2e8f0', border: '1px solid #30363d', borderRadius: 6, padding: '6px 10px', fontSize: '0.85rem', outline: 'none' }}>
+                <option value={6}>6 saat</option>
+                <option value={12}>12 saat</option>
+                <option value={24}>24 saat</option>
+                <option value={48}>48 saat</option>
+                <option value={72}>72 saat</option>
+                <option value={168}>7 gün</option>
+              </select>
             </div>
+
             <div>
-              <div style={{ color: '#8b949e', fontSize: '0.72rem', marginBottom: 4 }}>ZIP / TXT DOSYALAR (çoklu)</div>
-              <input type="file" multiple accept=".zip,.txt"
-                    onChange={e => {
-                        const files = Array.from(e.target.files || []);
-                        setDosyalar(files);
-                        if (files.length > 0) {
-                            const ad = files[0].name
-                            .replace('.zip', '').replace('.txt', '')
-                            .replace('WhatsApp Sohbeti - ', '')
-                            .replace('WhatsApp Chat - ', '')
-                            .replace(/[\u{1F000}-\u{1FFFF}]/gu, '')
-                            .replace(/[\u200e\u202a\u202c\u200f\u200b]/g, '')
-                            .replace(/[^\w\s\-\u00C0-\u024F]/g, '')
-                            .replace(/\s+/g, ' ')
-                            .trim();
-                            setGrupAdi(ad);
-                        }
-                    }}
-                style={{ color: '#e2e8f0', fontSize: '0.82rem' }} />
+              <div style={{ color: '#8b949e', fontSize: '0.72rem', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span>DOSYALAR</span>
+                <button
+                  onClick={() => { setKlasorModu(m => !m); setDosyalar([]); setSonuc(null); }}
+                  style={{
+                    background: klasorModu ? '#1e3a5f' : '#1f2937',
+                    border: `1px solid ${klasorModu ? '#3b82f6' : '#374151'}`,
+                    color: klasorModu ? '#60a5fa' : '#6b7280',
+                    borderRadius: 4, padding: '1px 7px', fontSize: '0.66rem',
+                    fontWeight: 700, cursor: 'pointer', lineHeight: 1.6,
+                  }}>
+                  {klasorModu ? '📁 klasör' : '📄 dosyalar'}
+                </button>
+              </div>
+
+              {/* Gizli input: tekil/çoklu dosya */}
+              <input
+                ref={dosyaRef}
+                type="file"
+                multiple
+                accept=".zip,.txt"
+                style={{ display: 'none' }}
+                onChange={e => {
+                  const files = Array.from(e.target.files || []);
+                  setDosyalar(files);
+                  if (files.length > 0 && !grupAdi)
+                    setGrupAdi(dosyaAdiTemizle(files[0].name));
+                  e.target.value = '';
+                }}
+              />
+
+              {/* Gizli input: klasör seçimi */}
+              {/* @ts-ignore */}
+              <input
+                ref={klasorRef}
+                type="file"
+                {...({ webkitdirectory: '' } as any)}
+                style={{ display: 'none' }}
+                onChange={e => {
+                  const files = Array.from(e.target.files || [])
+                    .filter(f => f.name.endsWith('.zip') || f.name.endsWith('.txt'));
+                  setDosyalar(files);
+                  if (files.length > 0 && !grupAdi) {
+                    // Klasör adını webkitRelativePath'ten çek
+                    const relPath = (files[0] as any).webkitRelativePath as string | undefined;
+                    const folderName = relPath?.split('/')?.[0] || dosyaAdiTemizle(files[0].name);
+                    setGrupAdi(folderName);
+                  }
+                  e.target.value = '';
+                }}
+              />
+
+              <button
+                onClick={() => (klasorModu ? klasorRef : dosyaRef).current?.click()}
+                style={{
+                  display: 'block', marginTop: 4,
+                  background: dosyalar.length > 0 ? '#0d2b1a' : '#0d1117',
+                  border: `1px dashed ${dosyalar.length > 0 ? '#166534' : '#374151'}`,
+                  color: dosyalar.length > 0 ? '#22c55e' : '#8b949e',
+                  borderRadius: 6, padding: '6px 14px', fontSize: '0.82rem',
+                  cursor: 'pointer', fontWeight: 600, whiteSpace: 'nowrap',
+                }}>
+                {dosyalar.length > 0
+                  ? `✓ ${dosyalar.length} dosya seçildi`
+                  : klasorModu
+                  ? '📁 Klasör Seç'
+                  : '📄 Dosya Seç'}
+              </button>
+
+              {klasorModu && dosyalar.length === 0 && (
+                <div style={{ color: '#4b5563', fontSize: '0.68rem', marginTop: 4, maxWidth: 200 }}>
+                  Tüm ZIP/TXT'leri aynı klasöre koy, o klasörü seç.
+                </div>
+              )}
             </div>
 
             <button onClick={yukle} disabled={yukleniyor || dosyalar.length === 0}
