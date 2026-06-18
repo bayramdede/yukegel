@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 
 export default function WhatsappYukle() {
   const [acik, setAcik] = useState(false);
@@ -8,7 +8,9 @@ export default function WhatsappYukle() {
   const [yukleniyor, setYukleniyor] = useState(false);
   const [sonuc, setSonuc] = useState<any>(null);
   const [saatFiltre, setSaatFiltre] = useState(48);
-
+  const [klasorModu, setKlasorModu] = useState(false);
+  const dosyaRef = useRef<HTMLInputElement>(null);
+  const klasorRef = useRef<HTMLInputElement>(null);
 
   const [debugAcik, setDebugAcik] = useState(false);
 
