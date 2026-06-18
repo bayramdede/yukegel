@@ -485,7 +485,36 @@ function DuzenleForm({ poi, onKaydet, onIptal, kayitYukleniyor }: {
     latitude: String(poi.latitude), longitude: String(poi.longitude),
     is_emergency: poi.is_emergency,
   });
+  const [enrichDurum, setEnrichDurum] = useState<'idle' | 'loading' | 'done' | 'error'>('idle');
+
   function set(f: string, v: string | boolean | string[]) { setForm(prev => ({ ...prev, [f]: v })); }
+
+  async function enrichirMevcut() {
+    setEnrichDurum('loading');
+    try {
+      const res = await fetch('/api/admin/enrich-poi', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ poi_id: poi.id }),
+      });
+      const d = await res.json();
+      if (!d.success) { setEnrichDurum('error'); return; }
+      const r = d.data;
+      setForm(prev => ({
+        ...prev,
+        ...(r.description  != null && { description:  r.description }),
+        ...(r.address_note != null && { address_note: r.address_note }),
+        ...(Array.isArray(r.categories) && r.categories.length > 0 && {
+          categories: r.categories,
+          category: r.categories[0],
+        }),
+      }));
+      setEnrichDurum('done');
+    } catch {
+      setEnrichDurum('error');
+    }
+  }
+
   function kaydet() {
     const tags = Array.isArray(form.tags) ? form.tags as string[] : [];
     const categories = Array.isArray(form.categories) && (form.categories as string[]).length > 0
@@ -509,6 +538,21 @@ function DuzenleForm({ poi, onKaydet, onIptal, kayitYukleniyor }: {
   }
   return (
     <div style={{ borderTop: `1px solid ${C.border}`, marginTop: 12, paddingTop: 14 }}>
+      {/* AI Doldur */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+        <button onClick={enrichirMevcut} disabled={enrichDurum === 'loading'}
+          style={{ background: enrichDurum === 'done' ? C.greenDark : '#1e1b4b',
+            color: enrichDurum === 'done' ? C.green : '#818cf8',
+            border: `1px solid ${enrichDurum === 'done' ? C.green : '#4338ca50'}`,
+            borderRadius: 6, padding: '5px 13px', fontSize: '0.78rem', fontWeight: 600,
+            cursor: enrichDurum === 'loading' ? 'wait' : 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
+          {enrichDurum === 'loading'
+            ? <><span style={{ display: 'inline-block', width: 9, height: 9, border: '2px solid #818cf8', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />Dolduruluyor...</>
+            : enrichDurum === 'done' ? '✅ Dolduruldu' : '🤖 AI Doldur'}
+        </button>
+        {enrichDurum === 'done' && <span style={{ color: C.muted, fontSize: '0.74rem' }}>Açıklama, adres tarifi ve kategoriler güncellendi — kontrol edin</span>}
+        {enrichDurum === 'error' && <span style={{ color: C.red, fontSize: '0.74rem' }}>Hata oluştu, tekrar deneyin</span>}
+      </div>
       <FormGrid form={form} set={set} showButtons onKaydet={kaydet} onIptal={onIptal} kayitYukleniyor={kayitYukleniyor} btnLabel="💾 Kaydet" />
     </div>
   );
