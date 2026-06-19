@@ -1290,7 +1290,43 @@ export default function PoiOnayClient() {
     finally { setYukleniyor(false); }
   }
 
-  useEffect(() => { yukle(gosterilen); }, [gosterilen]);
+  useEffect(() => { yukle(gosterilen); setSeciliIds(new Set()); }, [gosterilen]);
+
+  // ── Toplu seçim yardımcıları ──
+  function toggleSecim(id: string) {
+    setSeciliIds(prev => {
+      const s = new Set(prev);
+      if (s.has(id)) s.delete(id); else s.add(id);
+      return s;
+    });
+  }
+  function tumunuSec() { setSeciliIds(new Set(pois.map(p => p.id))); }
+  function secimiTemizle() { setSeciliIds(new Set()); }
+  function guvenliSec() {
+    // quality_score >= 70 olanlar
+    setSeciliIds(new Set(pois.filter(p => (p.quality_score ?? 0) >= 70).map(p => p.id)));
+  }
+
+  async function topluDurumGuncelle(status: 'approved' | 'rejected') {
+    if (seciliIds.size === 0) return;
+    setTopluIslemYukleniyor(true); setHata('');
+    try {
+      const ids = [...seciliIds];
+      const res = await fetch('/api/admin/poi', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids, status }),
+      });
+      const d = await res.json();
+      if (d.success) {
+        setPois(prev => prev.filter(p => !seciliIds.has(p.id)));
+        setSeciliIds(new Set());
+      } else {
+        setHata(d.error || 'Toplu işlem başarısız.');
+      }
+    } catch { setHata('Bağlantı hatası.'); }
+    finally { setTopluIslemYukleniyor(false); }
+  }
 
   function uygula() { yukle(gosterilen); }
   function sifirla() {
