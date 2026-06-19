@@ -221,3 +221,66 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, error: 'Beklenmeyen bir hata oluştu.' }, { status: 500 });
   }
 }
+
+// ─────────────────────────────────────────────
+// PATCH /api/admin/poi
+// Toplu durum güncelleme — body: { ids: string[], status: 'approved'|'rejected' }
+// Service role; .in() 50'lik chunk ile (PostgREST URL limiti)
+// ─────────────────────────────────────────────
+export async function PATCH(request: NextRequest) {
+  try {
+    const ssrClient = await getServerSupabase();
+    const { data: { user } } = await ssrClient.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ success: false, error: 'Giriş gerekli.' }, { status: 401 });
+    }
+
+    const supabase = getServiceSupabase();
+    const { data: profil } = await supabase
+      .from('users')
+      .select('role')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    if (!profil || !['admin', 'moderator'].includes(profil.role)) {
+      return NextResponse.json({ success: false, error: 'Yetersiz yetki.' }, { status: 403 });
+    }
+
+    const { ids, status } = await request.json() as { ids: string[]; status: string };
+
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return NextResponse.json({ success: false, error: 'En az bir kayıt seçilmeli.' }, { status: 400 });
+    }
+    if (!['approved', 'rejected'].includes(status)) {
+      return NextResponse.json({ success: false, error: 'Geçersiz durum.' }, { status: 400 });
+    }
+    if (ids.length > 1000) {
+      return NextResponse.json({ success: false, error: 'Tek seferde en fazla 1000 kayıt.' }, { status: 400 });
+    }
+
+    // PostgREST URL limiti — 50'lik chunk
+    let updated = 0;
+    for (let i = 0; i < ids.length; i += 50) {
+      const chunk = ids.slice(i, i + 50);
+      const { data, error } = await supabase
+        .from('pois')
+        .update({ status })
+        .in('id', chunk)
+        .select('id');
+      if (error) {
+        console.error('[admin/poi/PATCH] Update error:', error);
+        return NextResponse.json({ success: false, error: 'Güncelleme hatası: ' + error.message }, { status: 500 });
+      }
+      updated += data?.length ?? 0;
+    }
+
+    return NextResponse.json({
+      success: true,
+      updated,
+      message: `${updated} kayıt ${status === 'approved' ? 'onaylandı' : 'reddedildi'}.`,
+    });
+  } catch (err) {
+    console.error('[admin/poi/PATCH] Unexpected error:', err);
+    return NextResponse.json({ success: false, error: 'Beklenmeyen bir hata oluştu.' }, { status: 500 });
+  }
+}
