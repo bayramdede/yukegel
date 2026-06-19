@@ -1580,6 +1580,46 @@ export default function PoiOnayClient() {
         </div>
       </div>
 
+      {/* ── Toplu Seçim & Onay Barı ── */}
+      {!yukleniyor && pois.length > 0 && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
+          background: C.surface, border: `1px solid ${seciliIds.size > 0 ? C.green : C.border}`,
+          borderRadius: 8, padding: '10px 14px', marginBottom: 12,
+        }}>
+          <span style={{ color: C.text, fontSize: '0.82rem', fontWeight: 700 }}>
+            {seciliIds.size > 0 ? `${seciliIds.size} seçili` : 'Toplu işlem'}
+          </span>
+          <button onClick={guvenliSec}
+            style={{ background: C.greenDark, color: C.green, border: `1px solid ${C.greenBg}`, borderRadius: 6, padding: '5px 12px', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer' }}>
+            🟢 Puan≥ 70 Seç
+          </button>
+          <button onClick={tumunuSec}
+            style={{ background: 'none', color: C.muted, border: `1px solid ${C.border}`, borderRadius: 6, padding: '5px 12px', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer' }}>
+            Tümünü Seç
+          </button>
+          {seciliIds.size > 0 && (
+            <button onClick={secimiTemizle}
+              style={{ background: 'none', color: C.dim, border: `1px solid ${C.border}`, borderRadius: 6, padding: '5px 10px', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer' }}>
+              Temizle
+            </button>
+          )}
+          <div style={{ flex: 1 }} />
+          {seciliIds.size > 0 && gosterilen !== 'approved' && (
+            <button onClick={() => topluDurumGuncelle('approved')} disabled={topluIslemYukleniyor}
+              style={{ background: C.greenBg, color: C.green, border: `1px solid ${C.green}`, borderRadius: 6, padding: '6px 16px', fontSize: '0.82rem', fontWeight: 700, cursor: topluIslemYukleniyor ? 'wait' : 'pointer', opacity: topluIslemYukleniyor ? 0.6 : 1 }}>
+              {topluIslemYukleniyor ? '...' : `✅ Seçilenleri Onayla (${seciliIds.size})`}
+            </button>
+          )}
+          {seciliIds.size > 0 && gosterilen !== 'rejected' && (
+            <button onClick={() => topluDurumGuncelle('rejected')} disabled={topluIslemYukleniyor}
+              style={{ background: 'transparent', color: C.red, border: `1px solid ${C.redBg}`, borderRadius: 6, padding: '6px 16px', fontSize: '0.82rem', fontWeight: 700, cursor: topluIslemYukleniyor ? 'wait' : 'pointer', opacity: topluIslemYukleniyor ? 0.6 : 1 }}>
+              {topluIslemYukleniyor ? '...' : `❌ Seçilenleri Reddet (${seciliIds.size})`}
+            </button>
+          )}
+        </div>
+      )}
+
       {/* ── Liste ── */}
       {yukleniyor ? (
         <div style={{ textAlign: 'center', padding: '60px 0', color: C.dim }}>Yükleniyor...</div>
