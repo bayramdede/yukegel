@@ -1246,6 +1246,10 @@ export default function PoiOnayClient() {
   const [hata, setHata] = useState('');
   const [gosterilen, setGosterilen] = useState<'pending' | 'approved' | 'rejected'>('pending');
 
+  // Toplu seçim & onay
+  const [seciliIds, setSeciliIds] = useState<Set<string>>(new Set());
+  const [topluIslemYukleniyor, setTopluIslemYukleniyor] = useState(false);
+
   // Filtre & sıralama
   const [search, setSearch]       = useState('');
   const [katFilter, setKatFilter] = useState('');
