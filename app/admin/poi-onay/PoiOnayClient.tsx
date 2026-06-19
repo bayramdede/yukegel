@@ -51,6 +51,7 @@ const KATEGORI: Record<string, string> = POI_KATEGORI_ETIKET;
 const ETIKET_ONERILERI = POI_GENEL_ETIKETLER;
 
 const SORT_OPTIONS = [
+  { value: 'quality_score', label: 'Kalite Skoru' },
   { value: 'created_at',  label: 'Tarih' },
   { value: 'name',        label: 'Ad' },
   { value: 'avg_rating',  label: 'Puan' },
