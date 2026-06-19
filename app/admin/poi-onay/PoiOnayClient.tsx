@@ -1657,7 +1657,9 @@ export default function PoiOnayClient() {
                     {poi.is_emergency && <span style={{ background: C.redBg, color: C.red, fontSize: '0.65rem', fontWeight: 700, padding: '1px 6px', borderRadius: 4 }}>🆘 ACİL</span>}
                   </div>
                   <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 4, alignItems: 'center' }}>
-                    <span style={{ color: C.muted, fontSize: '0.8rem' }}>{KATEGORI[poi.category] ?? poi.category}</span>
+                    {(Array.isArray(poi.categories) && poi.categories.length > 0 ? poi.categories : [poi.category]).map(c => (
+                      <span key={c} style={{ color: C.muted, fontSize: '0.8rem', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 6, padding: '1px 7px' }}>{KATEGORI[c] ?? c}</span>
+                    ))}
                     {poi.city && <span style={{ color: C.dim, fontSize: '0.8rem' }}>📍 {poi.city}{poi.district ? ` / ${poi.district}` : ''}</span>}
                     {poi.phone && <span style={{ color: C.dim, fontSize: '0.78rem' }}>📞 {poi.phone}</span>}
                     <span style={{ color: C.dim, fontSize: '0.78rem' }}>{poi.latitude.toFixed(5)}, {poi.longitude.toFixed(5)}</span>
