@@ -1685,8 +1685,8 @@ export default function PoiOnayClient() {
                 {poi.google_place_id && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 3, flexShrink: 0 }}>
                     {poi.google_rating != null && (
-                      <span style={{ fontSize: '0.75rem', color: C.amber }}>
-                        ★ {poi.google_rating.toFixed(1)} ({poi.google_review_count ?? 0} G yorum)
+                      <span style={{ fontSize: '0.75rem', color: C.amber }} title="Google Maps puanı ve yorum sayısı">
+                        Google ★ {poi.google_rating.toFixed(1)} ({poi.google_review_count ?? 0} yorum)
                       </span>
                     )}
                     <span style={{ fontSize: '0.72rem', color: C.dim }}>🌐 Google Places</span>
