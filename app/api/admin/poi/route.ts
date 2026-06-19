@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSupabase, getServiceSupabase } from '../../../../lib/auth';
 import { POI_GECERLI_KATEGORILER } from '../../../../lib/poi-constants';
+import { scorePoi } from '../../../../lib/poi-score';
 
 export const runtime = 'nodejs';
 
