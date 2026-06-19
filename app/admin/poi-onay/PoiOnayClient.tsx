@@ -1631,10 +1631,17 @@ export default function PoiOnayClient() {
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {pois.map(poi => (
-            <div key={poi.id} style={{ background: C.surface, border: `1px solid ${duzenleId === poi.id ? C.blue : C.border}`, borderRadius: 8, padding: '14px 16px', transition: 'border-color 0.15s' }}>
+            <div key={poi.id} style={{ background: C.surface, border: `1px solid ${seciliIds.has(poi.id) ? C.green : duzenleId === poi.id ? C.blue : C.border}`, borderRadius: 8, padding: '14px 16px', transition: 'border-color 0.15s' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+                <input
+                  type="checkbox"
+                  checked={seciliIds.has(poi.id)}
+                  onChange={() => toggleSecim(poi.id)}
+                  style={{ accentColor: C.green, width: 18, height: 18, flexShrink: 0, cursor: 'pointer' }}
+                />
                 <div style={{ flex: 1, minWidth: 220 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
+                    <ScoreBadge score={poi.quality_score} level={poi.score_level} reasons={poi.score_reasons} />
                     <span style={{ color: C.text, fontWeight: 700, fontSize: '0.95rem' }}>{poi.name}</span>
                     {poi.is_emergency && <span style={{ background: C.redBg, color: C.red, fontSize: '0.65rem', fontWeight: 700, padding: '1px 6px', borderRadius: 4 }}>🆘 ACİL</span>}
                   </div>
