@@ -186,6 +186,10 @@ interface Poi extends PoiInput {
   satellite_confirmed?: boolean;
   is_active?: boolean;
   last_synced_at?: string | null;
+  // Kalite puanlama (API runtime'da ekler)
+  quality_score?: number;
+  score_level?: 'green' | 'yellow' | 'red';
+  score_reasons?: { label: string; delta: number }[];
 }
 
 // Form state — tüm alanlar string | boolean | string[]
