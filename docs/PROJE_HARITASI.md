@@ -312,6 +312,12 @@ Açık rotalar: /giris, /auth/, /profil-tamamla, /nasil-calisir, /hakkimizda,
 ## 14. GÖREV DURUMU
 
 ### ✅ Tamamlanan
+- **POI Kalite Puanlama + Toplu Onay** (19 Haziran 2026): `/admin/poi-onay` sayfasına kalite puanı ve toplu seç/onayla eklendi.
+  - `lib/poi-score.ts`: 0-100 kalite puanı hesaplar (telefon +20, website +10, tam adres +15, isimde TİR/kamyon anahtarı +20, Google rating≥4&yorum≥10 +25 / rating<2.5&yorum≥20 -40, blacklist isim -50, kategori çelişkisi -50). Eşik: ≥70 yeşil, 40-69 sarı, <40 kırmızı. İ/I trLower normalize.
+  - `/api/admin/poi` GET: her kayda `quality_score`, `score_level`, `score_reasons` ekler (DB'ye yazılmaz, runtime); select'e Google alanları eklendi.
+  - `/api/admin/poi` PATCH (yeni): toplu durum güncelleme `{ ids[], status }`, service role, `.in()` 50'lik chunk.
+  - UI: her kartta checkbox + puan rozeti (hover'da gerekçe tooltip), liste üstünde toplu bar ("Puan≥70 Seç" / Tümünü Seç / Seçilenleri Onayla / Reddet). Onay insan eliyle — puan tek başına approved yapmaz.
+  - **Not:** Şema değişikliği YOK, migration gerekmez. Puan tamamen runtime hesaplanır.
 - **POI Google Places Entegrasyonu** (15 Haziran 2026): Mevcut POI modülüne Google Places veri pipeline'ı eklendi.
   - DB: `google_place_id` (unique), `google_rating`, `google_review_count`, `reviews_summary`, `verified`, `satellite_confirmed`, `is_active`, `last_synced_at` kolonları. 11 yeni TIR-spesifik kategori.
   - API: `/api/admin/poi-import` (Places Text Search + Details, upsert, duplicate engeli), `/api/admin/poi-import/[id]/summarize` (Claude Haiku ile Türkçe özet).
