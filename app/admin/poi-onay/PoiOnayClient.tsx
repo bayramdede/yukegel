@@ -1640,7 +1640,7 @@ export default function PoiOnayClient() {
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {pois.map(poi => (
+          {siraliPois.map(poi => (
             <div key={poi.id} style={{ background: C.surface, border: `1px solid ${seciliIds.has(poi.id) ? C.green : duzenleId === poi.id ? C.blue : C.border}`, borderRadius: 8, padding: '14px 16px', transition: 'border-color 0.15s' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
                 <input
