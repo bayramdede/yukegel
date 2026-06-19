@@ -1254,7 +1254,7 @@ export default function PoiOnayClient() {
   // Filtre & sıralama
   const [search, setSearch]       = useState('');
   const [katFilter, setKatFilter] = useState('');
-  const [sortBy, setSortBy]       = useState('created_at');
+  const [sortBy, setSortBy]       = useState('quality_score');
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
 
   // Tekil ekleme
