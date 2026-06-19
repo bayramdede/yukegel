@@ -246,17 +246,18 @@ function ScoreBadge({ score, level, reasons }: {
   const renk = level === 'green' ? C.green : level === 'yellow' ? C.amber : C.red;
   const bg   = level === 'green' ? C.greenDark : level === 'yellow' ? C.amberBg : C.redBg;
   const ikon = level === 'green' ? '🟢' : level === 'yellow' ? '🟡' : '🔴';
-  const ozet = (reasons ?? []).map(r => `${r.delta > 0 ? '+' : ''}${r.delta} ${r.label}`).join('\n');
+  const gerekceler = (reasons ?? []).map(r => `${r.delta > 0 ? '+' : ''}${r.delta} ${r.label}`).join('\n');
+  const ozet = `Yukegel kalite skoru (Google puanı değil) — 0-100 arası.\nTır/kamyon uygunluğu, iletişim ve Google sinyallerinden hesaplanır.${gerekceler ? '\n\n' + gerekceler : ''}`;
   return (
     <span
-      title={ozet || 'Kalite puanı'}
+      title={ozet}
       style={{
         background: bg, color: renk, border: `1px solid ${renk}55`,
         borderRadius: 6, padding: '2px 8px', fontSize: '0.74rem', fontWeight: 700,
         whiteSpace: 'nowrap', cursor: 'help', display: 'inline-flex', alignItems: 'center', gap: 4,
       }}
     >
-      {ikon} {score}
+      {ikon} Kalite {score}
     </span>
   );
 }
