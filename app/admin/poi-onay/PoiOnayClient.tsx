@@ -1433,6 +1433,15 @@ export default function PoiOnayClient() {
   const onizlemeVar = excelGecerli.length > 0 || excelHatalar.length > 0;
   const filtreAktif = search || katFilter || sortBy !== 'quality_score' || sortOrder !== 'desc';
 
+  // Kalite skoru DB kolonu değil (runtime hesaplanır), bu yüzden skora göre
+  // sıralamayı client'ta yapıyoruz. Diğer sıralamalar API'dan geldiği gibi kalır.
+  const siraliPois = sortBy === 'quality_score'
+    ? [...pois].sort((a, b) => {
+        const fark = (a.quality_score ?? 0) - (b.quality_score ?? 0);
+        return sortOrder === 'asc' ? fark : -fark;
+      })
+    : pois;
+
   return (
     <div>
 
