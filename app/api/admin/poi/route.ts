@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
 
     let query = supabase
       .from('pois')
-      .select('id, name, description, category, city, district, address, address_note, phone, website, tags, latitude, longitude, is_emergency, status, added_by, created_at, avg_rating, review_count')
+      .select('id, name, description, category, city, district, address, address_note, phone, website, tags, latitude, longitude, is_emergency, status, added_by, created_at, avg_rating, review_count, google_place_id, google_maps_url, google_rating, google_review_count, reviews_summary, satellite_confirmed')
       .eq('status', statusFilter);
 
     if (search) query = query.ilike('name', `%${search}%`);
@@ -70,10 +70,27 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const sonuc = (pois || []).map(p => ({
-      ...p,
-      ekleyen: p.added_by ? (kullaniciMap[p.added_by] ?? null) : null,
-    }));
+    const sonuc = (pois || []).map(p => {
+      const skor = scorePoi({
+        name: p.name,
+        category: p.category,
+        phone: p.phone,
+        website: p.website,
+        address: p.address,
+        district: p.district,
+        tags: p.tags,
+        google_place_id: p.google_place_id,
+        google_rating: p.google_rating,
+        google_review_count: p.google_review_count,
+      });
+      return {
+        ...p,
+        ekleyen: p.added_by ? (kullaniciMap[p.added_by] ?? null) : null,
+        quality_score: skor.score,
+        score_level: skor.level,
+        score_reasons: skor.reasons,
+      };
+    });
 
     return NextResponse.json({ success: true, data: sonuc });
   } catch (err) {
