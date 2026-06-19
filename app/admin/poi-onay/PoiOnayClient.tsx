@@ -1331,8 +1331,8 @@ export default function PoiOnayClient() {
 
   function uygula() { yukle(gosterilen); }
   function sifirla() {
-    setSearch(''); setKatFilter(''); setSortBy('created_at'); setSortOrder('desc');
-    yukle(gosterilen, { search: '', category: '', sort: 'created_at', order: 'desc' });
+    setSearch(''); setKatFilter(''); setSortBy('quality_score'); setSortOrder('desc');
+    yukle(gosterilen, { search: '', category: '', sort: 'quality_score', order: 'desc' });
   }
 
   async function durumGuncelle(id: string, status: 'approved' | 'rejected') {
@@ -1431,7 +1431,7 @@ export default function PoiOnayClient() {
   ];
 
   const onizlemeVar = excelGecerli.length > 0 || excelHatalar.length > 0;
-  const filtreAktif = search || katFilter || sortBy !== 'created_at' || sortOrder !== 'desc';
+  const filtreAktif = search || katFilter || sortBy !== 'quality_score' || sortOrder !== 'desc';
 
   return (
     <div>
