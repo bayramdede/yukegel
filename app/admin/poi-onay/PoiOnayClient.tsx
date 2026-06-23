@@ -1333,7 +1333,7 @@ export default function PoiOnayClient() {
 
   function uygula() { yukle(gosterilen); }
   function sifirla() {
-    setSearch(''); setKatFilter(''); setSortBy('quality_score'); setSortOrder('desc');
+    setSearch(''); setKatFilter(''); setSortBy('quality_score'); setSortOrder('desc'); setTelefonsuzFiltre(false);
     yukle(gosterilen, { search: '', category: '', sort: 'quality_score', order: 'desc' });
   }
 
