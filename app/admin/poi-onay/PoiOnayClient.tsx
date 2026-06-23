@@ -1437,12 +1437,17 @@ export default function PoiOnayClient() {
 
   // Kalite skoru DB kolonu değil (runtime hesaplanır), bu yüzden skora göre
   // sıralamayı client'ta yapıyoruz. Diğer sıralamalar API'dan geldiği gibi kalır.
-  const siraliPois = sortBy === 'quality_score'
-    ? [...pois].sort((a, b) => {
-        const fark = (a.quality_score ?? 0) - (b.quality_score ?? 0);
-        return sortOrder === 'asc' ? fark : -fark;
-      })
-    : pois;
+  const siraliPois = (() => {
+    let liste = sortBy === 'quality_score'
+      ? [...pois].sort((a, b) => {
+          const fark = (a.quality_score ?? 0) - (b.quality_score ?? 0);
+          return sortOrder === 'asc' ? fark : -fark;
+        })
+      : [...pois];
+    if (telefonsuzFiltre) liste = liste.filter(p => !p.phone);
+    return liste;
+  })();
+  const telefonsuzSayisi = pois.filter(p => !p.phone).length;
 
   return (
     <div>
