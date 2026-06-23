@@ -568,7 +568,9 @@ export async function POST(request: NextRequest) {
             if (!sonuclar[i]) {
               filtrelenen++;
               filtreSayac.claude++;
-              elenenler.push({ ad: y.name, adres: y.formatted_address || '', kategori, sebep: 'Claude: kategori dışı', place_id: y.place_id });
+              if (!mevcutPlaceIds.has(y.place_id)) {
+                elenenler.push({ ad: y.name, adres: y.formatted_address || '', kategori, sebep: 'Claude: kategori dışı', place_id: y.place_id });
+              }
               return false;
             }
             return true;
