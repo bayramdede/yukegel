@@ -1433,7 +1433,7 @@ export default function PoiOnayClient() {
   ];
 
   const onizlemeVar = excelGecerli.length > 0 || excelHatalar.length > 0;
-  const filtreAktif = search || katFilter || sortBy !== 'quality_score' || sortOrder !== 'desc';
+  const filtreAktif = search || katFilter || sortBy !== 'quality_score' || sortOrder !== 'desc' || telefonsuzFiltre;
 
   // Kalite skoru DB kolonu değil (runtime hesaplanır), bu yüzden skora göre
   // sıralamayı client'ta yapıyoruz. Diğer sıralamalar API'dan geldiği gibi kalır.
