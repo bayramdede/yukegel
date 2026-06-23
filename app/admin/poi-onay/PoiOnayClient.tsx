@@ -1669,6 +1669,7 @@ export default function PoiOnayClient() {
                     <ScoreBadge score={poi.quality_score} level={poi.score_level} reasons={poi.score_reasons} />
                     <span style={{ color: C.text, fontWeight: 700, fontSize: '0.95rem' }}>{poi.name}</span>
                     {poi.is_emergency && <span style={{ background: C.redBg, color: C.red, fontSize: '0.65rem', fontWeight: 700, padding: '1px 6px', borderRadius: 4 }}>🆘 ACİL</span>}
+                    {!poi.phone && <span style={{ background: '#431407', color: '#f97316', fontSize: '0.65rem', fontWeight: 700, padding: '1px 6px', borderRadius: 4 }}>📵 Tel Yok</span>}
                   </div>
                   <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 4, alignItems: 'center' }}>
                     {(Array.isArray(poi.categories) && poi.categories.length > 0 ? poi.categories : [poi.category]).map(c => (
