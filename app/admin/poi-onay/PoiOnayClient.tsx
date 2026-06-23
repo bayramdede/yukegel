@@ -1257,6 +1257,7 @@ export default function PoiOnayClient() {
   const [katFilter, setKatFilter] = useState('');
   const [sortBy, setSortBy]       = useState('quality_score');
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
+  const [telefonsuzFiltre, setTelefonsuzFiltre] = useState(false);
 
   // Tekil ekleme
   const [ekleAcik, setEkleAcik] = useState(false);
