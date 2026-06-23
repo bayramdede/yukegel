@@ -1583,6 +1583,14 @@ export default function PoiOnayClient() {
             {sortOrder === 'desc' ? '↓ Azalan' : '↑ Artan'}
           </button>
         </div>
+        <div style={{ flex: '0 0 auto' }}>
+          <label style={lbl}>Hızlı Filtre</label>
+          <button onClick={() => setTelefonsuzFiltre(v => !v)}
+            title={`Telefon numarası olmayan ${telefonsuzSayisi} kayıt`}
+            style={{ background: telefonsuzFiltre ? '#7c2d1222' : 'transparent', color: telefonsuzFiltre ? '#f97316' : C.muted, border: `1px solid ${telefonsuzFiltre ? '#f97316' : C.border}`, borderRadius: 6, padding: '6px 14px', fontSize: '0.82rem', fontWeight: telefonsuzFiltre ? 700 : 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+            📵 Telefonsuz {telefonsuzSayisi > 0 && `(${telefonsuzSayisi})`}
+          </button>
+        </div>
         <div style={{ flex: '0 0 auto', display: 'flex', gap: 6, alignItems: 'flex-end' }}>
           <button onClick={uygula}
             style={{ background: C.greenDark, color: C.green, border: `1px solid ${C.greenBg}`, borderRadius: 6, padding: '6px 16px', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}>
