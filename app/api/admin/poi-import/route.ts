@@ -482,6 +482,15 @@ export async function POST(request: NextRequest) {
     const il = province.trim();
     const ilKoordinat = IL_KOORDINAT[il]; // undefined ise location bias uygulanmaz
 
+    // Daha önce eklenmiş place_id'leri önceden çek — elenenler listesinde tekrar gösterme
+    const { data: mevcutRows } = await supabase
+      .from('pois')
+      .select('google_place_id')
+      .not('google_place_id', 'is', null);
+    const mevcutPlaceIds = new Set<string>(
+      (mevcutRows ?? []).map((r: { google_place_id: string }) => r.google_place_id).filter(Boolean)
+    );
+
     let eklenen = 0, atlanan = 0, filtrelenen = 0, hatali = 0;
     const hatalar: string[] = [];
     const elenenler: { ad: string; adres: string; kategori: string; sebep: string; place_id: string }[] = [];
