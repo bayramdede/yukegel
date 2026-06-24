@@ -520,7 +520,8 @@ export async function POST(request: NextRequest) {
       const bulunanYerler: GooglePlace[] = [];
 
       for (const terim of config.terms) {
-        const sorgu = `${terim} ${il}`;
+        // İl adı öne alınıyor — "Adıyaman nakliyeciler sitesi" Google'ı coğrafi olarak daha iyi anchor eder
+        const sorgu = `${il} ${terim}`;
         try {
           const sonuclar = await textSearch(sorgu, config.type, ilKoordinat, apiKey);
           bulunanYerler.push(...sonuclar);
