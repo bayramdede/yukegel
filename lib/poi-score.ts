@@ -38,8 +38,9 @@ const BLACKLIST_KEYWORDS = [
 
 // Kategoriye özel çelişki anahtarları (kantar kategorisinde "terazi satışı" gibi)
 const CATEGORY_CONFLICT: Record<string, string[]> = {
-  kantar: ['terazi', 'baskül', 'baskul', 'tartı sistemleri', 'tarti sistemleri'],
-  kantar_resmi: ['terazi', 'baskül', 'baskul'],
+  kantar_resmi: ['terazi', 'baskül', 'baskul', 'tartı sistemleri', 'tarti sistemleri'],
+  kantar_ozel:  ['terazi', 'baskül', 'baskul', 'tartı sistemleri', 'tarti sistemleri'],
+  kantar:       ['terazi', 'baskül', 'baskul', 'tartı sistemleri', 'tarti sistemleri'], // eski compat
   tir_parki: ['katlı otopark', 'katli otopark', 'düğün', 'dugun', 'vale'],
   park_dinlenme: ['katlı otopark', 'katli otopark', 'düğün', 'dugun'],
 };
