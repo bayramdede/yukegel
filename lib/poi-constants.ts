@@ -275,7 +275,6 @@ export const POI_KAT_NORM: Record<string, string> = {
   'tesis & akaryakıt':        'akaryakit_istasyonu',
   'tesis & akaryakit':        'akaryakit_istasyonu',
   'tesis ve akaryakıt':       'akaryakit_istasyonu',
-  kantar_resmi:               'kantar',
-  'kantar & resmi':           'kantar',
-  'kantar ve resmi':          'kantar',
+  'kantar & resmi':           'kantar_resmi',
+  'kantar ve resmi':          'kantar_resmi',
 };
