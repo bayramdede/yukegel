@@ -28,7 +28,9 @@ const VALID_CATS_LABELS: Record<string, string> = {
   acil_yol_yardim:     'Acil Yol Yardım',
   dinlenme_tesisi:     'Dinlenme Tesisi',
   esnaf_lokantasi:     'Esnaf Lokantası',
-  kantar:              'Kantar',
+  kantar_resmi:        'Kantar (Resmi)',
+  kantar_ozel:         'Kantar (Özel)',
+  kantar:              'Kantar',             // eski compat
   nakliyeciler_sitesi: 'Nakliyeciler Sitesi',
   gumruk_sinir:        'Gümrük & Sınır',
   antrepo_depo:        'Antrepo & Depo',
