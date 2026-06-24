@@ -68,7 +68,6 @@ export default function YolRehberiClient() {
   // Backward-compat: tek kategori filtresi için
   const aktifKategori = aktifAltKatlar.length === 1 ? aktifAltKatlar[0] : aktifAltKatlar.length === 0 ? aktifAnaKat : 'hepsi';
   const [aktifEtiketler, setAktifEtiketler] = useState<string[]>([]);
-  const [sosAktif, setSosAktif] = useState(false);
   const [secilenPoi, setSecilenPoi] = useState<string | null>(null);
   const [ekleModalAcik, setEkleModalAcik] = useState(false);
   const [gorunum, setGorunum] = useState<Gorunum>('liste');
@@ -115,7 +114,7 @@ export default function YolRehberiClient() {
         });
         if (gonderilecekKatlar.length > 0) params.set('categories', gonderilecekKatlar.join(','));
         if (aktifEtiketler.length) params.set('tags', aktifEtiketler.join(','));
-        if (sosAktif) params.set('emergency', 'true');
+
         if (userLat) params.set('lat', userLat.toString());
         if (userLng) params.set('lng', userLng.toString());
 
