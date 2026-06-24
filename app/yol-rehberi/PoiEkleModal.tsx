@@ -219,6 +219,37 @@ export default function PoiEkleModal({ onKapat, onBasarili }: Props) {
             </>
           )}
 
+          {/* Özellikler / Etiketler */}
+          {(form.categories.length > 0 || aktifAnaKat === '') && (() => {
+            const etiketler = form.categories.length > 0
+              ? [...new Set(form.categories.flatMap(k => POI_ALT_ETIKETLER[k] ?? []))]
+              : POI_GENEL_ETIKETLER;
+            if (etiketler.length === 0) return null;
+            return (
+              <>
+                <label style={labelStyle}>Özellikler / Etiketler</label>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 16 }}>
+                  {etiketler.map(e => (
+                    <button
+                      key={e}
+                      type="button"
+                      onClick={() => toggleEtiket(e)}
+                      style={{
+                        padding: '5px 10px', borderRadius: 16, fontSize: 12,
+                        border: `1px solid ${secilenEtiketler.includes(e) ? '#22c55e' : '#30363d'}`,
+                        background: secilenEtiketler.includes(e) ? '#14532d' : 'transparent',
+                        color: secilenEtiketler.includes(e) ? '#22c55e' : '#8b949e',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {e}
+                    </button>
+                  ))}
+                </div>
+              </>
+            );
+          })()}
+
           {/* Koordinat — GPS butonu */}
           <label style={labelStyle}>Konum *</label>
           <button
