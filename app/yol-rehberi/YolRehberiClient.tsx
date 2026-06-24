@@ -200,20 +200,6 @@ export default function YolRehberiClient() {
         </div>
 
         <div style={{ display: 'flex', gap: 8 }}>
-          {/* SOS */}
-          <button
-            onClick={handleSos}
-            style={{
-              padding: '7px 12px', borderRadius: 8, border: 'none',
-              background: sosAktif ? '#dc2626' : '#7f1d1d',
-              color: '#fff', fontWeight: 700, fontSize: 12,
-              cursor: 'pointer',
-              boxShadow: sosAktif ? '0 0 0 3px rgba(239,68,68,0.35)' : 'none',
-            }}
-          >
-            🆘 SOS
-          </button>
-
           {/* Görünüm toggle */}
           <div style={{
             display: 'flex', background: '#21262d',
