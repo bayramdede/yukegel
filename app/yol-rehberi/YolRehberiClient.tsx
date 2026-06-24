@@ -174,13 +174,6 @@ export default function YolRehberiClient() {
     );
   };
 
-  const handleSos = () => {
-    setSosAktif(prev => !prev);
-    setAktifAnaKat('hepsi');
-    setAktifAltKatlar([]);
-    setAktifEtiketler([]);
-  };
-
   const aktifAnaKatConfig = POI_HIYERARSI.find(a => a.value === aktifAnaKat);
   // Tek alt kategori seçiliyse onun tag önerilerini göster
   const altEtiketler = aktifAltKatlar.length === 1 ? (ALT_ETIKETLER[aktifAltKatlar[0]] || []) : [];
