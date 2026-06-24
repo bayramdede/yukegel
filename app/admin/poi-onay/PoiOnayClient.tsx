@@ -389,45 +389,6 @@ function FormGrid({ form, set, showButtons, onKaydet, onIptal, kayitYukleniyor, 
         )}
       </div>
 
-      {/* Koordinat + GPS */}
-      <div style={{ marginBottom: 12 }}>
-        <label style={lbl}>Konum *</label>
-
-        {/* Birleşik yapıştırma alanı */}
-        <div style={{ marginBottom: 8 }}>
-          <input
-            style={{ ...inp, borderColor: C.blue + '80' }}
-            placeholder="Google Maps'ten kopyala: 40.97933, 29.16325"
-            onChange={e => {
-              const val = e.target.value.trim();
-              // "lat, lng" veya "lat lng" formatını dene
-              const m = val.match(/^(-?\d+\.?\d*)[,\s]+(-?\d+\.?\d*)$/);
-              if (m) { set('latitude', m[1]); set('longitude', m[2]); e.target.style.borderColor = C.green; }
-              else if (val) { e.target.style.borderColor = C.red; }
-              else { e.target.style.borderColor = C.blue + '80'; }
-            }}
-          />
-        </div>
-
-        <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', flexWrap: 'wrap' }}>
-          <div style={{ flex: '1 1 140px' }}>
-            <input style={inp} type="number" step="0.000001" value={String(form.latitude)} onChange={e => set('latitude', e.target.value)} placeholder="Enlem (41.015137)" />
-          </div>
-          <div style={{ flex: '1 1 140px' }}>
-            <input style={inp} type="number" step="0.000001" value={String(form.longitude)} onChange={e => set('longitude', e.target.value)} placeholder="Boylam (28.979530)" />
-          </div>
-          <button type="button" onClick={gps.durum === 'loading' ? undefined : gps.al}
-            style={{ flexShrink: 0, background: gps.durum === 'success' ? C.greenDark : C.surface,
-              color: gps.durum === 'success' ? C.green : gps.durum === 'error' ? C.red : C.muted,
-              border: `1px solid ${gps.durum === 'success' ? C.green : gps.durum === 'error' ? C.red : C.border}`,
-              borderRadius: 6, padding: '6px 12px', fontSize: '0.8rem', fontWeight: 600,
-              cursor: gps.durum === 'loading' ? 'wait' : 'pointer', whiteSpace: 'nowrap' }}>
-            {gps.durum === 'loading' ? '⏳ Alınıyor...' : gps.durum === 'success' ? '✅ Alındı' : '📍 GPS\'ten Al'}
-          </button>
-        </div>
-        {gps.durum === 'error' && <div style={{ color: C.red, fontSize: '0.74rem', marginTop: 4 }}>{gps.hata}</div>}
-      </div>
-
       {/* Etiketler */}
       <div style={{ marginBottom: 12 }}>
         <label style={lbl}>Özellikler / Etiketler</label>
