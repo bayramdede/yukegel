@@ -428,22 +428,6 @@ function FormGrid({ form, set, showButtons, onKaydet, onIptal, kayitYukleniyor, 
         {gps.durum === 'error' && <div style={{ color: C.red, fontSize: '0.74rem', marginTop: 4 }}>{gps.hata}</div>}
       </div>
 
-      {/* Adres + Adres Tarifi */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
-        <div><label style={lbl}>Adres</label>
-          <input style={inp} value={String(form.address)} onChange={e => set('address', e.target.value)} placeholder="E-5 No:12" />
-        </div>
-        <div><label style={lbl}>Adres Tarifi</label>
-          <textarea style={{ ...inp, resize: 'vertical', minHeight: 56 }} value={String(form.address_note)} onChange={e => set('address_note', e.target.value)} placeholder="Kavşaktan sağa dön..." />
-        </div>
-      </div>
-
-      {/* Açıklama */}
-      <div style={{ marginBottom: 10 }}>
-        <label style={lbl}>Açıklama</label>
-        <textarea style={{ ...inp, resize: 'vertical', minHeight: 56 }} value={String(form.description)} onChange={e => set('description', e.target.value)} placeholder="Kısa bir açıklama..." />
-      </div>
-
       {/* Etiketler */}
       <div style={{ marginBottom: 12 }}>
         <label style={lbl}>Özellikler / Etiketler</label>
@@ -469,6 +453,22 @@ function FormGrid({ form, set, showButtons, onKaydet, onIptal, kayitYukleniyor, 
             Seçili: {tags.join(', ')}
           </div>
         )}
+      </div>
+
+      {/* Adres + Adres Tarifi */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+        <div><label style={lbl}>Adres</label>
+          <input style={inp} value={String(form.address)} onChange={e => set('address', e.target.value)} placeholder="E-5 No:12" />
+        </div>
+        <div><label style={lbl}>Adres Tarifi</label>
+          <textarea style={{ ...inp, resize: 'vertical', minHeight: 56 }} value={String(form.address_note)} onChange={e => set('address_note', e.target.value)} placeholder="Kavşaktan sağa dön..." />
+        </div>
+      </div>
+
+      {/* Açıklama */}
+      <div style={{ marginBottom: 10 }}>
+        <label style={lbl}>Açıklama</label>
+        <textarea style={{ ...inp, resize: 'vertical', minHeight: 56 }} value={String(form.description)} onChange={e => set('description', e.target.value)} placeholder="Kısa bir açıklama..." />
       </div>
 
       {/* Acil */}
