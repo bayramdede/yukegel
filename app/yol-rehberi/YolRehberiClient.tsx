@@ -127,7 +127,7 @@ export default function YolRehberiClient() {
         setYukleniyor(false);
       }
     }, 300);
-  }, [aktifAnaKat, aktifAltKatlar, aktifEtiketler, sosAktif, userLat, userLng]);
+  }, [aktifAnaKat, aktifAltKatlar, aktifEtiketler, userLat, userLng]);
 
   // Liste modunda her zaman TR_BBOX kullan — sıralama algoritması
   // zaten mesafe+puana göre en iyi 30'u öne getirir.
