@@ -175,8 +175,12 @@ const KATEGORI_CONFIG: Record<string, {
   },
 
   // ── Operasyon Noktaları ─────────────────────────────────────
-  kantar: {
-    terms: ['tır kantarı', 'kamyon tartı istasyonu', 'taşıt kantarı'],
+  kantar_resmi: {
+    terms: ['resmi kantar', 'taşıt tartım istasyonu', 'karayolları kantarı', 'ulaştırma kantar'],
+    exclude: ['baskül üretici', 'baskül imalat', 'tartı sistemleri san.', 'terazi satış'],
+  },
+  kantar_ozel: {
+    terms: ['tır kantarı', 'kamyon tartı istasyonu', 'taşıt kantarı', 'özel kantar'],
     exclude: ['baskül üretici', 'baskül imalat', 'tartı sistemleri san.', 'terazi satış'],
   },
   nakliyeciler_sitesi: {
