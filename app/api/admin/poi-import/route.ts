@@ -209,7 +209,7 @@ const KATEGORI_CONFIG: Record<string, {
   yemek:           { terms: ['kamyoncu lokantası'], type: 'restaurant', min_reviews: 5 },
   tamirci:         { terms: ['tır tamircisi'], type: 'car_repair' },
   tesis_akaryakit: { terms: ['akaryakıt istasyonu'], type: 'gas_station' },
-  kantar_resmi:    { terms: ['kamyon tartı istasyonu'], min_reviews: 1 },
+  // Not: eski 'kantar' ve 'kantar_resmi' artık kantar_resmi / kantar_ozel oldu — yukarıda tanımlı
 };
 
 const GECERLI_KATEGORILER = Object.keys(KATEGORI_CONFIG);
