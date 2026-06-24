@@ -183,7 +183,7 @@ export const POI_ALT_ETIKETLER: Record<string, string[]> = {
   park_dinlenme:       ['Tır Park Yeri Var', '7/24 Açık', 'Güvenlik Kameralı', 'Duş İmkanı', 'WC'],
   yemek:               ['Sulu Yemek', 'Kamyoncu Dostu', 'Uygun Fiyat', '7/24 Açık', 'Paket Servis'],
   tamirci:             ['Nöbetçi', '7/24 Açık', 'Çekici', 'Lastik', 'Elektrik'],
-  kantar_resmi:        ['Vezneli Kantar', 'Resmi Tartı', 'CMR', 'Geçiş Belgesi'],
+  kantar:              ['Vezneli', 'Resmi Tartı', 'CMR', 'Geçiş Belgesi'],
 };
 
 export const POI_GENEL_ETIKETLER = [
