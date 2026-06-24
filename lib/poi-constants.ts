@@ -80,8 +80,9 @@ export const POI_HIYERARSI: PoiAnaKategori[] = [
     pinColor: '#6b7280',
     cokluSecim: false, // tek seçim
     altlar: [
-      { value: 'kantar',             label: 'Kantar',                     icon: '⚖️', pinColor: '#6b7280' },
-      { value: 'nakliyeciler_sitesi',label: 'Nakliyeciler Sitesi / Garaj', icon: '🏢', pinColor: '#4b5563' },
+      { value: 'kantar_resmi',        label: 'Kantar (Resmi)',             icon: '⚖️', pinColor: '#4b5563' },
+      { value: 'kantar_ozel',         label: 'Kantar (Özel)',              icon: '⚖️', pinColor: '#6b7280' },
+      { value: 'nakliyeciler_sitesi', label: 'Nakliyeciler Sitesi / Garaj', icon: '🏢', pinColor: '#374151' },
       { value: 'gumruk_sinir',       label: 'Gümrük & Sınır Kapısı',      icon: '🛃', pinColor: '#7c3aed' },
       { value: 'antrepo_depo',       label: 'Antrepo & Depo',             icon: '🏗️', pinColor: '#92400e' },
     ],
