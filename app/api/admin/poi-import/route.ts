@@ -243,6 +243,16 @@ function heuristicFiltre(
     if (ad.trim().length <= 3) return { gecti: false, sebep: 'çok kısa isim' };
   }
 
+  // Nakliyeciler sitesi: yalnızca adında "nakliyeciler/garaj/lojistik/terminal" geçen yerler
+  // (truck service, lastikçi gibi genel işyerleri buraya karışmasın)
+  if (kategori === 'nakliyeciler_sitesi') {
+    const nakliyeAnahtar = ['nakliyeciler', 'nakliyeci', 'kamyon garaj', 'kamyon garajı', 'lojistik', 'terminal', 'taşıyıcılar', 'taşıyıcı sitesi', 'kargo merkezi'];
+    const eslesiyorMu = nakliyeAnahtar.some(k => adKucuk.includes(k));
+    if (!eslesiyorMu) {
+      return { gecti: false, sebep: 'nakliyeciler_sitesi: isimde anahtar kelime yok' };
+    }
+  }
+
   // Kantar özel: baskül satıcısı değil, tartı noktası olmalı
   if (kategori === 'kantar' || kategori === 'kantar_resmi') {
     const saticiKelime = ['ltd', 'a.ş', 'sti.', 'şti.', 'sanayi', 'ticaret', 'san.', 'tic.'];
