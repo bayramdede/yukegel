@@ -344,29 +344,6 @@ export default function PoiEkleModal({ onKapat, onBasarili }: Props) {
             style={{ ...inputStyle, resize: 'vertical' }}
           />
 
-          {/* Özellikler */}
-          <label style={labelStyle}>Özellikler</label>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 16 }}>
-            {(form.categories.length > 0
-              ? [...new Set(form.categories.flatMap(k => POI_ALT_ETIKETLER[k] ?? []))]
-              : POI_GENEL_ETIKETLER
-            ).map(e => (
-              <button
-                key={e}
-                onClick={() => toggleEtiket(e)}
-                style={{
-                  padding: '5px 10px', borderRadius: 16, fontSize: 12,
-                  border: `1px solid ${secilenEtiketler.includes(e) ? '#22c55e' : '#30363d'}`,
-                  background: secilenEtiketler.includes(e) ? '#14532d' : 'transparent',
-                  color: secilenEtiketler.includes(e) ? '#22c55e' : '#8b949e',
-                  cursor: 'pointer',
-                }}
-              >
-                {e}
-              </button>
-            ))}
-          </div>
-
           {/* Nöbetçi */}
           <label style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20, cursor: 'pointer' }}>
             <input
