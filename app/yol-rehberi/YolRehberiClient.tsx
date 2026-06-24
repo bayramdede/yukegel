@@ -152,7 +152,6 @@ export default function YolRehberiClient() {
     setAktifAnaKat(anaKey);
     setAktifAltKatlar([]);
     setAktifEtiketler([]);
-    setSosAktif(false);
   };
 
   const toggleAltKat = (altKey: string) => {
