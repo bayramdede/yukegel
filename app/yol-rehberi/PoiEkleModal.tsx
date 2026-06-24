@@ -220,7 +220,7 @@ export default function PoiEkleModal({ onKapat, onBasarili }: Props) {
           )}
 
           {/* Özellikler / Etiketler */}
-          {(form.categories.length > 0 || aktifAnaKat === '') && (() => {
+          {(() => {
             const etiketler = form.categories.length > 0
               ? [...new Set(form.categories.flatMap(k => POI_ALT_ETIKETLER[k] ?? []))]
               : POI_GENEL_ETIKETLER;
