@@ -108,7 +108,7 @@ export const POI_ESKI_KATEGORILER: PoiAltKategori[] = [
   { value: 'park_dinlenme',    label: 'Park & Dinlenme',   icon: '🅿️', pinColor: '#2563eb' },
   { value: 'yemek',            label: 'Yemek',             icon: '🍲', pinColor: '#ea580c' },
   { value: 'tamirci',          label: 'Tamirci',           icon: '🛠️', pinColor: '#b91c1c' },
-  { value: 'kantar_resmi',     label: 'Kantar (Resmi)',    icon: '⚖️', pinColor: '#4b5563' },
+  { value: 'kantar',           label: 'Kantar',            icon: '⚖️', pinColor: '#6b7280' },
 ];
 
 /** Tüm alt kategoriler (yeni + eski) — harita pin rengi ve görüntüleme için */
