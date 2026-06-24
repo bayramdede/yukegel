@@ -9,9 +9,9 @@ const VALID_CATS = [
   'tir_parki', 'otel_pansiyon',
   'motor_mekanik', 'lastikci', 'elektrik_takograf', 'branda_dorse', 'yikama_yaglama', 'acil_yol_yardim',
   'dinlenme_tesisi', 'esnaf_lokantasi',
-  'kantar', 'nakliyeciler_sitesi', 'gumruk_sinir', 'antrepo_depo',
+  'kantar_resmi', 'kantar_ozel', 'nakliyeciler_sitesi', 'gumruk_sinir', 'antrepo_depo',
   // Eski (backward compat)
-  'park_dinlenme', 'yemek', 'konaklama', 'tamirci', 'tesis_akaryakit', 'kantar_resmi',
+  'park_dinlenme', 'yemek', 'konaklama', 'tamirci', 'tesis_akaryakit', 'kantar',
   'motorcu', 'elektrikci', 'kaportaci', 'dorse_branda', 'frigo_ustasi', 'lokanta', 'yikama',
 ];
 
