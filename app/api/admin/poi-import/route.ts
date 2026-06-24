@@ -258,7 +258,7 @@ function heuristicFiltre(
   }
 
   // Kantar özel: baskül satıcısı değil, tartı noktası olmalı
-  if (kategori === 'kantar' || kategori === 'kantar_resmi') {
+  if (kategori === 'kantar_resmi' || kategori === 'kantar_ozel' || kategori === 'kantar') {
     const saticiKelime = ['ltd', 'a.ş', 'sti.', 'şti.', 'sanayi', 'ticaret', 'san.', 'tic.'];
     const saticiMi = saticiKelime.some(k => adKucuk.includes(k));
     const kantarKelime = ['kantar', 'tartı', 'baskül istasyon', 'tartım'];
