@@ -388,7 +388,7 @@ export default function YolRehberiClient() {
               marginBottom: 12,
             }}>
               <span style={{ fontSize: 13, fontWeight: 600, color: '#8b949e' }}>
-                {sosAktif ? '🆘 Acil Noktalar' : 'Yakınındaki En İyi Noktalar'}
+                Yakınındaki En İyi Noktalar
               </span>
               {yukleniyor
                 ? <span style={{ fontSize: 12, color: '#8b949e' }}>Güncelleniyor...</span>
