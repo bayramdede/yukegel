@@ -203,7 +203,7 @@ const KATEGORI_CONFIG: Record<string, {
   kaportaci:       { terms: ['tır kaportacı', 'kamyon kaporta boya'], type: 'car_repair', skip_claude: true },
   dorse_branda:    { terms: ['dorse tamircisi', 'tır branda tenteci'], type: 'car_repair', skip_claude: true },
   frigo_ustasi:    { terms: ['frigo tamir', 'thermo king servis'], type: 'car_repair', skip_claude: true },
-  lokanta:         { terms: ['kamyoncu lokantası'], type: 'restaurant', exclude: ['sushi', 'pub'] },
+  lokanta:         { terms: ['kamyoncu lokantası'], type: 'restaurant', exclude: ['sushi', 'pub'], skip_claude: true },
   konaklama:       { terms: ['kamyoncu moteli'], type: 'lodging' },
   yikama:          { terms: ['tır yıkama', 'kamyon yıkama'], type: 'car_wash', exclude: ['oto yıkama', 'araba yıkama', 'binek', 'detailing'] },
   park_dinlenme:   { terms: ['tır parkı'], type: 'parking', exclude: ['çocuk', 'millet', 'avm'] },
