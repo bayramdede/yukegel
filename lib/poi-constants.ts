@@ -70,7 +70,7 @@ export const POI_HIYERARSI: PoiAnaKategori[] = [
     cokluSecim: true,
     altlar: [
       { value: 'dinlenme_tesisi', label: 'Dinlenme Tesisi', icon: '☕', pinColor: '#f97316' },
-      { value: 'esnaf_lokantasi', label: 'Esnaf Lokantası', icon: '🍲', pinColor: '#ea580c' },
+      { value: 'esnaf_lokantasi', label: 'Yemek', icon: '🍲', pinColor: '#ea580c' },
     ],
   },
   {
