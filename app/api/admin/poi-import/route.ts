@@ -207,7 +207,7 @@ const KATEGORI_CONFIG: Record<string, {
   konaklama:       { terms: ['kamyoncu moteli'], type: 'lodging' },
   yikama:          { terms: ['tır yıkama', 'kamyon yıkama'], type: 'car_wash', exclude: ['oto yıkama', 'araba yıkama', 'binek', 'detailing'] },
   park_dinlenme:   { terms: ['tır parkı'], type: 'parking', exclude: ['çocuk', 'millet', 'avm'] },
-  yemek:           { terms: ['kamyoncu lokantası'], type: 'restaurant', min_reviews: 5 },
+  yemek:           { terms: ['kamyoncu lokantası'], type: 'restaurant', min_reviews: 5, skip_claude: true },
   tamirci:         { terms: ['tır tamircisi'], type: 'car_repair' },
   tesis_akaryakit: { terms: ['akaryakıt istasyonu'], type: 'gas_station' },
   // Not: eski 'kantar' ve 'kantar_resmi' artık kantar_resmi / kantar_ozel oldu — yukarıda tanımlı
