@@ -172,6 +172,7 @@ const KATEGORI_CONFIG: Record<string, {
     terms: ['kamyoncu lokantası', 'şoför lokantası', 'esnaf lokantası'],
     type: 'restaurant',
     exclude: ['sushi', 'pub', 'bar ', 'nightclub', 'fine dining'],
+    skip_claude: true,  // heuristic exclude listesi yeterli; Claude geniş kapsamlı lokantaları eliyor
   },
 
   // ── Operasyon Noktaları ─────────────────────────────────────
