@@ -1508,7 +1508,7 @@ export default function PoiOnayClient() {
             <>
               <div style={{ overflowX: 'auto', marginBottom: 10 }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.78rem' }}>
-                  <thead><tr>{['Ad', 'Kategori', 'Şehir', 'İlçe', 'Enlem', 'Boylam', 'Acil'].map(h => (
+                  <thead><tr>{['Ad', 'Kategori', 'Şehir', 'İlçe', 'Telefon', 'Web', 'Açıklama', 'Etiketler', 'Enlem', 'Boylam', 'Acil'].map(h => (
                     <th key={h} style={{ color: C.muted, fontWeight: 700, padding: '4px 8px', textAlign: 'left', borderBottom: `1px solid ${C.border}`, whiteSpace: 'nowrap' }}>{h}</th>
                   ))}</tr></thead>
                   <tbody>{excelGecerli.slice(0, 8).map((r, i) => (
@@ -1517,6 +1517,10 @@ export default function PoiOnayClient() {
                       <td style={{ padding: '4px 8px', color: C.muted }}>{KATEGORI[r.category] ?? r.category}</td>
                       <td style={{ padding: '4px 8px', color: C.muted }}>{r.city ?? '—'}</td>
                       <td style={{ padding: '4px 8px', color: C.muted }}>{r.district ?? '—'}</td>
+                      <td style={{ padding: '4px 8px', color: C.muted }}>{r.phone ?? '—'}</td>
+                      <td style={{ padding: '4px 8px', color: C.dim, maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.website ?? '—'}</td>
+                      <td style={{ padding: '4px 8px', color: C.dim, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={r.description ?? ''}>{r.description ?? '—'}</td>
+                      <td style={{ padding: '4px 8px', color: C.dim }}>{r.tags.length > 0 ? r.tags.join(', ') : '—'}</td>
                       <td style={{ padding: '4px 8px', color: C.dim }}>{r.latitude}</td>
                       <td style={{ padding: '4px 8px', color: C.dim }}>{r.longitude}</td>
                       <td style={{ padding: '4px 8px', color: r.is_emergency ? C.red : C.dim }}>{r.is_emergency ? 'Evet' : '—'}</td>
