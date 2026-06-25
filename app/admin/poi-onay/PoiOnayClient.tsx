@@ -142,7 +142,7 @@ async function parseExcel(file: File): Promise<{
   for (let i = 1; i < rows.length; i++) {
     const row = rows[i] as unknown[];
     if (!row || row.every(c => c === undefined || c === null || c === '')) continue;
-    const [ad, kat, sehir, ilce, adres, adresTarifi, enlem, boylam, acil] = row;
+    const [ad, kat, sehir, ilce, adres, adresTarifi, enlem, boylam, telefon, webSitesi, aciklama, etiketler, acil] = row;
     const adStr = String(ad ?? '').trim();
     const hatalar: string[] = [];
     if (!adStr) hatalar.push('Ad zorunlu');
@@ -152,6 +152,7 @@ async function parseExcel(file: File): Promise<{
     const lng = parseFloat(String(boylam ?? ''));
     if (isNaN(lat) || lat < -90  || lat > 90)  hatalar.push('Geçersiz enlem');
     if (isNaN(lng) || lng < -180 || lng > 180) hatalar.push('Geçersiz boylam');
+    const tagsArr = String(etiketler ?? '').split(',').map(t => t.trim()).filter(Boolean);
     if (hatalar.length > 0) {
       errors.push({ satir: i + 1, ad: adStr, hatalar });
     } else {
@@ -159,7 +160,10 @@ async function parseExcel(file: File): Promise<{
         name: adStr, category: katNorm!, categories: [katNorm!],
         city: String(sehir ?? '').trim() || null, district: String(ilce ?? '').trim() || null,
         address: String(adres ?? '').trim() || null, address_note: String(adresTarifi ?? '').trim() || null,
-        phone: null, website: null, description: null, tags: [],
+        phone: String(telefon ?? '').trim() || null,
+        website: String(webSitesi ?? '').trim() || null,
+        description: String(aciklama ?? '').trim() || null,
+        tags: tagsArr,
         latitude: lat, longitude: lng,
         is_emergency: String(acil ?? '').toUpperCase() === 'EVET',
       });
