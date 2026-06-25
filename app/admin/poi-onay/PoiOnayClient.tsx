@@ -118,7 +118,7 @@ async function sablonIndir() {
     ['yikama_yaglama',      'Tamir & Bakım',      '🚿 Yıkama & Yağlama'],
     ['acil_yol_yardim',     'Tamir & Bakım',      '🆘 Acil Yol Yardım'],
     ['dinlenme_tesisi',     'Yeme & İçme',        '☕ Dinlenme Tesisi'],
-    ['esnaf_lokantasi',     'Yeme & İçme',        '🍲 Esnaf Lokantası'],
+    ['esnaf_lokantasi',     'Yeme & İçme',        '🍲 Yemek'],
     ['kantar',              'Operasyon Noktaları', '⚖️ Kantar'],
     ['nakliyeciler_sitesi', 'Operasyon Noktaları', '🏢 Nakliyeciler Sitesi / Garaj'],
     ['gumruk_sinir',        'Operasyon Noktaları', '🛃 Gümrük & Sınır Kapısı'],
