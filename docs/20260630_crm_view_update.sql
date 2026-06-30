@@ -2,10 +2,14 @@
 -- CRM View Güncelleme
 -- Tarih: 2026-06-30
 -- Açıklama: shadow_profile_summary view'ına etiket, ai_analiz,
---            ai_analiz_at kolonları eklendi (sonradan eklenen kolonlar).
+--            ai_analiz_at kolonları eklendi.
+-- NOT: CREATE OR REPLACE mevcut kolon sırasını değiştiremez,
+--      bu yüzden önce DROP edip yeniden oluşturuyoruz.
 -- ============================================================
 
-CREATE OR REPLACE VIEW public.shadow_profile_summary AS
+DROP VIEW IF EXISTS public.shadow_profile_summary;
+
+CREATE VIEW public.shadow_profile_summary AS
 SELECT
   sp.id,
   sp.phone,
