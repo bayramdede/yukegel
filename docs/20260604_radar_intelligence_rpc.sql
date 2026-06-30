@@ -1,6 +1,6 @@
 -- ============================================================
 -- Radar Intelligence RPC: get_radar_intelligence
--- Tarih: 2026-06-04  (v2: uuid MAX fix + opsiyonel kalkış/varış)
+-- Tarih: 2026-06-04  (v3: MATERIALIZED CTE + JOIN, timeout fix)
 -- Modül: Admin Radar & İstihbarat Paneli
 --
 -- Kullanım:
@@ -36,6 +36,14 @@ BEGIN
   END IF;
 
   -- ── 1. Route İstatistikleri ────────────────────────────────────────────
+  -- Varış filtresi için önce matching listing ID'lerini topla (MATERIALIZED)
+  -- Böylece her satır için ayrı EXISTS sorgusu gitmez.
+  WITH dest_ids AS MATERIALIZED (
+    SELECT DISTINCT listing_id
+    FROM public.listing_stops
+    WHERE v_to IS NOT NULL
+      AND city ILIKE '%' || v_to || '%'
+  )
   SELECT jsonb_build_object(
     'total_listings_last_30_days', COUNT(DISTINCT l.id),
     'unique_publishers',
@@ -50,16 +58,23 @@ BEGIN
   )
   INTO v_stats
   FROM public.listings l
+  LEFT JOIN dest_ids d ON d.listing_id = l.id
   WHERE l.created_at >= v_cutoff
     AND (v_from IS NULL OR l.origin_city ILIKE '%' || v_from || '%')
-    AND (v_to IS NULL OR EXISTS (
-      SELECT 1 FROM public.listing_stops ls
-      WHERE ls.listing_id = l.id
-        AND ls.city ILIKE '%' || v_to || '%'
-    ));
+    AND (v_to IS NULL OR d.listing_id IS NOT NULL);
 
   -- ── 2. Lead Analizi ────────────────────────────────────────────────────
-  WITH route_listings AS (
+  WITH
+  -- Varış iline uyan listing ID'leri bir kez tara (trgm index kullanır)
+  dest_ids AS MATERIALIZED (
+    SELECT DISTINCT listing_id
+    FROM public.listing_stops
+    WHERE v_to IS NOT NULL
+      AND city ILIKE '%' || v_to || '%'
+  ),
+
+  -- Son 365 gündeki rota ilanları — LEFT JOIN ile EXISTS'ten kurtul
+  route_listings AS (
     SELECT
       l.id,
       l.created_at,
@@ -74,15 +89,11 @@ BEGIN
         ELSE '+90' || l.contact_phone
       END AS norm_phone
     FROM public.listings l
+    LEFT JOIN dest_ids d ON d.listing_id = l.id
     WHERE
-      -- Zaman filtresi: en fazla 365 gün geriye bak (timeout önlemi)
       l.created_at >= now() - interval '365 days'
       AND (v_from IS NULL OR l.origin_city ILIKE '%' || v_from || '%')
-      AND (v_to IS NULL OR EXISTS (
-        SELECT 1 FROM public.listing_stops ls
-        WHERE ls.listing_id = l.id
-          AND ls.city ILIKE '%' || v_to || '%'
-      ))
+      AND (v_to IS NULL OR d.listing_id IS NOT NULL)
   ),
 
   phone_groups AS (
@@ -101,7 +112,6 @@ BEGIN
       )                                                                      AS has_contract_keywords,
       (ARRAY_AGG(raw_text ORDER BY created_at DESC)
          FILTER (WHERE raw_text IS NOT NULL))[1:5]                           AS recent_raw_texts,
-      -- UUID kolonlarında MAX() yok — ARRAY_AGG ile ilk değeri al
       (ARRAY_AGG(shadow_profile_id) FILTER (WHERE shadow_profile_id IS NOT NULL))[1]
                                                                              AS shadow_profile_id,
       (ARRAY_AGG(user_id) FILTER (WHERE user_id IS NOT NULL))[1]
@@ -178,8 +188,8 @@ $$;
 GRANT EXECUTE ON FUNCTION public.get_radar_intelligence(text, text, int) TO authenticated;
 
 -- ── Performans indexleri ───────────────────────────────────────────────────
-CREATE INDEX IF NOT EXISTS listing_stops_city_idx
-  ON public.listing_stops (city);
+CREATE INDEX IF NOT EXISTS listing_stops_listing_id_idx
+  ON public.listing_stops (listing_id);
 
 CREATE INDEX IF NOT EXISTS listings_origin_city_created_at_idx
   ON public.listings (origin_city, created_at DESC);
@@ -188,8 +198,10 @@ CREATE INDEX IF NOT EXISTS listings_contact_phone_idx
   ON public.listings (contact_phone)
   WHERE contact_phone IS NOT NULL;
 
--- ── pg_trgm: ILIKE '%...%' sorgularını hızlandırır ────────────────────────
--- (Supabase'de pg_trgm varsayılan olarak yüklü gelir)
+CREATE INDEX IF NOT EXISTS listings_created_at_idx
+  ON public.listings (created_at DESC);
+
+-- pg_trgm: ILIKE '%...%' sorgularını hızlandırır
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
 CREATE INDEX IF NOT EXISTS listings_origin_city_trgm_idx
@@ -197,6 +209,3 @@ CREATE INDEX IF NOT EXISTS listings_origin_city_trgm_idx
 
 CREATE INDEX IF NOT EXISTS listing_stops_city_trgm_idx
   ON public.listing_stops USING GIN (city gin_trgm_ops);
-
-CREATE INDEX IF NOT EXISTS listings_created_at_idx
-  ON public.listings (created_at DESC);
