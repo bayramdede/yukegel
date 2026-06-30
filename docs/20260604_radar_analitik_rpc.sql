@@ -1,15 +1,10 @@
 -- ============================================================
 -- Radar Analitik RPC Fonksiyonları
--- Tarih: 2026-06-04 (güncelleme: 2026-06-30)
+-- Tarih: 2026-06-04 (v3: work_mem override + arrival EXISTS → pre-computed IDs)
 -- Modül: Admin Radar Analitik Dashboard
---
--- DEĞİŞİKLİKLER (2026-06-30):
---   - get_radar_city_detail: p_counterpart parametresi eklendi (rota drilldown)
---   - ILIKE '%...%' → = p_city (tam eşleşme, indeks kullanır, timeout giderildi)
---   - Performans indeksleri eklendi
 -- ============================================================
 
--- ── İndeksler (timeout'u önlemek için) ───────────────────────────────────────
+-- ── İndeksler ─────────────────────────────────────────────────────────────────
 CREATE INDEX IF NOT EXISTS idx_listings_origin_city
   ON public.listings (origin_city)
   WHERE origin_city IS NOT NULL;
@@ -24,58 +19,63 @@ CREATE INDEX IF NOT EXISTS idx_listing_stops_city
 CREATE INDEX IF NOT EXISTS idx_listing_stops_listing_id
   ON public.listing_stops (listing_id);
 
+-- listing_stops(city, listing_id) composite — arrival sorgularını hızlandırır
+CREATE INDEX IF NOT EXISTS idx_listing_stops_city_listing_id
+  ON public.listing_stops (city, listing_id)
+  WHERE city IS NOT NULL;
+
 
 -- ── 1. Şehir Genel Bakış ─────────────────────────────────────────────────────
--- Tüm kalkış şehirlerini ilan sayısıyla döner (sol panel için)
 CREATE OR REPLACE FUNCTION public.get_radar_city_overview(
   p_days int DEFAULT 30
 )
 RETURNS jsonb
-LANGUAGE sql
+LANGUAGE plpgsql
 SECURITY DEFINER
 STABLE
 AS $$
-  SELECT COALESCE(
-    jsonb_agg(
-      jsonb_build_object(
-        'city',           origin_city,
-        'listing_count',  listing_count,
-        'unique_senders', unique_senders,
-        'last_at',        last_at
-      )
+BEGIN
+  PERFORM set_config('statement_timeout', '30000', true);
+  PERFORM set_config('work_mem', '67108864', true); -- 64MB
+
+  RETURN (
+    SELECT COALESCE(
+      jsonb_agg(
+        jsonb_build_object(
+          'city',           origin_city,
+          'listing_count',  listing_count,
+          'unique_senders', unique_senders,
+          'last_at',        last_at
+        )
+        ORDER BY listing_count DESC
+      ),
+      '[]'::jsonb
+    )
+    FROM (
+      SELECT
+        origin_city,
+        COUNT(DISTINCT id)            AS listing_count,
+        COUNT(DISTINCT contact_phone) AS unique_senders,
+        MAX(created_at)               AS last_at
+      FROM public.listings
+      WHERE
+        created_at >= now() - (p_days::text || ' days')::interval
+        AND origin_city IS NOT NULL
+        AND origin_city <> ''
+      GROUP BY origin_city
       ORDER BY listing_count DESC
-    ),
-    '[]'::jsonb
-  )
-  FROM (
-    SELECT
-      origin_city,
-      COUNT(DISTINCT id)            AS listing_count,
-      COUNT(DISTINCT contact_phone) AS unique_senders,
-      MAX(created_at)               AS last_at
-    FROM public.listings
-    WHERE
-      created_at >= now() - (p_days::text || ' days')::interval
-      AND origin_city IS NOT NULL
-      AND origin_city <> ''
-    GROUP BY origin_city
-    ORDER BY listing_count DESC
-    LIMIT 60
-  ) sub;
+      LIMIT 60
+    ) sub
+  );
+END;
 $$;
 
 GRANT EXECUTE ON FUNCTION public.get_radar_city_overview(int) TO authenticated;
 
 
 -- ── 2. Şehir Detay ────────────────────────────────────────────────────────────
--- Seçili şehrin varış/çıkış dağılımı + araç tipi breakdown
---
--- p_direction:
---   'departure' → Şehirden çıkan ilanlar: varış dağılımını gösterir
---   'arrival'   → Şehre gelen ilanlar: kalkış dağılımını gösterir
--- p_counterpart:
---   NULL        → Tüm karşı şehirler
---   'İstanbul'  → Sadece bu rota (rota drilldown)
+-- p_direction: 'departure' | 'arrival'
+-- p_counterpart: NULL = tüm karşı şehirler, dolu = rota drilldown
 CREATE OR REPLACE FUNCTION public.get_radar_city_detail(
   p_city        text,
   p_direction   text    DEFAULT 'departure',
@@ -94,11 +94,15 @@ DECLARE
   v_counterparts  jsonb;
   v_vehicle_types jsonb;
   v_daily         jsonb;
+  -- arrival yönünde: eşleşen listing ID'leri bir kez hesapla
+  v_arrival_ids   uuid[];
 BEGIN
+  PERFORM set_config('statement_timeout', '30000', true);
+  PERFORM set_config('work_mem', '67108864', true); -- 64MB
 
   IF p_direction = 'departure' THEN
+    -- ── DEPARTURE: kalkış şehri = p_city, index kullanır ──────────────────
 
-    -- Toplam ilan + gönderici
     SELECT COUNT(DISTINCT l.id), COUNT(DISTINCT l.contact_phone)
     INTO v_total, v_senders
     FROM public.listings l
@@ -112,7 +116,6 @@ BEGIN
         )
       );
 
-    -- Varış şehirleri (counterparts)
     SELECT COALESCE(jsonb_agg(
       jsonb_build_object('city', to_city, 'count', cnt, 'senders', snds)
       ORDER BY cnt DESC
@@ -127,12 +130,12 @@ BEGIN
       JOIN public.listing_stops ls ON ls.listing_id = l.id
       WHERE l.origin_city = p_city
         AND l.created_at >= v_cutoff
+        AND (p_counterpart IS NULL OR ls.city = p_counterpart)
       GROUP BY ls.city
       ORDER BY cnt DESC
       LIMIT 20
     ) sub;
 
-    -- Araç tipi dağılımı
     SELECT COALESCE(jsonb_agg(
       jsonb_build_object('type', vt, 'count', cnt)
       ORDER BY cnt DESC
@@ -156,7 +159,6 @@ BEGIN
       LIMIT 12
     ) sub;
 
-    -- Günlük aktivite (sparkline)
     SELECT COALESCE(jsonb_agg(
       jsonb_build_object('day', day_str, 'count', cnt)
       ORDER BY day_str
@@ -181,20 +183,34 @@ BEGIN
     ) sub;
 
   ELSE
-    -- arrival: şehre gelen ilanlar
+    -- ── ARRIVAL: varış şehri = p_city ─────────────────────────────────────
+    -- listing_stops'u BİR KEZ tara, ID'leri diziye al.
+    -- Sonraki 4 sorgu bu diziyi kullanır — correlated EXISTS tekrarlanmaz.
+
+    SELECT ARRAY_AGG(DISTINCT ls.listing_id)
+    INTO v_arrival_ids
+    FROM public.listing_stops ls
+    WHERE ls.city = p_city;  -- idx_listing_stops_city kullanır
+
+    -- Boş gelirse sonuç döndür
+    IF v_arrival_ids IS NULL THEN
+      RETURN jsonb_build_object(
+        'city', p_city, 'direction', p_direction,
+        'total', 0, 'unique_senders', 0,
+        'counterparts', '[]'::jsonb, 'vehicle_types', '[]'::jsonb,
+        'daily', '[]'::jsonb
+      );
+    END IF;
 
     -- Toplam ilan + gönderici
     SELECT COUNT(DISTINCT l.id), COUNT(DISTINCT l.contact_phone)
     INTO v_total, v_senders
     FROM public.listings l
-    WHERE l.created_at >= v_cutoff
-      AND (p_counterpart IS NULL OR l.origin_city = p_counterpart)
-      AND EXISTS (
-        SELECT 1 FROM public.listing_stops ls
-        WHERE ls.listing_id = l.id AND ls.city = p_city
-      );
+    WHERE l.id = ANY(v_arrival_ids)
+      AND l.created_at >= v_cutoff
+      AND (p_counterpart IS NULL OR l.origin_city = p_counterpart);
 
-    -- Kalkış şehirleri (counterparts)
+    -- Kalkış şehirleri
     SELECT COALESCE(jsonb_agg(
       jsonb_build_object('city', from_city, 'count', cnt, 'senders', snds)
       ORDER BY cnt DESC
@@ -206,12 +222,10 @@ BEGIN
         COUNT(DISTINCT l.id)            AS cnt,
         COUNT(DISTINCT l.contact_phone) AS snds
       FROM public.listings l
-      WHERE l.created_at >= v_cutoff
+      WHERE l.id = ANY(v_arrival_ids)
+        AND l.created_at >= v_cutoff
         AND l.origin_city IS NOT NULL
-        AND EXISTS (
-          SELECT 1 FROM public.listing_stops ls
-          WHERE ls.listing_id = l.id AND ls.city = p_city
-        )
+        AND (p_counterpart IS NULL OR l.origin_city = p_counterpart)
       GROUP BY l.origin_city
       ORDER BY cnt DESC
       LIMIT 20
@@ -226,19 +240,16 @@ BEGIN
     FROM (
       SELECT unnest(l.vehicle_type) AS vt, COUNT(*) AS cnt
       FROM public.listings l
-      WHERE l.created_at >= v_cutoff
+      WHERE l.id = ANY(v_arrival_ids)
+        AND l.created_at >= v_cutoff
         AND l.vehicle_type IS NOT NULL
         AND (p_counterpart IS NULL OR l.origin_city = p_counterpart)
-        AND EXISTS (
-          SELECT 1 FROM public.listing_stops ls
-          WHERE ls.listing_id = l.id AND ls.city = p_city
-        )
       GROUP BY vt
       ORDER BY cnt DESC
       LIMIT 12
     ) sub;
 
-    -- Günlük aktivite (sparkline)
+    -- Günlük aktivite
     SELECT COALESCE(jsonb_agg(
       jsonb_build_object('day', day_str, 'count', cnt)
       ORDER BY day_str
@@ -249,12 +260,9 @@ BEGIN
         TO_CHAR(DATE(l.created_at), 'MM-DD') AS day_str,
         COUNT(DISTINCT l.id)                  AS cnt
       FROM public.listings l
-      WHERE l.created_at >= v_cutoff
+      WHERE l.id = ANY(v_arrival_ids)
+        AND l.created_at >= v_cutoff
         AND (p_counterpart IS NULL OR l.origin_city = p_counterpart)
-        AND EXISTS (
-          SELECT 1 FROM public.listing_stops ls
-          WHERE ls.listing_id = l.id AND ls.city = p_city
-        )
       GROUP BY DATE(l.created_at)
       ORDER BY DATE(l.created_at)
     ) sub;
