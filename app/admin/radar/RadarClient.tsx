@@ -524,7 +524,7 @@ export default function RadarClient({
                             {lead.route_analytics.total_loads}
                           </span>
                           <span style={{ color: '#4b5563', fontSize: '0.72rem', marginLeft: 6 }}>
-                            (son {days}g: {lead.route_analytics.recent_loads})
+                            1y / son {days}g: {lead.route_analytics.recent_loads}
                           </span>
                         </td>
 
