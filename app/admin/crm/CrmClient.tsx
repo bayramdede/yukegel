@@ -128,22 +128,32 @@ export default function CrmClient() {
 
   const load = useCallback(async (p = 1, q = search, min = minListings, sort = siralama) => {
     setLoading(true);
+    setFetchError(null);
     const params = new URLSearchParams({
       page: String(p), limit: String(LIMIT),
       min_listings: String(min),
       sort,
     });
     if (q) params.set('search', q);
-    const res = await fetch(`/api/admin/crm?${params}`);
-    const json = await res.json();
-    // Etiket sıralaması client-side (DB'de string sort yeterli değil, öncelik puanına göre)
-    let data: ShadowProfile[] = json.data ?? [];
-    if (sort === 'etiket') {
-      data = [...data].sort((a, b) => (etiketMeta(b.etiket).puan - etiketMeta(a.etiket).puan) || (b.listing_count - a.listing_count));
+    try {
+      const res = await fetch(`/api/admin/crm?${params}`);
+      const json = await res.json();
+      if (!res.ok || json.error) {
+        setFetchError(json.error ?? `HTTP ${res.status}`);
+        setLoading(false);
+        return;
+      }
+      // Etiket sıralaması client-side (DB'de string sort yeterli değil, öncelik puanına göre)
+      let data: ShadowProfile[] = json.data ?? [];
+      if (sort === 'etiket') {
+        data = [...data].sort((a, b) => (etiketMeta(b.etiket).puan - etiketMeta(a.etiket).puan) || (b.listing_count - a.listing_count));
+      }
+      setRows(data);
+      setTotal(json.total ?? 0);
+      setPage(p);
+    } catch (e: unknown) {
+      setFetchError(e instanceof Error ? e.message : 'Bağlantı hatası');
     }
-    setRows(data);
-    setTotal(json.total ?? 0);
-    setPage(p);
     setLoading(false);
   }, [search, minListings, siralama]);
 
