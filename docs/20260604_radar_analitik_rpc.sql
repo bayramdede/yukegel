@@ -206,15 +206,12 @@ BEGIN
       );
     END IF;
 
-    -- Toplam ilan + gönderici
+    -- ID'ler zaten v_cutoff + p_counterpart ile filtrelendi, tekrar filtre gerekmez
     SELECT COUNT(DISTINCT l.id), COUNT(DISTINCT l.contact_phone)
     INTO v_total, v_senders
     FROM public.listings l
-    WHERE l.id = ANY(v_arrival_ids)
-      AND l.created_at >= v_cutoff
-      AND (p_counterpart IS NULL OR l.origin_city = p_counterpart);
+    WHERE l.id = ANY(v_arrival_ids);
 
-    -- Kalkış şehirleri
     SELECT COALESCE(jsonb_agg(
       jsonb_build_object('city', from_city, 'count', cnt, 'senders', snds)
       ORDER BY cnt DESC
@@ -227,15 +224,12 @@ BEGIN
         COUNT(DISTINCT l.contact_phone) AS snds
       FROM public.listings l
       WHERE l.id = ANY(v_arrival_ids)
-        AND l.created_at >= v_cutoff
         AND l.origin_city IS NOT NULL
-        AND (p_counterpart IS NULL OR l.origin_city = p_counterpart)
       GROUP BY l.origin_city
       ORDER BY cnt DESC
       LIMIT 20
     ) sub;
 
-    -- Araç tipi dağılımı
     SELECT COALESCE(jsonb_agg(
       jsonb_build_object('type', vt, 'count', cnt)
       ORDER BY cnt DESC
@@ -245,15 +239,12 @@ BEGIN
       SELECT unnest(l.vehicle_type) AS vt, COUNT(*) AS cnt
       FROM public.listings l
       WHERE l.id = ANY(v_arrival_ids)
-        AND l.created_at >= v_cutoff
         AND l.vehicle_type IS NOT NULL
-        AND (p_counterpart IS NULL OR l.origin_city = p_counterpart)
       GROUP BY vt
       ORDER BY cnt DESC
       LIMIT 12
     ) sub;
 
-    -- Günlük aktivite
     SELECT COALESCE(jsonb_agg(
       jsonb_build_object('day', day_str, 'count', cnt)
       ORDER BY day_str
@@ -265,8 +256,6 @@ BEGIN
         COUNT(DISTINCT l.id)                  AS cnt
       FROM public.listings l
       WHERE l.id = ANY(v_arrival_ids)
-        AND l.created_at >= v_cutoff
-        AND (p_counterpart IS NULL OR l.origin_city = p_counterpart)
       GROUP BY DATE(l.created_at)
       ORDER BY DATE(l.created_at)
     ) sub;
