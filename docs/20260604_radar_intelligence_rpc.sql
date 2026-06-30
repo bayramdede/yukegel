@@ -75,7 +75,9 @@ BEGIN
       END AS norm_phone
     FROM public.listings l
     WHERE
-      (v_from IS NULL OR l.origin_city ILIKE '%' || v_from || '%')
+      -- Zaman filtresi: en fazla 365 gün geriye bak (timeout önlemi)
+      l.created_at >= now() - interval '365 days'
+      AND (v_from IS NULL OR l.origin_city ILIKE '%' || v_from || '%')
       AND (v_to IS NULL OR EXISTS (
         SELECT 1 FROM public.listing_stops ls
         WHERE ls.listing_id = l.id
