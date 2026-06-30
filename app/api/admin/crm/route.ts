@@ -17,14 +17,25 @@ export async function GET(req: NextRequest) {
   const limit     = Math.min(100, parseInt(searchParams.get('limit') || '50'));
   const minCount  = parseInt(searchParams.get('min_listings') || '0');
   const search    = searchParams.get('search')?.trim() || '';
+  const sortParam = searchParams.get('sort') || 'listing_count';
   const offset    = (page - 1) * limit;
+
+  // Etiket sıralaması client-side (puan bazlı), DB'de desteklenmiyor
+  const validSorts: Record<string, string> = {
+    listing_count:  'listing_count',
+    last_listing_at: 'last_listing_at',
+    first_listing_at: 'first_listing_at',
+    created_at:     'created_at',
+    etiket:         'listing_count', // etiket client-side sort eder
+  };
+  const sortColumn = validSorts[sortParam] ?? 'listing_count';
 
   // count:'exact' yerine 'planned' kullan — aggregate view'da exact count
   // tüm tabloyu tarar, listings büyüdükçe Supabase statement timeout'u (8s) aşar.
   let query = svc
     .from('shadow_profile_summary')
     .select('*', { count: 'planned' })
-    .order('listing_count', { ascending: false })
+    .order(sortColumn, { ascending: false })
     .range(offset, offset + limit - 1);
 
   if (minCount > 0) query = query.gte('listing_count', minCount);
