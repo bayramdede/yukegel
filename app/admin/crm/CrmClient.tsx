@@ -107,6 +107,7 @@ export default function CrmClient() {
   const [total, setTotal]          = useState(0);
   const [page, setPage]            = useState(1);
   const [loading, setLoading]      = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [search, setSearch]        = useState('');
   const [minListings, setMin]      = useState(0);
   const [siralama, setSiralama]    = useState<'listing_count' | 'etiket' | 'last_listing_at'>('listing_count');
