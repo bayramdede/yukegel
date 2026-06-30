@@ -187,3 +187,16 @@ CREATE INDEX IF NOT EXISTS listings_origin_city_created_at_idx
 CREATE INDEX IF NOT EXISTS listings_contact_phone_idx
   ON public.listings (contact_phone)
   WHERE contact_phone IS NOT NULL;
+
+-- ── pg_trgm: ILIKE '%...%' sorgularını hızlandırır ────────────────────────
+-- (Supabase'de pg_trgm varsayılan olarak yüklü gelir)
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+
+CREATE INDEX IF NOT EXISTS listings_origin_city_trgm_idx
+  ON public.listings USING GIN (origin_city gin_trgm_ops);
+
+CREATE INDEX IF NOT EXISTS listing_stops_city_trgm_idx
+  ON public.listing_stops USING GIN (city gin_trgm_ops);
+
+CREATE INDEX IF NOT EXISTS listings_created_at_idx
+  ON public.listings (created_at DESC);
