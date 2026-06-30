@@ -171,6 +171,8 @@ $$;
 GRANT EXECUTE ON FUNCTION public.get_radar_intelligence(text, text, int) TO authenticated;
 
 -- ── Trigram index (varış ili ILIKE sorgusu için) ───────────────────────────
--- Yoksa: CREATE EXTENSION IF NOT EXISTS pg_trgm;
-CREATE INDEX IF NOT EXISTS listing_stops_city_trgm_idx
-  ON public.listing_stops USING gin(city gin_trgm_ops);
+-- ADIM 1: Extension'ı ayrı bir sorgu olarak çalıştır:
+--   CREATE EXTENSION IF NOT EXISTS pg_trgm;
+-- ADIM 2: Sonra bu index'i çalıştır:
+-- CREATE INDEX IF NOT EXISTS listing_stops_city_trgm_idx
+--   ON public.listing_stops USING gin(city gin_trgm_ops);
