@@ -289,6 +289,17 @@ export default function CrmClient() {
         </span>
       </div>
 
+      {/* ── Hata ── */}
+      {fetchError && (
+        <div style={{ background: '#2d0a0a', border: '1px solid #7f1d1d', borderRadius: 8, padding: '12px 16px', color: '#f87171', fontSize: '0.85rem', marginBottom: 14 }}>
+          <strong>API Hatası:</strong> {fetchError}
+          <br />
+          <span style={{ color: '#9b1c1c', fontSize: '0.78rem' }}>
+            Supabase loglarını kontrol edin. Büyük ihtimalle <code>shadow_profile_summary</code> view'ı güncel değil — <code>docs/20260630_crm_view_update.sql</code> migration'ını çalıştırın.
+          </span>
+        </div>
+      )}
+
       {/* ── Tablo ── */}
       <div style={{ overflowX: 'auto', borderRadius: 10, border: '1px solid #21262d' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
