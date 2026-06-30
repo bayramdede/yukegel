@@ -30,18 +30,25 @@ export async function GET(req: NextRequest) {
   };
   const sortColumn = validSorts[sortParam] ?? 'listing_count';
 
-  // count:'exact' yerine 'planned' kullan — aggregate view'da exact count
-  // tüm tabloyu tarar, listings büyüdükçe Supabase statement timeout'u (8s) aşar.
+  // count kaldırıldı — shadow_profiles artık denormalize listing_count kolonu taşıdığından
+  // view basit SELECT. Yine de PostgREST count isteği zaman zaman ağır EXPLAIN veya
+  // fallback COUNT yapabilir; toplam kayıt sayısı ayrı hafif sorguyla alınır.
   let query = svc
     .from('shadow_profile_summary')
-    .select('*', { count: 'planned' })
+    .select('*')
     .order(sortColumn, { ascending: false })
     .range(offset, offset + limit - 1);
 
   if (minCount > 0) query = query.gte('listing_count', minCount);
   if (search)       query = query.ilike('phone', `%${search}%`);
 
-  const { data, error, count } = await query;
+  // Toplam kayıt: count(*) shadow_profiles üzerinde — view'dan değil, çok daha hızlı
+  let countQuery = svc.from('shadow_profiles').select('id', { count: 'exact', head: true });
+  if (minCount > 0) countQuery = countQuery.gte('listing_count', minCount);
+  if (search)       countQuery = countQuery.ilike('phone', `%${search}%`);
+
+  const [{ data, error }, { count }] = await Promise.all([query, countQuery]);
+
   if (error) {
     console.error('[CRM] shadow_profile_summary sorgu hatası:', error.message, error.details);
     return NextResponse.json({ error: error.message }, { status: 500 });
