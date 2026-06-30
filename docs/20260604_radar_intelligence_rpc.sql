@@ -30,6 +30,9 @@ DECLARE
   v_stats     jsonb;
   v_leads     jsonb;
 BEGIN
+  -- PostgREST varsayılan 8s timeout'unu bu fonksiyon için 30s'ye çıkar
+  PERFORM set_config('statement_timeout', '30000', true);
+
   -- En az biri dolu olmalı
   IF v_from IS NULL AND v_to IS NULL THEN
     RETURN jsonb_build_object('error', 'En az kalkış veya varış ili girilmeli');
