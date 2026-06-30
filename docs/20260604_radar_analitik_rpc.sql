@@ -187,10 +187,14 @@ BEGIN
     -- listing_stops'u BİR KEZ tara, ID'leri diziye al.
     -- Sonraki 4 sorgu bu diziyi kullanır — correlated EXISTS tekrarlanmaz.
 
+    -- Zaman filtreli: sadece v_cutoff sonrası ilanların ID'lerini al
     SELECT ARRAY_AGG(DISTINCT ls.listing_id)
     INTO v_arrival_ids
     FROM public.listing_stops ls
-    WHERE ls.city = p_city;  -- idx_listing_stops_city kullanır
+    JOIN public.listings l ON l.id = ls.listing_id
+    WHERE ls.city = p_city
+      AND l.created_at >= v_cutoff
+      AND (p_counterpart IS NULL OR l.origin_city = p_counterpart);
 
     -- Boş gelirse sonuç döndür
     IF v_arrival_ids IS NULL THEN
