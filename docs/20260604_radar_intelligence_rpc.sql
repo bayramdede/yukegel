@@ -32,6 +32,8 @@ DECLARE
 BEGIN
   -- PostgREST varsayılan 8s timeout'unu bu fonksiyon için 30s'ye çıkar
   PERFORM set_config('statement_timeout', '30000', true);
+  -- Varsayılan 4MB work_mem hash join/sort'ları diske döküyor → 64MB ile RAM'de tutar
+  PERFORM set_config('work_mem', '67108864', true); -- 64MB (bayt cinsinden)
 
   -- En az biri dolu olmalı
   IF v_from IS NULL AND v_to IS NULL THEN
