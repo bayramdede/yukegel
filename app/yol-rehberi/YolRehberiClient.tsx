@@ -171,6 +171,23 @@ export default function YolRehberiClient() {
     fetchPois(bbox);
   }, [fetchPois]);
 
+  // Yakınımdaki Yükler sekmesi açıldığında (ve konum hazır olduğunda) bir kere çek
+  useEffect(() => {
+    if (gorunum !== 'yukler' || !userLat || !userLng || yakinYuklendi) return;
+    setYakinYukleniyor(true);
+    fetch(`/api/listings/yakin?lat=${userLat}&lng=${userLng}`)
+      .then(res => res.json())
+      .then(json => {
+        if (json.success) {
+          setYakinYukler(json.data);
+          setYakinIl(json.il);
+        }
+        setYakinYuklendi(true);
+      })
+      .catch(err => console.error('Yakın yük fetch hatası:', err))
+      .finally(() => setYakinYukleniyor(false));
+  }, [gorunum, userLat, userLng, yakinYuklendi]);
+
   const handleAnaKat = (anaKey: string) => {
     setAktifAnaKat(anaKey);
     setAktifAltKatlar([]);
