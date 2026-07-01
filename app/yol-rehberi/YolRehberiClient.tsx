@@ -94,6 +94,12 @@ export default function YolRehberiClient() {
   const bboxRef = useRef<BoundingBox | null>(null);
   const fetchTimerRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Yakınımdaki Yükler (il bazlı)
+  const [yakinYukler, setYakinYukler] = useState<YakinYukItem[]>([]);
+  const [yakinIl, setYakinIl] = useState<string | null>(null);
+  const [yakinYukleniyor, setYakinYukleniyor] = useState(false);
+  const [yakinYuklendi, setYakinYuklendi] = useState(false);
+
   // Kullanıcı konumunu al
   useEffect(() => {
     if (!navigator.geolocation) {
