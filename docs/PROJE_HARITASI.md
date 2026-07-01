@@ -1,6 +1,6 @@
 # Yükegel — Proje Haritası
 > **Kullanım:** Her sohbet başında sadece bu dosyayı oku. Kaynak dosyaları sadece o dosyada değişiklik yapacaksan oku.  
-> Son güncelleme: 17 Haziran 2026 — POI kategorileri 2 kademeli yapıya geçirildi: 5 Ana Kategori × 16 Alt Kategori (Akaryakıt&Enerji, Park&Konaklama, Tamir&Bakım, Yeme&İçme, Operasyon Noktaları). Tüm POI UI'ları güncellendi.
+> Son güncelleme: 1 Temmuz 2026 — "Yakınımdaki Yükler" özelliği eklendi (Faz 1: il bazlı, GPS→en yakın il→o ildeki aktif ilanlar). Faz 2'de gerçek PostGIS mesafesine geçilecek.
 
 **Referans Dökümanlar:**
 - `docs/LOG_VE_GUVENLIK_SPECLERI.md` — Log format standartları, audit trail, SecurityLogger kontrol listesi
