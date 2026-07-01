@@ -408,6 +408,7 @@ Açık rotalar: /giris, /auth/, /profil-tamamla, /nasil-calisir, /hakkimizda,
 - Kayıtlı adresler (müşteri)
 
 ### 🔮 Faz 2
+- **Yakınımdaki Yükler — gerçek mesafe:** `listings`/`listing_stops`'a `origin_location geography(Point,4326)` kolonu, ilan oluşturulurken (form/WhatsApp/Excel) geocoding, `get_listings_near_point(lat,lng,radius_m)` RPC (POI'deki `get_pois_in_bbox` mantığının aynısı) — haritada gerçek "500m yarıçap" gösterimi ve mesafeye göre sıralama.
 - "Bu işi aldım" akışı (durum güncellemeleri, bildirim, ilan pasife)
 - **Güven ve İtibar Sistemi** — çift körleme puanlama, rozet sistemi (detay: §15)
 - Trust score, MERNİS/GİB, canlı konum
