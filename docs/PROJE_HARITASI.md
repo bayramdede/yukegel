@@ -238,6 +238,7 @@ ZIP/TXT → raw_posts → DB trigger → parse-listing Edge Fn → listings → 
 | `/api/poi/[id]/review` | Yorum ekle + geo-fence doğrulama (POST) |
 | `/api/admin/poi-import` | Google Places'ten il+kategori bazlı veri çek (POST), kategori listesi (GET) |
 | `/api/admin/poi-import/[id]/summarize` | POI için Claude yorum özeti üret (POST) |
+| `/api/listings/yakin` | Yakınımdaki Yükler: lat/lng → en yakın il (offline haversine) → o ildeki aktif ilanlar (GET) |
 
 ---
 
