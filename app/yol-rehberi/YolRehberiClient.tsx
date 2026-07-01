@@ -682,3 +682,57 @@ function PoiListeKart({ poi, rank, onClick }: { poi: PoiItem; rank: number; onCl
     </button>
   );
 }
+
+// ── Yakın Yük Liste Kartı ──────────────────────────────────────────────────────
+function YukListeKart({ yuk }: { yuk: YakinYukItem }) {
+  const fiyatStr = yuk.price_offer
+    ? `${yuk.price_offer.toLocaleString('tr-TR')} TL${yuk.price_negotiable ? ' (pazarlık)' : ''}`
+    : 'Fiyat belirtilmemiş';
+
+  const zamanStr = (() => {
+    const fark = Date.now() - new Date(yuk.created_at).getTime();
+    const saat = Math.floor(fark / 3_600_000);
+    if (saat < 1) return 'az önce';
+    if (saat < 24) return `${saat} saat önce`;
+    return `${Math.floor(saat / 24)} gün önce`;
+  })();
+
+  return (
+    <a
+      href={`/ilan/${yuk.id}`}
+      style={{
+        display: 'block', width: '100%', background: '#161b22',
+        border: '1px solid #21262d', borderRadius: 12,
+        padding: '12px 14px', marginBottom: 10,
+        textDecoration: 'none', color: 'inherit',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+        <span style={{ fontSize: 15, fontWeight: 700, color: '#e6edf3' }}>
+          {yuk.origin_district ? `${yuk.origin_city}, ${yuk.origin_district}` : yuk.origin_city}
+        </span>
+        <span style={{ color: '#30363d' }}>→</span>
+        <span style={{ fontSize: 15, fontWeight: 700, color: '#e6edf3' }}>
+          {yuk.dest_city ? (yuk.dest_district ? `${yuk.dest_city}, ${yuk.dest_district}` : yuk.dest_city) : '—'}
+        </span>
+        {yuk.eslesme === 'ilce' && (
+          <span style={{
+            fontSize: 10, color: '#22c55e', background: '#14532d',
+            padding: '2px 6px', borderRadius: 4, fontWeight: 600,
+          }}>
+            YAKININDA
+          </span>
+        )}
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4, flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 13, fontWeight: 600, color: '#22c55e' }}>{fiyatStr}</span>
+        {yuk.vehicle_type && yuk.vehicle_type.length > 0 && (
+          <span style={{ fontSize: 12, color: '#8b949e' }}>{yuk.vehicle_type.join(', ')}</span>
+        )}
+      </div>
+
+      <div style={{ fontSize: 11, color: '#4b5563' }}>{zamanStr}</div>
+    </a>
+  );
+}
