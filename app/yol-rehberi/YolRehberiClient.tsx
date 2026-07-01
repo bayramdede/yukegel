@@ -511,6 +511,56 @@ export default function YolRehberiClient() {
             )}
           </div>
         )}
+        {/* YÜKLER GÖRÜNÜMÜ */}
+        {gorunum === 'yukler' && (
+          <div style={{ flex: 1, overflowY: 'auto', padding: '12px 14px 24px' }}>
+            {konumIzni === 'bekleniyor' && (
+              <div style={{ fontSize: 13, color: '#8b949e', textAlign: 'center', padding: '12px 0 4px' }}>
+                📍 Konum alınıyor...
+              </div>
+            )}
+            {konumIzni === 'reddedildi' && (
+              <div style={{
+                fontSize: 12, color: '#8b949e', background: '#161b22',
+                borderRadius: 8, padding: '8px 12px', marginBottom: 12,
+                border: '1px solid #21262d',
+              }}>
+                ⚠️ Konum izni verilmeden yükler gösterilemiyor. Tarayıcı ayarlarından konuma izin ver.
+              </div>
+            )}
+
+            {konumIzni === 'tamam' && (
+              <>
+                <div style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  marginBottom: 12,
+                }}>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: '#8b949e' }}>
+                    {yakinIl ? `${yakinIl} çevresindeki yükler` : 'Yakınımdaki Yükler'}
+                  </span>
+                  {yakinYukleniyor
+                    ? <span style={{ fontSize: 12, color: '#8b949e' }}>Yükleniyor...</span>
+                    : <span style={{ fontSize: 12, color: '#30363d' }}>{yakinYukler.length} sonuç</span>
+                  }
+                </div>
+
+                {!yakinYukleniyor && yakinYukler.length === 0 && yakinYuklendi && (
+                  <div style={{
+                    textAlign: 'center', padding: '48px 20px',
+                    color: '#8b949e', fontSize: 14,
+                  }}>
+                    <div style={{ fontSize: 36, marginBottom: 12 }}>📦</div>
+                    <div>{yakinIl ? `${yakinIl} bölgesinde aktif yük ilanı bulunamadı.` : 'Bu bölgede aktif yük ilanı bulunamadı.'}</div>
+                  </div>
+                )}
+
+                {yakinYukler.map(yuk => (
+                  <YukListeKart key={yuk.id} yuk={yuk} />
+                ))}
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       {/* ── POI Detay ── */}
