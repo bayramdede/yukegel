@@ -269,6 +269,18 @@ export default function YolRehberiClient() {
             >
               🗺️ Harita
             </button>
+            <button
+              onClick={() => setGorunum('yukler')}
+              style={{
+                padding: '7px 12px', border: 'none', fontSize: 13,
+                background: gorunum === 'yukler' ? '#22c55e' : 'transparent',
+                color: gorunum === 'yukler' ? '#0d1117' : '#8b949e',
+                fontWeight: gorunum === 'yukler' ? 700 : 400,
+                cursor: 'pointer',
+              }}
+            >
+              📦 Yükler
+            </button>
           </div>
 
           {/* Yeni yer ekle */}
