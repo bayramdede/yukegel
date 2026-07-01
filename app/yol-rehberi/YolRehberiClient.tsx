@@ -55,7 +55,24 @@ const TR_BBOX: BoundingBox = {
   max_lng: 45.0, max_lat: 42.5,
 };
 
-type Gorunum = 'liste' | 'harita';
+type Gorunum = 'liste' | 'harita' | 'yukler';
+
+export interface YakinYukItem {
+  id: string;
+  listing_type: string;
+  origin_city: string;
+  origin_district: string | null;
+  dest_city: string | null;
+  dest_district: string | null;
+  vehicle_type: string[] | null;
+  body_type: string[] | null;
+  price_offer: number | null;
+  price_negotiable: boolean;
+  available_date: string | null;
+  date_flexible: boolean;
+  created_at: string;
+  eslesme: 'ilce' | 'il';
+}
 
 export default function YolRehberiClient() {
   const [pois, setPois] = useState<PoiItem[]>([]);
