@@ -48,8 +48,20 @@ export default function WhatsappYukle() {
 
       try {
         const res = await fetch('/api/whatsapp-parse', { method: 'POST', body: formData });
-        const data = await res.json();
-        if (!data.success) {
+        const raw = await res.text();
+        let data: any;
+        try {
+          data = JSON.parse(raw);
+        } catch {
+          toplamSonuc.success = false;
+          toplamSonuc.error = res.status === 413
+            ? `Dosyalar çok büyük (grup ${ci + 1}/${chunks.length}) — sunucu isteği reddetti. Daha az dosya seçip tekrar dene.`
+            : res.status === 504
+            ? `Sunucu zaman aşımı (grup ${ci + 1}/${chunks.length}) — dosyalar çok uzun sürdü.`
+            : `Sunucu hatası (HTTP ${res.status}, grup ${ci + 1}/${chunks.length}) — JSON dönmedi.`;
+          break;
+        }
+        if (!res.ok || !data.success) {
           toplamSonuc.success = false;
           toplamSonuc.error = data.error || 'Bilinmeyen hata';
           break;
