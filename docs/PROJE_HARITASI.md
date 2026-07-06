@@ -267,6 +267,8 @@ Açık rotalar: /giris, /auth/, /profil-tamamla, /nasil-calisir, /hakkimizda,
 - Server action → ayrı dosya + `'use server'`
 - Vercel env → dashboard; `.next` cache → `rm -rf .next`
 - Supabase → Redirect URLs'e production URL eklenmeli
+- **Ağır/çoklu-dosya işleyen API route'ları** (`whatsapp-parse`, `learn-aliases`, `crm/[id]/analiz`) → `export const maxDuration = 60` şart; yoksa Vercel default timeout'ta düz-metin hata sayfası ("An error occurred with your deployment...") döner ve frontend'in `res.json()` çağrısı "Unexpected token" hatasıyla patlar
+- **Frontend fetch + `.json()` pattern'i** → önce `res.text()` al, sonra `JSON.parse` dene (try/catch); Vercel platform hataları (413/504) JSON değil HTML/düz-metin döner
 - **`write_file` tüm dosyayı ezer** — küçük değişiklikler için `str_replace` kullan
 - **İnline component anti-pattern**: Parent fonksiyonu içinde tanımlanan component'leri JSX olarak çağırmak (`<EditForm />`) her render'da yeni component tipi yaratır → input focus kaybolur, cursor başa döner. Çözüm: fonksiyon çağrısı (`{EditForm({})}`) veya parent dışına taşı.
 
