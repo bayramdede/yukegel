@@ -1,6 +1,6 @@
 # Yükegel — Proje Haritası
 > **Kullanım:** Her sohbet başında sadece bu dosyayı oku. Kaynak dosyaları sadece o dosyada değişiklik yapacaksan oku.  
-> Son güncelleme: 6 Temmuz 2026 — `whatsapp-parse` route'una `maxDuration=60` eklendi + `WhatsappYukle.tsx` JSON parse hatasına karşı sağlamlaştırıldı (bkz. 9. KURALLAR & TUZAKLAR).
+> Son güncelleme: 10 Temmuz 2026 — Landing page "sürücünün yol arkadaşı" (driver-mate) formatına güncellendi (bkz. 10. KULLANICI AKIŞLARI altı / GÖREV DURUMU).
 
 **Referans Dökümanlar:**
 - `docs/LOG_VE_GUVENLIK_SPECLERI.md` — Log format standartları, audit trail, SecurityLogger kontrol listesi
