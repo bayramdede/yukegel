@@ -119,40 +119,53 @@ function HeroNakliyeci({ ad }: { ad: string }) {
   );
 }
 
-const SURUCU_HIZMETLERI: { ikon: string; baslik: string; aciklama: string; href: string | null; renk: string; bg: string }[] = [
-  { ikon: '📦', baslik: 'Yük Bul', aciklama: 'Güncel yük ilanlarını gör', href: '#ilanlar', renk: '#22c55e', bg: '#0d2b1a' },
-  { ikon: '🔄', baslik: 'Lastikçi', aciklama: 'En yakın lastik ustası', href: '/yol-rehberi', renk: '#ef4444', bg: '#2b1414' },
-  { ikon: '🅿️', baslik: 'Park Yeri', aciklama: 'TIR parkı & konaklama', href: '/yol-rehberi', renk: '#60a5fa', bg: '#14202b' },
-  { ikon: '🍲', baslik: 'Yemek Yeri', aciklama: 'Kamyoncu lokantaları', href: '/yol-rehberi', renk: '#fb923c', bg: '#2b1f14' },
-  { ikon: '👷', baslik: 'Hamal', aciklama: 'Yakında', href: null, renk: '#94a3b8', bg: '#161b22' },
-  { ikon: '🗺️', baslik: 'Yol Rehberi', aciklama: 'Tüm hizmet noktaları', href: '/yol-rehberi', renk: '#a78bfa', bg: '#1e1b2e' },
+const SURUCU_HIZMETLERI: { ikon: string; baslik: string; aciklama: string; href: string | null; renk: string; bg: string; rozet?: string }[] = [
+  { ikon: '📦', baslik: 'Yük Bul', aciklama: 'Güncel ilanlar seni bekliyor', href: '#ilanlar', renk: '#22c55e', bg: '#0d2b1a', rozet: '🔥 En çok aranan' },
+  { ikon: '🔄', baslik: 'Lastikçi', aciklama: 'Patlak lastik moral bozmasın', href: '/yol-rehberi', renk: '#ef4444', bg: '#2b1414' },
+  { ikon: '🅿️', baslik: 'Park & Konaklama', aciklama: 'Güvenli TIR parkı, otel, pansiyon', href: '/yol-rehberi', renk: '#60a5fa', bg: '#14202b' },
+  { ikon: '🍲', baslik: 'Yeme & Mola', aciklama: 'Karnını doyur, biraz nefeslen', href: '/yol-rehberi', renk: '#fb923c', bg: '#2b1f14' },
+  { ikon: '⛽', baslik: 'Akaryakıt & Şarj', aciklama: 'En yakın istasyon & şarj noktası', href: '/yol-rehberi', renk: '#f59e0b', bg: '#2b2210' },
+  { ikon: '🏭', baslik: 'Kantar & Operasyon', aciklama: 'Kantar, gümrük, depo, garaj', href: '/yol-rehberi', renk: '#a78bfa', bg: '#201a2e' },
+  { ikon: '👷', baslik: 'Hamal', aciklama: 'Çok yakında burada 👀', href: null, renk: '#94a3b8', bg: '#161b22' },
+  { ikon: '🗺️', baslik: 'Tüm Yol Rehberi', aciklama: 'Haritada her şeyi keşfet', href: '/yol-rehberi', renk: '#34d399', bg: '#0d2b23' },
 ];
+
+function SurucuHizmetKarti({ h }: { h: typeof SURUCU_HIZMETLERI[number] }) {
+  if (!h.href) {
+    return (
+      <div style={{ position: 'relative', background: '#12151a', border: '1px dashed #30363d', borderRadius: 14, padding: '20px 16px', opacity: 0.7 }}>
+        <span style={{ position: 'absolute', top: 12, right: 12, background: '#1e1b2e', color: '#a78bfa', fontSize: '0.62rem', fontWeight: 700, padding: '2px 7px', borderRadius: 20 }}>YAKINDA</span>
+        <div style={{ width: 48, height: 48, borderRadius: '50%', background: h.bg, border: `1.5px solid ${h.renk}55`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem', marginBottom: 12 }}>{h.ikon}</div>
+        <div style={{ color: '#8b949e', fontWeight: 700, fontSize: '0.94rem', marginBottom: 3 }}>{h.baslik}</div>
+        <div style={{ color: '#6b7280', fontSize: '0.78rem' }}>{h.aciklama}</div>
+      </div>
+    );
+  }
+  return (
+    <a href={h.href}
+      style={{ position: 'relative', display: 'block', background: '#161b22', border: '1px solid #30363d', borderRadius: 14, padding: '20px 16px', textDecoration: 'none', transition: 'transform .15s, border-color .15s, box-shadow .15s' }}
+      onMouseEnter={e => { e.currentTarget.style.borderColor = h.renk; e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = `0 8px 20px -8px ${h.renk}66`; }}
+      onMouseLeave={e => { e.currentTarget.style.borderColor = '#30363d'; e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}>
+      {h.rozet && (
+        <span style={{ position: 'absolute', top: 12, right: 12, background: '#0d2b1a', color: '#4ade80', fontSize: '0.6rem', fontWeight: 700, padding: '2px 7px', borderRadius: 20, whiteSpace: 'nowrap' }}>{h.rozet}</span>
+      )}
+      <div style={{ width: 48, height: 48, borderRadius: '50%', background: h.bg, border: `1.5px solid ${h.renk}55`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem', marginBottom: 12 }}>{h.ikon}</div>
+      <div style={{ color: '#e2e8f0', fontWeight: 700, fontSize: '0.94rem', marginBottom: 3 }}>{h.baslik}</div>
+      <div style={{ color: '#6b7280', fontSize: '0.78rem' }}>{h.aciklama}</div>
+    </a>
+  );
+}
 
 function SurucuHizmetleri() {
   return (
     <div id="surucu-hizmetleri" style={{ background: '#0d1117', borderBottom: '1px solid #30363d' }}>
-      <div style={{ maxWidth: 1280, margin: '0 auto', padding: '36px 16px 28px' }}>
-        <div style={{ marginBottom: 18 }}>
-          <h2 style={{ color: '#e2e8f0', fontWeight: 800, fontSize: '1.25rem', margin: '0 0 4px' }}>🚛 Sürücünün Yol Arkadaşı</h2>
-          <p style={{ color: '#8b949e', fontSize: '0.85rem', margin: 0 }}>Yolda ihtiyacın olan her şey tek yerde — yük, lastikçi, park, yemek ve daha fazlası.</p>
+      <div style={{ maxWidth: 1280, margin: '0 auto', padding: '40px 16px 32px' }}>
+        <div style={{ marginBottom: 20 }}>
+          <h2 style={{ color: '#e2e8f0', fontWeight: 800, fontSize: '1.3rem', margin: '0 0 4px' }}>🚛 Yolda Yalnız Değilsin</h2>
+          <p style={{ color: '#8b949e', fontSize: '0.85rem', margin: 0 }}>Yükten lastiğe, duraktan sofraya — şoförün ihtiyacı olan her şey tek dokunuşta.</p>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }}>
-          {SURUCU_HIZMETLERI.map(h => h.href ? (
-            <a key={h.baslik} href={h.href}
-              style={{ display: 'block', background: '#161b22', border: '1px solid #30363d', borderRadius: 10, padding: '18px 16px', textDecoration: 'none', transition: 'border-color .15s' }}
-              onMouseEnter={e => (e.currentTarget.style.borderColor = h.renk)}
-              onMouseLeave={e => (e.currentTarget.style.borderColor = '#30363d')}>
-              <div style={{ width: 40, height: 40, borderRadius: 8, background: h.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.3rem', marginBottom: 10 }}>{h.ikon}</div>
-              <div style={{ color: '#e2e8f0', fontWeight: 700, fontSize: '0.92rem', marginBottom: 2 }}>{h.baslik}</div>
-              <div style={{ color: '#6b7280', fontSize: '0.76rem' }}>{h.aciklama}</div>
-            </a>
-          ) : (
-            <div key={h.baslik} style={{ background: '#12151a', border: '1px dashed #30363d', borderRadius: 10, padding: '18px 16px', opacity: 0.65, cursor: 'not-allowed' }}>
-              <div style={{ width: 40, height: 40, borderRadius: 8, background: h.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.3rem', marginBottom: 10 }}>{h.ikon}</div>
-              <div style={{ color: '#8b949e', fontWeight: 700, fontSize: '0.92rem', marginBottom: 6 }}>{h.baslik}</div>
-              <span style={{ background: '#1e1b2e', color: '#a78bfa', fontSize: '0.65rem', fontWeight: 700, padding: '2px 6px', borderRadius: 4 }}>YAKINDA</span>
-            </div>
-          ))}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 14 }}>
+          {SURUCU_HIZMETLERI.map(h => <SurucuHizmetKarti key={h.baslik} h={h} />)}
         </div>
       </div>
     </div>
