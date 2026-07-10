@@ -567,7 +567,7 @@ export default function HomeClient({ initialIlanlar = [], totalCount = 0 }: { in
       </nav>
 
       {/* HERO — misafir hero hemen görünür, auth resolve olunca kişiselleşir */}
-      {!kullanici && <HeroKayitsiz />}
+      {!kullanici && <HeroKayitsiz totalCount={totalCount} />}
       {authHazir && isMusteri && <HeroMusteri ad={ad} />}
       {authHazir && isNakliyeci && <HeroNakliyeci ad={ad} />}
 
