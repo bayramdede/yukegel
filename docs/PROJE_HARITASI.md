@@ -315,6 +315,14 @@ Açık rotalar: /giris, /auth/, /profil-tamamla, /nasil-calisir, /hakkimizda,
 ## 14. GÖREV DURUMU
 
 ### ✅ Tamamlanan
+- **Landing page → Driver-Mate formatı** (10 Temmuz 2026): `app/_components/HomeClient.tsx` sürücü-merkezli hub yapısına güncellendi (`app/page.tsx` değişmedi).
+  - Hero (`HeroKayitsiz`): başlık/CTA'lar sürücü odaklı yeniden yazıldı — birincil buton `🚛 Sürücüyüm, Hizmetleri Gör` (`#surucu-hizmetleri` anchor), ikincil `📦 Yük Vereceğim, İlan Ver` (`/ilan-ver`).
+  - Yeni `SurucuHizmetleri` bileşeni (hero altında, ana odak): 6 kartlık grid — Yük Bul (`#ilanlar` anchor), Lastikçi, Park Yeri, Yemek Yeri (üçü `/yol-rehberi`'ye link — kategori deep-link'i yok, POI sayfası `useSearchParams` desteklemiyor), Hamal (pasif/"YAKINDA" kart — POI şemasında karşılığı yok), Yol Rehberi (tümü).
+  - Yeni `YukVerenBanner` bileşeni: yük sahiplerinin ilan verebilmesi vurgusu için ayrı CTA kartı (`/ilan-ver`), hub'ın hemen altında.
+  - Canlı ilan feed'i (filtre barı + `IlanKart` listesi) korundu, ikinci plana alındı — `📋 Canlı Yük & Araç İlanları` başlığıyla `id="ilanlar"` anchor'ı eklendi.
+  - Auth/listing fetch mantığı değişmedi (`HeroMusteri`/`HeroNakliyeci` login sonrası bannerları aynı, hub tüm kullanıcı tiplerinde görünür).
+  - Doğrulama: `npx tsc --noEmit` temiz; `npx eslint` mevcut dosyadaki eski `any`/`<a>` uyarıları dışında yeni hata çıkarmadı. `next build` çalıştırılmadı (sandbox'ta canlı Supabase bağlantısı riskli) — deploy öncesi Bayram'ın lokalde/Vercel preview'da görsel kontrol etmesi önerilir.
+  - **Not:** `/yol-rehberi` kategori query param desteklemiyor (`YolRehberiClient.tsx`'de `useSearchParams` yok) — istenirse Lastikçi/Park/Yemek kartları için ileride `?anaKategori=`/`?altKategori=` deep-link desteği eklenebilir (Suspense boundary gerektirir).
 - **Yakınımdaki Yükler** (1 Temmuz 2026): `/yol-rehberi` haritasına 3. sekme ("📦 Yükler") eklendi — stealth büyüme stratejisine uygun, sürücü zaten haritayı açmışken arka planda yük keşfi.
   - `lib/il-koordinatlari.ts`: 81 il merkez koordinatı (`app/api/admin/poi-import/route.ts` içindeki tablonun kopyası) + `enYakinIl(lat,lng)` — GPS'ten offline haversine ile en yakın ili bulur (Geocoding API çağrısı YOK, ek maliyet yok).
   - `docs/20260701_nearby_listings_rpc.sql`: `get_nearby_listings_by_city(p_city, p_district, p_limit)` RPC — **gerçek şema** (`origin_city`/`origin_district`, varış `listing_stops`'un son durağından `DISTINCT ON` ile) ile yazıldı.
