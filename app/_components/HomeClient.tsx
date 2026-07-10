@@ -51,18 +51,18 @@ function HeroKayitsiz() {
             <span style={{ color: '#22c55e', fontSize: '0.75rem', fontWeight: 700 }}>Türkiye'nin Nakliye Platformu</span>
           </div>
           <h1 style={{ color: '#e2e8f0', fontWeight: 800, fontSize: 'clamp(1.6rem, 4vw, 2.4rem)', lineHeight: 1.2, margin: '0 0 12px', letterSpacing: '-0.03em' }}>
-            Teker boşa<br /><span style={{ color: '#22c55e' }}>dönmesin.</span>
+            Şoförün yol arkadaşı.<br /><span style={{ color: '#22c55e' }}>Teker boşa dönmesin.</span>
           </h1>
           <p style={{ color: '#8b949e', fontSize: '1rem', margin: '0 0 28px', lineHeight: 1.6 }}>
-            Yükünüzü taşıtın veya boş kapasitenizi değerlendirin.<br />
-            Binlerce nakliyeci ve yük sahibi Yükegel'de.
+            Yük bul, lastikçiyi/park yerini/yemek molasını keşfet — hepsi tek yerde.<br />
+            Yükün mü var? Saniyeler içinde ilan ver.
           </p>
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 28 }}>
-            <a href="/ilan-ver" style={{ background: '#22c55e', color: '#000', fontWeight: 800, fontSize: '0.95rem', padding: '12px 24px', borderRadius: 8, textDecoration: 'none' }}>
-              📦 Yük Taşıtmak İstiyorum
+            <a href="#surucu-hizmetleri" style={{ background: '#22c55e', color: '#000', fontWeight: 800, fontSize: '0.95rem', padding: '12px 24px', borderRadius: 8, textDecoration: 'none' }}>
+              🚛 Sürücüyüm, Hizmetleri Gör
             </a>
-            <a href="/giris" style={{ background: '#161b22', color: '#e2e8f0', fontWeight: 700, fontSize: '0.95rem', padding: '12px 24px', borderRadius: 8, textDecoration: 'none', border: '1px solid #30363d' }}>
-              🚛 Yük Taşımak İstiyorum
+            <a href="/ilan-ver" style={{ background: '#161b22', color: '#e2e8f0', fontWeight: 700, fontSize: '0.95rem', padding: '12px 24px', borderRadius: 8, textDecoration: 'none', border: '1px solid #30363d' }}>
+              📦 Yük Vereceğim, İlan Ver
             </a>
           </div>
           <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
