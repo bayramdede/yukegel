@@ -494,8 +494,19 @@ export default function HomeClient({ initialIlanlar = [], totalCount = 0 }: { in
       {authHazir && isMusteri && <HeroMusteri ad={ad} />}
       {authHazir && isNakliyeci && <HeroNakliyeci ad={ad} />}
 
+      {/* SÜRÜCÜ HİZMETLERİ HUB — ana odak: yük, lastikçi, park, yemek, hamal, yol rehberi */}
+      <SurucuHizmetleri />
+
+      {/* YÜK VEREN CTA — yük sahipleri için ilan verme çağrısı */}
+      <YukVerenBanner />
+
+      {/* İLAN BÖLÜMÜ BAŞLIĞI — ikinci plan, canlı ilan feed'ine giriş */}
+      <div id="ilanlar" style={{ maxWidth: 1280, margin: '0 auto', padding: '20px 16px 0' }}>
+        <h2 style={{ color: '#e2e8f0', fontWeight: 800, fontSize: '1.05rem', margin: 0 }}>📋 Canlı Yük & Araç İlanları</h2>
+      </div>
+
       {/* FİLTRE BARI */}
-      <div style={{ background: '#161b22', borderBottom: '1px solid #30363d', position: 'sticky', top: 56, zIndex: 40 }}>
+      <div style={{ background: '#161b22', borderBottom: '1px solid #30363d', position: 'sticky', top: 56, zIndex: 40, marginTop: 12 }}>
         <div style={{ maxWidth: 1280, margin: '0 auto', padding: '10px 16px', display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
           <div style={{ background: '#0d1117', borderRadius: 6, padding: 2, border: '1px solid #30363d', display: 'flex' }}>
             {(['arac', 'yuk'] as const).map(t => (
