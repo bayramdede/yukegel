@@ -41,38 +41,102 @@ function Chip({ label, bg = '#1f2937', color = '#94a3b8' }: { label: string; bg?
   );
 }
 
-function HeroKayitsiz() {
+function HeroKayitsiz({ totalCount = 0 }: { totalCount?: number }) {
+  const rotaDuraklari = SURUCU_HIZMETLERI.slice(0, 4);
   return (
-    <div style={{ borderBottom: '1px solid #1a3a2a', background: 'linear-gradient(180deg, #0d1f0f 0%, #0d1117 100%)' }}>
-      <div style={{ maxWidth: 1280, margin: '0 auto', padding: '48px 16px 40px' }}>
-        <div style={{ maxWidth: 600 }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#0d2b1a', border: '1px solid #166534', borderRadius: 20, padding: '4px 12px', marginBottom: 20 }}>
-            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#22c55e', display: 'inline-block' }} />
-            <span style={{ color: '#22c55e', fontSize: '0.75rem', fontWeight: 700 }}>Türkiye'nin Nakliye Platformu</span>
-          </div>
-          <h1 style={{ color: '#e2e8f0', fontWeight: 800, fontSize: 'clamp(1.6rem, 4vw, 2.4rem)', lineHeight: 1.2, margin: '0 0 12px', letterSpacing: '-0.03em' }}>
-            Şoförün yol arkadaşı.<br /><span style={{ color: '#22c55e' }}>Teker boşa dönmesin.</span>
-          </h1>
-          <p style={{ color: '#8b949e', fontSize: '1rem', margin: '0 0 28px', lineHeight: 1.6 }}>
-            Yük bul, lastikçiyi/park yerini/yemek molasını keşfet — hepsi tek yerde.<br />
-            Yükün mü var? Saniyeler içinde ilan ver.
-          </p>
-          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 28 }}>
-            <a href="#surucu-hizmetleri" style={{ background: '#22c55e', color: '#000', fontWeight: 800, fontSize: '0.95rem', padding: '12px 24px', borderRadius: 8, textDecoration: 'none' }}>
-              🚛 Sürücüyüm, Hizmetleri Gör
-            </a>
-            <a href="/ilan-ver" style={{ background: '#161b22', color: '#e2e8f0', fontWeight: 700, fontSize: '0.95rem', padding: '12px 24px', borderRadius: 8, textDecoration: 'none', border: '1px solid #30363d' }}>
-              📦 Yük Vereceğim, İlan Ver
-            </a>
-          </div>
-          <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
-            {[{ ikon: '⚡', text: 'Anında İlan' }, { ikon: '🔒', text: 'Güvenli Platform' }, { ikon: '🆓', text: 'Ücretsiz' }, { ikon: '📱', text: 'WhatsApp Entegrasyonu' }].map(item => (
-              <div key={item.text} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ fontSize: '0.9rem' }}>{item.ikon}</span>
-                <span style={{ color: '#6b7280', fontSize: '0.8rem', fontWeight: 600 }}>{item.text}</span>
+    <div style={{ position: 'relative', overflow: 'hidden', borderBottom: '1px solid #1a3a2a', background: 'linear-gradient(180deg, #0d1f0f 0%, #0d1117 100%)' }}>
+      <div style={{ position: 'absolute', top: -90, left: -80, width: 320, height: 320, borderRadius: '50%', background: '#22c55e', opacity: 0.12, filter: 'blur(90px)', pointerEvents: 'none' }} />
+      <div style={{ position: 'absolute', bottom: -110, right: -60, width: 280, height: 280, borderRadius: '50%', background: '#3b82f6', opacity: 0.1, filter: 'blur(90px)', pointerEvents: 'none' }} />
+
+      <style>{`
+        .hero-grid{display:grid;grid-template-columns:1.15fr .85fr;gap:44px;align-items:center;}
+        @media (max-width:860px){.hero-grid{grid-template-columns:1fr;}.hero-visual{display:none;}}
+        .hero-cta-primary{transition:transform .15s ease, box-shadow .15s ease;}
+        .hero-cta-primary:hover{transform:translateY(-2px);box-shadow:0 12px 26px -10px rgba(34,197,94,.55);}
+        .hero-cta-secondary{transition:transform .15s ease, border-color .15s ease, background .15s ease;}
+        .hero-cta-secondary:hover{transform:translateY(-2px);border-color:#22c55e;background:#12211a;}
+        .hero-route-stop{transition:transform .15s ease;}
+        .hero-route-stop:hover{transform:translateX(4px);}
+        .hero-visual-card{transition:border-color .2s ease, box-shadow .2s ease;}
+        .hero-visual-card:hover{border-color:#2f6b40;box-shadow:0 24px 60px -20px rgba(34,197,94,.25);}
+      `}</style>
+
+      <div style={{ maxWidth: 1280, margin: '0 auto', padding: '52px 16px 44px', position: 'relative' }}>
+        <div className="hero-grid">
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 20 }}>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#0d2b1a', border: '1px solid #166534', borderRadius: 20, padding: '4px 12px' }}>
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#22c55e', display: 'inline-block' }} />
+                <span style={{ color: '#22c55e', fontSize: '0.75rem', fontWeight: 700 }}>Türkiye&apos;nin şoför dostu yük platformu</span>
               </div>
-            ))}
+              {totalCount > 0 && (
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#161b22', border: '1px solid #30363d', borderRadius: 20, padding: '4px 12px' }}>
+                  <span style={{ color: '#e2e8f0', fontSize: '0.75rem', fontWeight: 700 }}>📦 {totalCount.toLocaleString('tr-TR')} aktif ilan</span>
+                </div>
+              )}
+            </div>
+
+            <h1 style={{ color: '#e2e8f0', fontWeight: 800, fontSize: 'clamp(1.8rem, 4.2vw, 2.75rem)', lineHeight: 1.15, margin: '0 0 14px', letterSpacing: '-0.03em' }}>
+              Şoförün yol arkadaşı.<br />
+              <span style={{ background: 'linear-gradient(90deg, #22c55e, #4ade80)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Teker boşa dönmesin.</span>
+            </h1>
+            <p style={{ color: '#8b949e', fontSize: '1.05rem', margin: '0 0 30px', lineHeight: 1.65, maxWidth: 520 }}>
+              Yük bul, lastikçiyi, park yerini, yemek molasını keşfet — hepsi tek yerde.<br />
+              Yükün mü var? Saniyeler içinde ilan ver.
+            </p>
+
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 32 }}>
+              <a href="#surucu-hizmetleri" className="hero-cta-primary" style={{ background: '#22c55e', color: '#000', fontWeight: 800, fontSize: '0.95rem', padding: '13px 26px', borderRadius: 10, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                🚛 Sürücüyüm, Hizmetleri Gör
+              </a>
+              <a href="/ilan-ver" className="hero-cta-secondary" style={{ background: '#161b22', color: '#e2e8f0', fontWeight: 700, fontSize: '0.95rem', padding: '13px 26px', borderRadius: 10, textDecoration: 'none', border: '1px solid #30363d', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                📦 Yük Vereceğim, İlan Ver
+              </a>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+              {[{ ikon: '⚡', text: 'Anında İlan' }, { ikon: '🔒', text: 'Güvenli Platform' }, { ikon: '🆓', text: 'Ücretsiz' }, { ikon: '📱', text: 'WhatsApp Entegrasyonu' }].flatMap((item, i, arr) => {
+                const els = [
+                  <div key={item.text} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ fontSize: '0.9rem' }}>{item.ikon}</span>
+                    <span style={{ color: '#6b7280', fontSize: '0.8rem', fontWeight: 600 }}>{item.text}</span>
+                  </div>,
+                ];
+                if (i < arr.length - 1) els.push(<span key={item.text + '-dot'} style={{ width: 3, height: 3, borderRadius: '50%', background: '#30363d', flexShrink: 0 }} />);
+                return els;
+              })}
+            </div>
           </div>
+
+          <a href="#surucu-hizmetleri" className="hero-visual" style={{ textDecoration: 'none', display: 'block' }}>
+            <div className="hero-visual-card" style={{ background: 'linear-gradient(160deg, #12251a 0%, #161b22 60%)', border: '1px solid #234a30', borderRadius: 20, padding: '26px 24px', boxShadow: '0 20px 50px -20px rgba(0,0,0,0.6)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+                <span style={{ color: '#8b949e', fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase' }}>Bugün Yolda</span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: '#0d2b1a', border: '1px solid #166534', borderRadius: 20, padding: '3px 9px' }}>
+                  <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#22c55e', display: 'inline-block' }} />
+                  <span style={{ color: '#4ade80', fontSize: '0.66rem', fontWeight: 700 }}>Canlı</span>
+                </span>
+              </div>
+
+              <div style={{ position: 'relative' }}>
+                <div style={{ position: 'absolute', left: 19, top: 8, bottom: 8, width: 2, background: 'repeating-linear-gradient(180deg, #30363d 0 6px, transparent 6px 12px)' }} />
+                {rotaDuraklari.map(d => (
+                  <div key={d.baslik} className="hero-route-stop" style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 14, padding: '9px 0' }}>
+                    <div style={{ width: 40, height: 40, borderRadius: '50%', background: d.bg, border: `1.5px solid ${d.renk}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.1rem', flexShrink: 0, zIndex: 1 }}>{d.ikon}</div>
+                    <div>
+                      <div style={{ color: '#e2e8f0', fontWeight: 700, fontSize: '0.88rem' }}>{d.baslik}</div>
+                      <div style={{ color: '#6b7280', fontSize: '0.74rem' }}>{d.aciklama}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid #21262d', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ color: '#6b7280', fontSize: '0.75rem' }}>🗺️ 81 il boyunca</span>
+                <span style={{ color: '#22c55e', fontSize: '0.75rem', fontWeight: 700 }}>Tümünü Gör →</span>
+              </div>
+            </div>
+          </a>
         </div>
       </div>
     </div>
