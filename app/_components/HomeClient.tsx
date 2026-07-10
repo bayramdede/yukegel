@@ -119,6 +119,64 @@ function HeroNakliyeci({ ad }: { ad: string }) {
   );
 }
 
+const SURUCU_HIZMETLERI: { ikon: string; baslik: string; aciklama: string; href: string | null; renk: string; bg: string }[] = [
+  { ikon: '📦', baslik: 'Yük Bul', aciklama: 'Güncel yük ilanlarını gör', href: '#ilanlar', renk: '#22c55e', bg: '#0d2b1a' },
+  { ikon: '🔄', baslik: 'Lastikçi', aciklama: 'En yakın lastik ustası', href: '/yol-rehberi', renk: '#ef4444', bg: '#2b1414' },
+  { ikon: '🅿️', baslik: 'Park Yeri', aciklama: 'TIR parkı & konaklama', href: '/yol-rehberi', renk: '#60a5fa', bg: '#14202b' },
+  { ikon: '🍲', baslik: 'Yemek Yeri', aciklama: 'Kamyoncu lokantaları', href: '/yol-rehberi', renk: '#fb923c', bg: '#2b1f14' },
+  { ikon: '👷', baslik: 'Hamal', aciklama: 'Yakında', href: null, renk: '#94a3b8', bg: '#161b22' },
+  { ikon: '🗺️', baslik: 'Yol Rehberi', aciklama: 'Tüm hizmet noktaları', href: '/yol-rehberi', renk: '#a78bfa', bg: '#1e1b2e' },
+];
+
+function SurucuHizmetleri() {
+  return (
+    <div id="surucu-hizmetleri" style={{ background: '#0d1117', borderBottom: '1px solid #30363d' }}>
+      <div style={{ maxWidth: 1280, margin: '0 auto', padding: '36px 16px 28px' }}>
+        <div style={{ marginBottom: 18 }}>
+          <h2 style={{ color: '#e2e8f0', fontWeight: 800, fontSize: '1.25rem', margin: '0 0 4px' }}>🚛 Sürücünün Yol Arkadaşı</h2>
+          <p style={{ color: '#8b949e', fontSize: '0.85rem', margin: 0 }}>Yolda ihtiyacın olan her şey tek yerde — yük, lastikçi, park, yemek ve daha fazlası.</p>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }}>
+          {SURUCU_HIZMETLERI.map(h => h.href ? (
+            <a key={h.baslik} href={h.href}
+              style={{ display: 'block', background: '#161b22', border: '1px solid #30363d', borderRadius: 10, padding: '18px 16px', textDecoration: 'none', transition: 'border-color .15s' }}
+              onMouseEnter={e => (e.currentTarget.style.borderColor = h.renk)}
+              onMouseLeave={e => (e.currentTarget.style.borderColor = '#30363d')}>
+              <div style={{ width: 40, height: 40, borderRadius: 8, background: h.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.3rem', marginBottom: 10 }}>{h.ikon}</div>
+              <div style={{ color: '#e2e8f0', fontWeight: 700, fontSize: '0.92rem', marginBottom: 2 }}>{h.baslik}</div>
+              <div style={{ color: '#6b7280', fontSize: '0.76rem' }}>{h.aciklama}</div>
+            </a>
+          ) : (
+            <div key={h.baslik} style={{ background: '#12151a', border: '1px dashed #30363d', borderRadius: 10, padding: '18px 16px', opacity: 0.65, cursor: 'not-allowed' }}>
+              <div style={{ width: 40, height: 40, borderRadius: 8, background: h.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.3rem', marginBottom: 10 }}>{h.ikon}</div>
+              <div style={{ color: '#8b949e', fontWeight: 700, fontSize: '0.92rem', marginBottom: 6 }}>{h.baslik}</div>
+              <span style={{ background: '#1e1b2e', color: '#a78bfa', fontSize: '0.65rem', fontWeight: 700, padding: '2px 6px', borderRadius: 4 }}>YAKINDA</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function YukVerenBanner() {
+  return (
+    <div style={{ background: '#0d1117', borderBottom: '1px solid #30363d' }}>
+      <div style={{ maxWidth: 1280, margin: '0 auto', padding: '0 16px 28px' }}>
+        <div style={{ background: 'linear-gradient(90deg, #0d1f2e 0%, #161b22 100%)', border: '1px solid #1e3a5f', borderRadius: 12, padding: '20px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+          <div>
+            <div style={{ color: '#e2e8f0', fontWeight: 800, fontSize: '1.05rem', marginBottom: 4 }}>📦 Yükünüz mü var?</div>
+            <div style={{ color: '#8b949e', fontSize: '0.85rem' }}>İlanınızı saniyeler içinde yayınlayın, binlerce nakliyeciye ulaşın. Ücretsiz.</div>
+          </div>
+          <a href="/ilan-ver" style={{ background: '#22c55e', color: '#000', fontWeight: 800, fontSize: '0.9rem', padding: '11px 22px', borderRadius: 8, textDecoration: 'none', whiteSpace: 'nowrap' }}>
+            İlan Ver →
+          </a>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function UyeBanner() {
   return (
     <div style={{ background: '#161b22', border: '1px solid #1e3a5f', borderRadius: 8, padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
