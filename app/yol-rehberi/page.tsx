@@ -1,4 +1,5 @@
 import { Metadata } from 'next';
+import { Suspense } from 'react';
 import YolRehberiClient from './YolRehberiClient';
 
 export const metadata: Metadata = {
@@ -7,5 +8,10 @@ export const metadata: Metadata = {
 };
 
 export default function YolRehberiPage() {
-  return <YolRehberiClient />;
+  // YolRehberiClient useSearchParams kullanıyor (kategori deep-link) — Suspense zorunlu
+  return (
+    <Suspense fallback={<div style={{ height: '100dvh', background: '#0d1117' }} />}>
+      <YolRehberiClient />
+    </Suspense>
+  );
 }
