@@ -76,13 +76,23 @@ export interface YakinYukItem {
 }
 
 export default function YolRehberiClient() {
+  // Landing page'deki hizmet kartlarından gelen deep-link: ?anaKategori=tamir_bakim&altKategori=lastikci
+  const searchParams = useSearchParams();
   const [pois, setPois] = useState<PoiItem[]>([]);
   const [poiTotal, setPoiTotal] = useState<number | null>(null);
   const [yukleniyor, setYukleniyor] = useState(false);
-  // Ana kategori seçimi ('hepsi' | ana kategori value)
-  const [aktifAnaKat, setAktifAnaKat] = useState('hepsi');
+  // Ana kategori seçimi ('hepsi' | ana kategori value) — geçersiz/eksik param varsa 'hepsi'e düşer
+  const [aktifAnaKat, setAktifAnaKat] = useState(() => {
+    const p = searchParams.get('anaKategori');
+    return p && POI_HIYERARSI.some(a => a.value === p) ? p : 'hepsi';
+  });
   // Seçili alt kategoriler (çoklu veya tekli — ana kategorinin cokluSecim'ine göre)
-  const [aktifAltKatlar, setAktifAltKatlar] = useState<string[]>([]);
+  const [aktifAltKatlar, setAktifAltKatlar] = useState<string[]>(() => {
+    const anaP = searchParams.get('anaKategori');
+    const altP = searchParams.get('altKategori');
+    const ana = POI_HIYERARSI.find(a => a.value === anaP);
+    return ana && altP && ana.altlar.some(alt => alt.value === altP) ? [altP] : [];
+  });
   // Backward-compat: tek kategori filtresi için
   const aktifKategori = aktifAltKatlar.length === 1 ? aktifAltKatlar[0] : aktifAltKatlar.length === 0 ? aktifAnaKat : 'hepsi';
   const [aktifEtiketler, setAktifEtiketler] = useState<string[]>([]);
