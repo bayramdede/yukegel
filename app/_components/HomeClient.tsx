@@ -185,11 +185,11 @@ function HeroNakliyeci({ ad }: { ad: string }) {
 
 const SURUCU_HIZMETLERI: { ikon: string; baslik: string; aciklama: string; href: string | null; renk: string; bg: string; rozet?: string }[] = [
   { ikon: '📦', baslik: 'Yük Bul', aciklama: 'Güncel ilanlar seni bekliyor', href: '#ilanlar', renk: '#22c55e', bg: '#0d2b1a', rozet: '🔥 En çok aranan' },
-  { ikon: '🔄', baslik: 'Lastikçi', aciklama: 'Patlak lastik moral bozmasın', href: '/yol-rehberi', renk: '#ef4444', bg: '#2b1414' },
-  { ikon: '🅿️', baslik: 'Park & Konaklama', aciklama: 'Güvenli TIR parkı, otel, pansiyon', href: '/yol-rehberi', renk: '#60a5fa', bg: '#14202b' },
-  { ikon: '🍲', baslik: 'Yeme & Mola', aciklama: 'Karnını doyur, biraz nefeslen', href: '/yol-rehberi', renk: '#fb923c', bg: '#2b1f14' },
-  { ikon: '⛽', baslik: 'Akaryakıt & Şarj', aciklama: 'En yakın istasyon & şarj noktası', href: '/yol-rehberi', renk: '#f59e0b', bg: '#2b2210' },
-  { ikon: '🏭', baslik: 'Kantar & Operasyon', aciklama: 'Kantar, gümrük, depo, garaj', href: '/yol-rehberi', renk: '#a78bfa', bg: '#201a2e' },
+  { ikon: '🔄', baslik: 'Lastikçi', aciklama: 'Patlak lastik moral bozmasın', href: '/yol-rehberi?anaKategori=tamir_bakim&altKategori=lastikci', renk: '#ef4444', bg: '#2b1414' },
+  { ikon: '🅿️', baslik: 'Park & Konaklama', aciklama: 'Güvenli TIR parkı, otel, pansiyon', href: '/yol-rehberi?anaKategori=park_konaklama', renk: '#60a5fa', bg: '#14202b' },
+  { ikon: '🍲', baslik: 'Yeme & Mola', aciklama: 'Karnını doyur, biraz nefeslen', href: '/yol-rehberi?anaKategori=yeme_icme', renk: '#fb923c', bg: '#2b1f14' },
+  { ikon: '⛽', baslik: 'Akaryakıt & Şarj', aciklama: 'En yakın istasyon & şarj noktası', href: '/yol-rehberi?anaKategori=akaryakit_enerji', renk: '#f59e0b', bg: '#2b2210' },
+  { ikon: '🏭', baslik: 'Kantar & Operasyon', aciklama: 'Kantar, gümrük, depo, garaj', href: '/yol-rehberi?anaKategori=operasyon', renk: '#a78bfa', bg: '#201a2e' },
   { ikon: '👷', baslik: 'Hamal', aciklama: 'Çok yakında burada 👀', href: null, renk: '#94a3b8', bg: '#161b22' },
   { ikon: '🗺️', baslik: 'Tüm Yol Rehberi', aciklama: 'Haritada her şeyi keşfet', href: '/yol-rehberi', renk: '#34d399', bg: '#0d2b23' },
 ];
