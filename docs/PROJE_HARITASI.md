@@ -1,6 +1,6 @@
 # Yükegel — Proje Haritası
 > **Kullanım:** Her sohbet başında sadece bu dosyayı oku. Kaynak dosyaları sadece o dosyada değişiklik yapacaksan oku.  
-> Son güncelleme: 10 Temmuz 2026 — Landing page "sürücünün yol arkadaşı" (driver-mate) formatına güncellendi (bkz. 10. KULLANICI AKIŞLARI altı / GÖREV DURUMU).
+> Son güncelleme: 22 Temmuz 2026 — `/profil-tamamla` TCKN artık hiçbir kullanıcı tipinde zorunlu değil (bkz. 14. GÖREV DURUMU).
 
 **Referans Dökümanlar:**
 - `docs/LOG_VE_GUVENLIK_SPECLERI.md` — Log format standartları, audit trail, SecurityLogger kontrol listesi
