@@ -234,7 +234,14 @@ function ProfilTamamlaIci() {
     }, { onConflict: 'id' });
 
     if (error) {
-      setHata('Profil kaydedilemedi: ' + error.message);
+      // email unique constraint — bu kişinin başka (eski) bir hesabı zaten var ama merge
+      // kontrolleri (giris/page.tsx, auth/callback/route.ts) onu yakalayamadı. Kullanıcıyı
+      // ham Postgres hatasıyla baş başa bırakmak yerine yönlendir.
+      if (error.message.includes('users_email_key')) {
+        setHata('Bu e-posta adresiyle zaten bir hesabınız var. Lütfen giriş yapın.');
+      } else {
+        setHata('Profil kaydedilemedi: ' + error.message);
+      }
       setYukleniyor(false);
       return;
     }

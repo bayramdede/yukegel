@@ -113,16 +113,24 @@ function GirisIci() {
       return;
     }
 
-    // 4. DB'de 05xx / 5xx formatında başka profil var mı? (ilk kez merge)
+    // 4. DB'de 05xx / 5xx formatında ya da aynı e-postayla başka profil var mı? (ilk kez merge)
     const telefonTemiz = fmt.startsWith('+90') ? '0' + fmt.slice(3) : fmt;
     const telefonKisa  = fmt.startsWith('+90') ? fmt.slice(3) : fmt;
+    const eposta = data.user?.email;
 
-    // Bu telefon başka bir users kaydında var mı?
+    const esleseceKosullar = [`phone.eq.${telefonTemiz}`, `phone.eq.${telefonKisa}`];
+    if (eposta) esleseceKosullar.push(`email.eq.${eposta}`);
+
+    // Bu telefon ya da e-posta başka bir users kaydında var mı?
+    // is_active yerine merged_into kullanıyoruz: eski hesaplarda is_active hiç set edilmemiş
+    // olabilir (NULL) — asıl önemli olan bu satırın daha önce başka bir hesaba merge edilmemiş olması.
+    // (Not: eposta kontrolü eklenmeden önce, telefon eşleşmesi olmayan ama aynı e-postayla zaten
+    // kayıtlı hesaplar burada yakalanamıyordu — profil-tamamla'ya düşüp email unique constraint'e çarpıyorlardı.)
     const { data: eskiProfil } = await supabase
       .from('users')
       .select('id, email, display_name')
-      .or(`phone.eq.${telefonTemiz},phone.eq.${telefonKisa}`)
-      .eq('is_active', true)
+      .or(esleseceKosullar.join(','))
+      .is('merged_into', null)
       .neq('id', mevcutUserId)
       .maybeSingle();
 

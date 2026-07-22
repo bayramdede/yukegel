@@ -46,18 +46,17 @@ export async function GET(request: Request) {
         return NextResponse.redirect(`${origin}/moderator`)
       }
 
-      // Profil tamamlanmamış (yeni kayıt) → profil-tamamla
-      if (!profil?.user_type) {
-        return NextResponse.redirect(`${origin}/profil-tamamla`)
-      }
-
-      // Gmail ile giriş — bu email başka bir users kaydında telefon ile kayıtlı mı?
+      // Gmail ile giriş — bu email başka bir users kaydında (telefon veya eposta ile) zaten kayıtlı mı?
+      // ÖNEMLİ: bu kontrol user_type kontrolünden ÖNCE çalışmalı — yoksa profili tamamlanmamış
+      // (yeni auth id, eski eposta) kullanıcılar profil-tamamla'ya düşüp orada email unique
+      // constraint'ine çarpıyordu (users_email_key).
+      // is_active yerine merged_into kullanıyoruz: eski hesaplarda is_active hiç set edilmemiş olabilir (NULL).
       if (user.email) {
         const { data: eskiProfil } = await supabase
           .from('users')
           .select('id, display_name, phone')
           .eq('email', user.email)
-          .eq('is_active', true)
+          .is('merged_into', null)
           .neq('id', user.id)
           .maybeSingle()
 
@@ -68,6 +67,11 @@ export async function GET(request: Request) {
           })
           return NextResponse.redirect(`${origin}/giris/merge?${params}`)
         }
+      }
+
+      // Profil tamamlanmamış (yeni kayıt) → profil-tamamla
+      if (!profil?.user_type) {
+        return NextResponse.redirect(`${origin}/profil-tamamla`)
       }
 
       // Normal kullanıcı, profil tamam → panele yönlendir

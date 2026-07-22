@@ -14,24 +14,108 @@ export default function WhatsappYukle() {
 
   const [debugAcik, setDebugAcik] = useState(false);
   const [progress, setProgress] = useState<{ current: number; total: number } | null>(null);
+  const [hazirlaniyor, setHazirlaniyor] = useState(false);
 
   const CHUNK_SIZE = 5; // Her istekte kaç dosya (üst sınır)
   const MAX_CHUNK_BYTES = 15 * 1024 * 1024; // ~15MB üstü tek istekte Vercel timeout riski yüksek
-  const BUYUK_DOSYA_ESIK = 20 * 1024 * 1024; // Bu boyutun üstü muhtemelen "medyalı" export — timeout'a çok yatkın
+  const BUYUK_DOSYA_ESIK = 20 * 1024 * 1024; // Bu boyutun üstü muhtemelen "medyalı" export — tarayıcıda ayıklama biraz sürer
 
   const buyukDosyalar = dosyalar.filter(f => f.size > BUYUK_DOSYA_ESIK);
+
+  // Sohbet metnindeki mesaj başlangıcı regex'leri — sunucudaki parseChatTxt (whatsapp-parse/route.ts) ile birebir aynı.
+  const TS_ANDROID = /^\[(\d{1,2}\.\d{1,2}\.\d{4}[,\s]\d{1,2}:\d{1,2}(?::\d{1,2})?)\]\s(.+?):\s(.*)$/;
+  const TS_IOS = /^(\d{1,2}\.\d{1,2}\.\d{4}[,\s]\d{1,2}:\d{1,2})\s?-\s(.+?):\s(.*)$/;
+
+  function zamanDamgasiCoz(raw: string): Date | null {
+    const tsClean = raw.replace(',', '').replace(/\s+/g, ' ').trim();
+    const parts = tsClean.split(' ');
+    if (parts.length < 2) return null;
+    const [datePart, timePart] = parts;
+    const ds = datePart.split('.');
+    if (ds.length < 3) return null;
+    const [day, month, year] = ds;
+    const isoDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+    const d = new Date(`${isoDate}T${timePart}`);
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  // Metni SONDAN başa doğru tarar, cutoff'tan (+ güvenlik payı) eski ilk mesajı bulunca durur —
+  // öncesindeki (muhtemelen çok daha büyük) eski geçmişi hiç okumaya/işlemeye gerek kalmaz.
+  // Sunucu zaten `saat_filtre` cutoff'undan eskisini atıyordu; bu adım aynı filtreyi göndermeden ÖNCE tarayıcıda uygular.
+  function eskiIcerigiKirp(text: string, saatFiltreSaat: number): string {
+    const GUVENLIK_PAYI_SAAT = 6; // saat dilimi/gecikme farklarına karşı tampon — sınırdaki mesajı yanlışlıkla atmamak için
+    const cutoff = new Date(Date.now() - (saatFiltreSaat + GUVENLIK_PAYI_SAAT) * 60 * 60 * 1000);
+    const lines = text.split('\n');
+    let kesimIndex = 0;
+    for (let i = lines.length - 1; i >= 0; i--) {
+      const trimmed = lines[i].replace(/[‎‪‬‏​]/g, '').trim();
+      if (!trimmed) continue;
+      const match = TS_ANDROID.exec(trimmed) || TS_IOS.exec(trimmed);
+      if (!match) continue; // devam satırı (mesaj başlangıcı değil) — atla, aramaya devam
+      const d = zamanDamgasiCoz(match[1]);
+      if (!d) continue;
+      if (d < cutoff) { kesimIndex = i + 1; break; } // bu mesajdan öncesi eski — burada dur
+    }
+    return kesimIndex === 0 ? text : lines.slice(kesimIndex).join('\n');
+  }
+
+  // ZIP'in içinden SADECE sohbet .txt'inin metnini çıkarır — foto/video hiç sunucuya gitmez.
+  // Bu işlem tarayıcıda çalışır, Vercel'in 60sn süresine dahil değil.
+  async function zipDenMetinCikar(file: File): Promise<string | null> {
+    try {
+      const JSZip = (await import('jszip')).default;
+      const buffer = await file.arrayBuffer();
+      const zip = await JSZip.loadAsync(buffer);
+      const allTxts = Object.keys(zip.files).filter(name => !zip.files[name].dir && name.toLowerCase().endsWith('.txt'));
+      const chatFile = allTxts.find(n => n.toLowerCase().includes('_chat')) ||
+                       allTxts.find(n => n.toLowerCase().includes('chat')) ||
+                       allTxts.find(n => n.toLowerCase().includes('sohbet')) ||
+                       (allTxts.length === 1 ? allTxts[0] : null);
+      if (!chatFile) return null; // sohbet txt'i bulunamadı — orijinali gönder, sunucu eskisi gibi atlar
+      return await zip.files[chatFile].async('string');
+    } catch {
+      return null; // ayıklama başarısız oldu (bozuk zip vb.) — orijinali gönder, eski davranış
+    }
+  }
+
+  // Dosyayı sunucuya göndermeden önce hazırlar: ZIP ise sohbet metnini çıkarır, ardından HER İKİ
+  // durumda da (zip'ten çıkan veya düz .txt) cutoff'tan eski geçmişi tarayıcıda kırpar —
+  // sunucuya sadece işe yarayacak son kısım gider, yıllık gruplarda da payload küçük kalır.
+  async function dosyaHazirla(file: File, saatFiltreSaat: number): Promise<File> {
+    const adKucuk = file.name.toLowerCase();
+    let text: string | null = null;
+    if (adKucuk.endsWith('.zip')) {
+      text = await zipDenMetinCikar(file);
+      if (text === null) return file; // ayıklanamadı — orijinal zip'i olduğu gibi gönder, sunucu eski davranışa düşer
+    } else if (adKucuk.endsWith('.txt')) {
+      try { text = await file.text(); } catch { return file; }
+    } else {
+      return file; // bilinmeyen format — dokunma
+    }
+    const kirpilmis = eskiIcerigiKirp(text, saatFiltreSaat);
+    return new File([kirpilmis], file.name.replace(/\.zip$/i, '.txt'), { type: 'text/plain' });
+  }
 
   async function yukle() {
     if (dosyalar.length === 0) return;
     setYukleniyor(true);
     setSonuc(null);
 
+    // 0. ZIP'leri tarayıcıda aç (medya sunucuya hiç gitmez) ve her iki durumda da (zip/txt)
+    // cutoff'tan eski geçmişi tarayıcıda kırp — sunucuya sadece işe yarayan son kısım gider.
+    setHazirlaniyor(true);
+    const hazirDosyalar: File[] = [];
+    for (const f of dosyalar) {
+      hazirDosyalar.push(await dosyaHazirla(f, saatFiltre));
+    }
+    setHazirlaniyor(false);
+
     // Boyuta duyarlı gruplama: hem dosya sayısı hem toplam byte sınırı aşılınca yeni grup açılır
     // (tek başına devasa bir dosya varsa yine de kendi grubunda tek başına gider — bölünemez)
     const chunks: File[][] = [];
     let acikGrup: File[] = [];
     let acikGrupBytes = 0;
-    for (const f of dosyalar) {
+    for (const f of hazirDosyalar) {
       const sayiAsimi = acikGrup.length >= CHUNK_SIZE;
       const boyutAsimi = acikGrup.length > 0 && acikGrupBytes + f.size > MAX_CHUNK_BYTES;
       if (sayiAsimi || boyutAsimi) {
@@ -225,15 +309,17 @@ export default function WhatsappYukle() {
 
             {buyukDosyalar.length > 0 && (
               <div style={{ width: '100%', background: '#2a1a0d', border: '1px solid #92400e', borderRadius: 6, padding: '8px 14px', fontSize: '0.78rem', color: '#fbbf24', lineHeight: 1.5 }}>
-                ⚠️ {buyukDosyalar.length} dosya çok büyük ({buyukDosyalar.map(f => `${f.name} — ${(f.size / 1024 / 1024).toFixed(1)}MB`).join(', ')}) — muhtemelen fotoğraf/video ile ("medyalı") export edilmiş.
-                Bu boyuttaki tek dosya sunucu zaman aşımına (60sn) takılabilir. WhatsApp'ta sohbeti dışa aktarırken <b>"Medya Olmadan"</b> seçeneğini kullan — sadece metin gerekiyor, çok daha küçük ve hızlı olur.
+                ⚠️ {buyukDosyalar.length} dosya büyük ({buyukDosyalar.map(f => `${f.name} — ${(f.size / 1024 / 1024).toFixed(1)}MB`).join(', ')}) — muhtemelen fotoğraf/video ile ("medyalı") export edilmiş.
+                Yükle'ye basınca tarayıcı önce içindeki sohbet metnini ayıklayıp sadece onu gönderecek (medya sunucuya gitmez); bu ayıklama adımı dosya boyutuna göre biraz sürebilir, sabırlı ol.
               </div>
             )}
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
               <button onClick={yukle} disabled={yukleniyor || dosyalar.length === 0}
                 style={{ background: dosyalar.length > 0 ? '#22c55e' : '#1f2937', color: '#000', border: 'none', borderRadius: 6, padding: '7px 16px', fontSize: '0.85rem', fontWeight: 700, cursor: yukleniyor ? 'not-allowed' : 'pointer', opacity: yukleniyor ? 0.8 : 1 }}>
-                {yukleniyor && progress
+                {hazirlaniyor
+                  ? '📦 Medya ayıklanıyor...'
+                  : yukleniyor && progress
                   ? `⏳ Grup ${progress.current}/${progress.total}...`
                   : yukleniyor
                   ? 'Yükleniyor...'
