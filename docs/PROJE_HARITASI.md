@@ -1,6 +1,6 @@
 # Yükegel — Proje Haritası
 > **Kullanım:** Her sohbet başında sadece bu dosyayı oku. Kaynak dosyaları sadece o dosyada değişiklik yapacaksan oku.  
-> Son güncelleme: 22 Temmuz 2026 — `/profil-tamamla` TCKN artık hiçbir kullanıcı tipinde zorunlu değil (bkz. 14. GÖREV DURUMU).
+> Son güncelleme: 22 Temmuz 2026 — SMS girişte tamamlanmış profiller artık `/profil-tamamla`'ya düşmüyor, doğrudan hedefe gidiyor (bkz. 14. GÖREV DURUMU).
 
 **Referans Dökümanlar:**
 - `docs/LOG_VE_GUVENLIK_SPECLERI.md` — Log format standartları, audit trail, SecurityLogger kontrol listesi
@@ -271,6 +271,7 @@ Açık rotalar: /giris, /auth/, /profil-tamamla, /nasil-calisir, /hakkimizda,
 - **Frontend fetch + `.json()` pattern'i** → önce `res.text()` al, sonra `JSON.parse` dene (try/catch); Vercel platform hataları (413/504) JSON değil HTML/düz-metin döner
 - **`write_file` tüm dosyayı ezer** — küçük değişiklikler için `str_replace` kullan
 - **İnline component anti-pattern**: Parent fonksiyonu içinde tanımlanan component'leri JSX olarak çağırmak (`<EditForm />`) her render'da yeni component tipi yaratır → input focus kaybolur, cursor başa döner. Çözüm: fonksiyon çağrısı (`{EditForm({})}`) veya parent dışına taşı.
+- **WhatsApp ZIP timeout — `maxDuration=60` olsa bile aşılabilir**: `whatsapp-parse` route'unda dosya sayısı az olsa bile ("grup 1/1") 504 timeout görülebiliyor — sebep dosya içeriği değil, **medyalı (fotoğraf/video dahil) WhatsApp export**'unun çok büyük olması (yüzlerce MB–GB); `request.formData()` + `file.arrayBuffer()` bu dosyayı tam okuyor ve bu süre 60sn'lik execution time'a dahil. Çözüm (22 Tem 2026, `WhatsappYukle.tsx`): frontend'e boyuta duyarlı gruplama eklendi (`MAX_CHUNK_BYTES` ~15MB, dosya sayısı sınırına ek olarak) + `BUYUK_DOSYA_ESIK` (~20MB) üstü dosyalar için kullanıcıya "Medya Olmadan dışa aktar" uyarısı gösteriliyor. Kalıcı çözüm değil (tek başına 20MB+ dosya yine kendi grubunda gidip timeout'a takılabilir) — asıl öneri: kullanıcı WhatsApp'ta sohbeti hep "Medya Olmadan" dışa aktarsın.
 
 ---
 
@@ -315,6 +316,12 @@ Açık rotalar: /giris, /auth/, /profil-tamamla, /nasil-calisir, /hakkimizda,
 ## 14. GÖREV DURUMU
 
 ### ✅ Tamamlanan
+- **SMS ile giriş → yanlış profil-tamamla yönlendirmesi düzeltildi** (22 Temmuz 2026): Profili tamam olan kullanıcılar OTP girişinden sonra hâlâ `/profil-tamamla`'ya düşüyordu; kök neden 3 katmanlıydı.
+  - `app/giris/page.tsx` (`otpDogrula`): `mevcutProfil?.is_active && mevcutProfil?.user_type` kontrolü `is_active` NULL olduğunda (profil-tamamla upsert'i bu alanı hiç set etmiyordu) yanlışlıkla "pasif" sayıyordu → `is_active !== false && user_type` yapıldı (sadece açıkça `false` ise pasif say).
+  - `proxy.ts`: `/profil-tamamla`'ya yönlendirirken orijinal hedef path artık `?redirect=` ile taşınıyor (önce sabit `/profil-tamamla` idi, kullanıcı tamamladıktan sonra hep `/panel`'e düşüyordu).
+  - `app/profil-tamamla/page.tsx`: `useSearchParams` + `Suspense` eklendi (`redirect` param okunuyor); init `useEffect` artık `user_type` zaten doluysa formu hiç göstermeden `redirect || '/panel'`'e yönlendiriyor; `user_type` boşsa mevcut `display_name`/`phone`/`company_name`/`tckn`/`vkn` DB'den önceden dolduruluyor (tam boş form yerine sadece eksik alan isteniyor). Submit upsert'i artık `is_active: true` set ediyor; başarı sonrası `redirect || '/panel'`'e gidiyor.
+  - Doğrulama: `npx tsc --noEmit` temiz. `npx eslint` — `MevcutUyari`/`KontrolYukleniyor` inline component tanımlarından kaynaklanan `react-hooks/static-components` hataları (7 hata/2 uyarı) 20 Temmuz commit'inde de aynı şekilde vardı (git ile doğrulandı) — bu değişiklikle gelmedi, pre-existing.
+  - `app/giris/page.tsx`'te `eskiProfil` (merge hedefi arama) sorgusundaki `.eq('is_active', true)` filtresi kasıtlı olarak dokunulmadı — farklı bir semantik (başka bir aktif hesap bulma).
 - **TCKN zorunluluğu kaldırıldı** (22 Temmuz 2026): `app/profil-tamamla/page.tsx` — TCKN alanı daha önce `arac_sahibi` (nakliyeci) tipi için zorunluydu; nakliyecileri kayıt sırasında ürküttüğü gözlemlendiği için tüm kullanıcı tiplerinde opsiyonel yapıldı.
   - `kimlikGecerli()`: `arac_sahibi` özel dalı kaldırıldı — artık sadece dolu girilmişse geçerlilik/tekillik kontrolü yapılıyor.
   - UI: TCKN etiketi her zaman "(opsiyonel)", `required` attribute'u kaldırıldı, "Kimlik bilgisi profil güvenilirliğinizi artırır" ipucu artık tüm kullanıcı tiplerinde (arac_sahibi dahil) boşken gösteriliyor.

@@ -104,7 +104,9 @@ function GirisIci() {
     }
 
     // 3. Aktif profil varsa direkt giriş
-    if (mevcutProfil?.is_active && mevcutProfil?.user_type) {
+    // is_active NULL olabilir (profil-tamamla upsert'i bu alanı set etmiyordu) —
+    // sadece admin/merge tarafından açıkça false yapılmışsa "pasif" say.
+    if (mevcutProfil?.is_active !== false && mevcutProfil?.user_type) {
       authLog('login_success', 'otp');
       await yonlendir();
       setYukleniyor(false);
@@ -149,7 +151,7 @@ function GirisIci() {
       .maybeSingle();
 
     if (!profil?.user_type) {
-      router.push('/profil-tamamla');
+      router.push(redirect ? `/profil-tamamla?redirect=${encodeURIComponent(redirect)}` : '/profil-tamamla');
     } else {
       await yonlendir();
     }

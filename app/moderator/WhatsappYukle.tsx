@@ -15,16 +15,34 @@ export default function WhatsappYukle() {
   const [debugAcik, setDebugAcik] = useState(false);
   const [progress, setProgress] = useState<{ current: number; total: number } | null>(null);
 
-  const CHUNK_SIZE = 5; // Her istekte kaç dosya
+  const CHUNK_SIZE = 5; // Her istekte kaç dosya (üst sınır)
+  const MAX_CHUNK_BYTES = 15 * 1024 * 1024; // ~15MB üstü tek istekte Vercel timeout riski yüksek
+  const BUYUK_DOSYA_ESIK = 20 * 1024 * 1024; // Bu boyutun üstü muhtemelen "medyalı" export — timeout'a çok yatkın
+
+  const buyukDosyalar = dosyalar.filter(f => f.size > BUYUK_DOSYA_ESIK);
 
   async function yukle() {
     if (dosyalar.length === 0) return;
     setYukleniyor(true);
     setSonuc(null);
 
+    // Boyuta duyarlı gruplama: hem dosya sayısı hem toplam byte sınırı aşılınca yeni grup açılır
+    // (tek başına devasa bir dosya varsa yine de kendi grubunda tek başına gider — bölünemez)
     const chunks: File[][] = [];
-    for (let i = 0; i < dosyalar.length; i += CHUNK_SIZE)
-      chunks.push(dosyalar.slice(i, i + CHUNK_SIZE));
+    let acikGrup: File[] = [];
+    let acikGrupBytes = 0;
+    for (const f of dosyalar) {
+      const sayiAsimi = acikGrup.length >= CHUNK_SIZE;
+      const boyutAsimi = acikGrup.length > 0 && acikGrupBytes + f.size > MAX_CHUNK_BYTES;
+      if (sayiAsimi || boyutAsimi) {
+        chunks.push(acikGrup);
+        acikGrup = [];
+        acikGrupBytes = 0;
+      }
+      acikGrup.push(f);
+      acikGrupBytes += f.size;
+    }
+    if (acikGrup.length > 0) chunks.push(acikGrup);
 
     const toplamSonuc = {
       success: true,
@@ -204,6 +222,13 @@ export default function WhatsappYukle() {
                 </div>
               )}
             </div>
+
+            {buyukDosyalar.length > 0 && (
+              <div style={{ width: '100%', background: '#2a1a0d', border: '1px solid #92400e', borderRadius: 6, padding: '8px 14px', fontSize: '0.78rem', color: '#fbbf24', lineHeight: 1.5 }}>
+                ⚠️ {buyukDosyalar.length} dosya çok büyük ({buyukDosyalar.map(f => `${f.name} — ${(f.size / 1024 / 1024).toFixed(1)}MB`).join(', ')}) — muhtemelen fotoğraf/video ile ("medyalı") export edilmiş.
+                Bu boyuttaki tek dosya sunucu zaman aşımına (60sn) takılabilir. WhatsApp'ta sohbeti dışa aktarırken <b>"Medya Olmadan"</b> seçeneğini kullan — sadece metin gerekiyor, çok daha küçük ve hızlı olur.
+              </div>
+            )}
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
               <button onClick={yukle} disabled={yukleniyor || dosyalar.length === 0}

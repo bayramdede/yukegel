@@ -90,7 +90,7 @@ export async function proxy(request: NextRequest) {
         viewerId: user.id,
         profileCompleted: false,
       })
-      return NextResponse.redirect(new URL('/profil-tamamla', request.url));
+      return NextResponse.redirect(new URL(`/profil-tamamla?redirect=${encodeURIComponent(pathname)}`, request.url));
     }
   }
 

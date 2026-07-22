@@ -1,7 +1,7 @@
 'use client';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, Suspense } from 'react';
 import { createClient } from '../../lib/supabase';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 const supabase = createClient();
 
@@ -61,7 +61,9 @@ async function tekilKontrol(
   }
 }
 
-export default function ProfilTamamla() {
+function ProfilTamamlaIci() {
+  const searchParams = useSearchParams();
+  const redirect = searchParams.get('redirect');
   const [mevcutId, setMevcutId] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [userType, setUserType] = useState('');
@@ -96,15 +98,33 @@ export default function ProfilTamamla() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.push('/giris'); return; }
       setMevcutId(user.id);
-      const fullName = user.user_metadata?.full_name || '';
+
+      const { data: profil } = await supabase
+        .from('users')
+        .select('user_type, display_name, phone, phone_verified, company_name, tckn, vkn')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      // Profil zaten tamamsa formu hiç göstermeden hedefe (son bulunulan yer veya panel) gönder
+      if (profil?.user_type) {
+        router.push(redirect || '/panel');
+        return;
+      }
+
+      // Eksik alan varsa — bilinen bilgileri prefill et, sadece eksik olanı doldursun
+      const fullName = profil?.display_name || user.user_metadata?.full_name || '';
       if (fullName) setDisplayName(fullName);
-      if (user.phone) {
-        const yerel = user.phone.startsWith('+90') ? '0' + user.phone.slice(3) : user.phone;
+
+      const bilinenTelefon = user.phone || (profil?.phone_verified ? profil.phone : '');
+      if (bilinenTelefon) {
+        const yerel = bilinenTelefon.startsWith('+90') ? '0' + bilinenTelefon.slice(3) : bilinenTelefon;
         setTelefon(yerel);
         setTelefonKilitli(true);
       }
-      const { data: profil } = await supabase.from('users').select('user_type').eq('id', user.id).maybeSingle();
-      if (profil?.user_type) router.push('/panel');
+
+      if (profil?.company_name) setSirketAdi(profil.company_name);
+      if (profil?.tckn) setTckn(profil.tckn);
+      if (profil?.vkn) setVkn(profil.vkn);
     }
     init();
   }, []);
@@ -207,6 +227,7 @@ export default function ProfilTamamla() {
       user_type: userType,
       phone: telefon,
       phone_verified: telefonKilitli,
+      is_active: true,
       ...(tckn ? { tckn } : {}),
       ...(vkn ? { vkn } : {}),
       ...(sirketAdi.trim() ? { company_name: sirketAdi.trim() } : {}),
@@ -229,7 +250,7 @@ export default function ProfilTamamla() {
     }
 
     await authLog('kayit_tamamlandi', userType);
-    router.push('/panel');
+    router.push(redirect || '/panel');
     setYukleniyor(false);
   }
 
@@ -469,5 +490,13 @@ export default function ProfilTamamla() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ProfilTamamla() {
+  return (
+    <Suspense>
+      <ProfilTamamlaIci />
+    </Suspense>
   );
 }
