@@ -135,11 +135,18 @@ function GirisIci() {
     }
 
     // 4. DB'de 05xx / 5xx formatında ya da aynı e-postayla başka profil var mı? (ilk kez merge)
-    const telefonTemiz = fmt.startsWith('+90') ? '0' + fmt.slice(3) : fmt;
-    const telefonKisa  = fmt.startsWith('+90') ? fmt.slice(3) : fmt;
+    // Telefon DB'de farklı formatlarda saklanmış olabilir:
+    //   +905xxxxxxxxx (E.164 — Supabase auth & WhatsApp normalize),
+    //   905xxxxxxxxx, 05xxxxxxxxx (profil-tamamla 0'lı saklıyor), 5xxxxxxxxx
+    // Sadece 0'lı ve kısa formatı aramak, kayıt E.164 ile durduğunda eşleşmeyi kaçırıyordu →
+    // mevcut hesap bulunamıyor, merge tetiklenmiyor, kullanıcı boş profil-tamamla'ya düşüyordu.
+    const telefonTemiz = fmt.startsWith('+90') ? '0' + fmt.slice(3) : fmt;   // 05xx...
+    const telefonKisa  = fmt.startsWith('+90') ? fmt.slice(3) : fmt;          // 5xx...
+    const telefon90    = fmt.replace(/^\+/, '');                              // 905xx...
     const eposta = data.user?.email;
 
-    const esleseceKosullar = [`phone.eq.${telefonTemiz}`, `phone.eq.${telefonKisa}`];
+    const telFormatlari = [...new Set([fmt, telefon90, telefonTemiz, telefonKisa])];
+    const esleseceKosullar = telFormatlari.map(t => `phone.eq.${t}`);
     if (eposta) esleseceKosullar.push(`email.eq.${eposta}`);
 
     // Bu telefon ya da e-posta başka bir users kaydında var mı?
