@@ -171,7 +171,6 @@ export default function ProfilTamamla() {
 
   const kimlikGecerli = () => {
     if (tcknMevcut || vknMevcut) return false;
-    if (userType === 'arac_sahibi') return tckn.length === 11 && !tcknHata;
     if (userType === 'sirket') return vkn.length === 10 && !vknHata;
     if (tckn.length > 0 && tcknHata) return false;
     if (vkn.length > 0 && vknHata) return false;
