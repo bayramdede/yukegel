@@ -85,7 +85,17 @@ export async function proxy(request: NextRequest) {
     // aşağıdaki user_type kontrolüne bırakılırsa kullanıcı SONSUZ profil-tamamla döngüsüne girer.
     // Bunun yerine giriş sayfasına gönder; orada oturum otomatik canlı hesaba geçirilir (switch-account).
     if (profil?.merged_into) {
-      return NextResponse.redirect(new URL('/giris?hesap=tasindi', request.url));
+      // Bu oturum emekli (merge edilmiş) bir kayda ait. Magic-link ile canlı hesaba
+      // geçirmek SSR cookie'lerini güncellemediği için SONSUZ DÖNGÜ yaratıyordu
+      // (localStorage yeni hesaba geçiyor, cookie eski oturumda kalıyor → proxy tekrar
+      // buraya atıyor). Çözüm: ölü oturumun sb- cookie'lerini TEMİZLE ve temiz giriş
+      // ekranına gönder. Kullanıcı Google ile yeniden girer (PKCE → /auth/callback →
+      // cookie doğru set edilir → /panel).
+      const clearResponse = NextResponse.redirect(new URL('/giris?hesap=tasindi', request.url));
+      request.cookies.getAll().forEach(({ name }) => {
+        if (name.startsWith('sb-')) clearResponse.cookies.delete(name);
+      });
+      return clearResponse;
     }
 
     if (profil?.role === 'admin' || profil?.role === 'moderator') {
