@@ -315,6 +315,11 @@ Açık rotalar: /giris, /auth/, /profil-tamamla, /nasil-calisir, /hakkimizda,
 ## 14. GÖREV DURUMU
 
 ### ✅ Tamamlanan
+- **TCKN zorunluluğu kaldırıldı** (22 Temmuz 2026): `app/profil-tamamla/page.tsx` — TCKN alanı daha önce `arac_sahibi` (nakliyeci) tipi için zorunluydu; nakliyecileri kayıt sırasında ürküttüğü gözlemlendiği için tüm kullanıcı tiplerinde opsiyonel yapıldı.
+  - `kimlikGecerli()`: `arac_sahibi` özel dalı kaldırıldı — artık sadece dolu girilmişse geçerlilik/tekillik kontrolü yapılıyor.
+  - UI: TCKN etiketi her zaman "(opsiyonel)", `required` attribute'u kaldırıldı, "Kimlik bilgisi profil güvenilirliğinizi artırır" ipucu artık tüm kullanıcı tiplerinde (arac_sahibi dahil) boşken gösteriliyor.
+  - VKN (şirket zorunlu) ve diğer alanlar değişmedi. `npx tsc --noEmit` temiz.
+  - **Not:** İleride TCKN'yi tekrar zorunlu kılmak istenirse `kimlikGecerli()`'ye `arac_sahibi` dalı geri eklenir.
 - **Landing page → Driver-Mate formatı** (10 Temmuz 2026): `app/_components/HomeClient.tsx` sürücü-merkezli hub yapısına güncellendi (`app/page.tsx` değişmedi).
   - Hero (`HeroKayitsiz`): başlık/CTA'lar sürücü odaklı yeniden yazıldı — birincil buton `🚛 Sürücüyüm, Hizmetleri Gör` (`#surucu-hizmetleri` anchor), ikincil `📦 Yük Vereceğim, İlan Ver` (`/ilan-ver`).
   - Yeni `SurucuHizmetleri` bileşeni (hero altında, ana odak): kartlık grid — Yük Bul (`#ilanlar` anchor), Lastikçi, Park Yeri, Yemek Yeri (üçü `/yol-rehberi`'ye link — kategori deep-link'i yok, POI sayfası `useSearchParams` desteklemiyor), Hamal (pasif/"YAKINDA" kart — POI şemasında karşılığı yok), Yol Rehberi (tümü).
