@@ -384,7 +384,7 @@ export default function ProfilTamamla() {
               </div>
             )}
 
-            {/* TCKN — arac_sahibi zorunlu, diğerleri (sirket ve broker hariç) opsiyonel */}
+            {/* TCKN — herkes için opsiyonel (arac_sahibi zorunluluğu nakliyecileri ürküttüğü için kaldırıldı, bkz. PROJE_HARITASI) */}
             {userType && userType !== 'sirket' && (
               <div style={{ marginBottom: 16 }}>
                 <label style={lbl}>
