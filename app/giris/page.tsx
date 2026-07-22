@@ -55,7 +55,7 @@ function GirisIci() {
     // hash'ini TÜKETTİKTEN) sonra bir kez tetiklenir. Böylece eski/merged cookie yerine hash'ten
     // gelen GÜNCEL oturumu değerlendiririz — race condition ortadan kalkar. Formla yapılan
     // (SIGNED_IN) girişleri ETKİLEMEZ; onları otpGonder/epostaGiris kendi akışında yönetir.
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event: string, session: { user?: { id: string } } | null) => {
       if (event !== 'INITIAL_SESSION' || islendi) return;
       const user = session?.user;
       if (!user) return; // oturum yok → temiz giriş formu, bekle
