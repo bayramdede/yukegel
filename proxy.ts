@@ -93,7 +93,33 @@ export async function proxy(request: NextRequest) {
     }
 
     if (!profil?.user_type) {
-      // Profil tamamlanmamış kullanıcı korumalı rotaya girmeye çalışıyor — WARN
+      // Bu auth kimliğinin tamamlanmış satırı yok. Ama kullanıcının aynı e-posta/telefonla
+      // KAYITLI (tamamlanmış) başka bir hesabı olabilir — ör. Google ile kayıtlı, şimdi ayrı
+      // bir telefon (SMS OTP) auth kimliğiyle gelmiş (farklı auth.uid, users satırı yok).
+      // Böyle bir durumda profil-tamamla'ya atmak DUPLICATE hesap/döngü yaratır; bunun yerine
+      // girişe gönder, orada oturum otomatik canlı hesaba bağlanır (merge/switch self-heal).
+      const eslesmeKosullari: string[] = [];
+      if (user.email) eslesmeKosullari.push(`email.eq.${user.email}`);
+      if (user.phone) {
+        const p = user.phone.replace(/\D/g, '');
+        const yerel = p.startsWith('90') ? '0' + p.slice(2) : p;
+        const kisa  = p.startsWith('90') ? p.slice(2) : p;
+        for (const t of new Set([p, `+${p}`, yerel, kisa])) eslesmeKosullari.push(`phone.eq.${t}`);
+      }
+      if (eslesmeKosullari.length > 0) {
+        const { data: canliHesaplar } = await supabase
+          .from('users')
+          .select('user_type')
+          .or(eslesmeKosullari.join(','))
+          .is('merged_into', null)
+          .neq('id', user.id)
+          .limit(1);
+        if (canliHesaplar?.[0]?.user_type) {
+          return NextResponse.redirect(new URL('/giris?hesap=eslesme', request.url));
+        }
+      }
+
+      // Gerçekten yeni/eksik profil — tamamlama ekranına gönder
       logPhoneAccess({
         viewerId: user.id,
         profileCompleted: false,
