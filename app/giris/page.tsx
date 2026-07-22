@@ -41,9 +41,14 @@ function GirisIci() {
   const [bilgi, setBilgi] = useState('');
   const redirect = searchParams.get('redirect');
 
-  // Sayfa açılışında oturum self-heal: kullanıcı zaten "kayıtlı" olduğu halde ayrı bir auth
-  // kimliğiyle (ör. telefon vs. Google) gelmiş olabilir. Bu durumda profil-tamamla'ya düşmesin;
-  // oturumu otomatik canlı hesaba bağla. (proxy.ts bu tür oturumları buraya yönlendirir.)
+  // Sayfa açılışında oturum sağlık kontrolü.
+  // Kullanıcı ayrı bir auth kimliğiyle (ör. telefon OTP vs. Google) gelip "kayıtlı olduğu
+  // halde" ölü/eksik bir oturuma düşmüş olabilir. ÖNEMLİ: bu durumu magic-link ile canlı
+  // hesaba geçirmeye çalışmak SONSUZ DÖNGÜ yaratıyordu — magic-link implicit flow yalnız
+  // localStorage'ı günceller, SSR cookie'si eski oturumda kalır, proxy tekrar buraya atar.
+  // Sağlam çözüm: ölü/eksik oturumu TAMAMEN kapat (signOut → localStorage + cookie temizlenir)
+  // ve temiz giriş formunu göster. Kullanıcı Google ile yeniden girer; PKCE akışı
+  // /auth/callback üzerinden cookie'yi doğru set eder → /panel.
   useEffect(() => {
     let iptal = false;
     (async () => {
@@ -56,45 +61,20 @@ function GirisIci() {
         .maybeSingle();
       if (iptal) return;
 
-      // 1) Zaten merge edilmiş (emekli) oturum → asıl hesaba magic link ile geç
-      if (profil?.merged_into) {
-        const res = await fetch('/api/auth/switch-account', { method: 'POST' }).catch(() => null);
-        const json = res ? await res.json().catch(() => null) : null;
-        if (json?.redirectUrl) window.location.href = json.redirectUrl;
+      // Sağlıklı, tamamlanmış canlı oturum → giriş başarılı, yönlendir.
+      if (profil?.user_type && !profil?.merged_into) {
+        yonlendir();
         return;
       }
 
-      // 2) Bu kimliğin tamamlanmış satırı yok; ama aynı e-posta/telefonla KAYITLI başka hesap
-      //    var mı? Varsa otomatik birleştir (döngü / duplicate hesap yerine tek hesapta topla).
-      if (!profil?.user_type) {
-        const kosullar: string[] = [];
-        if (user.email) kosullar.push(`email.eq.${user.email}`);
-        if (user.phone) {
-          const p = user.phone.replace(/\D/g, '');
-          const yerel = p.startsWith('90') ? '0' + p.slice(2) : p;
-          const kisa  = p.startsWith('90') ? p.slice(2) : p;
-          [...new Set([p, `+${p}`, yerel, kisa])].forEach(t => kosullar.push(`phone.eq.${t}`));
-        }
-        if (kosullar.length === 0) return;
-        const { data: canli } = await supabase
-          .from('users')
-          .select('id, user_type')
-          .or(kosullar.join(','))
-          .is('merged_into', null)
-          .neq('id', user.id)
-          .limit(1);
-        const hedef = canli?.[0];
-        if (iptal || !hedef?.user_type) return;
-        const res = await fetch('/api/auth/merge', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ keepUserId: hedef.id, mergeUserId: user.id }),
-        }).catch(() => null);
-        const json = res && res.ok ? await res.json().catch(() => null) : null;
-        if (json?.redirectUrl) window.location.href = json.redirectUrl;
-      }
+      // Ölü (merge edilmiş) veya eksik (tamamlanmamış satırı olan ayrı kimlik) oturum.
+      // Döngüye girmeden temizle ve kullanıcıyı bilgilendir.
+      await supabase.auth.signOut().catch(() => {});
+      if (iptal) return;
+      setBilgi('Hesabınıza tekrar giriş yapın. Kayıtlıysanız Google veya e-posta ile giriş yapmanız yeterli.');
     })();
     return () => { iptal = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function temizle() { setHata(''); }
