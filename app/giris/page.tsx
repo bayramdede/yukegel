@@ -50,30 +50,36 @@ function GirisIci() {
   // ve temiz giriş formunu göster. Kullanıcı Google ile yeniden girer; PKCE akışı
   // /auth/callback üzerinden cookie'yi doğru set eder → /panel.
   useEffect(() => {
-    let iptal = false;
-    (async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user || iptal) return;
+    let islendi = false;
+    // INITIAL_SESSION: Supabase istemcisi başlatıldıktan (ve URL'deki #access_token magic-link
+    // hash'ini TÜKETTİKTEN) sonra bir kez tetiklenir. Böylece eski/merged cookie yerine hash'ten
+    // gelen GÜNCEL oturumu değerlendiririz — race condition ortadan kalkar. Formla yapılan
+    // (SIGNED_IN) girişleri ETKİLEMEZ; onları otpGonder/epostaGiris kendi akışında yönetir.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event !== 'INITIAL_SESSION' || islendi) return;
+      const user = session?.user;
+      if (!user) return; // oturum yok → temiz giriş formu, bekle
+      islendi = true;
+
       const { data: profil } = await supabase
         .from('users')
         .select('merged_into, user_type')
         .eq('id', user.id)
         .maybeSingle();
-      if (iptal) return;
 
-      // Sağlıklı, tamamlanmış canlı oturum → giriş başarılı, yönlendir.
+      // Sağlıklı, tamamlanmış canlı oturum (magic-link'ten yeni gelmiş de olabilir) → yönlendir.
       if (profil?.user_type && !profil?.merged_into) {
-        yonlendir();
+        await yonlendir();
         return;
       }
 
       // Ölü (merge edilmiş) veya eksik (tamamlanmamış satırı olan ayrı kimlik) oturum.
-      // Döngüye girmeden temizle ve kullanıcıyı bilgilendir.
+      // Magic-link ile geçiş SSR cookie'sini güncellemediği için döngü yaratıyordu; onun yerine
+      // oturumu tamamen kapat ve kullanıcıyı temiz girişe yönlendir.
       await supabase.auth.signOut().catch(() => {});
-      if (iptal) return;
       setBilgi('Hesabınıza tekrar giriş yapın. Kayıtlıysanız Google veya e-posta ile giriş yapmanız yeterli.');
-    })();
-    return () => { iptal = true; };
+    });
+    return () => subscription.unsubscribe();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
