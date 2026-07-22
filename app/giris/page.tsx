@@ -41,6 +41,27 @@ function GirisIci() {
   const [bilgi, setBilgi] = useState('');
   const redirect = searchParams.get('redirect');
 
+  // Sayfa açılışında: mevcut oturum başka bir hesaba merge edilmiş (emekli) bir kayda mı ait?
+  // Öyleyse kullanıcı zaten "kayıtlı" — profil-tamamla'ya düşmesin, otomatik canlı hesaba geçir.
+  // (proxy.ts merge edilmiş oturumları buraya yönlendirir.)
+  useEffect(() => {
+    let iptal = false;
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user || iptal) return;
+      const { data: profil } = await supabase
+        .from('users')
+        .select('merged_into')
+        .eq('id', user.id)
+        .maybeSingle();
+      if (iptal || !profil?.merged_into) return;
+      const res = await fetch('/api/auth/switch-account', { method: 'POST' }).catch(() => null);
+      const json = res ? await res.json().catch(() => null) : null;
+      if (json?.redirectUrl) window.location.href = json.redirectUrl;
+    })();
+    return () => { iptal = true; };
+  }, []);
+
   function temizle() { setHata(''); }
 
   // Başarılı giriş sonrası yönlendirme
