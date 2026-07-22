@@ -251,7 +251,7 @@ Açık rotalar: /giris, /auth/, /profil-tamamla, /nasil-calisir, /hakkimizda,
 2. Giriş yok + korumalı → /giris?redirect=
 3. Giriş var:
    - maybeSingle() ile users.select('user_type, role, merged_into')
-   - merged_into dolu (emekli oturum) → /giris?hesap=tasindi (self-heal switch)
+   - merged_into dolu (emekli oturum) → sb- cookie'leri SİL + /giris?hesap=tasindi (temiz giriş)
    - role=admin|moderator → direkt geç
    - user_type yoksa:
      - aynı e-posta/telefonla KAYITLI başka hesap var mı? → varsa /giris?hesap=eslesme (self-heal merge)
