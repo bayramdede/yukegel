@@ -389,16 +389,13 @@ export default function ProfilTamamla() {
               <div style={{ marginBottom: 16 }}>
                 <label style={lbl}>
                   TC Kimlik No{' '}
-                  {userType === 'arac_sahibi'
-                    ? '*'
-                    : <span style={{ color: '#4b5563', fontWeight: 400 }}>(opsiyonel)</span>}
+                  <span style={{ color: '#4b5563', fontWeight: 400 }}>(opsiyonel)</span>
                 </label>
                 <input
                   value={tckn}
                   onChange={e => handleTckn(e.target.value)}
                   onBlur={handleTcknBlur}
                   placeholder="xxxxxxxxxxx"
-                  required={userType === 'arac_sahibi'}
                   style={{
                     ...inp,
                     borderColor: tcknHata || tcknMevcut
