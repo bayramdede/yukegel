@@ -76,9 +76,17 @@ export async function proxy(request: NextRequest) {
   if (user) {
     const { data: profil } = await supabase
       .from('users')
-      .select('user_type, role')
+      .select('user_type, role, merged_into')
       .eq('id', user.id)
       .maybeSingle();
+
+    // Bu oturum başka bir hesaba merge edilmiş (emekli) bir kayda ait.
+    // Böyle bir satırda user_type NULL'dır (merge upsert'i sadece is_active/merged_into set eder) —
+    // aşağıdaki user_type kontrolüne bırakılırsa kullanıcı SONSUZ profil-tamamla döngüsüne girer.
+    // Bunun yerine giriş sayfasına gönder; orada oturum otomatik canlı hesaba geçirilir (switch-account).
+    if (profil?.merged_into) {
+      return NextResponse.redirect(new URL('/giris?hesap=tasindi', request.url));
+    }
 
     if (profil?.role === 'admin' || profil?.role === 'moderator') {
       return supabaseResponse;
