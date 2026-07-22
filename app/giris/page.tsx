@@ -41,9 +41,9 @@ function GirisIci() {
   const [bilgi, setBilgi] = useState('');
   const redirect = searchParams.get('redirect');
 
-  // Sayfa açılışında: mevcut oturum başka bir hesaba merge edilmiş (emekli) bir kayda mı ait?
-  // Öyleyse kullanıcı zaten "kayıtlı" — profil-tamamla'ya düşmesin, otomatik canlı hesaba geçir.
-  // (proxy.ts merge edilmiş oturumları buraya yönlendirir.)
+  // Sayfa açılışında oturum self-heal: kullanıcı zaten "kayıtlı" olduğu halde ayrı bir auth
+  // kimliğiyle (ör. telefon vs. Google) gelmiş olabilir. Bu durumda profil-tamamla'ya düşmesin;
+  // oturumu otomatik canlı hesaba bağla. (proxy.ts bu tür oturumları buraya yönlendirir.)
   useEffect(() => {
     let iptal = false;
     (async () => {
@@ -51,13 +51,48 @@ function GirisIci() {
       if (!user || iptal) return;
       const { data: profil } = await supabase
         .from('users')
-        .select('merged_into')
+        .select('merged_into, user_type')
         .eq('id', user.id)
         .maybeSingle();
-      if (iptal || !profil?.merged_into) return;
-      const res = await fetch('/api/auth/switch-account', { method: 'POST' }).catch(() => null);
-      const json = res ? await res.json().catch(() => null) : null;
-      if (json?.redirectUrl) window.location.href = json.redirectUrl;
+      if (iptal) return;
+
+      // 1) Zaten merge edilmiş (emekli) oturum → asıl hesaba magic link ile geç
+      if (profil?.merged_into) {
+        const res = await fetch('/api/auth/switch-account', { method: 'POST' }).catch(() => null);
+        const json = res ? await res.json().catch(() => null) : null;
+        if (json?.redirectUrl) window.location.href = json.redirectUrl;
+        return;
+      }
+
+      // 2) Bu kimliğin tamamlanmış satırı yok; ama aynı e-posta/telefonla KAYITLI başka hesap
+      //    var mı? Varsa otomatik birleştir (döngü / duplicate hesap yerine tek hesapta topla).
+      if (!profil?.user_type) {
+        const kosullar: string[] = [];
+        if (user.email) kosullar.push(`email.eq.${user.email}`);
+        if (user.phone) {
+          const p = user.phone.replace(/\D/g, '');
+          const yerel = p.startsWith('90') ? '0' + p.slice(2) : p;
+          const kisa  = p.startsWith('90') ? p.slice(2) : p;
+          [...new Set([p, `+${p}`, yerel, kisa])].forEach(t => kosullar.push(`phone.eq.${t}`));
+        }
+        if (kosullar.length === 0) return;
+        const { data: canli } = await supabase
+          .from('users')
+          .select('id, user_type')
+          .or(kosullar.join(','))
+          .is('merged_into', null)
+          .neq('id', user.id)
+          .limit(1);
+        const hedef = canli?.[0];
+        if (iptal || !hedef?.user_type) return;
+        const res = await fetch('/api/auth/merge', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ keepUserId: hedef.id, mergeUserId: user.id }),
+        }).catch(() => null);
+        const json = res && res.ok ? await res.json().catch(() => null) : null;
+        if (json?.redirectUrl) window.location.href = json.redirectUrl;
+      }
     })();
     return () => { iptal = true; };
   }, []);
