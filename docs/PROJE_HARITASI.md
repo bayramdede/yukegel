@@ -250,10 +250,15 @@ Açık rotalar: /giris, /auth/, /profil-tamamla, /nasil-calisir, /hakkimizda,
 1. Açık rota → geç
 2. Giriş yok + korumalı → /giris?redirect=
 3. Giriş var:
-   - maybeSingle() ile users.select('user_type, role')
+   - maybeSingle() ile users.select('user_type, role, merged_into')
+   - merged_into dolu (emekli oturum) → /giris?hesap=tasindi (self-heal switch)
    - role=admin|moderator → direkt geç
-   - user_type yoksa → /profil-tamamla
+   - user_type yoksa:
+     - aynı e-posta/telefonla KAYITLI başka hesap var mı? → varsa /giris?hesap=eslesme (self-heal merge)
+     - yoksa → /profil-tamamla
 ```
+
+> **KRİTİK auth tuzağı (22 Tem 2026):** Bir kişinin birden fazla auth kimliği olabilir — Google/e-posta bir `auth.users` satırı (`email` dolu, `phone` null), telefon (SMS OTP) AYRI bir satır (`phone` dolu, `email` null), FARKLI `id`'lerle. `public.users` satırı yalnızca birinde (genelde ilk kayıt olunanda) bulunur. Diğer kimlikle girildiğinde `auth.uid()` ≠ `users.id` → proxy satır bulamaz. **Eskiden** bu doğrudan `/profil-tamamla`'ya atıyor, oradan `users_email_key` / duplicate hesap doğuyordu. **Artık** proxy uzlaştırma yapıyor: satır yoksa aynı e-posta/telefonla kayıtlı canlı hesabı arar, bulursa girişe yönlendirir; `app/giris/page.tsx` açılış `useEffect`'i oturumu otomatik `merge`/`switch-account` ile canlı hesaba bağlar. Telefon eşleştirmesi 4 formatı da dener: `+905xx`, `905xx`, `05xx`, `5xx` (RLS `users` üzerinde okumaya izin verdiği için client/proxy bu aramayı yapabiliyor).
 
 ---
 
