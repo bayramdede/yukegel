@@ -411,7 +411,7 @@ export default function ProfilTamamla() {
                 {!tcknHata && !tcknMevcut && tckn.length === 11 && (
                   <div style={{ color: '#22c55e', fontSize: '0.78rem', marginTop: 4 }}>✓ Geçerli TCKN</div>
                 )}
-                {userType !== 'arac_sahibi' && !tckn && (
+                {!tckn && (
                   <div style={ipucu}>Kimlik bilgisi profil güvenilirliğinizi artırır.</div>
                 )}
               </div>
