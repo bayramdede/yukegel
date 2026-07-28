@@ -89,6 +89,29 @@ export default function SifreSifirla() {
     setYukleniyor(false);
   }
 
+  // SPRINT_01 R1 — recovery oturumu doğrulanana kadar formu GÖSTERME.
+  if (durum === 'kontrol') return (
+    <div style={{ minHeight: '100vh', background: '#0d1117', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'IBM Plex Sans', system-ui, sans-serif" }}>
+      <div style={{ color: '#8b949e', fontSize: '0.9rem' }}>Link doğrulanıyor…</div>
+    </div>
+  );
+
+  if (durum === 'gecersiz') return (
+    <div style={{ minHeight: '100vh', background: '#0d1117', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'IBM Plex Sans', system-ui, sans-serif" }}>
+      <div style={{ maxWidth: 400, width: '100%', padding: '0 16px', textAlign: 'center' }}>
+        <div style={{ fontSize: '3rem', marginBottom: 16 }}>🔗</div>
+        <div style={{ color: '#e2e8f0', fontWeight: 700, fontSize: '1.1rem', marginBottom: 8 }}>Bu sayfaya link ile gelinmeli</div>
+        <div style={{ color: '#8b949e', fontSize: '0.85rem', marginBottom: 24, lineHeight: 1.6 }}>
+          Şifre sıfırlama linki geçersiz veya süresi dolmuş. Güvenlik gereği yeni bir link istemeniz gerekiyor.
+        </div>
+        <button onClick={() => router.push('/giris')}
+          style={{ background: '#22c55e', color: '#000', fontWeight: 700, borderRadius: 8, border: 'none', padding: '11px 28px', cursor: 'pointer', fontSize: '0.95rem' }}>
+          Yeni link iste →
+        </button>
+      </div>
+    </div>
+  );
+
   if (tamamlandi) return (
     <div style={{ minHeight: '100vh', background: '#0d1117', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'IBM Plex Sans', system-ui, sans-serif" }}>
       <div style={{ maxWidth: 400, width: '100%', padding: '0 16px', textAlign: 'center' }}>
