@@ -99,6 +99,21 @@ function GirisIci() {
   const [yukleniyor, setYukleniyor] = useState(false);
   const router = useRouter();
 
+  // SPRINT_01 A4b — kalan bekleme saniyesi. Lazy initializer: bu sayfa `useSearchParams`
+  // yüzünden zaten istemcide render ediliyor, hidrasyon uyuşmazlığı riski yok.
+  const [bekleme, setBekleme] = useState(otpKalanSaniye);
+
+  useEffect(() => {
+    if (bekleme <= 0) return;
+    const sayac = setInterval(() => setBekleme(otpKalanSaniye()), 1000);
+    return () => clearInterval(sayac);
+  }, [bekleme]);
+
+  function beklemeBaslat() {
+    otpBeklemeYaz();
+    setBekleme(OTP_BEKLEME_SN);
+  }
+
   const [bilgi, setBilgi] = useState('');
 
   // SPRINT_01 A3 — proxy kullanıcıyı buraya `?hesap=tasindi` veya `?hesap=eslesme` ile
