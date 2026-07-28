@@ -168,11 +168,8 @@ export async function POST(request: NextRequest) {
         const buffer = await file.arrayBuffer();
         const JSZip = (await import('jszip')).default;
         const zip = await JSZip.loadAsync(buffer);
-        const allTxts = Object.keys(zip.files).filter(name => !zip.files[name].dir && name.toLowerCase().endsWith('.txt'));
-        const chatFile = allTxts.find(n => n.toLowerCase().includes('_chat')) ||
-                         allTxts.find(n => n.toLowerCase().includes('chat')) ||
-                         allTxts.find(n => n.toLowerCase().includes('sohbet')) ||
-                         (allTxts.length === 1 ? allTxts[0] : null);
+        const allTxts = Object.keys(zip.files).filter(name => !zip.files[name].dir);
+        const chatFile = sohbetTxtSec(allTxts);
         if (!chatFile) continue;
         content = await zip.files[chatFile].async('string');
       } else if (file.name.endsWith('.txt')) {
