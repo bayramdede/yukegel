@@ -82,38 +82,6 @@ function extractPhones(text: string): string[] {
   return [...new Set(phones)];
 }
 
-function parseChatTxt(content: string): Array<{ sender: string; timestamp: string; message: string }> {
-  const lines = content.split('\n');
-  const messages: Array<{ sender: string; timestamp: string; message: string }> = [];
-  const patternAndroid = /^\[(\d{1,2}\.\d{1,2}\.\d{4}[,\s]\d{1,2}:\d{1,2}(?::\d{1,2})?)\]\s(.+?):\s(.*)$/;
-  const patternIOS    = /^(\d{1,2}\.\d{1,2}\.\d{4}[,\s]\d{1,2}:\d{1,2})\s?-\s(.+?):\s(.*)$/;
-  let current: { sender: string; timestamp: string; lines: string[] } | null = null;
-  const SISTEM = ['katıldı', 'ekledi', 'çıkardı', 'ayrıldı', 'silindi', 'şifreli', 'güvenlik kodu',
-    'değiştirdi', 'e-fatura', 'gider fişi', 'medya dahil edilmedi', 'bu mesaj silindi',
-    'süreli mesajlar', 'uçtan uca', 'missed voice call', 'missed video call', 'this message was deleted'];
-  for (const line of lines) {
-    const trimmed = line.replace(/[\u200e\u202a\u202c\u200f\u200b]/g, '').trim();
-    if (!trimmed) continue;
-    const match = patternAndroid.exec(trimmed) || patternIOS.exec(trimmed);
-    if (match) {
-      if (current && current.lines.length > 0) {
-        const msg = current.lines.join('\n').trim();
-        if (!SISTEM.some(s => msg.toLowerCase().includes(s)) && msg.length > 10)
-          messages.push({ sender: current.sender, timestamp: current.timestamp, message: msg });
-      }
-      current = { sender: match[2].trim(), timestamp: match[1], lines: [match[3]] };
-    } else if (current) {
-      current.lines.push(trimmed);
-    }
-  }
-  if (current && current.lines.length > 0) {
-    const msg = current.lines.join('\n').trim();
-    if (!SISTEM.some(s => msg.toLowerCase().includes(s)) && msg.length > 10)
-      messages.push({ sender: current.sender, timestamp: current.timestamp, message: msg });
-  }
-  return messages;
-}
-
 // Sync version — DB çağrısı yok, tüm veriler bellekte
 function gatekeeper_sync(message: string, aliases: any[]): { isAd: boolean; score: number; phones: string[]; cities: string[]; vehicles: string[] } {
   const norm = trNorm(message);
