@@ -308,7 +308,6 @@ export async function POST(request: NextRequest) {
 
     for (const row of mevcutSatirlar) {
       existingMap.set(`${row.clean_hash}__${row.message_date}`, { id: row.id, contact_phone: row.contact_phone });
-      mevcutHashler.add(row.clean_hash);
       // Repost map: (hash + phone) → en son kayıt id'si
       if (row.contact_phone && phoneSet.has(row.contact_phone)) {
         const key = `${row.clean_hash}__${row.contact_phone}`;
