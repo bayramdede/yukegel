@@ -5,6 +5,9 @@
 **Referans Dökümanlar:**
 - `docs/LOG_VE_GUVENLIK_SPECLERI.md` — Log format standartları, audit trail, SecurityLogger kontrol listesi
 - `docs/LANDING_AUTH_ANALIZ.md` — Landing / kayıt / giriş analizi (28 Tem 2026), bulgu kodları L1–L5, A1–A7, K1–K3
+- `docs/SPRINT_01.md` — **Aktif sprint.** 30 madde / 78 puan, W0–W4 dalgaları. Yukarıdaki analiz + geniş tarama (M1–M2, R1–R2, C1–C2, G1–G2, S1–S4, F1–F2) birleşik backlog'u. Kabul kriterleri ve bağımlılıklar burada.
+
+> **⚠️ PROXY PREFIX TUZAĞI (28 Tem 2026, `SPRINT_01` M1):** `proxy.ts` hem `ACIK_ROTALAR` hem `KORUNMALI` eşleşmesinde `pathname.startsWith(r)` kullanıyor. `KORUNMALI` içindeki `'/moderator'` girdisi `/moderator-giris`'i de yakalıyor → moderatör giriş sayfası oturumsuz erişilemez hâlde. **Kural: `KORUNMALI`/`ACIK_ROTALAR`'a segment eklerken sonuna `/` koy** (`'/moderator/'`), yoksa kardeş rotaları da kilitlersin. Yeni bir `/panel-*`, `/profil-*` rotası eklerken bunu kontrol et.
 
 > **⚠️ EKSİK ROTALAR (28 Tem 2026, `LANDING_AUTH_ANALIZ` A1/A2):** Koddan çağrılan ama var olmayan iki rota tespit edildi.
 > (1) `POST /api/auth/log` — `giris/page.tsx` ve `profil-tamamla/page.tsx` içindeki `authLog()` buraya POST atıyor, klasör yok; çağrı `.catch(()=>{})` ile sarmalı olduğu için 404 sessizce yutuluyor ve **auth audit trail'i tamamen boş**.
