@@ -16,6 +16,30 @@ import { getServerSupabase, getServiceSupabase } from '../../../../../lib/auth'
  *   güncelliyordu — dokümante edilmiş proxy döngüsü riski).
  */
 
+/**
+ * SPRINT_01 A4b — SMS gönderimine bekleme süresi.
+ *
+ * Eski hali: `{ adim: 'gonder' }` isteği sınırsızdı. Sahiplenilmemiş bir ilanın
+ * id'sini bilen herkes bu endpoint'e döngüyle vurup ilandaki numaraya sınırsız SMS
+ * attırabiliyordu — hem Twilio faturası, hem numara sahibine taciz.
+ *
+ * Artık ilan başına 60 sn. Bellek içi (tek instance varsayımı); kalıcı çözüm için
+ * Redis/DB gerekir ama bu haliyle bile kör döngüyü kesiyor.
+ */
+const OTP_BEKLEME_MS = 60_000
+const otpSonGonderim = new Map<string, number>()
+
+function beklemeKalan(anahtar: string): number {
+  const simdi = Date.now()
+  // Sızıntıyı önle: süresi dolmuş kayıtları ara sıra temizle.
+  if (otpSonGonderim.size > 500) {
+    for (const [k, v] of otpSonGonderim) if (simdi - v > OTP_BEKLEME_MS) otpSonGonderim.delete(k)
+  }
+  const son = otpSonGonderim.get(anahtar)
+  if (!son) return 0
+  return Math.max(0, Math.ceil((OTP_BEKLEME_MS - (simdi - son)) / 1000))
+}
+
 function telefonNormalize(ham: string): string {
   const rakam = ham.replace(/\D/g, '')
   if (rakam.startsWith('90')) return `+${rakam}`
