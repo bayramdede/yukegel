@@ -527,7 +527,6 @@ olma iddiası hiç olmamış. Otorite `message_date`.
    transaction'a sardığı için zaten kullanılamıyor: `ERROR 25001`).
 2. ✅ Kodu dağıt — `post_date` insert payload'ından çıktı; `existingMap` ve 23505 kurtarma
    bloğu `message_date` kullanıyor.
-3. ⏳ Kolonu düşür — `ALTER TABLE public.raw_posts DROP COLUMN post_date;` (dağıtım canlıda
-   doğrulandıktan sonra).
+3. ✅ Kolonu düşür — `ALTER TABLE public.raw_posts DROP COLUMN post_date;` (28 Tem 2026).
 
 Ayrıntı ve geri alma adımları: `docs/20260728_raw_posts_post_date_sadelestirme.sql`.

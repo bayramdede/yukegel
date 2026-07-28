@@ -83,9 +83,10 @@ WHERE d.refobjid = 'public.raw_posts'::regclass
 --
 -- ✅ ADIM 1 UYGULANDI (28 Tem 2026, Seçenek A). idx_raw_posts_hash_msgdate kuruldu,
 --    idx_raw_posts_hash_day düşürüldü.
--- ✅ KOD DAĞITIMI HAZIR: app/api/whatsapp-parse/route.ts artık `post_date` YAZMIYOR;
+-- ✅ KOD DAĞITILDI (commit dd02073): app/api/whatsapp-parse/route.ts `post_date` YAZMIYOR;
 --    existingMap ve 23505 kurtarma bloğu `message_date` üzerinden çalışıyor.
---    → Dağıtım canlıda doğrulandıktan sonra ADIM 2 çalıştırılabilir.
+-- ✅ ADIM 2 UYGULANDI: post_date kolonu düşürüldü.
+--    MIGRATION TAMAMLANDI — bu dosya artık yalnızca kayıt amaçlıdır.
 --
 -- İSTEĞE BAĞLI TEMİZLİK (kolonu düşürmeden önce arşiv tutarlılığı isteniyorsa):
 --   UPDATE public.raw_posts
@@ -190,6 +191,7 @@ WHERE indrelid = 'public.raw_posts'::regclass;
 -- Geri alınamaz. Adım 0'daki bağımlılık sorgusu boş dönmüş olmalı ve
 -- app/api/whatsapp-parse/route.ts artık `post_date` YAZMIYOR olmalı.
 
+-- ✅ 28 Tem 2026'da çalıştırıldı:
 -- ALTER TABLE public.raw_posts DROP COLUMN post_date;
 
 -- =============================================================================
