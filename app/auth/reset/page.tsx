@@ -84,8 +84,17 @@ export default function SifreSifirla() {
     setYukleniyor(true); setHata('');
 
     const { error } = await supabase.auth.updateUser({ password: sifre });
-    if (error) setHata('Şifre güncellenemedi. Linkin süresi dolmuş olabilir.');
-    else setTamamlandi(true);
+    if (error) {
+      setHata('Şifre güncellenemedi. Linkin süresi dolmuş olabilir.');
+      setYukleniyor(false);
+      return;
+    }
+
+    // SPRINT_01 R1 — recovery oturumu tam yetkili bir oturuma dönüşmesin.
+    // Kullanıcı yeni şifresiyle temiz giriş yapsın; ayrıca linki eline geçiren
+    // birinin oturumu açık kalmaz.
+    await supabase.auth.signOut().catch(() => {});
+    setTamamlandi(true);
     setYukleniyor(false);
   }
 
