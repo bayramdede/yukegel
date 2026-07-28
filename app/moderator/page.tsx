@@ -271,7 +271,17 @@ export default function Moderator() {
       ? (data || []).sort((a: any, b: any) => (b.audit_score ?? 0) - (a.audit_score ?? 0))
       : (data || []);
 
-    setIlanlar(sorted); setYukleniyor(false);
+    // SPRINT_01 L1e — numaraları server action'dan al ve birleştir.
+    // Hata olursa liste yine gösterilir; sadece telefon sütunu boş kalır.
+    let telefonlar: Record<string, string | null> = {};
+    if (sorted.length > 0) {
+      const tel = await ilanTelefonlariGetir(sorted.map((i: any) => i.id));
+      if (tel.ok) telefonlar = tel.veri;
+      else console.warn('Telefonlar alınamadı:', tel.hata);
+    }
+
+    setIlanlar(sorted.map((i: any) => ({ ...i, contact_phone: telefonlar[i.id] ?? null })));
+    setYukleniyor(false);
   }
 
   // ── Client-side filtre + sıralama
