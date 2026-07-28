@@ -28,12 +28,12 @@
 -- =============================================================================
 -- ⚠️ UYGULAMADAN ÖNCE — bu migration KOD DEĞİŞİKLİĞİYLE SIRALI çalışmalı
 -- =============================================================================
---   1. ÖNCE bu SQL çalıştırılır (kod hâlâ post_date yazıyor olabilir → 3. adıma
---      kadar `post_date` kolonu DURUYOR, sadece indeks taşınıyor).
+--   1. ÖNCE adım 0 ve 1 çalıştırılır (kod hâlâ post_date yazıyor olabilir → kolon
+--      DURUYOR, sadece unique indeks message_date üzerine taşınıyor).
 --   2. Kod dağıtılır: `post_date: c.msgDate` satırı insert payload'ından çıkarılır
 --      ve `select('... post_date ...')` → `message_date` olur.
 --      (app/api/whatsapp-parse/route.ts)
---   3. Kod canlıda doğrulandıktan SONRA aşağıdaki 3. ADIM çalıştırılıp kolon düşürülür.
+--   3. Kod canlıda doğrulandıktan SONRA aşağıdaki ADIM 2 çalıştırılıp kolon düşürülür.
 --
 -- Bu sırayı bozmak (kolonu kod dağıtılmadan düşürmek) TÜM içe aktarma insert'lerini
 -- PostgREST hatasıyla kırar.
@@ -60,37 +60,68 @@ WHERE d.refobjid = 'public.raw_posts'::regclass
   );
 
 -- =============================================================================
--- ADIM 1 — Yeni indeksi message_date üzerine kur (CONCURRENTLY, kilitsiz)
+-- ADIM 1 — Yeni indeksi message_date üzerine kur
 -- =============================================================================
--- NOT: CREATE INDEX CONCURRENTLY transaction bloğu İÇİNDE çalışmaz.
--- Supabase SQL editöründe tek tek çalıştır.
+-- ⚠️ Supabase SQL editörü her çalıştırmayı bir TRANSACTION'a sarar; bu yüzden
+--    `CREATE INDEX CONCURRENTLY` orada ÇALIŞMAZ:
+--        ERROR: 25001: CREATE INDEX CONCURRENTLY cannot run inside a transaction block
+--    İki seçenek var — A veya B, ikisini birden yapma.
 
-CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS idx_raw_posts_hash_msgdate
+-- ── Önce tabloyu ölç: kilit ne kadar sürer? ──────────────────────────────────
+SELECT count(*) AS satir_sayisi,
+       pg_size_pretty(pg_total_relation_size('public.raw_posts')) AS boyut
+FROM public.raw_posts;
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- SEÇENEK A (basit) — CONCURRENTLY olmadan, SQL editöründe
+-- ─────────────────────────────────────────────────────────────────────────────
+-- `CREATE INDEX` tabloya SHARE kilidi alır: SELECT'ler devam eder, INSERT/UPDATE
+-- indeks kurulana kadar BEKLER. Birkaç yüz bin satıra kadar bu saniyeler sürer.
+-- İçe aktarma yapılmayan bir anda çalıştır. Yaklaşık 1M satırın üstündeyse
+-- Seçenek B'yi tercih et.
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_raw_posts_hash_msgdate
   ON public.raw_posts USING btree (clean_hash, message_date)
   WHERE (clean_hash IS NOT NULL);
 
--- Başarılı mı? invalid kalmamalı:
-SELECT indexrelid::regclass AS indeks, indisvalid
+DROP INDEX IF EXISTS public.idx_raw_posts_hash_day;
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- SEÇENEK B (kilitsiz) — CONCURRENTLY, transaction DIŞINDA
+-- ─────────────────────────────────────────────────────────────────────────────
+-- SQL editörü kullanılamaz. Doğrudan psql ile bağlan (Supabase → Project Settings
+-- → Database → Connection string) ve aşağıdakileri TEK TEK, ayrı ayrı çalıştır:
+--
+--   psql "postgresql://postgres:[PAROLA]@[HOST]:5432/postgres"
+--
+--   CREATE UNIQUE INDEX CONCURRENTLY idx_raw_posts_hash_msgdate
+--     ON public.raw_posts USING btree (clean_hash, message_date)
+--     WHERE (clean_hash IS NOT NULL);
+--
+--   DROP INDEX CONCURRENTLY public.idx_raw_posts_hash_day;
+--
+-- CONCURRENTLY başarısız olursa indeks "invalid" halde kalır ve tekrar
+-- denemeden ÖNCE düşürülmesi gerekir:
+--   DROP INDEX CONCURRENTLY IF EXISTS public.idx_raw_posts_hash_msgdate;
+
+-- ── Doğrulama (hangi seçeneği kullandıysan) ──────────────────────────────────
+-- indisvalid = true olmalı, hash_day artık listede olmamalı:
+SELECT indexrelid::regclass AS indeks, indisvalid, indisunique
 FROM pg_index
-WHERE indexrelid = 'public.idx_raw_posts_hash_msgdate'::regclass;
+WHERE indrelid = 'public.raw_posts'::regclass;
 
 -- =============================================================================
--- ADIM 2 — Eski indeksi düşür
+-- ADIM 2 — Kolonu düşür (SADECE kod dağıtıldıktan ve doğrulandıktan SONRA)
 -- =============================================================================
-
-DROP INDEX CONCURRENTLY IF EXISTS public.idx_raw_posts_hash_day;
-
--- =============================================================================
--- ADIM 3 — Kolonu düşür (SADECE kod dağıtıldıktan ve doğrulandıktan SONRA)
--- =============================================================================
--- Geri alınamaz. Adım 0'daki bağımlılık sorgusu boş dönmüş olmalı.
+-- Geri alınamaz. Adım 0'daki bağımlılık sorgusu boş dönmüş olmalı ve
+-- app/api/whatsapp-parse/route.ts artık `post_date` YAZMIYOR olmalı.
 
 -- ALTER TABLE public.raw_posts DROP COLUMN post_date;
 
 -- =============================================================================
--- GERİ ALMA (adım 3 çalıştırılmadıysa)
+-- GERİ ALMA (adım 2 çalıştırılmadıysa)
 -- =============================================================================
--- CREATE UNIQUE INDEX CONCURRENTLY idx_raw_posts_hash_day
+-- CREATE UNIQUE INDEX idx_raw_posts_hash_day
 --   ON public.raw_posts USING btree (clean_hash, post_date)
 --   WHERE (clean_hash IS NOT NULL);
--- DROP INDEX CONCURRENTLY IF EXISTS public.idx_raw_posts_hash_msgdate;
+-- DROP INDEX IF EXISTS public.idx_raw_posts_hash_msgdate;
