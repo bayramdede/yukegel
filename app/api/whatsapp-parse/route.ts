@@ -539,6 +539,10 @@ export async function POST(request: NextRequest) {
       reposted,
       insert_failed: insertHatasi,
       errors: hatalar,
+      // İstemci bunu görünce aynı grubu tekrar gönderir: hash dedup sayesinde
+      // yeniden gönderim güvenli, zaten yazılmış olanlar `skipped` olarak döner.
+      tamamlanmadi,
+      islenmeyen,
       cutoff: cutoff.toISOString(),
       saat_filtre: saatFiltre,
       aliases_count: aliases.length,
