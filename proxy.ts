@@ -78,7 +78,7 @@ export async function proxy(request: NextRequest) {
     user = null;
   }
 
-  if (!user && KORUNMALI.some(r => pathname.startsWith(r))) {
+  if (!user && korunmaliMi(pathname)) {
     return NextResponse.redirect(new URL(`/giris?redirect=${pathname}`, request.url));
   }
 
