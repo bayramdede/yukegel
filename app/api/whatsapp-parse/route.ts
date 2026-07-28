@@ -470,20 +470,40 @@ export async function POST(request: NextRequest) {
       await Promise.all(repostEdilecekler.map(r => repostListings(r.kaynakId, r.yeniId)));
     }
 
+    structuredLog(insertHatasi > 0 ? 'WARN' : 'INFO', 'whatsapp-import', 'ZIP/TXT import tamamlandı', {
+      output_status: insertHatasi > 0 ? 'partial' : 'success',
+      source_group: groupName,
+      file_count: fileContents.length,
+      total_messages: totalMessages,
+      saved: savedToDb,
+      skipped,
+      spam_blocked: spamEngel,
+      reposted,
+      insert_failed: insertHatasi,
+      duration_ms: Date.now() - baslangic,
+    });
+
     return NextResponse.json({
       success: true,
       total_messages: totalMessages,
-      passed_gate: savedToDb + skipped,
+      passed_gate: candidates.length,
       saved_to_db: savedToDb,
       skipped,
       spam_blocked: spamEngel,
       reposted,
+      insert_failed: insertHatasi,
+      errors: hatalar,
       cutoff: cutoff.toISOString(),
       saat_filtre: saatFiltre,
       aliases_count: aliases.length,
       debug: debugLog,
     });
   } catch (error: any) {
+    structuredLog('ERROR', 'whatsapp-import', 'Import beklenmeyen hata', {
+      output_status: 'error',
+      error_message: error?.message ?? String(error),
+      duration_ms: Date.now() - baslangic,
+    });
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
