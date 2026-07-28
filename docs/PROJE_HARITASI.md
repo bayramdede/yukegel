@@ -91,6 +91,8 @@ yukegel/
 ├── lib/auth.ts + supabase.ts             # auth.ts: requireStaff() → API route'lar için (redirect atmaz)
 ├── lib/whatsapp/chatParser.ts            # 📱 TEK KAYNAK sohbet parser (server + client ortak) ✅
 ├── lib/whatsapp/__tests__/chatParser.test.ts  # 29 assertion — `npm run test:parser` ✅
+├── lib/whatsapp/telefon.ts               # 📱 TEK KAYNAK telefon regex (05XXXXXXXXX) ✅
+├── app/api/raw-posts/telefon-doldur/route.ts  # 📱 contact_phone geriye-doldurma (içe aktarmadan AYRI) ✅
 ├── supabase/functions/parse-listing/index.ts
 ├── proxy.ts
 │   └── api/ilanlar/[id]/route.ts       # Public AI-readable API ✅
