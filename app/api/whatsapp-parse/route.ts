@@ -1,13 +1,41 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { requireStaff } from '../../../lib/auth';
+import { structuredLog } from '../../../lib/logger';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60; // Çoklu ZIP parse + hash + DB batch işlemleri için
 
+// Service-role client — RLS bypass eder. SADECE requireStaff() geçtikten sonra kullanılır.
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
+
+// ── Basit in-memory rate limit ────────────────────────────────────────────────
+// Vercel'de her instance kendi sayacını tutar; amaç mutlak sınır değil, kazara/kötü
+// niyetli seri isteklerde tek bir instance'ın DB'yi yormasını engellemek.
+const RATE_LIMIT_PENCERE_MS = 60_000;
+const RATE_LIMIT_MAX = 10;
+const istekGecmisi = new Map<string, number[]>();
+
+function rateLimitAsildi(userId: string): boolean {
+  const simdi = Date.now();
+  const gecmis = (istekGecmisi.get(userId) || []).filter(t => simdi - t < RATE_LIMIT_PENCERE_MS);
+  if (gecmis.length >= RATE_LIMIT_MAX) {
+    istekGecmisi.set(userId, gecmis);
+    return true;
+  }
+  gecmis.push(simdi);
+  istekGecmisi.set(userId, gecmis);
+  // Map'in sınırsız büyümesini engelle
+  if (istekGecmisi.size > 500) {
+    for (const [k, v] of istekGecmisi) {
+      if (v.every(t => simdi - t >= RATE_LIMIT_PENCERE_MS)) istekGecmisi.delete(k);
+    }
+  }
+  return false;
+}
 
 async function cleanHash(text: string): Promise<string> {
   const normalized = text.toLowerCase().replace(/\s+/g, ' ').trim();
