@@ -92,6 +92,22 @@ export async function profilKaydet(girdi: ProfilGirdi): Promise<ProfilSonuc> {
 
   const service = getServiceSupabase()
 
+  // ── Askıya alınmış hesap kontrolü ──────────────────────────────────
+  // Eski istemci kodu upsert gövdesine `is_active: true` koyuyordu. Bu, banlanmış
+  // bir kullanıcının profil-tamamla'yı tekrar POST'layarak kendini AKTİFLEŞTİRMESİ
+  // demekti. Artık `is_active` hiç yazılmıyor (aşağıdaki beyaz listede yok) ve
+  // pasif hesap buradan geri dönüyor.
+  const { data: mevcut } = await service
+    .from('users')
+    .select('is_active, merged_into')
+    .eq('id', user.id)
+    .maybeSingle()
+
+  if (mevcut?.is_active === false)
+    return { ok: false, hata: 'Hesabınız askıya alınmış. Destek ile iletişime geçin.' }
+  if (mevcut?.merged_into)
+    return { ok: false, hata: 'Bu hesap başka bir hesapla birleştirilmiş. Lütfen tekrar giriş yapın.' }
+
   // ── Tekillik ───────────────────────────────────────────────────────
   // İstemci onBlur'da /api/auth/tekil-kontrol çağırıyor ama o sadece UX.
   // Yarış durumunda (iki sekme) ya da devtools'la atlandığında burası tutar.
