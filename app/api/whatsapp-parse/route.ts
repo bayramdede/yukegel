@@ -5,6 +5,7 @@ import { structuredLog } from '../../../lib/logger';
 // Sohbet ayrıştırma TEK KAYNAKTAN gelir — tarayıcı tarafı (WhatsappYukle.tsx) da
 // aynı modülü kullanır. İkisi ayrışırsa mesajlar sessizce kaybolur.
 import { parseChatTxt, grupAdiTuret, sohbetTxtSec } from '../../../lib/whatsapp/chatParser';
+import { telefonlariCikar } from '../../../lib/whatsapp/telefon';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60; // Çoklu ZIP parse + hash + DB batch işlemleri için
@@ -107,26 +108,10 @@ function trNorm(s: string): string {
     .replace(/û/g, 'u').replace(/[^a-z0-9\s\.>-]/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
-function extractPhones(text: string): string[] {
-  const phones: string[] = [];
-  const t = text
-    .replace(/\+\s*9\s*0\s*/g, '0')
-    .replace(/[()]/g, ' ');
-  const re = /0\s*5(?:\s*\d){9}/g;
-  let m;
-  while ((m = re.exec(t)) !== null) {
-    const digits = m[0].replace(/\D/g, '');
-    if (digits.length === 11 && digits.startsWith('05')) {
-      phones.push(digits);
-    }
-  }
-  return [...new Set(phones)];
-}
-
 // Sync version — DB çağrısı yok, tüm veriler bellekte
 function gatekeeper_sync(message: string, aliases: any[]): { isAd: boolean; score: number; phones: string[]; cities: string[]; vehicles: string[] } {
   const norm = trNorm(message);
-  const phones = extractPhones(message);
+  const phones = telefonlariCikar(message);
   const blacklist = aliases.filter(a => a.type === 'blacklist').map(a => trNorm(a.alias));
   for (const bl of blacklist) {
     if (norm.includes(bl)) return { isAd: false, score: 0, phones: [], cities: [], vehicles: [] };
