@@ -530,3 +530,31 @@ olma iddiası hiç olmamış. Otorite `message_date`.
 3. ✅ Kolonu düşür — `ALTER TABLE public.raw_posts DROP COLUMN post_date;` (28 Tem 2026).
 
 Ayrıntı ve geri alma adımları: `docs/20260728_raw_posts_post_date_sadelestirme.sql`.
+
+### 7.7 `aliases` sorgusu 1000 satırda sessizce kesiliyordu
+
+İçe aktarma sonucundaki `1000 alias` rakamı fazla yuvarlaktı. Sebebi: PostgREST
+(Supabase `db.max-rows`) tek sorguda **en fazla 1000 satır** döndürür ve sınırı
+aşınca **hata vermez** — listeyi kesip verir. `SELECT count(*) FROM aliases
+WHERE is_active` → **1887**. Yani alias'ların %47'si hiç okunmuyordu.
+
+Etkilenen iki yer:
+
+| Yer | Ne yapıyor | Sonucu |
+|---|---|---|
+| `app/api/whatsapp-parse/route.ts` | `gatekeeper_sync` — `isAd`, şehir, araç, blacklist | Reklam olmayan mesaj ilan sayılabilir / gerçek ilan elenebilir |
+| `supabase/functions/parse-listing/index.ts` | `parseMessage` — güzergâh ve araç çıkarımı | Şehir tanınmaz → `no_lane`; araç tipi boş kalır |
+
+İkinci sorun daha sinsi: sorguda `ORDER BY` yoktu. PostgreSQL sırasız sorguda satır
+sırasını garanti etmez, dolayısıyla **hangi 887 satırın düştüğü belirsizdi** — aynı
+mesaj farklı zamanlarda farklı ayrıştırılabiliyordu.
+
+**Düzeltme:** her iki yerde `.range()` ile sayfalama (`SAYFA_BOYU = 1000`) ve
+`.order('id')`. Sıralama olmadan sayfalama yapmak yeni bir hata kaynağıdır: sayfalar
+çakışabilir ya da satır atlayabilir.
+
+> **Genel kural:** bir tabloyu "hepsini çek" niyetiyle okuyan HER sorgu sayfalanmalı.
+> Sessiz kesilme, hata veren bir sorgudan çok daha pahalıdır.
+
+`parse-listing` bir Edge Function olduğu için Vercel dağıtımıyla gelmez;
+`supabase functions deploy parse-listing` ayrıca çalıştırılmalıdır.
