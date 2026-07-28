@@ -969,8 +969,14 @@ export default function Moderator() {
                     {EditForm({ rawForLlm: raw.raw_text })}
                     <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
                       <button onClick={async () => {
-                        const { data: listing } = await supabase.from('listings').insert({ listing_type: duzenleData.listing_type, origin_city: duzenleData.origin_city, origin_district: duzenleData.origin_district || null, contact_phone: duzenleData.contact_phone || null, source: raw.source || 'whatsapp', moderation_status: 'approved', status: 'active', trust_level: 'social', raw_post_id: raw.id, raw_text: raw.raw_text, notes: duzenleData.notes, vehicle_type: duzenleData.vehicle_type, body_type: duzenleData.body_type, reviewed_at: new Date().toISOString() }).select().single();
+                        // SPRINT_01 L1e — insert'te `contact_phone` YOK; hemen ardından
+                        // server action ile yazılıyor (anon key'in kolon yetkisi kaldırıldı).
+                        const { data: listing } = await supabase.from('listings').insert({ listing_type: duzenleData.listing_type, origin_city: duzenleData.origin_city, origin_district: duzenleData.origin_district || null, source: raw.source || 'whatsapp', moderation_status: 'approved', status: 'active', trust_level: 'social', raw_post_id: raw.id, raw_text: raw.raw_text, notes: duzenleData.notes, vehicle_type: duzenleData.vehicle_type, body_type: duzenleData.body_type, reviewed_at: new Date().toISOString() }).select().single();
                         if (listing) {
+                          if (duzenleData.contact_phone) {
+                            const telSonuc = await ilanTelefonGuncelle(listing.id, duzenleData.contact_phone);
+                            if (!telSonuc.ok) alert('Telefon kaydedilemedi: ' + telSonuc.hata);
+                          }
                           for (let i = 0; i < duzenleData.stops.length; i++) {
                             const s = duzenleData.stops[i];
                             await supabase.from('listing_stops').insert({ listing_id: listing.id, stop_order: i + 1, city: s.city, district: s.district || null, weight_ton: s.weight_ton || null, pallet_count: s.pallet_count || null, vehicle_count: s.vehicle_count || 1, cargo_type: s.cargo_type || null });
