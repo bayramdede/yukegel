@@ -155,12 +155,7 @@ export async function POST(request: NextRequest) {
     const saatFiltre = parseInt(formData.get('saat_filtre') as string || '12');
     const cutoff = new Date(Date.now() - saatFiltre * 60 * 60 * 1000);
     const groupName = (formData.get('group_name') as string) ||
-      files[0]?.name
-        .replace(/\.zip$/i, '').replace(/\.txt$/i, '')
-        .replace(/WhatsApp Sohbeti - /i, '').replace(/WhatsApp Chat - /i, '')
-        .replace(/[\u{1F000}-\u{1FFFF}]/gu, '')
-        .replace(/[\u200e\u202a\u202c\u200f\u200b]/g, '')
-        .replace(/\s+/g, ' ').trim() || 'Bilinmiyor';
+      (files[0]?.name ? grupAdiTuret(files[0].name) : '') || 'Bilinmiyor';
 
     if (!files || files.length === 0)
       return NextResponse.json({ error: 'Dosya bulunamadı' }, { status: 400 });
