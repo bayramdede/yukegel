@@ -53,7 +53,11 @@ Sonuç: internetteki herkes bu endpoint'e uydurma bir "sohbet metni" POST'layara
 `raw_posts`'a satır yazdırabilir; trigger bunları `listings`'e çevirir; audit skoru
 düşük olanlar `auto_published` olur. RLS de bypass edilmiş durumda.
 
-`app/api/excel-import/route.ts` aynı açığa sahip.
+**DÜZELTME (ilk taslakta hatalıydı):** `app/api/excel-import/route.ts` bu açığa sahip
+DEĞİL. O route inline `createServerClient` + `auth.getUser()` ile giriş zorunluluğu
+uyguluyor; sadece rol (admin/moderator) kontrolü yok. İlk taslaktaki iddia, grep'in
+inline client kullanımını kaçırmasından kaynaklandı. A1 yalnızca `whatsapp-parse`
+için geçerlidir.
 
 Çözüm — `toplu-islem` route'undaki pattern'i uygula:
 
