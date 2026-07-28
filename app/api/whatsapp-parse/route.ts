@@ -163,9 +163,8 @@ export async function POST(request: NextRequest) {
   // yetkilendirme burada yapılmak ZORUNDA — aksi halde endpoint herkese açık.
   const yetki = await requireStaff();
   if (!yetki.ok) {
-    structuredLog('WARN', 'whatsapp-parse yetkisiz erişim denemesi', {
-      context: 'whatsapp-import',
-      status: yetki.status,
+    structuredLog('WARN', 'whatsapp-import', 'Yetkisiz erişim denemesi', {
+      output_status: yetki.status,
     });
     return NextResponse.json({ error: yetki.error }, { status: yetki.status });
   }
