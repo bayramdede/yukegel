@@ -135,8 +135,10 @@ export default function WhatsappYukle() {
       skipped: 0,
       spam_blocked: 0,
       reposted: 0,
+      insert_failed: 0,
       aliases_count: 0,
       debug: [] as string[],
+      errors: [] as string[],
       error: '',
     };
 
