@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 import { createClient } from '../../lib/supabase';
 import { useRouter } from 'next/navigation';
 import WhatsappYukle from './WhatsappYukle';
+import { ilanTelefonlariGetir, ilanTelefonGuncelle } from './actions';
 
 const supabase = createClient();
 
