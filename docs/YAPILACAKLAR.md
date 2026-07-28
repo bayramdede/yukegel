@@ -1,6 +1,6 @@
 # Yükegel — Yapılacaklar Listesi
 
-> Son güncelleme: 28 Temmuz 2026 (WhatsApp Import analizi + sertleştirme)  
+> Son güncelleme: 28 Temmuz 2026 (Landing / Kayıt / Giriş analizi)  
 > Bu dosya tüm geçmiş sohbetler taranarak oluşturulmuştur.
 
 ---
