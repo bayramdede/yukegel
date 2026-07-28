@@ -271,6 +271,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         success: true, total_messages: totalMessages, passed_gate: 0,
         saved_to_db: 0, skipped: 0, spam_blocked: 0, reposted: 0,
+        insert_failed: 0, errors: [] as string[],
         cutoff: cutoff.toISOString(), saat_filtre: saatFiltre,
         aliases_count: aliases.length, debug: debugLog,
       });
