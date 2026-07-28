@@ -244,6 +244,33 @@ function DuzenleFormu({ ilan, stops, onKaydet, onIptal }: {
     if (duraklar.some(d => !d.city.trim())) { setHata('Tüm varış şehirlerini doldurun.'); return; }
     setYukleniyor(true); setHata('');
 
+    // SPRINT_01 L1e — kayıt sunucuda. Gövde orada beyaz listeden geçiyor,
+    // sahiplik orada doğrulanıyor; buradaki `patch` yalnızca ekrandaki listeyi
+    // iyimser güncellemek için.
+    const sonuc = await ilanGuncelle({
+      id: ilan.id,
+      origin_city: kalkisSehir.trim(),
+      origin_district: kalkisIlce.trim() || null,
+      vehicle_type: aracTipleri,
+      body_type: ustyapi,
+      available_date: tarih || null,
+      date_flexible: tarihEsnek,
+      price_offer: fiyat ? Number(fiyat) : null,
+      price_negotiable: fiyatMuzakere,
+      telefon: telefon.trim() || null,
+      notes: notlar.trim() || null,
+      duraklar: duraklar.map(d => ({
+        city: d.city.trim(),
+        district: d.district.trim() || null,
+        cargo_type: d.cargo_type.trim() || null,
+        weight_ton: d.weight_ton ? Number(d.weight_ton) : null,
+        pallet_count: d.pallet_count ? Number(d.pallet_count) : null,
+        vehicle_count: d.vehicle_count ? Number(d.vehicle_count) : null,
+      })),
+    });
+
+    if (!sonuc.ok) { setHata(sonuc.hata); setYukleniyor(false); return; }
+
     const patch = {
       origin_city: kalkisSehir.trim(),
       origin_district: kalkisIlce.trim() || null,
@@ -257,24 +284,7 @@ function DuzenleFormu({ ilan, stops, onKaydet, onIptal }: {
       notes: notlar.trim() || null,
     };
 
-    const { error } = await supabase.from('listings').update(patch).eq('id', ilan.id);
-    if (error) { setHata('Kayıt hatası: ' + error.message); setYukleniyor(false); return; }
-
-    // Durakları sil + yeniden ekle
-    await supabase.from('listing_stops').delete().eq('listing_id', ilan.id);
-    const yeniStoplar = duraklar.map((d, i) => ({
-      listing_id: ilan.id,
-      stop_order: i + 1,
-      city: d.city.trim(),
-      district: d.district.trim() || null,
-      cargo_type: d.cargo_type.trim() || null,
-      weight_ton: d.weight_ton ? Number(d.weight_ton) : null,
-      pallet_count: d.pallet_count ? Number(d.pallet_count) : null,
-      vehicle_count: d.vehicle_count ? Number(d.vehicle_count) : null,
-    }));
-    const { data: insertedStops } = await supabase.from('listing_stops').insert(yeniStoplar).select();
-
-    onKaydet(patch, insertedStops || yeniStoplar);
+    onKaydet(patch, (sonuc.veri?.duraklar as any[]) || []);
     setYukleniyor(false);
   }
 
