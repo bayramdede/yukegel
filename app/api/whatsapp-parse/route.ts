@@ -197,30 +197,24 @@ export async function POST(request: NextRequest) {
     };
 
     let totalMessages = 0;
+    let cozulemeyenZaman = 0;
     const rawCandidates: Omit<Candidate, 'hash'>[] = [];
     const debugLog: string[] = [];
 
     for (const fc of fileContents) {
-      const messages = parseChatTxt(fc.content);
-      totalMessages += messages.length;
-      for (const msg of messages) {
-        let msgDate = '';
-        let msgTimestamp = new Date().toISOString();
-        try {
-          const tsClean = msg.timestamp.replace(',', '').replace(/\s+/g, ' ').trim();
-          const tsParts = tsClean.split(' ');
-          if (tsParts.length < 2) { debugLog.push(`SKIP ts_split: ${msg.timestamp}`); continue; }
-          const [datePart, timePart] = tsParts;
-          const dateSplit = datePart.split('.');
-          if (dateSplit.length < 3) { debugLog.push(`SKIP date_split: ${datePart}`); continue; }
-          const [day, month, year] = dateSplit;
-          const isoDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-          const d = new Date(`${isoDate}T${timePart}`);
-          if (isNaN(d.getTime())) { debugLog.push(`SKIP invalid_date: ${isoDate}T${timePart}`); continue; }
-          if (d < cutoff) { debugLog.push(`SKIP cutoff: ${isoDate}T${timePart}`); continue; }
-          msgDate = isoDate;
-          msgTimestamp = d.toISOString();
-        } catch (e: any) { debugLog.push(`SKIP ts_error: ${e.message}`); continue; }
+      // parseChatTxt zaman damgasını sabit +03:00 varsayarak çözer; sunucu (UTC) ile
+      // tarayıcı (UTC+3) aynı sonucu üretir. Kendi başımıza new Date('...T..:..')
+      // YAPMIYORUZ — o çağrı host saat dilimine göre kayar.
+      const { mesajlar, cozulemeyenZaman: cz } = parseChatTxt(fc.content);
+      totalMessages += mesajlar.length;
+      cozulemeyenZaman += cz;
+      for (const msg of mesajlar) {
+        if (msg.tarih < cutoff) {
+          debugLog.push(`SKIP cutoff: ${msg.timestamp}`);
+          continue;
+        }
+        const msgDate = msg.yerelTarih;
+        const msgTimestamp = msg.tarih.toISOString();
 
         const gate = gatekeeper_sync(msg.message, aliases);
         debugLog.push(`MSG ${msgDate} | isAd=${gate.isAd} score=${gate.score} phones=${gate.phones.length} cities=${gate.cities.join(',')} vehicles=${gate.vehicles.join(',')} | ${msg.message.slice(0, 60).replace(/\n/g, ' ')}`);
