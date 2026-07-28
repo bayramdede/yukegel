@@ -367,21 +367,35 @@ testi, ileriki her değişikliği güvenli hale getirir.
 
 ## 5. Öncelik Sırası
 
-| # | Bulgu | Etki | Efor |
-|---|---|---|---|
-| 1 | A1 — Endpoint yetkisiz (whatsapp-parse + excel-import) | Kritik güvenlik | ~30 dk |
-| 2 | A4 — Chunk insert sessiz veri kaybı | Veri kaybı | ~30 dk |
-| 3 | A3 — Desteklenmeyen tarih formatları | Sessiz tam kayıp | ~2 sa |
-| 4 | A2 — Saat dilimi kayması | Yanlış veri + kayıp | ~1 sa |
-| 5 | B2 — Repost çift ilan | Veri kirliliği | doğrulama + ~1 sa |
-| 6 | A5 — Repost indeks eşleşmesi | A4 sonrası kritik | ~30 dk |
-| 7 | B5 — Zombi `pending` + retry yok | Sessiz kayıp | ~2 sa |
-| 8 | B1 — Sabit hat numaraları | Kaçırılan ilan | ~30 dk |
-| 9 | B3 — Intra-batch spam sayacı | Kalite | ~15 dk |
-| 10 | C5 — Grup adı kaybı | Analitik kaybı | ~1 sa |
-| 11 | C1 — LLM fallback (no_lane kurtarma) | Yüksek getiri | ~4 sa |
-| 12 | C9 — Ortak parser modülü | Bakım | ~2 sa |
-| 13 | C10 — `import_runs` telemetrisi | Görünürlük | ~2 sa |
-| 14 | C12 — Parser testleri | Güvenlik ağı | ~3 sa |
+| # | Bulgu | Etki | Efor | Durum |
+|---|---|---|---|---|
+| 1 | A1 — Endpoint yetkisiz (whatsapp-parse) | Kritik güvenlik | ~30 dk | ✅ kapandı |
+| 2 | A4 — Chunk insert sessiz veri kaybı | Veri kaybı | ~30 dk | ✅ kapandı |
+| 3 | A3 — Desteklenmeyen tarih formatları | Sessiz tam kayıp | ~2 sa | ✅ kapandı |
+| 4 | A2 — Saat dilimi kayması | Yanlış veri + kayıp | ~1 sa | ✅ kapandı |
+| 5 | B2 — Repost çift ilan | Veri kirliliği | doğrulama + ~1 sa | ✅ kapandı (trigger SQL doğrulanmalı) |
+| 6 | A5 — Repost indeks eşleşmesi | A4 sonrası kritik | ~30 dk | ✅ kapandı |
+| 7 | B5 — Zombi `pending` + retry yok | Sessiz kayıp | ~2 sa | ⬜ açık |
+| 8 | B1 — Sabit hat numaraları | Kaçırılan ilan | ~30 dk | ⬜ açık |
+| 9 | B3 — Intra-batch spam sayacı | Kalite | ~15 dk | ⬜ açık |
+| 10 | C5 — Grup adı kaybı | Analitik kaybı | ~1 sa | ⬜ açık |
+| 11 | C1 — LLM fallback (no_lane kurtarma) | Yüksek getiri | ~4 sa | ⬜ açık |
+| 12 | C9 — Ortak parser modülü | Bakım | ~2 sa | ✅ kapandı |
+| 13 | C10 — `import_runs` telemetrisi | Görünürlük | ~2 sa | 🟨 kısmi (structuredLog var, tablo yok) |
+| 14 | C12 — Parser testleri | Güvenlik ağı | ~3 sa | ✅ kapandı (29 test) |
 
 İlk 6 madde tek bir sprint'te kapatılabilir ve sistemin en büyük risklerini ortadan kaldırır.
+
+---
+
+## 6. Uygulanan Değişiklikler (2026-07-28)
+
+| Dosya | Değişiklik |
+|---|---|
+| `lib/whatsapp/chatParser.ts` | **YENİ** — tek kaynak parser: iOS/Android, `.`/`/`/`-` ayraçlı tarih, 12/24 saat (ÖÖ/ÖS/AM/PM), 2/4 haneli yıl, U+202F dar boşluk. Zaman damgası sabit `+03:00` ile çözülür → host TZ'den bağımsız. |
+| `lib/whatsapp/__tests__/chatParser.test.ts` | **YENİ** — 29 assertion. `npm run test:parser`. TZ bağımsızlığı için `process.env.TZ` değiştirilerek doğrulanıyor. |
+| `lib/auth.ts` | `requireStaff()` eklendi — `requireAdmin()` `redirect()` attığı için API route'ta 500 üretiyordu. |
+| `lib/logger.ts` | `LogContext`'e `'whatsapp-import'` eklendi. |
+| `app/api/whatsapp-parse/route.ts` | Yetki + rate limit (10/dk/kullanıcı); satır satır 23505 retry; anahtar bazlı repost eşleşmesi; `repostListings` kaldırıldı; `insert_failed`/`errors`/`unparsed_timestamps` response'ta; `structuredLog` + `duration_ms`. |
+| `app/moderator/WhatsappYukle.tsx` | Kopya parser silindi, `chatParser`'dan import; hata ve çözülemeyen-tarih göstergeleri. |
+| `supabase/functions/parse-listing/index.ts` | Listing insert'ine `is_repost: rawPost.is_repost === true` eklendi. |
