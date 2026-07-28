@@ -99,7 +99,7 @@ export async function profilKaydet(girdi: ProfilGirdi): Promise<ProfilSonuc> {
   // pasif hesap buradan geri dönüyor.
   const { data: mevcut } = await service
     .from('users')
-    .select('is_active, merged_into')
+    .select('is_active, merged_into, phone, phone_verified')
     .eq('id', user.id)
     .maybeSingle()
 
