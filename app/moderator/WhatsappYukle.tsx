@@ -1,5 +1,7 @@
 'use client';
 import { useState, useRef } from 'react';
+// Sohbet ayrıştırma/kırpma mantığı sunucuyla ORTAK modülden gelir (lib/whatsapp/chatParser).
+import { eskiIcerigiKirp, grupAdiTuret, sohbetTxtSec } from '../../lib/whatsapp/chatParser';
 
 export default function WhatsappYukle() {
   const [acik, setAcik] = useState(false);
@@ -154,18 +156,6 @@ export default function WhatsappYukle() {
     if (toplamSonuc.success) setDosyalar([]);
   }
 
-  function dosyaAdiTemizle(ad: string) {
-    return ad
-      .replace('.zip', '').replace('.txt', '')
-      .replace('WhatsApp Sohbeti - ', '')
-      .replace('WhatsApp Chat - ', '')
-      .replace(/[\u{1F000}-\u{1FFFF}]/gu, '')
-      .replace(/[‎‪‬‏​]/g, '')
-      .replace(/[^\w\s\-À-ɏ]/g, '')
-      .replace(/\s+/g, ' ')
-      .trim();
-  }
-
   return (
     <div style={{ background: '#161b22', borderBottom: '1px solid #30363d' }}>
       <div style={{ maxWidth: 1400, margin: '0 auto', padding: '8px 16px' }}>
@@ -223,7 +213,7 @@ export default function WhatsappYukle() {
                   const files = Array.from(e.target.files || []);
                   setDosyalar(files);
                   if (files.length > 0 && !grupAdi)
-                    setGrupAdi(dosyaAdiTemizle(files[0].name));
+                    setGrupAdi(grupAdiTuret(files[0].name));
                   e.target.value = '';
                 }}
               />
@@ -242,7 +232,7 @@ export default function WhatsappYukle() {
                   if (files.length > 0 && !grupAdi) {
                     // Klasör adını webkitRelativePath'ten çek
                     const relPath = (files[0] as any).webkitRelativePath as string | undefined;
-                    const folderName = relPath?.split('/')?.[0] || dosyaAdiTemizle(files[0].name);
+                    const folderName = relPath?.split('/')?.[0] || grupAdiTuret(files[0].name);
                     setGrupAdi(folderName);
                   }
                   e.target.value = '';
