@@ -271,6 +271,34 @@ function UyeBanner() {
 function IlanKart({ ilan, kullanici }: { ilan: any; kullanici: any }) {
   const kaynak = KAYNAK_ETIKET[ilan.kaynak] || KAYNAK_ETIKET.form;
   const isYuk = ilan.tip === 'yuk';
+  const [telAliniyor, setTelAliniyor] = useState(false);
+  const [telHata, setTelHata] = useState('');
+
+  // SPRINT_01 L1 — numara artık ilan objesinde gelmiyor; tıklama anında authed
+  // endpoint'ten çekilip doğrudan tel: ile aranıyor. Numara state'te tutulmaz.
+  async function araTikla(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (telAliniyor) return;
+    setTelAliniyor(true);
+    setTelHata('');
+    try {
+      const res = await fetch(`/api/ilan/${ilan.id}/telefon`);
+      const veri = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        if (res.status === 401) { window.location.assign(`/giris?redirect=/ilan/${ilan.id}`); return; }
+        if (veri?.redirect) { window.location.assign(veri.redirect); return; }
+        setTelHata(veri?.error || 'Numara alınamadı');
+        return;
+      }
+      window.location.assign(`tel:${veri.telefon}`);
+    } catch {
+      setTelHata('Bağlantı hatası');
+    } finally {
+      setTelAliniyor(false);
+    }
+  }
+
   return (
     <a href={`/ilan/${ilan.id}`}
       style={{ display: 'block', background: '#161b22', border: '1px solid #30363d', borderRadius: 8, padding: '14px 16px', cursor: 'pointer', textDecoration: 'none' }}
@@ -315,10 +343,13 @@ function IlanKart({ ilan, kullanici }: { ilan: any; kullanici: any }) {
         <div style={{ textAlign: 'right', flexShrink: 0 }}>
           {ilan.fiyat && <div style={{ color: '#22c55e', fontWeight: 800, fontSize: '1.05rem', marginBottom: 8 }}>₺{Number(ilan.fiyat).toLocaleString('tr-TR')}</div>}
           {kullanici ? (
-            <button onClick={e => { e.preventDefault(); e.stopPropagation(); window.location.href = `tel:${ilan.tel}`; }}
-              style={{ display: 'block', background: '#1a3a1a', color: '#4ade80', border: '1px solid #166634', borderRadius: 6, padding: '6px 12px', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}>
-              📞 Ara
-            </button>
+            <>
+              <button onClick={araTikla} disabled={telAliniyor}
+                style={{ display: 'block', background: '#1a3a1a', color: '#4ade80', border: '1px solid #166634', borderRadius: 6, padding: '6px 12px', fontSize: '0.8rem', fontWeight: 700, cursor: telAliniyor ? 'wait' : 'pointer', opacity: telAliniyor ? 0.6 : 1, whiteSpace: 'nowrap' }}>
+                {telAliniyor ? '⏳ …' : '📞 Ara'}
+              </button>
+              {telHata && <div style={{ color: '#f87171', fontSize: '0.68rem', marginTop: 4, maxWidth: 140 }}>{telHata}</div>}
+            </>
           ) : (
             <button onClick={e => { e.preventDefault(); e.stopPropagation(); window.location.href = '/giris'; }}
               style={{ display: 'block', background: '#1a2a3a', color: '#60a5fa', border: '1px solid #1e3a5f', borderRadius: 6, padding: '6px 12px', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
@@ -439,9 +470,12 @@ export default function HomeClient({ initialIlanlar = [], totalCount = 0 }: { in
         //  yoksa SSR initialIlanlar verisi kullanılır, retry hâlâ boş döner)
         const sorgu = supabase
           .from('listings')
+          // ⚠️ SPRINT_01 L1 — `contact_phone` BURADA ÇEKİLMEZ.
+          // Bu sorgu anon key ile çalışıyor; seçilen her kolon giriş yapmamış
+          // ziyaretçiye açık demektir. Telefon yalnızca /api/ilan/[id]/telefon'dan.
           .select(`
             id, listing_type, origin_city, origin_district,
-            contact_phone, price_offer, source, created_at,
+            price_offer, source, created_at,
             trust_level, user_id, vehicle_type, body_type,
             available_date, date_flexible,
             listing_stops ( listing_id, stop_order, city, district, vehicle_count, cargo_type, weight_ton, pallet_count )
@@ -483,7 +517,7 @@ export default function HomeClient({ initialIlanlar = [], totalCount = 0 }: { in
             duraklar: stops.map((s: any) => ({ sehir: s.city, ilce: s.district || '', ton: s.weight_ton, palet: s.pallet_count, arac_adet: s.vehicle_count })),
             kaynak: ilan.source || 'form',
             sure: new Date(ilan.created_at).toLocaleDateString('tr-TR'),
-            tel: ilan.contact_phone, fiyat: ilan.price_offer?.toString() ?? null,
+            fiyat: ilan.price_offer?.toString() ?? null,
             tarih: ilan.available_date, tarihEsnek: ilan.date_flexible,
             aracTipleri: aracTipiList, ustyapilari: (ilan.body_type || []) as string[],
             dogrulanmamis: !ilan.user_id || ilan.trust_level === 'social',

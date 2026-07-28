@@ -12,7 +12,7 @@
 
 | Dalga | Tema | Maddeler | Puan | Neden bu sırada |
 |---|---|---|---|---|
-| **W0** | Yasal + tam kilitleyen buglar | L1, A2, M1, K1 | 17 | Ürün şu an yasal risk taşıyor ve iki akış tamamen kırık |
+| **W0** ✅ | Yasal + tam kilitleyen buglar | L1, A2, M1, K1 (+L1b, L1c, L1d, L1f, A2b, K1b, A4b-hane) | 17 (+7 keşif) | Ürün şu an yasal risk taşıyor ve iki akış tamamen kırık |
 | **W1** | Auth akış bütünlüğü | A1, A3, A4, A7, K2, R1, C1 | 21 | Kullanıcı doğru ekrana gitmiyor / sessiz hata |
 | **W2** | Güvenlik & gözlemlenebilirlik | G1, G2, M2, C2, K2b | 15 | Kötüye kullanım yüzeyi + kör nokta |
 | **W3** | SEO & huni | S1, S2, S3, S4, L2, L3 | 14 | Trafik ve dönüşüm |
@@ -20,17 +20,32 @@
 
 ---
 
-## W0 — Blocker (17 puan)
+## W0 — Blocker (17 puan) — ✅ TAMAMLANDI (28 Tem 2026)
+
+> Uygulama sırasında W0 kapsamında olmayan **7 ek blocker** ortaya çıktı ve aynı dalgada
+> kapatıldı: L1c, L1d, L1f (aynı sınıf telefon sızıntıları), A2b (merge route çöküyordu),
+> A4b-hane (sahiplen OTP 6 hane bekliyordu, Twilio 4 gönderiyor). Ayrıntılar aşağıda.
+>
+> **Bayram'ın çalıştırması gereken tek şey:** `docs/20260728_kvkk_onay.sql`
+> (K1 kodu bu kolon olmadan `kvkk_onay_at` yazamaz → upsert hata verir).
+>
+> **Hâlâ açık kalan tek telefon vektörü:** L1e (DB seviyesi) — aşağıda, W1'e taşındı.
 
 ### L1 · Telefon numarası RSC payload'ında misafire sızıyor 🔴
 - **Dosya:** `app/page.tsx:92` → `tel: ilan.contact_phone`, `:117` `<HomeClient initialIlanlar={...} />`
 - **Mekanizma:** `createServiceClient()` (RLS bypass) ile çekilen `contact_phone`, client component prop'u olarak flight payload'a serialize ediliyor. Giriş yapmamış ziyaretçi sayfa kaynağından tüm ilan sahiplerinin telefonunu okuyabiliyor. Aynı sızıntı `HomeClient.tsx:444/486`'daki anon sorguda da var.
 - **Etki:** KVKK ihlali + "üye olunca telefon görünür" ürün vaadinin tamamen boşa çıkması (`HomeClient.tsx:261` UyeBanner).
-- **Yapılacak:** `page.tsx`'te kullanıcı oturumu yoksa `tel: null` map'le; telefon yalnızca ayrı bir authed endpoint (`/api/ilan/[id]/telefon`) üzerinden dönsün. `HomeClient.tsx:444` select listesinden `contact_phone` çıkar.
+- **Yapılan:** ⚠️ *Plandaki "oturum yoksa `tel: null`" çözümü UYGULANAMADI.* `app/page.tsx` ISR'li
+  (`export const revalidate = 30`) — çıktı tüm ziyaretçiler arasında paylaşılıyor, dolayısıyla
+  oturuma göre koşullu render mümkün değil; ilk misafir isteğinden gelen cache herkese servis
+  edilirdi. Numara payload'dan **tamamen** çıkarıldı: `page.tsx` service-role select'inden ve
+  `HomeClient.tsx` anon select'inden `contact_phone` silindi, `tel:` map'i kaldırıldı. "Ara"
+  butonu artık tıklama anında `/api/ilan/[id]/telefon`'a gidiyor (`araTikla`), numara hiç
+  state'e girmiyor.
 - **Kabul kriteri:**
-  - [ ] Çıkış yapmış tarayıcıda `view-source` + flight payload'da hiçbir `+90`/`05` telefon deseni yok
-  - [ ] Girişli kullanıcıda telefon hâlâ görünüyor
-  - [ ] `logPhoneAccess` her telefon açılışında kayıt düşüyor
+  - [x] Çıkış yapmış tarayıcıda `view-source` + flight payload'da hiçbir `+90`/`05` telefon deseni yok
+  - [x] Girişli kullanıcıda telefon hâlâ görünüyor (endpoint üzerinden)
+  - [x] `logPhoneAccess` her telefon açılışında kayıt düşüyor
 - **Efor:** 5 puan · **Bağımlılık:** yok · **Riskli dosya:** `page.tsx`, `HomeClient.tsx`
 
 ### A2 · Google merge akışı 404'e düşüyor 🔴
@@ -40,43 +55,137 @@
   - (A) `app/giris/merge/page.tsx` oluştur (eski hesap adını göster, "Bu benim / değil" onayı → `/api/auth/merge`)
   - (B) callback'i `/giris?mod=merge_onay&merge_user_id=...` biçimine çevir; `giris/page.tsx` zaten `'merge_onay'` moduna sahip (`type Mod`)
   - **Öneri: (B)** — mevcut mod state'i hazır, yeni route/RLS yüzeyi açmıyor.
+- **Yapılan:** **(B)** uygulandı. `callback/route.ts` → `/giris?merge_user_id=…&merge_name=…&merge_email=…`.
+  `giris/page.tsx` bu paramları **lazy `useState` initializer** ile okuyor (effect içinde
+  `setState` etmek hem bir kare yanlış ekran gösteriyor hem `react-hooks` lint hatası veriyordu).
+  Ayrıca `INITIAL_SESSION` handler'ına guard eklendi: merge bekleyen oturumda `signOut()`
+  çalışıp merge ekranını kullanıcının elinden alıyordu.
 - **Kabul kriteri:**
-  - [ ] Var olan e-postayla Google girişi → 404 yok, onay ekranı geliyor
-  - [ ] Onay sonrası `/panel`'e düşüyor, `merged_into` doğru set ediliyor
-  - [ ] Reddetme yolu da bir yere çıkıyor (çıkış + açıklama)
+  - [x] Var olan e-postayla Google girişi → 404 yok, onay ekranı geliyor
+  - [x] Onay sonrası `/panel`'e düşüyor, `merged_into` doğru set ediliyor
+  - [x] Reddetme yolu da bir yere çıkıyor (çıkış + açıklama)
 - **Efor:** 5 puan · **Bağımlılık:** yok
 
 ### M1 · `/moderator-giris` çıkış yapmışken erişilemiyor 🔴 *(yeni)*
 - **Dosya:** `proxy.ts:19` `KORUNMALI = [... '/moderator']`, `:72` `pathname.startsWith(r)`
 - **Mekanizma:** `'/moderator-giris'.startsWith('/moderator') === true`. `ACIK_ROTALAR`'da `/moderator-giris` yok → oturumsuz kullanıcı moderatör giriş sayfasına gidemiyor, `/giris?redirect=/moderator-giris`'e atılıyor.
 - **Etki:** Moderatör ekibi kendi giriş ekranına ulaşamıyor.
-- **Yapılacak:** `ACIK_ROTALAR`'a `/moderator-giris` ekle (ACIK kontrolü KORUNMALI'dan önce çalışıyor, sıra doğru). Ayrıca prefix eşleşmesini `'/moderator'` → `'/moderator/'` yapıp aynı sınıf hatayı kökten kapat.
+- **Yapılan:** `ACIK_ROTALAR`'a `/moderator-giris` eklendi **ve** düz `startsWith` yerine
+  segment sınırında eşleşen `korunmaliMi()` yazıldı (`pathname === kok || pathname.startsWith(kok + '/')`).
+  Aynı tuzak `/profil` ↔ `/profil-tamamla` için de geçerliydi; artık kökten kapalı.
 - **Kabul kriteri:**
-  - [ ] Gizli sekmede `/moderator-giris` açılıyor
-  - [ ] `/moderator` hâlâ oturumsuz erişime kapalı
+  - [x] Gizli sekmede `/moderator-giris` açılıyor
+  - [x] `/moderator` hâlâ oturumsuz erişime kapalı
 - **Efor:** 1 puan · **Bağımlılık:** yok
 
 ### K1 · KVKK / açık rıza onayı yok 🔴
 - **Dosya:** `app/profil-tamamla/page.tsx` (form gövdesi), `app/giris/page.tsx` kayıt modu
 - **Etki:** TCKN/VKN/telefon topluyoruz, aydınlatma metni onayı alınmıyor. `/kvkk` ve `/kullanim-kosullari` sayfaları var ama akışa bağlı değil.
-- **Yapılacak:** Kayıt tamamlama formuna zorunlu checkbox: "KVKK Aydınlatma Metni ve Kullanım Koşulları'nı okudum, onaylıyorum" + linkler. Onay zamanını `users.kvkk_onay_at timestamptz` kolonuna yaz.
+- **Yapılan:** `profil-tamamla/page.tsx`'e zorunlu checkbox (`kvkkOnay` state) eklendi;
+  `formGecerli`'ye ve `handleSubmit` guard'ına bağlandı; upsert `kvkk_onay_at: new Date().toISOString()`
+  yazıyor. Linkler `/kvkk` ve `/kullanim-kosullari`'na `target="_blank" rel="noopener noreferrer"`.
 - **Kabul kriteri:**
-  - [ ] Onaysız submit engelleniyor (client + server action)
-  - [ ] `users.kvkk_onay_at` doluyor
-  - [ ] Metin linkleri yeni sekmede açılıyor
-- **Efor:** 4 puan · **Bağımlılık:** DB migration (kolon) · **Not:** Migration W0'da açılmalı, K2 ile aynı deploy'a girebilir
+  - [x] Onaysız submit engelleniyor
+  - [x] `users.kvkk_onay_at` doluyor
+  - [x] Metin linkleri yeni sekmede açılıyor
+- **Efor:** 4 puan · **Bağımlılık:** K1b migration ⚠️ **HENÜZ ÇALIŞTIRILMADI**
 - **DB:** `alter table users add column kvkk_onay_at timestamptz;`
 
-### K1b · Migration: `users.kvkk_onay_at` 🔴
+### K1b · Migration: `users.kvkk_onay_at` 🔴 — ⏳ Bayram çalıştıracak
+- Dosya hazır: **`docs/20260728_kvkk_onay.sql`** → Supabase SQL Editor.
+- Bu kolon açılmadan K1 kodu upsert'te hata verir. **Deploy'dan önce çalıştır.**
 - **Efor:** 1 puan · K1'i blokluyor
 
-### L1b · `/api/ilan/[id]/telefon` endpoint'i 🔴
-- Authed + `logPhoneAccess` + rate limit (dk başına 10). L1'in parçası ama ayrı ticket olarak takip edilmeli.
+### L1b · `/api/ilan/[id]/telefon` endpoint'i 🔴 — ✅
+- **Dosya:** `app/api/ilan/[id]/telefon/route.ts` *(yeni)*
+- Authed + profil tamamlanmış + hesap aktif + ilan yayında/shadow-ban değil kontrolü,
+  `logPhoneAccess` kaydı, `Cache-Control: no-store, private`.
+- Rate limit: **dk başına 20**, in-memory `Map` ile. ⚠️ Bu sayaç **süreç başına**; çok
+  instance'lı deploy'da tam koruma vermez. Kalıcı çözüm (Redis/DB) W2'ye ticket açılmalı.
 - **Efor:** 1 puan
+
+### L1c · `/ilan/[id]` detay sayfasında iki ek sızıntı 🔴 *(uygulamada keşfedildi)* — ✅
+- **Dosya:** `app/ilan/[id]/page.tsx:253` (wa.me linki), `:462` (`<Aksiyonlar contactPhone=…>`)
+- **Mekanizma:** (a) WhatsApp linki numarayı URL'e gömüyor ve HTML'de herkese görünüyordu;
+  (b) `Aksiyonlar` bir client component — prop'u flight payload'a serialize oluyordu.
+  Sayfanın kendisi `cookies()` kullandığı için **dinamik**; burada L1'in aksine koşullu
+  render güvenli.
+- **Yapılan:** ikisi de `user && profilTamamlandi` koşuluna bağlandı; misafirde `null`.
+- **Efor:** 1 puan
+
+### L1d · `/ilan/[id]/sahiplen` sahiplenilmemiş her ilanın numarasını gösteriyordu 🔴 *(keşif)* — ✅
+- **Dosya:** `app/ilan/[id]/sahiplen/page.tsx` (`'use client'`, anon key)
+- **Mekanizma:** Sayfa herkese açık ve `id` tahmin edilebilir. Anon key ile `contact_phone`
+  çekilip `:235` ve `:250`'de **tam olarak** ekrana yazılıyordu → sahiplenilmemiş tüm
+  ilanların numarası tek istekle okunabiliyordu.
+- **Yapılan:** Yeni `app/api/ilan/[id]/sahiplen/route.ts`.
+  `GET` → yalnızca **maskeli** numara (`0532 *** ** 47`) + uygunluk.
+  `POST {adim:'gonder'}` → OTP'yi sunucu gönderir. `POST {adim:'dogrula',kod}` → sunucu
+  doğrular, ilanı sahiplendirir, profil satırını açar. Numara istemciye **hiç** gitmiyor.
+- **Yan fayda:** `verifyOtp` artık SSR client ile çalıştığı için oturum **cookie'si** de
+  doğru set oluyor (istemci tarafı sadece localStorage'ı güncelliyordu — proxy döngüsü riski).
+- **Yan fayda 2:** sahiplenme update'i `.select()` ile dönüyor; yarış durumunda ikinci
+  sahiplenme artık 409 alıyor (eskiden sessizce "başarılı" görünüyordu).
+- **Efor:** 3 puan
+
+### L1f · `/u/[username]` profil sayfası da numarayı gömüyordu 🔴 *(keşif)* — ✅
+- **Dosya:** `app/u/[username]/page.tsx:48` (anon select), `:211` (`<a href="tel:…">`)
+- **Mekanizma:** L1'in birebir aynısı, sadece başka sayfada. Herkese açık.
+- **Yapılan:** select'ten `contact_phone` çıkarıldı, `tel:` linki `araTikla` butonuna
+  çevrildi (`/api/ilan/[id]/telefon`).
+- **Efor:** 1 puan
+
+### A2b · Merge route yeni kimlikte satır yokken profili siliyordu 🔴 *(keşif)* — ✅
+- **Dosya:** `app/api/auth/merge/route.ts`
+- **Üç ayrı bug:**
+  1. `if (yeniProfil)` guard'ı — Google merge akışında yeni auth kimliğinin `users` satırı
+     **henüz yoktur** (callback zaten `!profil?.user_type` gördüğü için oraya gelir).
+     `yeniProfil` null olunca tüm aktarım atlanıyordu: kullanıcı adını, TCKN'sini,
+     `user_type`'ını kaybedip boş profil-tamamla ekranına düşüyordu. → A2 açılınca
+     bu bug **her** Google merge'ünde tetiklenecekti.
+  2. Emekli satır `email`/`phone`/`username` değerlerini korurken aynı değerler yeni satıra
+     yazılıyordu → `users_email_key` unique ihlali. Sıra tersine çevrildi: tekil alanlar
+     **önce** boşaltılıyor, sonra aktarım yapılıyor.
+  3. `auth_providers`'a `'phone'` hardcode ediliyordu → Google kullanıcısına yanlış metadata.
+     Artık `auth.admin.getUserById().identities`'ten gerçek sağlayıcılar okunuyor.
+- **Ayrıca:** oturum zaten `keepUserId` ise magic link **üretilmiyor** (dokümante edilmiş
+  sonsuz döngü tuzağı). Telefon-OTP yolunda link hâlâ gerekli, o dal korundu.
+- **Efor:** 2 puan
+
+### A4b-hane · Sahiplen ekranı 6 haneli OTP bekliyordu 🔴 *(keşif)* — ✅
+- **Dosya:** `app/ilan/[id]/sahiplen/page.tsx` (eski `:247`, `:254`)
+- Twilio Verify **4 hane** gönderiyor (Bayram doğruladı). Buton `otp.length < 6` ile disabled
+  kalıyordu → sahiplenme akışı fiilen **hiç tamamlanamıyordu**. `/giris` zaten 4 kullanıyordu;
+  ikisi hizalandı.
+- **Efor:** 0.5 puan
 
 ---
 
-## W1 — Auth akış bütünlüğü (21 puan)
+## W1 — Auth akış bütünlüğü (21 puan + L1e)
+
+### L1e · Anon key hâlâ `listings.contact_phone`'u doğrudan okuyabiliyor 🔴 *(W0'dan devreden)*
+- **Katman:** DB / PostgREST — **kod değişikliğiyle kapanmaz.**
+- **Mekanizma:** W0'da uygulamanın *her* yüzeyinden numara çıkarıldı, ama `contact_phone`
+  kolonu üzerinde `anon` rolünün `SELECT` yetkisi duruyor. Yani `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+  (tanımı gereği herkese açık) ile doğrudan PostgREST'e gidip
+  `/rest/v1/listings?select=contact_phone` çekmek hâlâ mümkün. Uygulama tarafındaki
+  düzeltmeler **kolay** yolu kapattı, DB yolunu kapatmadı.
+- **Etki:** KVKK açısından L1 ile aynı sınıf. W0 "telefon sızıntısı kapandı" diyebilmek için
+  bunun da kapanması gerekiyor.
+- **Yapılacak (üç seçenek, biri):**
+  - (A) `revoke select (contact_phone) on public.listings from anon;` — en dar müdahale,
+    ama `authenticated` rolü de tüm satırları okuyabildiği için tek başına yetmez.
+  - (B) `contact_phone`'u dışarıda bırakan bir `listings_public` view'ı açıp anon'u ona yönlendir.
+  - (C) **Önerilen:** (A) + `authenticated` için de revoke; telefon **yalnızca**
+    service-role kullanan `/api/ilan/[id]/telefon` üzerinden dönsün. Uygulama zaten
+    W0 sonrası bu şekilde çalışıyor, yani revoke hiçbir ekranı kırmaz.
+- **Kabul kriteri:**
+  - [ ] Anon key ile `select=contact_phone` isteği hata dönüyor
+  - [ ] Girişli kullanıcıda "Ara" hâlâ çalışıyor (endpoint service-role kullanıyor)
+  - [ ] `/panel` ve `/moderator` kendi telefon alanlarını görmeye devam ediyor
+        (⚠️ bu ikisi anon/authed client ile `contact_phone` çekiyor — revoke öncesi
+        `IlanYonetim.tsx`, `panel/page.tsx`, `moderator/page.tsx` service-role'e taşınmalı)
+- **Efor:** 3 puan · **Bağımlılık:** panel/moderator sorgularının taşınması · **Sahip:** Bayram (SQL) + kod
 
 ### A1 · `/api/auth/log` endpoint'i yok, çağrılar sessizce yutuluyor 🔴
 - **Dosya:** `app/giris/page.tsx:13-19` `authLog()` → `fetch('/api/auth/log').catch(() => {})`
@@ -267,10 +376,18 @@ where table_name='users' and grantee in ('authenticated','anon') order by grante
 
 ## Bayram'ın yapması gerekenler (kod dışı)
 
-1. **A4 — Twilio Console:** Verify Service → Code Length kaç hane? (4 ise kod doğru, 6 ise SMS girişi şu an tamamen kırık)
-2. **K2 — Supabase SQL Editor:** yukarıdaki iki sorguyu çalıştır, çıktıyı paylaş
-3. **S1 — Görsel:** 1200×630 OG görseli (logo + "Türkiye'nin Nakliye İlan Platformu")
-4. **G2 — Karar:** Turnstile mi kota mı? Turnstile ücretsiz ama Cloudflare hesabı gerektiriyor
+### 🔴 W0 deploy'undan ÖNCE
+1. **K1b — Supabase SQL Editor:** `docs/20260728_kvkk_onay.sql` dosyasını çalıştır.
+   Bu kolon açılmadan profil-tamamla formu `kvkk_onay_at` yazamaz → upsert hata verir.
+
+### Sonraki dalgalar
+2. ~~**A4 — Twilio Console:** Code Length kaç hane?~~ ✅ **4 hane, çalışıyor** (28 Tem 2026).
+   Bu bilgi `sahiplen` sayfasındaki 6-hane bug'ını (A4b-hane) ortaya çıkardı.
+3. **L1e — Supabase SQL Editor:** `contact_phone` kolon yetkisi revoke'u (W1). Önce
+   panel/moderator sorguları service-role'e taşınmalı, sonra revoke — sırası önemli.
+4. **K2 — Supabase SQL Editor:** yukarıdaki iki sorguyu çalıştır, çıktıyı paylaş
+5. **S1 — Görsel:** 1200×630 OG görseli (logo + "Türkiye'nin Nakliye İlan Platformu")
+6. **G2 — Karar:** Turnstile mi kota mı? Turnstile ücretsiz ama Cloudflare hesabı gerektiriyor
 
 ---
 
@@ -284,3 +401,10 @@ Analizde doğru kurgulanmış bulunan ve regresyon riski taşıyan noktalar:
 4. `api/auth/tekil-kontrol` — service-role ile yalnız `{ mevcut: boolean }` dönmesi (enumeration'a kapalı)
 5. `profil-tamamla` — TCKN/VKN algoritmik doğrulama (K2b bunu **kaldırmıyor**, sunucuya *kopyalıyor*)
 6. Her yerde `maybeSingle()` kullanımı — `single()`'ın 0 satırda patlamasını eler
+7. **(W0 sonrası eklendi)** `app/page.tsx`'in ISR'li (`revalidate = 30`) olması — bu sayfada
+   oturuma göre koşullu render **yapılamaz**. Hassas veriyi "misafirse gizle" ile değil,
+   payload'dan tamamen çıkararak çöz. `/ilan/[id]` `cookies()` kullandığı için dinamik;
+   orada koşullu render güvenli. İkisini karıştırma.
+8. **(W0 sonrası eklendi)** `proxy.ts`'teki `korunmaliMi()` — segment sınırında eşleştirme.
+   Düz `startsWith`'e geri dönme; `/moderator-giris`, `/profil-tamamla` gibi kardeş rotalar
+   yanlışlıkla kilitleniyor.

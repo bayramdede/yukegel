@@ -247,7 +247,10 @@ export default async function IlanDetay({ params }: { params: Promise<{ id: stri
 
           {/* Doğrulanmamış İlan */}
           {dogrulanmamis && (() => {
-            const telefon = ilan.contact_phone?.replace(/\D/g, '');
+            // ⚠️ SPRINT_01 L1c — wa.me linki numarayı URL'e gömüyor ve HTML'de herkese
+            // görünüyordu. "Doğrulamasını İste" aksiyonu artık numara görme hakkı olan
+            // (girişli + profili tamam) kullanıcıya açık; diğerlerine sadece rozet.
+            const telefon = (user && profilTamamlandi) ? ilan.contact_phone?.replace(/\D/g, '') : null;
             const waNumara = telefon ? (telefon.startsWith('90') ? telefon : `90${telefon.replace(/^0/, '')}`) : null;
             const stops = (ilan.listing_stops as { stop_order: number; city: string }[] | null) ?? [];
             const varis = stops.sort((a, b) => a.stop_order - b.stop_order).at(-1)?.city;
@@ -454,7 +457,9 @@ export default async function IlanDetay({ params }: { params: Promise<{ id: stri
         <Aksiyonlar
           ilanId={ilan.id}
           dogrulanmamis={dogrulanmamis}
-          contactPhone={ilan.contact_phone}
+          // SPRINT_01 L1c — client component prop'u flight payload'a serialize olur.
+          // Numara yalnızca görme hakkı olana geçer; misafirde null.
+          contactPhone={user && profilTamamlandi ? ilan.contact_phone : null}
           uyeGiris={!!user}
         />
         </article>

@@ -1,20 +1,27 @@
 # Yükegel — Proje Haritası
 > **Kullanım:** Her sohbet başında sadece bu dosyayı oku. Kaynak dosyaları sadece o dosyada değişiklik yapacaksan oku.  
-> Son güncelleme: 22 Temmuz 2026 — Ayrı auth kimliğiyle (telefon vs. Google) gelen KAYITLI kullanıcı artık profil-tamamla'ya düşmüyor. Magic-link self-heal SONSUZ DÖNGÜ yaratıyordu (implicit flow yalnız localStorage'ı günceller, SSR cookie eski oturumda kalır → proxy tekrar /giris'e atar); çözüm: proxy ölü oturumun sb- cookie'lerini siler, giriş sayfası ölü/eksik oturumu signOut ile kapatır → kullanıcı Google/e-posta ile temiz yeniden girer (PKCE → cookie doğru set). (bkz. 14. GÖREV DURUMU).
+> Son güncelleme: 28 Temmuz 2026 — **SPRINT_01 W0 tamamlandı.** Telefon sızıntısı 4 yüzeyde birden kapatıldı (`/`, `/ilan/[id]`, `/u/[username]`, `/ilan/[id]/sahiplen`), numara artık yalnız `/api/ilan/[id]/telefon` üzerinden dönüyor. Google merge 404'ü çözüldü, merge route'undaki 3 bug giderildi, proxy prefix tuzağı kökten kapatıldı, KVKK açık rıza onayı eklendi. ⏳ **`docs/20260728_kvkk_onay.sql` çalıştırılmayı bekliyor.** (bkz. `docs/SPRINT_01.md`)
+>
+> Önceki: 22 Temmuz 2026 — Ayrı auth kimliğiyle (telefon vs. Google) gelen KAYITLI kullanıcı artık profil-tamamla'ya düşmüyor. Magic-link self-heal SONSUZ DÖNGÜ yaratıyordu (implicit flow yalnız localStorage'ı günceller, SSR cookie eski oturumda kalır → proxy tekrar /giris'e atar); çözüm: proxy ölü oturumun sb- cookie'lerini siler, giriş sayfası ölü/eksik oturumu signOut ile kapatır → kullanıcı Google/e-posta ile temiz yeniden girer (PKCE → cookie doğru set). (bkz. 14. GÖREV DURUMU).
 
 **Referans Dökümanlar:**
 - `docs/LOG_VE_GUVENLIK_SPECLERI.md` — Log format standartları, audit trail, SecurityLogger kontrol listesi
 - `docs/LANDING_AUTH_ANALIZ.md` — Landing / kayıt / giriş analizi (28 Tem 2026), bulgu kodları L1–L5, A1–A7, K1–K3
 - `docs/SPRINT_01.md` — **Aktif sprint.** 30 madde / 78 puan, W0–W4 dalgaları. Yukarıdaki analiz + geniş tarama (M1–M2, R1–R2, C1–C2, G1–G2, S1–S4, F1–F2) birleşik backlog'u. Kabul kriterleri ve bağımlılıklar burada.
 
-> **⚠️ PROXY PREFIX TUZAĞI (28 Tem 2026, `SPRINT_01` M1):** `proxy.ts` hem `ACIK_ROTALAR` hem `KORUNMALI` eşleşmesinde `pathname.startsWith(r)` kullanıyor. `KORUNMALI` içindeki `'/moderator'` girdisi `/moderator-giris`'i de yakalıyor → moderatör giriş sayfası oturumsuz erişilemez hâlde. **Kural: `KORUNMALI`/`ACIK_ROTALAR`'a segment eklerken sonuna `/` koy** (`'/moderator/'`), yoksa kardeş rotaları da kilitlersin. Yeni bir `/panel-*`, `/profil-*` rotası eklerken bunu kontrol et.
+> **✅ PROXY PREFIX TUZAĞI (28 Tem 2026, `SPRINT_01` M1 — ÇÖZÜLDÜ):** `proxy.ts` düz `pathname.startsWith(r)` kullanıyordu; `KORUNMALI` içindeki `'/moderator'` girdisi `/moderator-giris`'i de yakalıyordu → moderatör giriş sayfası oturumsuz erişilemez hâldeydi. Artık `korunmaliMi()` **segment sınırında** eşleştiriyor: `pathname === kok || pathname.startsWith(kok + '/')`. `ACIK_ROTALAR`'a da `/moderator-giris` eklendi. **Kural: `KORUNMALI`'ya segment eklerken düz `startsWith`'e geri dönme** — `/profil` ↔ `/profil-tamamla` aynı tuzağı taşıyor.
 
-> **⚠️ EKSİK ROTALAR (28 Tem 2026, `LANDING_AUTH_ANALIZ` A1/A2):** Koddan çağrılan ama var olmayan iki rota tespit edildi.
-> (1) `POST /api/auth/log` — `giris/page.tsx` ve `profil-tamamla/page.tsx` içindeki `authLog()` buraya POST atıyor, klasör yok; çağrı `.catch(()=>{})` ile sarmalı olduğu için 404 sessizce yutuluyor ve **auth audit trail'i tamamen boş**.
-> (2) `/giris/merge` — `app/auth/callback/route.ts` Google akışında aynı e-postayla eski profil bulunca buraya yönlendiriyor, sayfa yok → **404**. `users_email_key` senaryosunun telefon ayağı `giris/page.tsx`'teki `merge_onay` moduyla çözülmüş, Google ayağı boşa bağlanmış.
+> **⚠️ EKSİK ROTALAR (28 Tem 2026, `LANDING_AUTH_ANALIZ` A1/A2):**
+> (1) `POST /api/auth/log` — **HÂLÂ YOK.** `giris/page.tsx` ve `profil-tamamla/page.tsx` içindeki `authLog()` buraya POST atıyor, klasör yok; çağrı `.catch(()=>{})` ile sarmalı olduğu için 404 sessizce yutuluyor ve **auth audit trail'i tamamen boş**. → `SPRINT_01` A1 (W1).
+> (2) ~~`/giris/merge`~~ — **ÇÖZÜLDÜ.** `app/auth/callback/route.ts` artık `/giris?merge_user_id=…&merge_name=…&merge_email=…` yönlendiriyor; `giris/page.tsx` bu paramları lazy `useState` initializer ile okuyup mevcut `merge_onay` moduna giriyor. Yeni route açılmadı.
 > **Tuzak:** Yeni endpoint çağrısı eklerken `.catch(()=>{})` ile sessizleştirme — en azından `console.warn` bırak; bu iki hata aylarca görünmez kaldı.
 
-> **⚠️ TELEFON SIZINTISI (28 Tem 2026, `LANDING_AUTH_ANALIZ` L1):** `app/page.tsx:92` server component'te `tel: ilan.contact_phone` map'leyip `HomeClient`'a **prop** olarak geçiyor. Next.js client component prop'larını flight payload olarak HTML'e gömer → `IlanKart` ekranda göstermese bile misafir kullanıcı sayfa kaynağından tüm numaraları okuyabiliyor. `UyeBanner`'ın "telefonu görmek için üye ol" vaadi geçersiz + KVKK riski. **Kural: misafire kapalı hiçbir alan client component prop'una girmemeli.**
+> **✅ TELEFON SIZINTISI (28 Tem 2026, `SPRINT_01` L1/L1b/L1c/L1d/L1f — UYGULAMA KATMANI ÇÖZÜLDÜ):**
+> Dört ayrı yüzeyde aynı sızıntı vardı: `/` (RSC flight payload + anon select), `/ilan/[id]` (wa.me linki + `Aksiyonlar` prop'u), `/u/[username]` (`tel:` href), `/ilan/[id]/sahiplen` (numarayı tam olarak ekrana yazıyordu).
+> **Yeni mimari:** `contact_phone` hiçbir public sorguda **seçilmez**. Numara yalnızca `GET /api/ilan/[id]/telefon` üzerinden döner (authed + profil tamam + hesap aktif + ilan yayında; `logPhoneAccess`; dk başına 20 istek; `no-store`). Sahiplenme akışı için `/api/ilan/[id]/sahiplen` var: `GET` maskeli numara, `POST` OTP gönder/doğrula — numara istemciye hiç gitmez.
+> **Kural 1:** misafire kapalı hiçbir alan client component prop'una **veya** anon key sorgusuna girmemeli.
+> **Kural 2 (ISR):** `app/page.tsx` `revalidate = 30` ile cache'li — çıktı tüm ziyaretçilerde ortak, **oturuma göre koşullu render imkânsız**. Hassas veriyi "misafirse gizle" ile değil, payload'dan tamamen çıkararak çöz. `/ilan/[id]` `cookies()` kullandığı için dinamik; orada koşullu render güvenli.
+> **⏳ Açık kalan:** `anon` rolünün `listings.contact_phone` üzerindeki `SELECT` yetkisi duruyor → PostgREST'e doğrudan gidilebilir (`SPRINT_01` L1e, W1). Revoke öncesi `panel/`, `moderator/`, `IlanYonetim.tsx` sorguları service-role'e taşınmalı.
 
 ---
 
@@ -90,6 +97,10 @@ yukegel/
 │   ├── admin/kullanici/ + guvenlik/
 │   ├── auth/merge/ + switch-account/ + tekil-kontrol/
 │   ├── excel-import/
+│   ├── ilan/[id]/telefon/route.ts        # 🔒 SPRINT_01 L1b — TEK telefon kaynağı. GET, authed+profil tam,
+│   │                                     #    logPhoneAccess, 20 istek/dk (in-memory → çok instance'ta zayıf) ✅
+│   ├── ilan/[id]/sahiplen/route.ts       # 🔒 SPRINT_01 L1d — GET maskeli numara, POST {adim:'gonder'|'dogrula'}
+│   │                                     #    OTP sunucuda; verifyOtp SSR client ile → cookie doğru set ✅
 │   ├── ilan/pasif/ + duzelt/
 │   ├── llm-parse/
 │   ├── moderator/kullanici-askiya/ + toplu-islem/
@@ -184,7 +195,8 @@ converted_user_id (nullable FK → auth.users.id)
 - Admin UI: `/admin/crm` — tablo + detay drawer (ilan geçmişi, isim/not/şirket düzenleme, durum yönetimi)
 - API: `app/api/admin/crm/route.ts` (GET + PATCH), `app/api/admin/crm/[id]/route.ts` (GET detay)
 
-### `users` — `role`, `is_active`, `user_type`, `phone_verified`, `company_name`, `ai_listing_quota_daily` (NULL = sistem default)
+### `users` — `role`, `is_active`, `user_type`, `phone_verified`, `company_name`, `ai_listing_quota_daily` (NULL = sistem default), `kvkk_onay_at`
+> `kvkk_onay_at timestamptz` (28 Tem 2026, `SPRINT_01` K1) — KVKK aydınlatma metni + kullanım koşullarının onay anı. NULL = onay alınmamış (eski kayıt). `profil-tamamla` upsert'i yazıyor. ⏳ Migration: `docs/20260728_kvkk_onay.sql` — **henüz çalıştırılmadı.** Eski kullanıcılardan onay toplamak ayrı iş (panele tek seferlik modal gerekiyor, ticket açılmalı).
 ### `raw_posts`, `aliases`, `vehicles`
 
 ### `aliases` kolonözeti

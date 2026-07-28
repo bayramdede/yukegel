@@ -94,7 +94,8 @@ async function fetchInitialIlanlar() {
         })),
         kaynak: ilan.source || 'form',
         sure: new Date(ilan.created_at).toLocaleDateString('tr-TR'),
-        tel: ilan.contact_phone,
+        // tel alanı bilinçli olarak yok — bkz. yukarıdaki L1 notu.
+        // İstemci "Ara"ya bastığında /api/ilan/[id]/telefon'dan çeker.
         fiyat: ilan.price_offer?.toString() ?? null,
         tarih: ilan.available_date,
         tarihEsnek: ilan.date_flexible,

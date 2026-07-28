@@ -3,30 +3,67 @@ import { useState, useEffect } from 'react';
 import { createClient } from '../../lib/supabase';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
+import { REDIRECT_COOKIE, guvenliRedirect } from '../../lib/redirect';
 
 const supabase = createClient();
+
+// SPRINT_01 A7 — proxy giriş öncesi hedefi `yk_redirect` cookie'sine yazıyor
+// (query param Google/magic-link zincirinde kayboluyor). httpOnly değil, burada okunabilir.
+function redirectCookieOku(): string | null {
+  if (typeof document === 'undefined') return null;
+  const eslesme = document.cookie.match(new RegExp(`(?:^|; )${REDIRECT_COOKIE}=([^;]*)`));
+  return eslesme ? decodeURIComponent(eslesme[1]) : null;
+}
+
+function redirectCookieSil() {
+  if (typeof document === 'undefined') return;
+  document.cookie = `${REDIRECT_COOKIE}=; path=/; max-age=0`;
+}
 
 type Mod = 'giris' | 'kayit' | 'reset' | 'reset_tamam' | 'dogrulama_bekle' | 'merge_onay';
 type Sekme = 'telefon' | 'eposta';
 
-// Auth event'i server'a ilet — client'ta structuredLog çağrılamaz
+// Auth event'i server'a ilet — client'ta structuredLog çağrılamaz.
+// SPRINT_01 A1 — bu fetch aylarca 404 dönüyordu (endpoint yazılmamıştı) ama
+// `.catch(() => {})` yüzünden hiç görünmedi. Artık en azından console.warn bırakıyoruz.
+// Kullanıcı akışını yine bloklamaz.
 async function authLog(event: string, method: string, reason?: string) {
-  await fetch('/api/auth/log', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ event, method, reason }),
-  }).catch(() => {}) // log hatası kullanıcı akışını durdurmasın
+  try {
+    const res = await fetch('/api/auth/log', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ event, method, reason }),
+    })
+    if (!res.ok) console.warn('authLog başarısız:', res.status, event)
+  } catch (e) {
+    console.warn('authLog isteği gönderilemedi:', event, e)
+  }
 }
 
 function GirisIci() {
+  const searchParams = useSearchParams();
+  const redirect = searchParams.get('redirect');
+
+  // SPRINT_01 A2 — /auth/callback, aynı e-postayla eski kaydı olan Google kullanıcısını
+  // buraya bu paramlarla gönderir. (Eskiden var olmayan /giris/merge sayfasına gönderiyordu
+  // ve kullanıcı 404 ile kilitleniyordu.)
+  // Bunlar URL'den türetiliyor; effect içinde setState ETME — ilk render'da lazy initializer
+  // ile kur, yoksa ekran bir kare 'giris' modunda yanıp merge ekranına atlıyor (ve eslint
+  // "setState synchronously within an effect" uyarısı veriyor).
+  const mergeUserId = searchParams.get('merge_user_id');
+  const mergeName   = searchParams.get('merge_name');
+  const mergeEmail  = searchParams.get('merge_email');
+
   const [sekme, setSekme] = useState<Sekme>('telefon');
-  const [mod, setMod] = useState<Mod>('giris');
+  const [mod, setMod] = useState<Mod>(() => (mergeUserId ? 'merge_onay' : 'giris'));
 
   // Telefon
   const [telefon, setTelefon] = useState('');
   const [otp, setOtp] = useState('');
   const [otpAdim, setOtpAdim] = useState(false);
-  const [mergeHedef, setMergeHedef] = useState<{ id: string; email: string | null; display_name: string | null } | null>(null);
+  const [mergeHedef, setMergeHedef] = useState<{ id: string; email: string | null; display_name: string | null } | null>(
+    () => (mergeUserId ? { id: mergeUserId, email: mergeEmail, display_name: mergeName } : null)
+  );
   const [mergeYukleniyor, setMergeYukleniyor] = useState(false);
 
   // E-posta
@@ -37,9 +74,25 @@ function GirisIci() {
   const [hata, setHata] = useState('');
   const [yukleniyor, setYukleniyor] = useState(false);
   const router = useRouter();
-  const searchParams = useSearchParams();
+
   const [bilgi, setBilgi] = useState('');
-  const redirect = searchParams.get('redirect');
+
+  // SPRINT_01 A3 — proxy kullanıcıyı buraya `?hesap=tasindi` veya `?hesap=eslesme` ile
+  // gönderiyordu ama BU SAYFA O PARAMI HİÇ OKUMUYORDU. Kullanıcı sebepsiz yere boş bir
+  // giriş ekranına düşüyor, "az önce giriş yapmıştım, ne oldu?" diyordu.
+  //
+  // Kritik ayrıntı: `hesap=tasindi` dalında proxy sb- cookie'lerini SİLİYOR → aşağıdaki
+  // INITIAL_SESSION handler'ı `if (!user) return;` ile erken çıkabilir ve setBilgi'ye hiç
+  // ulaşmaz. Bu yüzden mesaj state'ten değil, doğrudan URL'den TÜRETİLİYOR; ayrıca
+  // sekmelerin ÜSTÜNDE render ediliyor (bilgi kutusu yalnız telefon sekmesinde görünüyor,
+  // oysa bu kullanıcılar çoğunlukla Google/e-posta ile kayıtlı).
+  const hesapDurumu = searchParams.get('hesap');
+  const hesapMesaji =
+    hesapDurumu === 'tasindi'
+      ? 'Hesabınız başka bir hesabınızla birleştirildi. Güvenlik için oturumunuz kapatıldı — lütfen tekrar giriş yapın. İlanlarınız ve geçmişiniz yeni hesabınızda duruyor.'
+      : hesapDurumu === 'eslesme'
+      ? 'Bu telefon/e-posta ile zaten kayıtlı bir hesabınız var. Yeni kayıt açmak yerine mevcut hesabınıza giriş yapın — ilanlarınız orada.'
+      : '';
 
   // Sayfa açılışında oturum sağlık kontrolü.
   // Kullanıcı ayrı bir auth kimliğiyle (ör. telefon OTP vs. Google) gelip "kayıtlı olduğu
@@ -57,6 +110,10 @@ function GirisIci() {
     // (SIGNED_IN) girişleri ETKİLEMEZ; onları otpGonder/epostaGiris kendi akışında yönetir.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event: string, session: { user?: { id: string } } | null) => {
       if (event !== 'INITIAL_SESSION' || islendi) return;
+      // SPRINT_01 A2 — merge onayı bekleyen akışa DOKUNMA. Google callback'ten yeni gelen
+      // kimliğin users satırı henüz yok (user_type boş) → aşağıdaki "eksik oturum" dalı
+      // signOut() çağırıp merge ekranını kullanıcının elinden alırdı.
+      if (mergeUserId) { islendi = true; return; }
       const user = session?.user;
       if (!user) return; // oturum yok → temiz giriş formu, bekle
       islendi = true;
@@ -77,7 +134,11 @@ function GirisIci() {
       // Magic-link ile geçiş SSR cookie'sini güncellemediği için döngü yaratıyordu; onun yerine
       // oturumu tamamen kapat ve kullanıcıyı temiz girişe yönlendir.
       await supabase.auth.signOut().catch(() => {});
-      setBilgi('Hesabınıza tekrar giriş yapın. Kayıtlıysanız Google veya e-posta ile giriş yapmanız yeterli.');
+      // SPRINT_01 A3 — `?hesap=` mesajı zaten sekmelerin üstünde gösteriliyor; burada
+      // tekrar etme, iki kutu üst üste binmesin.
+      if (!hesapDurumu) {
+        setBilgi('Hesabınıza tekrar giriş yapın. Kayıtlıysanız Google veya e-posta ile giriş yapmanız yeterli.');
+      }
     });
     return () => subscription.unsubscribe();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -89,7 +150,10 @@ function GirisIci() {
   // - Explicit redirect varsa oraya git
   // - Yoksa role'e göre: admin -> /admin, moderator -> /moderator, diğerleri -> /
   async function yonlendir() {
-    if (redirect) { router.push(redirect); return; }
+    // SPRINT_01 A7 — hedef sırayla: URL param → proxy'nin bıraktığı cookie → rol varsayılanı.
+    // Cookie tek kullanımlık; tükettikten sonra sil, sonraki girişe sarkmasın.
+    const hedef = guvenliRedirect(redirect) ?? guvenliRedirect(redirectCookieOku());
+    if (hedef) { redirectCookieSil(); router.push(hedef); return; }
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { router.push('/'); return; }
     const { data: profil } = await supabase
@@ -196,7 +260,16 @@ function GirisIci() {
         return;
       }
       const json = await res.json();
-      window.location.href = json.redirectUrl || '/panel';
+      // SPRINT_01 A7 — merge magic-link döndürdüyse ona git (oturumu taşıyor, zorunlu).
+      // Döndürmediyse ('/panel' varsayılanı) kullanıcının asıl hedefine götür.
+      const magicLink = typeof json.redirectUrl === 'string' && json.redirectUrl.startsWith('http');
+      if (magicLink) {
+        window.location.assign(json.redirectUrl);
+      } else {
+        const hedef = guvenliRedirect(redirect) ?? guvenliRedirect(redirectCookieOku());
+        if (hedef) redirectCookieSil();
+        window.location.assign(hedef ?? json.redirectUrl ?? '/panel');
+      }
       return;
     }
 
@@ -208,7 +281,9 @@ function GirisIci() {
       .maybeSingle();
 
     if (!profil?.user_type) {
-      router.push(redirect ? `/profil-tamamla?redirect=${encodeURIComponent(redirect)}` : '/profil-tamamla');
+      // SPRINT_01 A7 — cookie'yi SİLME: hedef profil tamamlandıktan sonra kullanılacak.
+      const hedef = guvenliRedirect(redirect) ?? guvenliRedirect(redirectCookieOku());
+      router.push(hedef ? `/profil-tamamla?redirect=${encodeURIComponent(hedef)}` : '/profil-tamamla');
     } else {
       await yonlendir();
     }
@@ -392,6 +467,14 @@ function GirisIci() {
   return (
     <Wrap>
       <Logo />
+
+      {/* SPRINT_01 A3 — hesap birleştirme / eşleşme bildirimi. Sekmelerin ÜSTÜNDE,
+          çünkü kullanıcı hangi sekmeyi seçerse seçsin bu mesajı görmeli. */}
+      {hesapMesaji && (
+        <div style={{ background: '#1c2333', border: '1px solid #2f4368', borderRadius: 10, padding: '12px 14px', marginBottom: 16, color: '#93c5fd', fontSize: '0.82rem', lineHeight: 1.5 }}>
+          <strong style={{ color: '#bfdbfe' }}>ℹ️ Bilgi:</strong> {hesapMesaji}
+        </div>
+      )}
 
       {/* Sekmeler */}
       <div style={{ display: 'flex', background: '#161b22', border: '1px solid #30363d', borderRadius: 10, padding: 4, marginBottom: 16 }}>

@@ -172,14 +172,19 @@ export default function WhatsappYukle() {
         try {
           data = JSON.parse(raw);
         } catch {
-          // 504/413 → platform JSON değil HTML döner. Küçült ve tekrar dene.
-          if ((res.status === 504 || res.status === 413) && await bolVeKuyruklaAsync()) continue;
+          // 504/413/500 → platform JSON değil HTML/düz metin döner. Küçült ve
+          // tekrar dene. 500 de listeye dahil: yanıt gövdesi Vercel'in ~4,5 MB
+          // tavanını aştığında platform FUNCTION_RESPONSE_PAYLOAD_TOO_LARGE ile
+          // düz 500 döndürür ve bu da bölünce çözülür. Bölünemiyorsa döngü
+          // `bolVeKuyruklaAsync` false dönünce kendiliğinden durur.
+          if ((res.status === 504 || res.status === 413 || res.status === 500)
+              && await bolVeKuyruklaAsync()) continue;
           toplamSonuc.success = false;
           toplamSonuc.error = res.status === 413
             ? 'Dosyalar çok büyük — sunucu isteği reddetti ve daha fazla bölünemedi.'
             : res.status === 504
             ? 'Sunucu zaman aşımı — parça daha fazla bölünemedi.'
-            : `Sunucu hatası (HTTP ${res.status}) — JSON dönmedi.`;
+            : `Sunucu hatası (HTTP ${res.status}) — JSON dönmedi. Parça daha fazla bölünemedi.`;
           break;
         }
         if (!res.ok || !data.success) {

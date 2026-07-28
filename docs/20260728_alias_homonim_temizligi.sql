@@ -103,15 +103,21 @@ LIMIT 40;
 -- Alternatif (daha iyi ama iş gerektirir): yalnızca "kastamonu arac" bigram'ı
 -- olarak eşleşsin diye alias'ı iki kelimeye çevirmek.
 
+-- ⚠️ 28 Tem 2026 EK BULGU: `olur` da DOĞRULANDI. Algoritma gerçek alias
+-- tablosuyla yerel olarak çalıştırıldı; şu mesaj Erzurum eşleşmesi üretti:
+--   "ANTEP >> SİVAS KOYULHİSAR HAFİF YARIM TIRLIK KAMYONDA OLUR"
+--   → Gaziantep ✅ | Sivas ✅ | Erzurum ← 'olur' ❌
+-- ADIM 2 ölçümü ilk 40'a bakıyordu, `olur` altta kaldığı için kaçmıştı.
+
 -- Önce gör:
 SELECT id, alias, normalized, district, is_active
 FROM public.aliases
-WHERE type = 'city' AND lower(alias) IN ('arac', 'araç');
+WHERE type = 'city' AND lower(alias) IN ('arac', 'araç', 'olur');
 
 -- Sonra uygula:
 -- UPDATE public.aliases
 -- SET is_active = false
--- WHERE type = 'city' AND lower(alias) IN ('arac', 'araç');
+-- WHERE type = 'city' AND lower(alias) IN ('arac', 'araç', 'olur');
 
 -- GERİ ALMA: aynı WHERE ile is_active = true.
 
@@ -158,9 +164,110 @@ ORDER BY 1;
 -- Otomatik yazmadım: `normalized` çelişkisi varsa (4.2) elle karar gerekir.
 
 -- =============================================================================
+-- ADIM 4 SONUCU (28 Tem 2026) — kopyalar yaygın, iki ayrı zarar var
+-- =============================================================================
+-- 4.1 yüzlerce grup döndürdü. İki farklı sorun ayrışıyor:
+--
+-- (a) ÇELİŞEN `normalized` — 4.2'nin boş dönmesini beklemiştim, dönmüyor:
+--       avcilar   → {Istanbul, İstanbul}
+--       hadimkoy  → {Istanbul, İstanbul}
+--     Şehir YANLIŞ değil, YAZIMI tutarsız. `normalized` ilana yazılan değer
+--     olduğu için bir kısım ilan 'Istanbul', bir kısmı 'İstanbul' kaydediliyor;
+--     şehir filtresi bunları İKİ AYRI ŞEHİR sayar.
+--
+-- (b) ÇELİŞEN `district` — çok daha yaygın. İki alt tipi var:
+--       • NULL vs dolu:  gebze, çorlu, torbalı, alanya, çiğli, sincan, aksehir,
+--         aliaga, luleburgaz, kadikoy, beylikduzu ... (onlarca)
+--         → `findPlaces` ilk eşleşmeyi alıp `seen`'e eklediği için hangi kopyanın
+--           önce geldiğine göre İLÇE KAYBOLUYOR.
+--       • Yazım farkı: Avcilar/Avcılar, Hadimkoy/Hadımköy, Kirkağaç/Kırkağaç,
+--         Ulukisla/Ulukışla, Alaçati/Alaçatı, Kazan/Kahramankazan.
+--
+-- KARAR: kopya satırları SİLMİYORUZ. Her gruptaki TÜM satırlara aynı doğru
+-- `normalized` + `district` yazıyoruz. Eşleşme zaten `trNorm` ile normalize
+-- ettiği için hangi satırın kazandığı böylece önemsizleşir. Satır pasifleştirmeye
+-- göre çok daha düşük riskli — hiçbir alias kaybolmaz.
+
+-- =============================================================================
+-- ADIM 5 — Kopya gruplarını tek doğru değere hizala
+-- =============================================================================
+-- Kanonik değer seçimi:
+--   normalized → Türkçe karakter İÇEREN yazım tercih edilir. Gerekçe: bir değer
+--                ASCII'ye indirgenmiş haliyle AYNI ise ('Istanbul'), zaten
+--                bozulmuş demektir; farklıysa ('İstanbul') orijinaldir.
+--   district   → önce NOT NULL, sonra aynı Türkçe-karakter kuralı.
+
+-- 5.1 — ÖNCE BAK: ne değişecek? (hiçbir şey yazmaz)
+WITH kanonik AS (
+  SELECT translate(lower(replace(alias, 'İ', 'i')), 'ıçğöşü', 'icgosu') AS norm_alias,
+         (array_agg(normalized ORDER BY
+            (normalized <> translate(normalized, 'ıçğöşüİĞÜŞÖÇ', 'icgosuIGUSOC')) DESC,
+            normalized))[1] AS y_normalized,
+         (array_agg(district ORDER BY
+            (district IS NOT NULL) DESC,
+            (district <> translate(district, 'ıçğöşüİĞÜŞÖÇ', 'icgosuIGUSOC')) DESC,
+            district))[1] AS y_district
+  FROM public.aliases
+  WHERE type = 'city' AND is_active = true
+  GROUP BY 1
+)
+SELECT a.id, a.alias,
+       a.normalized AS eski_normalized, k.y_normalized,
+       a.district   AS eski_district,   k.y_district
+FROM public.aliases a
+JOIN kanonik k
+  ON translate(lower(replace(a.alias, 'İ', 'i')), 'ıçğöşü', 'icgosu') = k.norm_alias
+WHERE a.type = 'city' AND a.is_active = true
+  AND (a.normalized IS DISTINCT FROM k.y_normalized
+    OR a.district   IS DISTINCT FROM k.y_district)
+ORDER BY k.norm_alias, a.alias;
+
+-- 5.2 — SONRA UYGULA (5.1 çıktısı mantıklıysa yorumu kaldır):
+-- WITH kanonik AS (
+--   SELECT translate(lower(replace(alias, 'İ', 'i')), 'ıçğöşü', 'icgosu') AS norm_alias,
+--          (array_agg(normalized ORDER BY
+--             (normalized <> translate(normalized, 'ıçğöşüİĞÜŞÖÇ', 'icgosuIGUSOC')) DESC,
+--             normalized))[1] AS y_normalized,
+--          (array_agg(district ORDER BY
+--             (district IS NOT NULL) DESC,
+--             (district <> translate(district, 'ıçğöşüİĞÜŞÖÇ', 'icgosuIGUSOC')) DESC,
+--             district))[1] AS y_district
+--   FROM public.aliases
+--   WHERE type = 'city' AND is_active = true
+--   GROUP BY 1
+-- )
+-- UPDATE public.aliases a
+-- SET normalized = k.y_normalized,
+--     district   = k.y_district
+-- FROM kanonik k
+-- WHERE translate(lower(replace(a.alias, 'İ', 'i')), 'ıçğöşü', 'icgosu') = k.norm_alias
+--   AND a.type = 'city' AND a.is_active = true
+--   AND (a.normalized IS DISTINCT FROM k.y_normalized
+--     OR a.district   IS DISTINCT FROM k.y_district);
+
+-- 5.3 — DOĞRULAMA: 4.2'yi tekrar çalıştır, artık BOŞ dönmeli.
+--       Ayrıca district çelişkisi de kalmamalı:
+-- SELECT translate(lower(replace(alias, 'İ', 'i')), 'ıçğöşü', 'icgosu') AS norm_alias,
+--        array_agg(DISTINCT normalized) AS n, array_agg(DISTINCT district) AS d
+-- FROM public.aliases WHERE type='city' AND is_active = true
+-- GROUP BY 1 HAVING count(DISTINCT normalized) > 1 OR count(DISTINCT district) > 1;
+
+-- =============================================================================
+-- ADIM 6 — Geçmiş ilanlarda 'Istanbul' / 'İstanbul' karışıklığı
+-- =============================================================================
+-- Alias düzeltilse bile GEÇMİŞTE kaydedilmiş ilanlar bozuk kalır. Önce ölç:
+-- SELECT origin_city, count(*) FROM public.listings
+-- WHERE origin_city IN ('Istanbul','İstanbul') GROUP BY 1;
+-- (aynısını destination_city için de çalıştır)
+-- Sayı anlamlıysa UPDATE ile 'İstanbul'a çevrilmeli. ⚠️ ÖNCE ölç, sonra karar ver.
+
+-- =============================================================================
 -- NOT — Kalıcı çözüm
 -- =============================================================================
 -- İlçe adları il adı olmadan tek başına güvenilmez. Uzun vadede ilçe alias'ları
 -- yalnızca yanında il geçtiğinde (bigram) eşleşmeli; `findPlaces` bigram desteği
 -- zaten var, tekil ilçe eşleşmesini `priority` ile zayıflatmak da bir seçenek.
--- Ayrıca alias yazımı DB'ye girerken normalize edilmeli ki kopyalar hiç oluşmasın.
+-- Ayrıca alias yazımı DB'ye girerken normalize edilmeli ki kopyalar hiç oluşmasın:
+-- `aliases` üzerine BEFORE INSERT/UPDATE trigger + normalize edilmiş forma UNIQUE
+-- indeks konursa 'Gebze'/'GEBZE'/'gebze' üçlüsü bir daha oluşamaz. ADIM 5 mevcut
+-- kopyaların ZARARINI keser ama YENİSİNİN oluşmasını engellemez.

@@ -28,6 +28,34 @@ export default function PublicIlanListesi() {
   const [ustYapi, setUstYapi] = useState('');
   const [arama, setArama] = useState('');
 
+  // SPRINT_01 L1f — bu sayfa da anasayfa gibi numarayı HTML'e gömüyordu (`tel:` href).
+  // Sayfa herkese açık; anon key ile `contact_phone` çekmek = numarayı misafire vermek.
+  // Numara artık tıklama anında authed endpoint'ten alınıyor, state'te tutulmuyor.
+  const [telBekleyen, setTelBekleyen] = useState<string | null>(null);
+  const [telHata, setTelHata] = useState('');
+
+  async function araTikla(e: React.MouseEvent, ilanId: string) {
+    e.preventDefault();
+    if (telBekleyen) return;
+    setTelBekleyen(ilanId);
+    setTelHata('');
+    try {
+      const res = await fetch(`/api/ilan/${ilanId}/telefon`);
+      const veri = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        if (res.status === 401) { window.location.assign(`/giris?redirect=/ilan/${ilanId}`); return; }
+        if (veri?.redirect) { window.location.assign(veri.redirect); return; }
+        setTelHata(veri?.error || 'Numara alınamadı');
+        return;
+      }
+      window.location.assign(`tel:${veri.telefon}`);
+    } catch {
+      setTelHata('Bağlantı hatası');
+    } finally {
+      setTelBekleyen(null);
+    }
+  }
+
   useEffect(() => {
     async function getIlanlar() {
       const { data: kullanici } = await supabase
@@ -43,9 +71,10 @@ export default function PublicIlanListesi() {
 
       const { data } = await supabase
         .from('listings')
+        // ⚠️ SPRINT_01 L1f — `contact_phone` BURADA ÇEKİLMEZ (anon key + herkese açık sayfa).
         .select(`
           id, listing_type, origin_city, origin_district,
-          contact_phone, price_offer, source, created_at,
+          price_offer, source, created_at,
           vehicle_type, body_type, notes, carrier_note,
           available_date, date_flexible, completed_at,
           listing_stops (
@@ -70,7 +99,7 @@ export default function PublicIlanListesi() {
           .sort((a: any, b: any) => a.stop_order - b.stop_order)
           .map((s: any) => ({ sehir: s.city, ilce: s.district || '', ton: s.weight_ton, palet: s.pallet_count, arac_adet: s.vehicle_count })),
         sure: new Date(ilan.created_at).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }),
-        tel: ilan.contact_phone,
+        // tel alanı bilinçli olarak yok — bkz. yukarıdaki L1f notu.
         fiyat: ilan.price_offer,
         aracTipleri: (ilan.vehicle_type || []) as string[],
         ustyapilari: (ilan.body_type || []) as string[],
@@ -208,10 +237,13 @@ export default function PublicIlanListesi() {
                       {ilan.notes && <div style={{ color: '#8b949e', fontSize: '0.78rem', marginTop: 8 }}>📝 {ilan.notes}</div>}
                       <div style={{ color: '#4b5563', fontSize: '0.7rem', marginTop: 8 }}>{ilan.sure}</div>
                     </div>
-                    <a href={`tel:${ilan.tel}`}
-                      style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#14532d', color: '#22c55e', border: '1px solid #166634', borderRadius: 7, padding: '8px 16px', fontSize: '0.85rem', fontWeight: 700, textDecoration: 'none', whiteSpace: 'nowrap', flexShrink: 0 }}>
-                      📞 Ara
-                    </a>
+                    <div style={{ flexShrink: 0 }}>
+                      <button onClick={e => araTikla(e, ilan.id)} disabled={telBekleyen === ilan.id}
+                        style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#14532d', color: '#22c55e', border: '1px solid #166634', borderRadius: 7, padding: '8px 16px', fontSize: '0.85rem', fontWeight: 700, whiteSpace: 'nowrap', cursor: telBekleyen === ilan.id ? 'wait' : 'pointer', opacity: telBekleyen === ilan.id ? 0.6 : 1 }}>
+                        {telBekleyen === ilan.id ? '⏳ …' : '📞 Ara'}
+                      </button>
+                      {telHata && telBekleyen === null && <div style={{ color: '#f87171', fontSize: '0.68rem', marginTop: 4, maxWidth: 150 }}>{telHata}</div>}
+                    </div>
                   </div>
                 </div>
               );

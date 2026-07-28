@@ -191,26 +191,60 @@ function aliasEslesiyorMu(
 }
 
 // Sync version — DB çağrısı yok, tüm veriler bellekte
-function gatekeeper_sync(message: string, aliases: any[]): { isAd: boolean; score: number; phones: string[]; cities: string[]; vehicles: string[] } {
+// ── Alias dizini ─────────────────────────────────────────────────────────────
+// `trNorm` 13 ayrı regex replace çalıştırır. Eskiden gatekeeper_sync HER MESAJ
+// için 1887 alias'ın tamamını yeniden normalize ediyordu (~1900 × N çağrı);
+// 5000 mesajlık bir dosyada bu ~9,5 milyon trNorm demekti ve süre bütçesini
+// tek başına yiyordu. Normalizasyon artık İSTEK BAŞINA bir kez yapılır.
+// `anahtar`: `normalized` değerinin trNorm'lanmış hali. Şehir tekilleştirmesi
+// BUNUNLA yapılır, ham `normalized` ile DEĞİL. Sebep: `aliases` tablosunda aynı
+// şehir iki yazımla kayıtlı ('Istanbul' 13 satır, 'İstanbul' 154 satır) ve ham
+// karşılaştırma bunları AYRI ŞEHİR sayıyordu — "avcılar kastamonu" geçen bir
+// mesaj 2 yerine 3 şehir buluyor, `foundCities.length >= 2` kuralı şişiyordu.
+type AliasKaydi = { norm: string; normalized: string; anahtar: string };
+type AliasDizini = { blacklist: string[]; sehir: AliasKaydi[]; arac: AliasKaydi[] };
+
+function aliasDiziniKur(aliases: any[]): AliasDizini {
+  const dizin: AliasDizini = { blacklist: [], sehir: [], arac: [] };
+  for (const a of aliases) {
+    const norm = trNorm(a.alias);
+    if (a.type === 'blacklist') dizin.blacklist.push(norm);
+    else if (a.type === 'city') dizin.sehir.push({ norm, normalized: a.normalized, anahtar: trNorm(a.normalized) });
+    else if (a.type === 'vehicle') dizin.arac.push({ norm, normalized: a.normalized, anahtar: trNorm(a.normalized) });
+  }
+  return dizin;
+}
+
+// `cityHits`/`vehicleHits` SADECE teşhis içindir: hangi şehri HANGİ alias'ın
+// tetiklediğini yazar ("İstanbul←tuzla"). Bunlar olmadan debug log'una bakıp
+// yanlış eşleşmenin kaynağını bulmak imkânsız — sadece sonucu görüyorduk.
+function gatekeeper_sync(message: string, dizin: AliasDizini): { isAd: boolean; score: number; phones: string[]; cities: string[]; vehicles: string[]; cityHits: string[]; vehicleHits: string[] } {
   const norm = trNorm(message);
   const phones = telefonlariCikar(message);
-  const blacklist = aliases.filter(a => a.type === 'blacklist').map(a => trNorm(a.alias));
-  for (const bl of blacklist) {
-    if (norm.includes(bl)) return { isAd: false, score: 0, phones: [], cities: [], vehicles: [] };
+  for (const bl of dizin.blacklist) {
+    if (norm.includes(bl)) return { isAd: false, score: 0, phones: [], cities: [], vehicles: [], cityHits: [], vehicleHits: [] };
   }
   const kume = tokenKumeleri(norm);
 
   const foundCities: string[] = [];
-  for (const ca of aliases) {
-    if (ca.type !== 'city') continue;
-    if (!aliasEslesiyorMu(trNorm(ca.alias), kume)) continue;
-    if (!foundCities.includes(ca.normalized)) foundCities.push(ca.normalized);
+  const cityHits: string[] = [];
+  const sehirGorulen = new Set<string>();
+  for (const ca of dizin.sehir) {
+    if (!aliasEslesiyorMu(ca.norm, kume)) continue;
+    if (sehirGorulen.has(ca.anahtar)) continue;   // ham `normalized` ile DEĞİL
+    sehirGorulen.add(ca.anahtar);
+    foundCities.push(ca.normalized);
+    cityHits.push(`${ca.normalized}←${ca.norm}`);
   }
   const foundVehicles: string[] = [];
-  for (const va of aliases) {
-    if (va.type !== 'vehicle') continue;
-    if (!aliasEslesiyorMu(trNorm(va.alias), kume)) continue;
-    if (!foundVehicles.includes(va.normalized)) foundVehicles.push(va.normalized);
+  const vehicleHits: string[] = [];
+  const aracGorulen = new Set<string>();
+  for (const va of dizin.arac) {
+    if (!aliasEslesiyorMu(va.norm, kume)) continue;
+    if (aracGorulen.has(va.anahtar)) continue;
+    aracGorulen.add(va.anahtar);
+    foundVehicles.push(va.normalized);
+    vehicleHits.push(`${va.normalized}←${va.norm}`);
   }
   let score = 0;
   score += phones.length > 0 ? 40 : 0;
@@ -218,7 +252,7 @@ function gatekeeper_sync(message: string, aliases: any[]): { isAd: boolean; scor
   score += foundCities.length >= 2 ? 20 : foundCities.length === 1 ? 10 : 0;
   score += foundCities.length >= 2 && foundVehicles.length > 0 ? 10 : 0;
   const isAd = phones.length > 0 && (foundVehicles.length > 0 || foundCities.length >= 2);
-  return { isAd, score, phones, cities: foundCities, vehicles: foundVehicles };
+  return { isAd, score, phones, cities: foundCities, vehicles: foundVehicles, cityHits, vehicleHits };
 }
 
 // NOT: Eskiden burada `repostListings()` vardı — repost tespit edilen mesaj için
@@ -298,13 +332,26 @@ export async function POST(request: NextRequest) {
       msgTimestamp: string;
       hash: string;
       phone: string | null;
-      gate: { isAd: boolean; score: number; phones: string[]; cities: string[]; vehicles: string[] };
+      gate: { isAd: boolean; score: number; phones: string[]; cities: string[]; vehicles: string[]; cityHits: string[]; vehicleHits: string[] };
     };
 
     let totalMessages = 0;
     let cozulemeyenZaman = 0;
     const rawCandidates: Omit<Candidate, 'hash'>[] = [];
+    // Vercel yanıt gövdesi tavanı ~4,5 MB. `debugLog` mesaj başına bir satır
+    // biriktirdiği için büyük ZIP'lerde bu tavanı aşıyor ve platform JSON değil
+    // düz 500 döndürüyordu (frontend: "JSON dönmedi"). Artık sınırlı.
+    const DEBUG_MAX = 300;
     const debugLog: string[] = [];
+    let debugAtlanan = 0;
+    let cutoffAtlanan = 0;
+    const debugEkle = (satir: string) => {
+      if (debugLog.length < DEBUG_MAX) debugLog.push(satir);
+      else debugAtlanan++;
+    };
+
+    // Alias normalizasyonu istek başına BİR KEZ (bkz. aliasDiziniKur yorumu).
+    const dizin = aliasDiziniKur(aliases);
 
     for (const fc of fileContents) {
       // parseChatTxt zaman damgasını sabit +03:00 varsayarak çözer; sunucu (UTC) ile
@@ -315,14 +362,19 @@ export async function POST(request: NextRequest) {
       cozulemeyenZaman += cz;
       for (const msg of mesajlar) {
         if (msg.tarih < cutoff) {
-          debugLog.push(`SKIP cutoff: ${msg.timestamp}`);
+          // Eskiden her biri debugLog'a satır yazıyordu; saat filtresi dar
+          // olduğunda mesajların ÇOĞU buraya düşer ve log şişerdi. Artık sayılır.
+          cutoffAtlanan++;
           continue;
         }
         const msgDate = msg.yerelTarih;
         const msgTimestamp = msg.tarih.toISOString();
 
-        const gate = gatekeeper_sync(msg.message, aliases);
-        debugLog.push(`MSG ${msgDate} | isAd=${gate.isAd} score=${gate.score} phones=${gate.phones.length} cities=${gate.cities.join(',')} vehicles=${gate.vehicles.join(',')} | ${msg.message.slice(0, 60).replace(/\n/g, ' ')}`);
+        const gate = gatekeeper_sync(msg.message, dizin);
+        // 60 karakterlik önizleme yetersizdi: çok satırlı toplu ilanlarda şehrin
+        // metnin neresinden geldiği görünmüyordu. 220 karakter + satır sonları
+        // görünür (⏎). DEBUG_MAX zaten toplam boyutu sınırlıyor.
+        debugEkle(`MSG ${msgDate} | isAd=${gate.isAd} score=${gate.score} phones=${gate.phones.length} cities=${gate.cityHits.join(',')} vehicles=${gate.vehicleHits.join(',')} | ${msg.message.slice(0, 220).replace(/\n/g, ' ⏎ ')}`);
         if (!gate.isAd || gate.score < 30) continue;
 
         rawCandidates.push({ msg, msgDate, msgTimestamp, phone: gate.phones[0] || null, gate });
@@ -337,6 +389,7 @@ export async function POST(request: NextRequest) {
         insert_failed: 0, errors: [] as string[],
         cutoff: cutoff.toISOString(), saat_filtre: saatFiltre,
         aliases_count: aliases.length, debug: debugLog,
+        debug_atlanan: debugAtlanan, cutoff_atlanan: cutoffAtlanan,
       });
     }
 
@@ -623,6 +676,9 @@ export async function POST(request: NextRequest) {
       saat_filtre: saatFiltre,
       aliases_count: aliases.length,
       debug: debugLog,
+      // debugLog kırpıldıysa kaç satırın atıldığı; yanıt boyutu tavanı için.
+      debug_atlanan: debugAtlanan,
+      cutoff_atlanan: cutoffAtlanan,
     });
   } catch (error: any) {
     structuredLog('ERROR', 'whatsapp-import', 'Import beklenmeyen hata', {

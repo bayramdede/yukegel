@@ -5,12 +5,19 @@ import { useRouter, useSearchParams } from 'next/navigation';
 
 const supabase = createClient();
 
+// SPRINT_01 A1 — bkz. app/giris/page.tsx'teki aynı fonksiyon.
+// Sessiz catch kaldırıldı; endpoint 404 dönerse artık konsolda görünür.
 async function authLog(event: string, method: string) {
-  await fetch('/api/auth/log', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ event, method }),
-  }).catch(() => {})
+  try {
+    const res = await fetch('/api/auth/log', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ event, method }),
+    })
+    if (!res.ok) console.warn('authLog başarısız:', res.status, event)
+  } catch (e) {
+    console.warn('authLog isteği gönderilemedi:', event, e)
+  }
 }
 
 const KULLANICI_TIPLERI = [
@@ -77,6 +84,9 @@ function ProfilTamamlaIci() {
   const [aracUtsyapi, setAracUtsyapi] = useState<string[]>([]);
   const [yukleniyor, setYukleniyor] = useState(false);
   const [hata, setHata] = useState('');
+  // SPRINT_01 K1 — KVKK açık rıza. TCKN/VKN/telefon topluyoruz; onay alınmadan
+  // kayıt tamamlanamaz. Onay anı users.kvkk_onay_at'e yazılır.
+  const [kvkkOnay, setKvkkOnay] = useState(false);
 
   // Alan hataları
   const [telefonHata, setTelefonHata] = useState('');
@@ -211,53 +221,44 @@ function ProfilTamamlaIci() {
     telefonGecerli &&
     kimlikGecerli() &&
     sirketAdiGecerli() &&
-    aracGecerli;
+    aracGecerli &&
+    kvkkOnay;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!formGecerli) return;
+    // SPRINT_01 K1 — istemci tarafı disable'a güvenme, submit'te tekrar doğrula.
+    if (!kvkkOnay) { setHata('Devam etmek için KVKK metnini onaylamalısınız.'); return; }
     setYukleniyor(true);
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { setYukleniyor(false); return; }
 
-    const { error } = await supabase.from('users').upsert({
-      id: user.id,
-      email: user.email,
-      display_name: displayName.trim(),
-      user_type: userType,
-      phone: telefon,
-      phone_verified: telefonKilitli,
-      is_active: true,
-      ...(tckn ? { tckn } : {}),
-      ...(vkn ? { vkn } : {}),
-      ...(sirketAdi.trim() ? { company_name: sirketAdi.trim() } : {}),
-    }, { onConflict: 'id' });
+    // SPRINT_01 K2 — upsert ARTIK BURADA DEĞİL.
+    // Eskiden istemci doğrudan `supabase.from('users').upsert({...})` çağırıyordu; gövdeye
+    // `role: 'admin'` eklemek devtools açmak kadar kolaydı ve RLS bunu engellemiyor
+    // (satır kendisinin, kolon kısıtı yok). Artık gövde sunucudaki beyaz listeden geçiyor.
+    const sonuc = await profilKaydet({
+      displayName,
+      userType,
+      telefon,
+      telefonKilitli,
+      tckn: tckn || undefined,
+      vkn: vkn || undefined,
+      sirketAdi: sirketAdi || undefined,
+      kvkkOnay,
+      arac: userType === 'arac_sahibi' && aracPlaka && aracTipi
+        ? { plaka: aracPlaka, tip: aracTipi, utsyapi: aracUtsyapi }
+        : null,
+    });
 
-    if (error) {
-      // email unique constraint — bu kişinin başka (eski) bir hesabı zaten var ama merge
-      // kontrolleri (giris/page.tsx, auth/callback/route.ts) onu yakalayamadı. Kullanıcıyı
-      // ham Postgres hatasıyla baş başa bırakmak yerine yönlendir.
-      if (error.message.includes('users_email_key')) {
-        setHata('Bu e-posta adresiyle zaten bir hesabınız var. Lütfen giriş yapın.');
-      } else {
-        setHata('Profil kaydedilemedi: ' + error.message);
-      }
+    if (!sonuc.ok) {
+      setHata(sonuc.hata);
       setYukleniyor(false);
       return;
     }
 
-    if (userType === 'arac_sahibi' && aracPlaka && aracTipi) {
-      await supabase.from('vehicles').insert({
-        user_id: user.id,
-        plate: aracPlaka.toUpperCase().replace(/\s/g, ''),
-        vehicle_type: aracTipi,
-        body_types: aracUtsyapi,
-        is_active: true,
-      });
-    }
-
     await authLog('kayit_tamamlandi', userType);
-    router.push(redirect || '/panel');
+    // SPRINT_01 A7 — hedef tüketildi, cookie'yi temizle.
+    redirectCookieSil();
+    router.push(guvenliRedirect(redirect) ?? guvenliRedirect(redirectCookieOku()) ?? '/panel');
     setYukleniyor(false);
   }
 
@@ -477,6 +478,31 @@ function ProfilTamamlaIci() {
                 )}
               </div>
             )}
+
+            {/* SPRINT_01 K1 — KVKK açık rıza onayı (zorunlu) */}
+            <label style={{
+              display: 'flex', alignItems: 'flex-start', gap: 10, marginTop: 18, marginBottom: 12,
+              padding: '12px 14px', background: '#0d1117', border: `1px solid ${kvkkOnay ? '#166534' : '#30363d'}`,
+              borderRadius: 8, cursor: 'pointer',
+            }}>
+              <input
+                type="checkbox"
+                checked={kvkkOnay}
+                onChange={e => { setKvkkOnay(e.target.checked); if (e.target.checked) setHata(''); }}
+                style={{ marginTop: 2, width: 16, height: 16, accentColor: '#22c55e', cursor: 'pointer', flexShrink: 0 }}
+              />
+              <span style={{ color: '#8b949e', fontSize: '0.8rem', lineHeight: 1.55 }}>
+                <a href="/kvkk" target="_blank" rel="noopener noreferrer" style={{ color: '#22c55e', textDecoration: 'underline' }}>
+                  KVKK Aydınlatma Metni
+                </a>
+                {' ve '}
+                <a href="/kullanim-kosullari" target="_blank" rel="noopener noreferrer" style={{ color: '#22c55e', textDecoration: 'underline' }}>
+                  Kullanım Koşulları
+                </a>
+                &apos;nı okudum; kimlik ve iletişim bilgilerimin platform hizmetleri kapsamında
+                işlenmesini onaylıyorum.
+              </span>
+            </label>
 
             {hata && <div style={{ color: '#ef4444', fontSize: '0.82rem', marginBottom: 10 }}>⚠️ {hata}</div>}
 

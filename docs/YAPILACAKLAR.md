@@ -1,6 +1,6 @@
 # Yükegel — Yapılacaklar Listesi
 
-> Son güncelleme: 28 Temmuz 2026 (Landing / Kayıt / Giriş analizi)  
+> Son güncelleme: 28 Temmuz 2026 (SPRINT_01 **W0 tamamlandı** — telefon sızıntısı 4 yüzeyde kapatıldı, Google merge çözüldü, KVKK onayı eklendi. ⏳ `docs/20260728_kvkk_onay.sql` bekliyor.)  
 > Bu dosya tüm geçmiş sohbetler taranarak oluşturulmuştur.
 
 ---
@@ -153,7 +153,10 @@ Tam analiz: `docs/WHATSAPP_IMPORT_ANALIZ.md` (bulgu kodları A1–A5, B1–B8, C
 - [x] **23505 fırtınasının asıl sebebi kapatıldı** — batch-içi dedup anahtarı `hash__tarih`'e çekildi (DB indeksiyle birebir); `existingMap` `post_date` üzerinden kuruluyor; kurtarma bloğu artık `(clean_hash, post_date)` çiftine bakıyor (önceden sadece `clean_hash`'e bakıp başka güne ait meşru repost'ları da eliyordu).
 - [x] **Telefon geriye-doldurma ayrıldı** — `POST /api/raw-posts/telefon-doldur`. İçe aktarmanın doğruluğunu etkilemiyordu ama satır başına 2 UPDATE ile bütçeyi yiyordu. Telefon regex'i `lib/whatsapp/telefon.ts`'e alındı.
 - [x] **Gatekeeper substring eşleşmesi düzeltildi** (28 Tem 2026) — `norm.includes(alias)` yerine token eşitliği + ek soyma. `"lojistik"→İstanbul`, `"getirin"→TIR`, `"balyası"→Balıkesir` gibi sahte eşleşmeler bitti.
-- [ ] **Alias tablosunda KOPYA kayıtlar** (28 Tem 2026) — aynı alias birden çok yazımla kayıtlı (`Gebze`/`GEBZE`/`gebze`, `Çorlu`/`çorlu`/`corlu`, `izmir`/`izmır`). Eşleşmeyi bozmuyor (`trNorm` aynılaştırıyor) ama `district` kolonu kopyalar arasında tutarsız; `findPlaces` ilk eşleşmeyi aldığı için **ilçe bilgisi sıraya bağlı olarak kayboluyor**. Teşhis: `docs/20260728_alias_homonim_temizligi.sql` ADIM 4. Kalıcı çözüm: alias DB'ye girerken normalize edilmeli.
+- [ ] **Alias tablosunda KOPYA kayıtlar — ÖLÇÜLDÜ, yüzlerce grup** (28 Tem 2026). İki ayrı zarar: (a) `avcilar` ve `hadimkoy` alias'larında `normalized` çelişiyor — `Istanbul` vs `İstanbul`. Şehir doğru ama yazım tutarsız; `normalized` ilana yazılan değer olduğu için şehir filtresi bunları iki ayrı şehir sayıyor. (b) `district` çelişkisi çok daha yaygın: onlarca grupta kopyaların biri dolu diğeri NULL (`gebze`, `çorlu`, `torbalı`, `alanya`, `çiğli`, `sincan`...), ayrıca yazım farkları (`Avcilar`/`Avcılar`, `Kirkağaç`/`Kırkağaç`, `Kazan`/`Kahramankazan`). `findPlaces` ilk eşleşmeyi aldığı için **ilçe bilgisi sıraya bağlı olarak kayboluyor**. Çözüm: kopya SİLİNMEYECEK — `docs/20260728_alias_homonim_temizligi.sql` ADIM 5 ile her gruptaki tüm satırlara aynı doğru `normalized`+`district` yazılacak (5.1 önizleme → 5.2 UPDATE → 5.3 doğrulama). Sonra ADIM 6: geçmiş `listings` satırlarındaki `Istanbul`/`İstanbul` karışıklığı ölçülüp düzeltilmeli. Kalıcı çözüm: `aliases` üzerine normalize trigger + normalize forma UNIQUE indeks, yoksa kopyalar yeniden oluşur.
+- [ ] **SAHTE GÜZERGÂH — `Istanbul` vs `İstanbul`** (28 Tem 2026, YENİ BULGU). `findPlaces` içindeki `seen` kümesi `normalized` DEĞERİYLE tutuluyor. `aliases` tablosunda 13 satır `Istanbul` (Türkçe karakteri düşmüş), 154 satır `İstanbul` yazıyor — bunlar AYRI iki değer. İçinde hem `avcilar` (→`Istanbul`) hem `kadıköy` (→`İstanbul`) geçen mesaj İKİ ŞEHİR bulmuş sayılıp **İstanbul→İstanbul güzergâhı** üretiyor. Aynı sorun `Izmir`/`İzmir`, `Mugla`/`Muğla`, `Bingol`/`Bingöl`'de de var. Düzeltme: `docs/20260728_alias_kopya_temizligi.sql` BÖLÜM 1. Sonrasında geçmiş `listings` için BÖLÜM 6 (`origin_city = destination_city` olanları da say).
+- [ ] **`payas` yanlış ile yazılıyor** (28 Tem 2026). `aliases` id=1003 `Payas → Adana` diyor; Payas 2008'den beri **Hatay** ilçesi. Doğru satır (id=1844, Hatay) da var ama `findPlaces` küçük id'yi seçtiği için bugün her "payas" ilanı Adana'ya yazılıyor. Düzeltme: aynı dosya BÖLÜM 4.1.
+- [ ] **Belirsiz alias'lar: `gölbaşı`, `kemalpaşa`** (28 Tem 2026). İkisi de iki farklı ile ait gerçek yer adı; tek kelimeyle ayırt edilemiyor. `araç` ile aynı mantıkla baskın olmayanı pasifleştirilmeli. Düzeltme: aynı dosya BÖLÜM 4.5 / 4.6.
 - [ ] **Alias homonim temizliği — ölçüldü, tek suçlu `araç`** (28 Tem 2026). 3000 mesajın 580'inde (%19) geçiyor, sıralamada Bursa'nın üstünde; `Kastamonu/Araç` ilçesi ama metinde "vasıta" anlamında. `olur`/`merkez`/`pazar` ilk 40'a girmedi. Kalan: `docs/20260728_alias_homonim_temizligi.sql` ADIM 3 ile `is_active = false`.
 - [ ] **Gatekeeper düzeltmesi sonrası ölçüm** — düzeltme öncesi `isAd` fiilen "telefon var mı" idi, yani geçmişte kaydedilen bir kısım `raw_posts` aslında ilan değil. Düzeltilmiş kodla aynı dosya yeniden içe aktarılıp `kaydedilen` sayısındaki düşüş ölçülmeli; büyük düşüş varsa eski kayıtlar için temizlik gerekebilir.
 - [x] **1000 satır sessiz kesilmesi kapatıldı** (28 Tem 2026) — `aliases` (1887 aktif satır) hem `whatsapp-parse` gatekeeper'ında hem `parse-listing` edge fonksiyonunda tek sorguyla çekiliyordu; PostgREST 1000'de kesiyordu. İkisi de `.range()` + `.order('id')` ile sayfalandı. ⚠️ `parse-listing` bir Edge Function — ayrıca `supabase functions deploy parse-listing` gerekiyor.
@@ -177,16 +180,32 @@ değişikliği içermiyor — yalnızca statik okuma. Canlı DB/RLS doğrulamas�
 > Her maddede dosya:satır, kabul kriteri, efor ve bağımlılık var. Aşağıdaki liste bulgu
 > envanteri; **çalışma sırası için SPRINT_01.md'yi kullan.**
 >
-> W0 (blocker, 17p): L1 · A2 · **M1** · K1  —  W1 (auth bütünlüğü, 21p): A1 · A3 · A4 · A7 · K2 · **R1** · **C1**
+> ~~W0 (blocker, 17p): L1 · A2 · **M1** · K1~~ **✅ TAMAMLANDI (28 Tem 2026)**
+> W1 (auth bütünlüğü, 21p): **L1e** · A1 · A3 · A4 · A7 · K2 · **R1** · **C1**
 > W2 (güvenlik, 15p): **G1** · **G2** · **M2** · **C2** · K2b  —  W3 (SEO/huni, 14p): **S1–S4** · L2 · L3
 > W4 (cila, 11p): K3 · **R2** · **F1** · **F2** · L4 · L5 · A5 · A6
 
-### 🔴 Yeni kritik bulgu (geniş tarama, 28 Tem 2026)
-- [ ] **M1** — `/moderator-giris` çıkış yapmışken **erişilemiyor**. `proxy.ts:19` `KORUNMALI`
-      listesinde `/moderator` var ve `:72` `startsWith` kullanıyor →
-      `'/moderator-giris'.startsWith('/moderator') === true`. `ACIK_ROTALAR`'da da yok.
-      Oturumsuz moderatör kendi giriş ekranına ulaşamıyor, `/giris?redirect=/moderator-giris`'e
-      atılıyor. Düzeltme: `ACIK_ROTALAR`'a `/moderator-giris` ekle + prefix'i `/moderator/` yap.
+### ✅ W0 — Tamamlandı (28 Tem 2026)
+- [x] **L1** — Telefon sızıntısı. `app/page.tsx` ISR'li olduğu için "misafirse gizle" yapılamadı;
+      numara payload'dan tamamen çıkarıldı, `/api/ilan/[id]/telefon` üzerinden veriliyor.
+- [x] **L1b** — `app/api/ilan/[id]/telefon/route.ts` *(yeni)* — authed + `logPhoneAccess` + 20/dk.
+- [x] **L1c** — `/ilan/[id]`: wa.me linki ve `Aksiyonlar` prop'u `user && profilTamamlandi`'ya bağlandı.
+- [x] **L1d** — `/ilan/[id]/sahiplen` sahiplenilmemiş **her** ilanın numarasını gösteriyordu.
+      Yeni `app/api/ilan/[id]/sahiplen/route.ts`: maskeli görüntü + OTP sunucuda.
+- [x] **L1f** — `/u/[username]` de `tel:` href ile numarayı gömüyordu; `araTikla`'ya çevrildi.
+- [x] **A2** — Google merge 404'ü. Callback artık `/giris?merge_user_id=…`'ye gidiyor.
+- [x] **A2b** — Merge route'unda 3 bug: `if (yeniProfil)` guard'ı profili siliyordu,
+      tekil alanlar `users_email_key` ihlali yaratıyordu, `auth_providers`'a `'phone'` hardcode'du.
+- [x] **M1** — `proxy.ts` artık segment sınırında eşleştiriyor (`korunmaliMi()`).
+- [x] **K1** — KVKK açık rıza checkbox'ı + `users.kvkk_onay_at`.
+- [ ] **K1b** ⏳ **BAYRAM:** `docs/20260728_kvkk_onay.sql` çalıştırılmalı — **deploy'dan önce.**
+- [x] **A4b-hane** — `sahiplen` OTP girişi 6 hane bekliyordu, Twilio 4 gönderiyor → akış
+      fiilen tamamlanamıyordu. 4'e çekildi.
+
+### 🔴 W0'dan devreden — DB katmanı
+- [ ] **L1e** — `anon` rolü hâlâ `listings.contact_phone`'u PostgREST üzerinden okuyabiliyor.
+      Uygulama katmanı kapandı, DB katmanı açık. Revoke öncesi `panel/page.tsx`,
+      `panel/IlanYonetim.tsx`, `moderator/page.tsx` sorguları service-role'e taşınmalı.
 
 ### 🟠 Diğer yeni bulgular
 - [ ] **M2** — `app/moderator-giris/page.tsx:20-30` giriş sonrası rol kontrolü yok; normal

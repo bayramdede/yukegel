@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import { logPhoneAccess } from './lib/logger'
+import { REDIRECT_COOKIE, REDIRECT_COOKIE_MAX_AGE, guvenliRedirect } from './lib/redirect'
 
 const ACIK_ROTALAR = [
   '/giris',
@@ -25,6 +26,36 @@ const KORUNMALI = ['/panel', '/ilan-ver', '/araclarim', '/profil', '/moderator']
 // geçerli. Segment sınırında eşleştir: tam eşleşme veya `kok + '/'`.
 function korunmaliMi(pathname: string): boolean {
   return KORUNMALI.some(kok => pathname === kok || pathname.startsWith(kok + '/'));
+}
+
+/**
+ * SPRINT_01 A7 — /giris URL'i üret, kullanıcının gitmek istediği yeri KAYBETME.
+ *
+ * Eskiden üç ayrı yerde elle URL kuruluyordu ve ikisi (`?hesap=tasindi`,
+ * `?hesap=eslesme`) redirect'i tamamen düşürüyordu: kullanıcı `/ilan-ver`'e
+ * tıklıyor, hesap birleştirme akışından geçiyor, sonunda anasayfaya bırakılıyordu.
+ * Üçüncüsü de `pathname`'i encode etmiyordu — query string'li yollar (`/panel?sekme=ilanlar`)
+ * bozuluyordu.
+ */
+function girisYonlendir(request: NextRequest, hesap?: 'tasindi' | 'eslesme'): NextResponse {
+  const { pathname, search } = request.nextUrl;
+  const url = new URL('/giris', request.url);
+  const hedef = guvenliRedirect(pathname + search);
+  if (hedef) url.searchParams.set('redirect', hedef);
+  if (hesap) url.searchParams.set('hesap', hesap);
+
+  const yanit = NextResponse.redirect(url);
+  // Query param Google OAuth / magic-link zincirinde kayboluyor; cookie sağ çıkar.
+  // httpOnly DEĞİL: /giris sayfası client tarafında da okuyup temizliyor.
+  // Değer `guvenliRedirect`'ten geçmiş göreli bir yol, hassas veri değil.
+  if (hedef) {
+    yanit.cookies.set(REDIRECT_COOKIE, hedef, {
+      path: '/',
+      maxAge: REDIRECT_COOKIE_MAX_AGE,
+      sameSite: 'lax',
+    });
+  }
+  return yanit;
 }
 
 export async function proxy(request: NextRequest) {
@@ -79,7 +110,7 @@ export async function proxy(request: NextRequest) {
   }
 
   if (!user && korunmaliMi(pathname)) {
-    return NextResponse.redirect(new URL(`/giris?redirect=${pathname}`, request.url));
+    return girisYonlendir(request);
   }
 
   if (user) {
@@ -100,7 +131,7 @@ export async function proxy(request: NextRequest) {
       // buraya atıyor). Çözüm: ölü oturumun sb- cookie'lerini TEMİZLE ve temiz giriş
       // ekranına gönder. Kullanıcı Google ile yeniden girer (PKCE → /auth/callback →
       // cookie doğru set edilir → /panel).
-      const clearResponse = NextResponse.redirect(new URL('/giris?hesap=tasindi', request.url));
+      const clearResponse = girisYonlendir(request, 'tasindi');
       request.cookies.getAll().forEach(({ name }) => {
         if (name.startsWith('sb-')) clearResponse.cookies.delete(name);
       });
@@ -134,7 +165,7 @@ export async function proxy(request: NextRequest) {
           .neq('id', user.id)
           .limit(1);
         if (canliHesaplar?.[0]?.user_type) {
-          return NextResponse.redirect(new URL('/giris?hesap=eslesme', request.url));
+          return girisYonlendir(request, 'eslesme');
         }
       }
 
@@ -143,7 +174,10 @@ export async function proxy(request: NextRequest) {
         viewerId: user.id,
         profileCompleted: false,
       })
-      return NextResponse.redirect(new URL(`/profil-tamamla?redirect=${encodeURIComponent(pathname)}`, request.url));
+      // SPRINT_01 A7 — query string de korunsun (`/panel?sekme=ilanlar` gibi).
+      const ptUrl = new URL('/profil-tamamla', request.url);
+      ptUrl.searchParams.set('redirect', pathname + request.nextUrl.search);
+      return NextResponse.redirect(ptUrl);
     }
   }
 
