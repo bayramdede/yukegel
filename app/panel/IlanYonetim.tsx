@@ -88,15 +88,19 @@ function Bolum({ baslik, renk, soluk, children }: { baslik: string; renk: string
 
 function IlanKart({ ilan, onGuncelle }: { ilan: any; onGuncelle: (id: string, patch: any) => void }) {
   const [duzenle, setDuzenle] = useState(false);
+  const [kartHata, setKartHata] = useState('');
   const isYuk = ilan.listing_type === 'yuk';
   const tamamlandi = !!ilan.completed_at;
   const stops = [...(ilan.listing_stops || [])].sort((a: any, b: any) => a.stop_order - b.stop_order);
   const ilkStop = stops[0];
 
   async function tamamlandiToggle() {
-    const val = tamamlandi ? null : new Date().toISOString();
-    await supabase.from('listings').update({ completed_at: val }).eq('id', ilan.id);
-    onGuncelle(ilan.id, { completed_at: val });
+    setKartHata('');
+    const sonuc = await ilanTamamlandiToggle(ilan.id, !tamamlandi);
+    // Eskiden hata sessizce yutuluyordu: buton "çalıştı" gibi görünüp sayfa
+    // yenilenince eski hale dönüyordu.
+    if (!sonuc.ok) { setKartHata(sonuc.hata); return; }
+    onGuncelle(ilan.id, { completed_at: sonuc.veri?.completed_at ?? null });
   }
 
   return (
