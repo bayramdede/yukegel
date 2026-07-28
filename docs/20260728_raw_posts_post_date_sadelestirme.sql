@@ -60,8 +60,65 @@ WHERE d.refobjid = 'public.raw_posts'::regclass
   );
 
 -- =============================================================================
+-- ⛔ ADIM 0 SONUCU (28 Tem 2026): 1453 / 59533 satır AYRIŞMIŞ
+-- =============================================================================
+-- Beklenen 0 idi, çıkan 1453 (%2,4). Yani `post_date` ile `message_date` her zaman
+-- aynı DEĞİL — kolonlardan biri bir yerlerde farklı yazılıyor ya da geçmişte
+-- farklı yazılmış. ADIM 1'e GEÇME; önce aşağıdaki 0b teşhis sorguları çalıştırılıp
+-- ayrışmanın karakteri anlaşılmalı.
+--
+-- Neden önemli: unique indeksi `message_date` üzerine taşımak, bu 1453 satırın
+-- benzersizlik davranışını değiştirir. İki olasılık var ve tedavileri farklı:
+--   (a) post_date NULL, message_date dolu → bu satırlar bugün hash_day indeksinin
+--       DIŞINDA (btree'de NULL'lar birbirinden farklı sayılır). Taşıma sonrası
+--       ANİDEN kural kapsamına girerler; aralarında kopya varsa
+--       CREATE UNIQUE INDEX komutu hata verir (zararsız ama iş durur).
+--   (b) İkisi de dolu ama farklı gün → hangisinin "doğru" tarih olduğuna karar
+--       vermeden taşıma yapılırsa yanlış tarih otorite olur.
+
+-- =============================================================================
+-- ADIM 0b — TEŞHİS (ADIM 1'den önce çalıştır)
+-- =============================================================================
+
+-- 0b.1 — Ayrışma hangi karakterde ve hangi kaynaktan geliyor?
+SELECT
+  source,
+  count(*)                                                        AS adet,
+  count(*) FILTER (WHERE post_date IS NULL)                       AS post_date_bos,
+  count(*) FILTER (WHERE message_date IS NULL)                    AS message_date_bos,
+  count(*) FILTER (WHERE post_date IS NOT NULL
+                     AND message_date IS NOT NULL
+                     AND post_date <> message_date)               AS ikisi_dolu_farkli,
+  min(created_at)::date                                           AS ilk_kayit,
+  max(created_at)::date                                           AS son_kayit
+FROM public.raw_posts
+WHERE post_date IS DISTINCT FROM message_date
+GROUP BY source
+ORDER BY adet DESC;
+
+-- 0b.2 — Gözle görmek için örnek satırlar
+SELECT id, source, post_date, message_date, message_timestamp, created_at
+FROM public.raw_posts
+WHERE post_date IS DISTINCT FROM message_date
+ORDER BY created_at DESC
+LIMIT 20;
+
+-- 0b.3 — ⚠️ BELİRLEYİCİ SORU: yeni indeks kurulabilir mi?
+--        Bu sorgu SATIR DÖNDÜRÜRSE `CREATE UNIQUE INDEX ... (clean_hash, message_date)`
+--        "could not create unique index" ile BAŞARISIZ olur. Önce bu kopyalar
+--        temizlenmeli ya da taşımadan vazgeçilmeli.
+SELECT clean_hash, message_date, count(*) AS kopya_adedi
+FROM public.raw_posts
+WHERE clean_hash IS NOT NULL
+GROUP BY clean_hash, message_date
+HAVING count(*) > 1
+ORDER BY count(*) DESC
+LIMIT 20;
+
+-- =============================================================================
 -- ADIM 1 — Yeni indeksi message_date üzerine kur
 -- =============================================================================
+-- ⛔ ADIM 0b sonuçları değerlendirilmeden ÇALIŞTIRMA.
 -- ⚠️ Supabase SQL editörü her çalıştırmayı bir TRANSACTION'a sarar; bu yüzden
 --    `CREATE INDEX CONCURRENTLY` orada ÇALIŞMAZ:
 --        ERROR: 25001: CREATE INDEX CONCURRENTLY cannot run inside a transaction block
