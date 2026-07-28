@@ -186,6 +186,28 @@ eklenmeli ya da `repostListings` kaldırılıp iş tamamen `parse-listing`'e bı
 Ayrıca kopyalanan ilanlar `moderation_status: 'pending'` ile açılıyor, yani her repost
 moderatör kuyruğunu şişiriyor. Orijinalin durumu `approved` ise korunmalı.
 
+**UYGULANAN ÇÖZÜM — ikinci seçenek (tek üretici = `parse-listing`):**
+`repostListings()` route'tan tamamen kaldırıldı. `parse-listing/index.ts` artık listing
+insert'ine `is_repost: rawPost.is_repost === true` ekleyerek bayrağı `raw_posts`'tan
+taşıyor. Route'taki `reposted` sayacı yalnızca raporlama amaçlı kaldı.
+
+Yan etkileri: repost ilanı artık orijinalin moderatör düzeltmelerini miras almıyor,
+metinden yeniden üretiliyor (parse-listing zaten çok-stop'lu ilanları doğru işliyor).
+`listing_stops` kopyalama kodu da gitti — N+1 insert yükü azaldı.
+
+**⚠️ Doğrulanması gereken tek varsayım:** trigger'ın koşulsuz (WHEN'siz) çalıştığı.
+Eğer trigger `is_repost` bazlı bir `WHEN` içeriyorsa repost satırları hiç ilan üretmez.
+Kontrol sorgusu:
+
+```sql
+SELECT tgname, pg_get_triggerdef(oid)
+FROM pg_trigger
+WHERE tgrelid = 'public.raw_posts'::regclass AND NOT tgisinternal;
+```
+
+`WHEN` yoksa mevcut kod doğrudur. `WHEN` varsa ve `is_repost` filtreliyorsa o koşul
+kaldırılmalıdır (repostListings'e geri dönmek yerine).
+
 ### B3 — Spam sayacı yükleme içindeki tekrarları görmüyor
 
 `phoneCountMap` sadece DB'deki son 1 saati sayıyor. Tek dosyada aynı numaradan 50 farklı
