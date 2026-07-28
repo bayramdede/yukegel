@@ -14,9 +14,18 @@ const ACIK_ROTALAR = [
   '/hakkimizda',
   '/kvkk',
   '/kullanim-kosullari',
+  '/moderator-giris',
 ];
 
 const KORUNMALI = ['/panel', '/ilan-ver', '/araclarim', '/profil', '/moderator'];
+
+// DİKKAT: düz `startsWith` kullanma. `/moderator-giris` gibi KARDEŞ rotalar `/moderator`
+// prefix'ine takılıp yanlışlıkla kilitleniyordu — oturumsuz moderatör kendi giriş ekranına
+// ulaşamıyordu (bkz. docs/SPRINT_01.md M1). Aynı tuzak `/profil` ↔ `/profil-tamamla` için de
+// geçerli. Segment sınırında eşleştir: tam eşleşme veya `kok + '/'`.
+function korunmaliMi(pathname: string): boolean {
+  return KORUNMALI.some(kok => pathname === kok || pathname.startsWith(kok + '/'));
+}
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
