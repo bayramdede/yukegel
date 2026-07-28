@@ -242,9 +242,9 @@ export default function SahiplenPage({ params }: { params: Promise<{ id: string 
               İlandaki telefon numarasına (<strong style={{ color: '#e2e8f0' }}>{maskeliTelefon || '…'}</strong>) SMS kodu göndereceğiz.
             </div>
             {hata && <div style={{ color: '#ef4444', fontSize: '0.82rem', marginBottom: 12 }}>⚠️ {hata}</div>}
-            <button type="button" onClick={otpGonder} disabled={islemYukleniyor}
-              style={{ width: '100%', padding: '12px', borderRadius: 8, border: 'none', background: islemYukleniyor ? '#166534' : '#22c55e', color: '#000', fontWeight: 800, fontSize: '1rem', cursor: 'pointer' }}>
-              {islemYukleniyor ? 'Gönderiliyor...' : 'SMS Kodu Gönder →'}
+            <button type="button" onClick={otpGonder} disabled={islemYukleniyor || bekleme > 0}
+              style={{ width: '100%', padding: '12px', borderRadius: 8, border: 'none', background: (islemYukleniyor || bekleme > 0) ? '#166534' : '#22c55e', color: '#000', fontWeight: 800, fontSize: '1rem', cursor: bekleme > 0 ? 'not-allowed' : 'pointer' }}>
+              {islemYukleniyor ? 'Gönderiliyor...' : bekleme > 0 ? `Tekrar göndermek için ${bekleme} sn` : 'SMS Kodu Gönder →'}
             </button>
           </div>
         )}
