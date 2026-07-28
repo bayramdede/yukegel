@@ -566,6 +566,13 @@ function GirisIci() {
                   style={{ width: '100%', padding: '12px', borderRadius: 8, border: 'none', background: otp.length === 4 ? '#22c55e' : '#166534', color: '#000', fontWeight: 800, fontSize: '1rem', cursor: 'pointer', marginBottom: 10 }}>
                   {yukleniyor ? 'Doğrulanıyor...' : 'Giriş Yap →'}
                 </button>
+                {/* SPRINT_01 A4b — kod gelmediyse tekrar iste, ama 60 sn bekleyerek.
+                    Eskiden bu buton hiç yoktu; kullanıcı "Telefonu değiştir" → aynı numara →
+                    "Kod Gönder" döngüsüyle sınırsız SMS tetikleyebiliyordu. */}
+                <button type="button" onClick={otpGonder} disabled={yukleniyor || bekleme > 0}
+                  style={{ width: '100%', padding: '10px', borderRadius: 8, border: '1px solid #30363d', background: 'none', color: bekleme > 0 ? '#4b5563' : '#60a5fa', fontSize: '0.85rem', cursor: bekleme > 0 ? 'not-allowed' : 'pointer', marginBottom: 8 }}>
+                  {bekleme > 0 ? `Kodu tekrar gönder (${bekleme} sn)` : 'Kodu tekrar gönder'}
+                </button>
                 <button type="button" onClick={() => { setOtpAdim(false); setOtp(''); temizle(); }}
                   style={{ width: '100%', padding: '10px', borderRadius: 8, border: '1px solid #30363d', background: 'none', color: '#8b949e', fontSize: '0.85rem', cursor: 'pointer' }}>
                   ← Telefonu değiştir
