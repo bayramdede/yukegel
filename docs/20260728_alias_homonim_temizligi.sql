@@ -84,16 +84,78 @@ LIMIT 40;
 -- dolu olan satırlar ilçe alias'ıdır ve yüksek sayı orada şüphelidir.
 
 -- =============================================================================
--- ADIM 3 — Pasifleştir (SİLME, is_active = false yeterli ve geri alınabilir)
+-- ADIM 2 SONUCU (28 Tem 2026) — tek suçlu: `araç`
 -- =============================================================================
--- ADIM 1/2 çıktısına bakıp listeyi daralttıktan SONRA çalıştır.
+-- İlk 40'ta homonim olarak SADECE `araç`/`arac` çıktı:
 --
+--   arac / araç → Kastamonu (ilçe: Araç)   3000 mesajın 580'inde  (%19)
+--
+-- Sıralamada Bursa'nın (534) ÜSTÜNDE. Bir ilçe adının il adlarını geçmesi tek
+-- başına yeterli kanıt. Listedeki diğer yüksek satırlar (Gebze 451, Çorlu 290,
+-- Torbalı 238, Esenyurt 233, Tuzla 219) gerçek nakliye merkezleri — meşru.
+-- `olur`, `merkez`, `pazar`, `perşembe` ilk 40'a girmedi; ADIM 1 ile ayrıca bak.
+
+-- =============================================================================
+-- ADIM 3 — `araç` alias'ını pasifleştir
+-- =============================================================================
+-- SİLME değil: is_active = false. Geri alınabilir ve alias geçmişi korunur.
+-- Kastamonu/Araç gerçekten geçtiğinde artık yakalanmaz; bu kabul edilen bedel.
+-- Alternatif (daha iyi ama iş gerektirir): yalnızca "kastamonu arac" bigram'ı
+-- olarak eşleşsin diye alias'ı iki kelimeye çevirmek.
+
+-- Önce gör:
+SELECT id, alias, normalized, district, is_active
+FROM public.aliases
+WHERE type = 'city' AND lower(alias) IN ('arac', 'araç');
+
+-- Sonra uygula:
 -- UPDATE public.aliases
 -- SET is_active = false
--- WHERE type = 'city'
---   AND lower(alias) IN ('arac','olur','merkez');   -- ← listeyi sen belirle
---
+-- WHERE type = 'city' AND lower(alias) IN ('arac', 'araç');
+
 -- GERİ ALMA: aynı WHERE ile is_active = true.
+
+-- =============================================================================
+-- ADIM 4 — Alias tablosundaki KOPYALAR (ayrı sorun, ayrı fayda)
+-- =============================================================================
+-- ADIM 2 çıktısı aynı alias'ın birden çok yazımla kayıtlı olduğunu gösterdi:
+--   Gebze / GEBZE / gebze,  Çorlu / çorlu / corlu,  izmir / izmır,
+--   Torbali / torbali / torbalı,  Tuzla / tuzla,  balıkesir / balikesir
+--
+-- `alias` kolonu unique olduğu için bunlar AYRI satırlar. Eşleşme sırasında
+-- `trNorm` hepsini aynı forma indirdiğinden YANLIŞ sonuç üretmezler — ama:
+--   • 1887 satırın önemli bir kısmı gereksiz (her mesajda baştan taranıyor),
+--   • `district` kolonu kopyalar arasında TUTARSIZ (birinde 'Gebze', diğerinde
+--     NULL). `findPlaces` ilk eşleşmeyi alıp `seen`'e eklediği için hangi kopyanın
+--     önce geldiğine göre İLÇE BİLGİSİ KAYBOLUYOR. Bu gerçek bir veri kaybı.
+
+-- 4.1 — Kopyaları gör (normalize edilmiş forma göre gruplanmış):
+SELECT translate(lower(replace(alias, 'İ', 'i')), 'ıçğöşü', 'icgosu') AS norm_alias,
+       count(*)                                        AS kopya,
+       array_agg(alias ORDER BY alias)                 AS yazimlar,
+       array_agg(DISTINCT normalized)                  AS normalized_degerleri,
+       array_agg(DISTINCT coalesce(district, '∅'))     AS district_degerleri
+FROM public.aliases
+WHERE type = 'city' AND is_active = true
+GROUP BY 1
+HAVING count(*) > 1
+ORDER BY count(*) DESC, 1
+LIMIT 50;
+
+-- 4.2 — TEHLİKELİ olanlar: kopyalar FARKLI `normalized` gösteriyorsa, hangisinin
+--       kazandığı sıraya bağlıdır → şehir yanlış atanabilir. Bu boş dönmeli.
+SELECT translate(lower(replace(alias, 'İ', 'i')), 'ıçğöşü', 'icgosu') AS norm_alias,
+       array_agg(DISTINCT normalized) AS celisen_normalized
+FROM public.aliases
+WHERE type = 'city' AND is_active = true
+GROUP BY 1
+HAVING count(DISTINCT normalized) > 1
+ORDER BY 1;
+
+-- 4.3 — Birleştirme fikri (ÖNCE 4.1/4.2 çıktısına bak, sonra karar ver):
+--   a) Her normalize form için TEK satır bırak; district'i dolu olanı tercih et.
+--   b) Kalanları is_active = false yap.
+-- Otomatik yazmadım: `normalized` çelişkisi varsa (4.2) elle karar gerekir.
 
 -- =============================================================================
 -- NOT — Kalıcı çözüm
@@ -101,3 +163,4 @@ LIMIT 40;
 -- İlçe adları il adı olmadan tek başına güvenilmez. Uzun vadede ilçe alias'ları
 -- yalnızca yanında il geçtiğinde (bigram) eşleşmeli; `findPlaces` bigram desteği
 -- zaten var, tekil ilçe eşleşmesini `priority` ile zayıflatmak da bir seçenek.
+-- Ayrıca alias yazımı DB'ye girerken normalize edilmeli ki kopyalar hiç oluşmasın.
