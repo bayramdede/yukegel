@@ -56,6 +56,28 @@ const IN_PARCA_BOYU = 150;
 // Supabase bağlantı havuzunu tıkamamak için eşzamanlı istek tavanı.
 const ESZAMANLI = 6;
 
+// PostgREST varsayılan olarak sorgu başına EN FAZLA 1000 satır döndürür
+// (Supabase `db.max-rows`). Sınırı aşan sorgu HATA VERMEZ, sessizce kesilir.
+// `aliases` tablosu 1000'i geçtiğinde gatekeeper eksik listeyle çalışıp
+// mesajları yanlış sınıflandırıyordu. Ayrıca ORDER BY olmadığı için hangi
+// satırların düştüğü de belirsizdi — aynı girdi farklı sonuç verebiliyordu.
+const SAYFA_BOYU = 1000;
+
+/** Bir tabloyu `.range()` ile sayfalayarak TAMAMEN çeker. */
+async function tumSatirlar<T = any>(
+  sorguKur: () => any,
+  sayfaBoyu = SAYFA_BOYU,
+): Promise<T[]> {
+  const hepsi: T[] = [];
+  for (let baslangic = 0; ; baslangic += sayfaBoyu) {
+    const { data, error } = await sorguKur().range(baslangic, baslangic + sayfaBoyu - 1);
+    if (error) throw new Error(error.message);
+    const parca = (data || []) as T[];
+    hepsi.push(...parca);
+    if (parca.length < sayfaBoyu) return hepsi;
+  }
+}
+
 function parcala<T>(dizi: T[], boyut: number): T[][] {
   const parcalar: T[][] = [];
   for (let i = 0; i < dizi.length; i += boyut) parcalar.push(dizi.slice(i, i + boyut));
@@ -196,11 +218,16 @@ export async function POST(request: NextRequest) {
     }
 
     // ── 2. DB'den aliases + config'i PARALEL çek (tek seferlik) ──────────────
-    const [aliasesRes, configRes] = await Promise.all([
-      supabase.from('aliases').select('*').eq('is_active', true),
+    // `aliases` SAYFALANARAK çekilir: tablo 1000 satırı geçtiği için tek sorgu
+    // sessizce kesiliyor ve gatekeeper alias'ların yarısını hiç görmüyordu.
+    // `id` sıralaması sayfalar arası tutarlılık için şart (ORDER BY yoksa
+    // PostgreSQL satır sırasını garanti etmez → sayfalar çakışabilir/atlayabilir).
+    const [aliases, configRes] = await Promise.all([
+      tumSatirlar<any>(() =>
+        supabase.from('aliases').select('*').eq('is_active', true).order('id', { ascending: true }),
+      ),
       supabase.from('system_config').select('value').eq('key', 'spam_threshold').single(),
     ]);
-    const aliases = aliasesRes.data || [];
     const spamEsik: number = configRes.data?.value?.max_listings_per_hour ?? 3;
 
     // ── 3. Tüm mesajları parse et + gatekeeper (tamamen in-memory, DB yok) ───
