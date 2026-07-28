@@ -370,6 +370,11 @@ export default function WhatsappYukle() {
                     <span style={{ color: '#ef4444' }}>⚠️ {sonuc.error}</span>
                   )}
                 </div>
+                {sonuc.errors?.length > 0 && (
+                  <div style={{ background: '#2a0d0d', border: '1px solid #7f1d1d', borderRadius: 6, padding: '8px 14px', marginTop: 4, fontSize: '0.75rem', color: '#fca5a5', lineHeight: 1.5 }}>
+                    {sonuc.errors.map((e: string, i: number) => <div key={i}>• {e}</div>)}
+                  </div>
+                )}
                 {debugAcik && sonuc.debug?.length > 0 && (
                   <div style={{ background: '#0d1117', border: '1px solid #1f2937', borderRadius: 6, padding: 10, marginTop: 4, maxHeight: 300, overflowY: 'auto' }}>
                     {sonuc.debug.slice(0, 60).map((line: string, i: number) => (
