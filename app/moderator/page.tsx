@@ -231,8 +231,12 @@ export default function Moderator() {
     }
 
     // Sprint 3: audit_score ve is_shadow_banned select'e eklendi
+    // ⚠️ SPRINT_01 L1e — `contact_phone` BURADA ÇEKİLMEZ.
+    // Bu istemci anon key kullanıyor ve o kolonun yetkisi anon/authenticated'dan
+    // revoke edildi. Numaralar aşağıda `ilanTelefonlariGetir()` ile, rolü sunucuda
+    // doğrulandıktan sonra ayrıca çekilip listeye birleştiriliyor.
     let query = supabase.from('listings').select(`
-      id, listing_type, origin_city, origin_district, contact_phone, price_offer,
+      id, listing_type, origin_city, origin_district, price_offer,
       source, created_at, moderation_status, status, notes, trust_level,
       raw_text, raw_post_id, vehicle_type, body_type,
       audit_score, is_shadow_banned, internal_audit_logs,
