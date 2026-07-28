@@ -4,6 +4,14 @@
 
 **Referans Dökümanlar:**
 - `docs/LOG_VE_GUVENLIK_SPECLERI.md` — Log format standartları, audit trail, SecurityLogger kontrol listesi
+- `docs/LANDING_AUTH_ANALIZ.md` — Landing / kayıt / giriş analizi (28 Tem 2026), bulgu kodları L1–L5, A1–A7, K1–K3
+
+> **⚠️ EKSİK ROTALAR (28 Tem 2026, `LANDING_AUTH_ANALIZ` A1/A2):** Koddan çağrılan ama var olmayan iki rota tespit edildi.
+> (1) `POST /api/auth/log` — `giris/page.tsx` ve `profil-tamamla/page.tsx` içindeki `authLog()` buraya POST atıyor, klasör yok; çağrı `.catch(()=>{})` ile sarmalı olduğu için 404 sessizce yutuluyor ve **auth audit trail'i tamamen boş**.
+> (2) `/giris/merge` — `app/auth/callback/route.ts` Google akışında aynı e-postayla eski profil bulunca buraya yönlendiriyor, sayfa yok → **404**. `users_email_key` senaryosunun telefon ayağı `giris/page.tsx`'teki `merge_onay` moduyla çözülmüş, Google ayağı boşa bağlanmış.
+> **Tuzak:** Yeni endpoint çağrısı eklerken `.catch(()=>{})` ile sessizleştirme — en azından `console.warn` bırak; bu iki hata aylarca görünmez kaldı.
+
+> **⚠️ TELEFON SIZINTISI (28 Tem 2026, `LANDING_AUTH_ANALIZ` L1):** `app/page.tsx:92` server component'te `tel: ilan.contact_phone` map'leyip `HomeClient`'a **prop** olarak geçiyor. Next.js client component prop'larını flight payload olarak HTML'e gömer → `IlanKart` ekranda göstermese bile misafir kullanıcı sayfa kaynağından tüm numaraları okuyabiliyor. `UyeBanner`'ın "telefonu görmek için üye ol" vaadi geçersiz + KVKK riski. **Kural: misafire kapalı hiçbir alan client component prop'una girmemeli.**
 
 ---
 
