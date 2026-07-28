@@ -130,6 +130,64 @@ function trNorm(s: string): string {
     .replace(/û/g, 'u').replace(/[^a-z0-9\s\.>-]/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
+// ── Alias eşleşmesi: KELİME bazlı, substring DEĞİL ───────────────────────────
+// Eskiden `norm.includes(aliasNorm)` kullanılıyordu. Bu, alias'ı metnin HERHANGİ
+// bir yerinde arıyordu ve kelime ortalarını da yakalıyordu:
+//   "lojistik" içinde "ist"  → İstanbul
+//   "getirin"  içinde "tir"  → TIR
+//   "balyası"  içinde "balya"→ Balıkesir
+// Sonuç: neredeyse her mesaj 2+ şehir bulmuş sayılıyordu; `isAd` kuralı
+// (`telefon && (araç || şehir>=2)`) pratikte "telefon var mı"ya indirgenmişti,
+// yani gatekeeper devre dışıydı. Artık eşleşme TOKEN eşitliği üzerinden yapılır.
+// (parse-listing/findPlaces zaten böyle çalışıyor; iki taraf hizalandı.)
+
+const CASE_SUFFIXES = [
+  'dan', 'den', 'tan', 'ten', 'da', 'de', 'ta', 'te',
+  'ya', 'ye', 'yi', 'yi', 'yu', 'yu', 'nin', 'nin', 'nun', 'nun',
+  'na', 'ne', 'a', 'e', 'i', 'u',
+];
+
+/** Türkçe hal eklerini soyar. Kök 3 harften kısalacaksa soymaz. */
+function ekSoy(token: string): string {
+  let t = token;
+  if (t.length < 5) return t;
+  for (let degisti = true; degisti; ) {
+    degisti = false;
+    for (const ek of CASE_SUFFIXES) {
+      if (t.endsWith(ek) && t.length - ek.length >= 3) {
+        t = t.slice(0, -ek.length);
+        degisti = true;
+        break;
+      }
+    }
+  }
+  return t;
+}
+
+/** Normalize metinden tekil (ekli/eksiz) ve ikili token kümeleri üretir. */
+function tokenKumeleri(norm: string): { tekil: Set<string>; ikili: Set<string> } {
+  const tokenlar = norm.split(' ').filter(t => t.length >= 2);
+  const tekil = new Set<string>();
+  for (const t of tokenlar) {
+    tekil.add(t);
+    tekil.add(ekSoy(t));
+  }
+  const ikili = new Set<string>();
+  for (let i = 0; i < tokenlar.length - 1; i++) {
+    ikili.add(tokenlar[i] + ' ' + tokenlar[i + 1]);
+    ikili.add(ekSoy(tokenlar[i]) + ' ' + ekSoy(tokenlar[i + 1]));
+  }
+  return { tekil, ikili };
+}
+
+function aliasEslesiyorMu(
+  aliasNorm: string,
+  kume: { tekil: Set<string>; ikili: Set<string> },
+): boolean {
+  if (aliasNorm.length < 3) return false;   // "ay", "of" gibi alias'lar gürültü
+  return aliasNorm.includes(' ') ? kume.ikili.has(aliasNorm) : kume.tekil.has(aliasNorm);
+}
+
 // Sync version — DB çağrısı yok, tüm veriler bellekte
 function gatekeeper_sync(message: string, aliases: any[]): { isAd: boolean; score: number; phones: string[]; cities: string[]; vehicles: string[] } {
   const norm = trNorm(message);
@@ -138,18 +196,19 @@ function gatekeeper_sync(message: string, aliases: any[]): { isAd: boolean; scor
   for (const bl of blacklist) {
     if (norm.includes(bl)) return { isAd: false, score: 0, phones: [], cities: [], vehicles: [] };
   }
-  const cityAliases = aliases.filter(a => a.type === 'city');
+  const kume = tokenKumeleri(norm);
+
   const foundCities: string[] = [];
-  for (const ca of cityAliases) {
-    const aliasNorm = trNorm(ca.alias);
-    if (norm.includes(aliasNorm) || norm.split(' ').includes(aliasNorm))
-      if (!foundCities.includes(ca.normalized)) foundCities.push(ca.normalized);
+  for (const ca of aliases) {
+    if (ca.type !== 'city') continue;
+    if (!aliasEslesiyorMu(trNorm(ca.alias), kume)) continue;
+    if (!foundCities.includes(ca.normalized)) foundCities.push(ca.normalized);
   }
-  const vehicleAliases = aliases.filter(a => a.type === 'vehicle');
   const foundVehicles: string[] = [];
-  for (const va of vehicleAliases) {
-    if (norm.includes(trNorm(va.alias)))
-      if (!foundVehicles.includes(va.normalized)) foundVehicles.push(va.normalized);
+  for (const va of aliases) {
+    if (va.type !== 'vehicle') continue;
+    if (!aliasEslesiyorMu(trNorm(va.alias), kume)) continue;
+    if (!foundVehicles.includes(va.normalized)) foundVehicles.push(va.normalized);
   }
   let score = 0;
   score += phones.length > 0 ? 40 : 0;
