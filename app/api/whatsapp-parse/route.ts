@@ -381,10 +381,13 @@ export async function POST(request: NextRequest) {
         detected_ad_count: 1,
         message_date: c.msgDate,
         post_date: c.msgDate,
-        // geçici meta — insert sonrası repost için, DB'ye gitmez
-        _sourceRawPostId: sourceRawPostId,
-        _isRepost: isRepost,
       });
+
+      // Repost meta'sı satırın İÇİNDE taşınmıyor (DB'ye sızmasın diye);
+      // insert sonrası doğal anahtarla (hash|phone|date) geri eşleştirilecek.
+      if (isRepost && sourceRawPostId) {
+        repostPlan.set(batchKey, sourceRawPostId);
+      }
     }
 
     // ── 7. Phone güncellemelerini PARALEL yap ────────────────────────────────
