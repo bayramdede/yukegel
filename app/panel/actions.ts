@@ -55,11 +55,15 @@ export type PanelSonuc<T = undefined> =
   | { ok: true; veri?: T }
   | { ok: false; hata: string }
 
+type SahiplikSonuc =
+  | { ok: false; hata: string }
+  | { ok: true; userId: string; service: ReturnType<typeof getServiceSupabase> }
+
 /** Oturumu doğrular ve ilanın gerçekten bu kullanıcıya ait olduğunu kontrol eder. */
-async function sahipMi(ilanId: string) {
+async function sahipMi(ilanId: string): Promise<SahiplikSonuc> {
   const supabase = await getServerSupabase()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { hata: 'Oturum bulunamadı. Lütfen tekrar giriş yapın.' as const }
+  if (!user) return { ok: false, hata: 'Oturum bulunamadı. Lütfen tekrar giriş yapın.' }
 
   const service = getServiceSupabase()
   const { data: ilan } = await service
@@ -68,12 +72,12 @@ async function sahipMi(ilanId: string) {
     .eq('id', ilanId)
     .maybeSingle()
 
-  if (!ilan) return { hata: 'İlan bulunamadı.' as const }
+  if (!ilan) return { ok: false, hata: 'İlan bulunamadı.' }
   // Sahiplik kontrolü SUNUCUDA. RLS'e güvenip atlamıyoruz çünkü aşağıda
   // service-role kullanıyoruz — service-role RLS'i BYPASS eder.
-  if (ilan.user_id !== user.id) return { hata: 'Bu ilan size ait değil.' as const }
+  if (ilan.user_id !== user.id) return { ok: false, hata: 'Bu ilan size ait değil.' }
 
-  return { user, service }
+  return { ok: true, userId: user.id, service }
 }
 
 function sayiYada(v: unknown): number | null {
