@@ -166,12 +166,20 @@ function GirisIci() {
 
   // ── Telefon akışı ───────────────────────────────────────────────
   async function otpGonder(e: React.FormEvent) {
-    e.preventDefault(); setYukleniyor(true); temizle();
+    e.preventDefault();
+    // SPRINT_01 A4b — bekleme süresi dolmadan tekrar gönderme.
+    if (bekleme > 0) { setHata(`${bekleme} saniye sonra tekrar deneyebilirsiniz.`); return; }
+    setYukleniyor(true); temizle();
     const temiz = telefon.replace(/\D/g, '');
     const fmt = temiz.startsWith('90') ? `+${temiz}` : temiz.startsWith('0') ? `+9${temiz}` : `+90${temiz}`;
     const { error } = await supabase.auth.signInWithOtp({ phone: fmt });
-    if (error) setHata('SMS gönderilemedi. Numarayı kontrol edin.');
-    else setOtpAdim(true);
+    if (error) {
+      setHata('SMS gönderilemedi. Numarayı kontrol edin.');
+    } else {
+      setOtpAdim(true);
+      beklemeBaslat();
+      authLog('otp_sent', 'otp');
+    }
     setYukleniyor(false);
   }
 
