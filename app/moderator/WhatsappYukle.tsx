@@ -95,6 +95,7 @@ export default function WhatsappYukle() {
     const toplamSonuc = {
       success: true,
       total_messages: 0,
+      unparsed_timestamps: 0,
       saved_to_db: 0,
       skipped: 0,
       spam_blocked: 0,
@@ -135,6 +136,7 @@ export default function WhatsappYukle() {
           break;
         }
         toplamSonuc.total_messages += data.total_messages || 0;
+        toplamSonuc.unparsed_timestamps += data.unparsed_timestamps || 0;
         toplamSonuc.saved_to_db   += data.saved_to_db   || 0;
         toplamSonuc.skipped       += data.skipped       || 0;
         toplamSonuc.spam_blocked  += data.spam_blocked  || 0;
@@ -306,6 +308,11 @@ export default function WhatsappYukle() {
                         {sonuc.aliases_count !== undefined && ` · ${sonuc.aliases_count} alias`}
                         {sonuc.total_messages === 0 && ' ⚠️ Mesaj parse edilemedi — format kontrol et'}
                       </span>
+                      {sonuc.unparsed_timestamps > 0 && (
+                        <span style={{ color: '#fbbf24' }}>
+                          ⚠️ {sonuc.unparsed_timestamps} mesajın tarihi çözülemedi
+                        </span>
+                      )}
                       {sonuc.insert_failed > 0 && (
                         <span style={{ color: '#f87171' }}>
                           ⚠️ {sonuc.insert_failed} kayıt yazılamadı
