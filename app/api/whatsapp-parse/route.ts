@@ -438,12 +438,14 @@ export async function POST(request: NextRequest) {
       spam_blocked: spamEngel,
       reposted,
       insert_failed: insertHatasi,
+      unparsed_timestamps: cozulemeyenZaman,
       duration_ms: Date.now() - baslangic,
     });
 
     return NextResponse.json({
       success: true,
       total_messages: totalMessages,
+      unparsed_timestamps: cozulemeyenZaman,
       passed_gate: candidates.length,
       saved_to_db: savedToDb,
       skipped,
