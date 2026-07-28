@@ -416,7 +416,7 @@ kısmen ilerliyor, sonra grup 2/2'de düşüyor. Tarayıcıda da hata görünüy
 | 1 | `.in(...)` çağrılarına sınırsız dizi veriliyordu. PostgREST filtreyi **URL'e gömer**; binlerce 32 karakterlik hash on binlerce karakterlik URL üretir. | Sorgu başına saniyeler, üstelik 2 kez |
 | 2 | 5c sorgusu 5a'nın tam alt kümesiydi — tamamen gereksiz üçüncü tur. | 1 tam tablo turu |
 | 3 | Telefon güncellemeleri `Promise.all` ile **sınırsız eşzamanlılıkta** atılıyordu → Supabase bağlantı havuzu doyuyor, hepsi sıraya giriyor. | Doğrusal olmayan yavaşlama |
-| 4 | 23505 alındığında **satır satır** insert deneniyordu (chunk başına ~100 istek). `raw_posts.clean_hash` UNIQUE olduğu için bu **her repost'ta** tetikleniyordu — yani istisna değil, normal durum. | Chunk başına ~100 ek istek |
+| 4 | 23505 alındığında **satır satır** insert deneniyordu (chunk başına ~100 istek) ve bu sürekli tetikleniyordu. Asıl sebep §7.4'te — batch-içi tekilleştirme anahtarının DB indeksiyle uyuşmaması. | Chunk başına ~100 ek istek |
 | 5 | Süre bütçesi yoktu. 60 sn aşılınca süreç öldürülüyor, kısmi yazım geri bildirimsiz kalıyordu. | Tüm partinin kaybı |
 
 ### 7.2 Yöntem: sunucu bütçesi + istemci ikiye bölme (bisection)
@@ -441,13 +441,55 @@ Sabit "parti boyu" sihirli sayısı yerine, parti boyu **ölçülen davranışta
 zararsızdır — zaten yazılmış satırlar `skipped` olarak döner. Bu, yeniden denemeyi
 idempotent kılar ve bisection'ı mümkün kılan temel özelliktir.
 
-### 7.3 Doğrulanmamış varsayım
+### 7.3 `raw_posts` benzersizlik kuralları (doğrulandı, 28 Tem 2026)
 
-`raw_posts` üzerindeki unique constraint'in **hangi kolonlarda** olduğu belgeli değil.
-Kolonlar netleşirse 23505 yolu tamamen kaldırılıp tek `upsert` ile değiştirilebilir:
+`pg_constraint` yalnızca `raw_posts_pkey (id)` döndürdü — yani **unique CONSTRAINT yok**.
+Kurallar `CREATE UNIQUE INDEX` ile tanımlanmış, o yüzden `pg_constraint`'te görünmüyorlar.
+`pg_indexes` gerçek durumu gösterdi:
 
-```sql
-SELECT conname, pg_get_constraintdef(oid)
-FROM pg_constraint
-WHERE conrelid = 'public.raw_posts'::regclass AND contype IN ('u','p');
 ```
+raw_posts_dedup_idx     UNIQUE (clean_hash, contact_phone, message_date)
+                        WHERE clean_hash IS NOT NULL AND contact_phone IS NOT NULL
+idx_raw_posts_hash_day  UNIQUE (clean_hash, post_date)
+                        WHERE clean_hash IS NOT NULL
+```
+
+Kodda `post_date: c.msgDate` — yani `message_date` ile birebir aynı değer. İkinci indeks
+birincinin daha katı hali olduğu için **bağlayıcı kural `(clean_hash, post_date)`**'dir;
+telefon dahil değildir.
+
+> ⚠️ Bu bölümün ilk hali "`clean_hash` tek başına UNIQUE" diyordu. **YANLIŞTI** —
+> `idx_raw_posts_clean_hash` unique DEĞİL, sıradan bir btree indeksi.
+
+**`upsert` neden kullanılamıyor:** her iki indeks de **kısmi** (`WHERE ...`).
+PostgreSQL kısmi bir indeksi `ON CONFLICT` hedefi olarak ancak ifadede indeksin
+predicate'ini ima eden bir `WHERE` varsa çıkarsayabilir; PostgREST böyle bir cümle
+üretmiyor. Dolayısıyla constraint-agnostik 23505 yakalaması **kalmalı** — ama artık
+normal yol değil, emniyet supabı.
+
+### 7.4 23505 fırtınasının ASIL sebebi
+
+Route'un batch-içi tekilleştirme anahtarı `hash__telefon__tarih` idi; DB'nin indeksi
+`(clean_hash, post_date)` — **telefon içermiyor**. Sonuç: aynı gün aynı metni **farklı
+iki kişi** paylaştığında uygulama bunları ayrı satır sanıyor, DB tüm chunk'ı 23505 ile
+reddediyordu. Nakliye gruplarında aynı yükün iletilmesi son derece yaygın olduğu için
+bu istisna değil rutin durumdu.
+
+Aynı hata 23505 kurtarma bloğunda da vardı: çakışanları yalnızca `clean_hash`'e bakarak
+buluyordu, dolayısıyla aynı içeriğin **başka bir güne ait meşru repost'unu** da
+"zaten var" sayıp sessizce eliyordu.
+
+**Düzeltme:** batch-içi anahtar `hash__tarih`'e çekildi (DB indeksiyle birebir),
+`existingMap` `post_date` üzerinden kuruldu ve kurtarma bloğu `(clean_hash, post_date)`
+çifti üzerinden çakışma testi yapıyor. Insert dönüşünü geri eşlemek için kullanılan
+anahtar (`satirAnahtar`, telefon içerir) ayrı tutuldu.
+
+### 7.5 Telefon geriye-doldurma ayrıldı
+
+Route bölüm 7'deki `phoneUpdates` — mevcut ama `contact_phone`'u boş satırlara telefon
+yazma — içe aktarmanın doğruluğunu etkilemiyordu (yeni satırlar telefonu zaten dolu
+geliyor) ama satır başına 2 UPDATE atıyor ve tam da bütçenin dolduğu yerde duruyordu.
+Kendi başına çalışan bir işe taşındı: **`POST /api/raw-posts/telefon-doldur`**.
+`contact_phone IS NULL` olan satırları kendisi bulur, `raw_text`'ten numarayı yeniden
+çıkarır, `.is('contact_phone', null)` koşuluyla yazar (yarış koşuluna karşı) ve
+idempotenttir. Telefon regex'i `lib/whatsapp/telefon.ts`'te tek kaynağa alındı.
