@@ -511,8 +511,11 @@ export async function POST(request: NextRequest) {
       reposted = eklenenSatirlar.filter(r => repostPlan.has(r.anahtar)).length;
     }
 
-    structuredLog(insertHatasi > 0 ? 'WARN' : 'INFO', 'whatsapp-import', 'ZIP/TXT import tamamlandı', {
-      output_status: insertHatasi > 0 ? 'partial' : 'success',
+    structuredLog(insertHatasi > 0 || tamamlanmadi ? 'WARN' : 'INFO', 'whatsapp-import', 'ZIP/TXT import tamamlandı', {
+      output_status: insertHatasi > 0 || tamamlanmadi ? 'partial' : 'success',
+      tamamlanmadi,
+      unprocessed: islenmeyen,
+      phone_updates: telefonGuncellendi,
       source_group: groupName,
       file_count: fileContents.length,
       total_messages: totalMessages,
