@@ -15,6 +15,7 @@ export type LogContext =
   | 'rls-monitor'
   | 'auth'
   | 'whatsapp-webhook'
+  | 'whatsapp-import'
 
 interface LogEntry {
   level: LogLevel
