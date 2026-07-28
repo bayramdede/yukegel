@@ -141,9 +141,12 @@ export async function profilKaydet(girdi: ProfilGirdi): Promise<ProfilSonuc> {
     display_name: displayName,
     user_type: girdi.userType,
     phone: telefon,
-    // phone_verified istemcinin `telefonKilitli` bayrağına DEĞİL, gerçek auth
-    // kimliğine bakılarak belirleniyor: numara Supabase auth'ta doğrulanmışsa true.
-    phone_verified: Boolean(user.phone) && user.phone!.replace(/\D/g, '').endsWith(telefon.slice(1)),
+    // phone_verified istemcinin `telefonKilitli` bayrağına DEĞİL, gerçek kanıta bakıyor:
+    // ya bu oturum SMS OTP ile açılmış ve numara tutuyor, ya da satırda AYNI numara
+    // için zaten doğrulanmış kaydı var. İstemci bu bayrağı kendi başına set edemez.
+    phone_verified:
+      (Boolean(user.phone) && user.phone!.replace(/\D/g, '').endsWith(telefon.slice(1))) ||
+      (mevcut?.phone_verified === true && (mevcut.phone ?? '').replace(/\D/g, '') === telefon),
     kvkk_onay_at: new Date().toISOString(),
     ...(tckn ? { tckn } : {}),
     ...(vkn ? { vkn } : {}),
