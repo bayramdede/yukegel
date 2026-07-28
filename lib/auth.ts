@@ -83,6 +83,27 @@ export async function getCurrentUser(): Promise<{ id: string; email: string | nu
 }
 
 /**
+ * API route'ları için rol kontrolü — redirect ETMEZ, sonucu döner.
+ * `requireAdmin` server component'ler için tasarlandı ve `redirect()` çağırıyor;
+ * API route içinde bu NEXT_REDIRECT fırlatıp 500'e dönüşüyor. Route'larda bunu kullan.
+ *
+ * Kullanım:
+ *   const yetki = await requireStaff();
+ *   if (!yetki.ok) return NextResponse.json({ error: yetki.error }, { status: yetki.status });
+ */
+export async function requireStaff(
+  izinliRoller: UserRole[] = ['admin', 'moderator']
+): Promise<
+  | { ok: true; user: { id: string; email: string | null; role: UserRole } }
+  | { ok: false; status: 401 | 403; error: string }
+> {
+  const user = await getCurrentUser();
+  if (!user) return { ok: false, status: 401, error: 'Giriş gerekli' };
+  if (!izinliRoller.includes(user.role)) return { ok: false, status: 403, error: 'Yetkisiz' };
+  return { ok: true, user };
+}
+
+/**
  * Admin olmayanı /giris'e atar. Admin'i geri döndürür.
  */
 export async function requireAdmin() {
