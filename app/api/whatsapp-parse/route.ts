@@ -168,9 +168,14 @@ function ekSoy(token: string): string {
 function tokenKumeleri(norm: string): { tekil: Set<string>; ikili: Set<string> } {
   // trNorm çıktısında boşluk dışında `.`, `>`, `-` de kalıyor ("bala-cerkes",
   // "ist>ankara"). Bunlar da sınır sayılmazsa iki şehir tek token'a yapışır.
-  const tokenlar = norm.split(/[\s.>-]+/).filter(t => t.length >= 2);
+  // Tek harflik token'lar TEKİL kümeden atılır (gürültü), ama İKİLİ kümede
+  // kalmalı: 'G.ANTEP' → ['g','antep'], 'M.KEMALPAŞA' → ['m','kemalpasa'].
+  // Eskiden 'g' ve 'm' baştan eleniyor, ikili 'bursa kemalpasa' oluşuyor ve
+  // 'M.Kemalpaşa'→Bursa alias'ı hiç eşleşemiyordu.
+  const tokenlar = norm.split(/[\s.>-]+/).filter(Boolean);
   const tekil = new Set<string>();
   for (const t of tokenlar) {
+    if (t.length < 2) continue;
     tekil.add(t);
     tekil.add(ekSoy(t));
   }
