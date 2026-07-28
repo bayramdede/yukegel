@@ -399,3 +399,55 @@ testi, ileriki her değişikliği güvenli hale getirir.
 | `app/api/whatsapp-parse/route.ts` | Yetki + rate limit (10/dk/kullanıcı); satır satır 23505 retry; anahtar bazlı repost eşleşmesi; `repostListings` kaldırıldı; `insert_failed`/`errors`/`unparsed_timestamps` response'ta; `structuredLog` + `duration_ms`. |
 | `app/moderator/WhatsappYukle.tsx` | Kopya parser silindi, `chatParser`'dan import; hata ve çözülemeyen-tarih göstergeleri. |
 | `supabase/functions/parse-listing/index.ts` | Listing insert'ine `is_repost: rawPost.is_repost === true` eklendi. |
+
+---
+
+## 7. Vercel 60 sn Timeout — Kök Neden ve Çözüm Yöntemi (2026-07-28)
+
+**Belirti:** `Vercel Runtime Timeout Error: Task timed out after 60 seconds.` İçe aktarma
+kısmen ilerliyor, sonra grup 2/2'de düşüyor. Tarayıcıda da hata görünüyor çünkü fonksiyon
+öldürüldüğünde Vercel **JSON değil HTML** hata sayfası döner → istemcideki `res.json()`
+"Unexpected token" ile patlar.
+
+### 7.1 Kök nedenler (birikimli)
+
+| # | Neden | Maliyet |
+|---|---|---|
+| 1 | `.in(...)` çağrılarına sınırsız dizi veriliyordu. PostgREST filtreyi **URL'e gömer**; binlerce 32 karakterlik hash on binlerce karakterlik URL üretir. | Sorgu başına saniyeler, üstelik 2 kez |
+| 2 | 5c sorgusu 5a'nın tam alt kümesiydi — tamamen gereksiz üçüncü tur. | 1 tam tablo turu |
+| 3 | Telefon güncellemeleri `Promise.all` ile **sınırsız eşzamanlılıkta** atılıyordu → Supabase bağlantı havuzu doyuyor, hepsi sıraya giriyor. | Doğrusal olmayan yavaşlama |
+| 4 | 23505 alındığında **satır satır** insert deneniyordu (chunk başına ~100 istek). `raw_posts.clean_hash` UNIQUE olduğu için bu **her repost'ta** tetikleniyordu — yani istisna değil, normal durum. | Chunk başına ~100 ek istek |
+| 5 | Süre bütçesi yoktu. 60 sn aşılınca süreç öldürülüyor, kısmi yazım geri bildirimsiz kalıyordu. | Tüm partinin kaybı |
+
+### 7.2 Yöntem: sunucu bütçesi + istemci ikiye bölme (bisection)
+
+Sabit "parti boyu" sihirli sayısı yerine, parti boyu **ölçülen davranıştan kendi kendine ayarlanır**:
+
+**Sunucu (`app/api/whatsapp-parse/route.ts`)**
+- `SURE_BUTCESI_MS = 45_000` — Vercel'in 60 sn'sinden önce durur ve **her zaman geçerli JSON** döner.
+- Bütçe dolduğunda döngü `break` eder; yanıt `tamamlanmadi: true` ve `islenmeyen: N` taşır.
+- `parcala()` + `IN_PARCA_BOYU = 150` — `.in()` sorguları parçalanır, URL uzunluğu sınırlanır.
+- `sirayla()` + `ESZAMANLI = 6` — eşzamanlılık tavanı; bağlantı havuzu doymuyor.
+- 5c sorgusu silindi.
+- 23505'te satır satır fırtına yerine **tek bir yeniden sorgu**: çakışan hash'ler bulunur, kalanlar tek seferde yazılır. Satır satır yol yalnızca son çare olarak ve bütçe kontrollü kaldı.
+
+**İstemci (`app/moderator/WhatsappYukle.tsx`)**
+- Sıralı `for` döngüsü yerine **iş kuyruğu** (`while (kuyruk.length > 0)`).
+- 504/413 ya da `tamamlanmadi: true` gelirse parti **ikiye bölünüp kuyruğun başına** geri konur.
+- Grupta tek dosya kaldıysa `dosyayiBol()` dosyayı **mesaj başlığı sınırından** ikiye ayırır (satır ortasından kesmez).
+- `MAX_BOLUNME = 8` sonsuz bölünmeyi engeller.
+
+**Neden güvenli:** tekilleştirme hash tabanlı olduğu için aynı içeriği tekrar göndermek
+zararsızdır — zaten yazılmış satırlar `skipped` olarak döner. Bu, yeniden denemeyi
+idempotent kılar ve bisection'ı mümkün kılan temel özelliktir.
+
+### 7.3 Doğrulanmamış varsayım
+
+`raw_posts` üzerindeki unique constraint'in **hangi kolonlarda** olduğu belgeli değil.
+Kolonlar netleşirse 23505 yolu tamamen kaldırılıp tek `upsert` ile değiştirilebilir:
+
+```sql
+SELECT conname, pg_get_constraintdef(oid)
+FROM pg_constraint
+WHERE conrelid = 'public.raw_posts'::regclass AND contype IN ('u','p');
+```
