@@ -271,7 +271,7 @@ export async function POST(request: NextRequest) {
       //      —id, clean_hash, contact_phone, message_date— zaten burada dönüyor.)
       sirayla(parcala(allHashes, IN_PARCA_BOYU), ESZAMANLI, async parca => {
         const { data } = await supabase.from('raw_posts')
-          .select('id, clean_hash, message_date, post_date, contact_phone')
+          .select('id, clean_hash, message_date, contact_phone')
           .in('clean_hash', parca);
         return data || [];
       }).then(r => r.flat()),
@@ -292,12 +292,11 @@ export async function POST(request: NextRequest) {
     const repostMap = new Map<string, { id: string; message_date: string }>();
 
     for (const row of mevcutSatirlar) {
-      // Anahtar `post_date` üzerinden kurulur, `message_date` üzerinden DEĞİL:
-      // benzersizliği dayatan indeks idx_raw_posts_hash_day (clean_hash, post_date).
-      // Kod ikisine de aynı değeri yazıyor ama eski satırlarda ayrışmış olabilir;
-      // indeksle aynı kolonu kullanmak "önce kontrol ettim, yine de 23505 aldım"
-      // durumunu ortadan kaldırır.
-      existingMap.set(`${row.clean_hash}__${row.post_date}`, { id: row.id, contact_phone: row.contact_phone });
+      // Anahtar, benzersizliği dayatan indeksle AYNI kolonu kullanmalı:
+      //   idx_raw_posts_hash_msgdate UNIQUE (clean_hash, message_date)
+      //                              WHERE clean_hash IS NOT NULL
+      // (28 Tem 2026'ya kadar bu indeks `post_date` üzerindeydi; kolon düşürüldü.)
+      existingMap.set(`${row.clean_hash}__${row.message_date}`, { id: row.id, contact_phone: row.contact_phone });
       // Repost map: (hash + phone) → en son kayıt id'si
       if (row.contact_phone && phoneSet.has(row.contact_phone)) {
         const key = `${row.clean_hash}__${row.contact_phone}`;
@@ -317,7 +316,8 @@ export async function POST(request: NextRequest) {
     let skipped = 0, spamEngel = 0;
     const toInsert: any[] = [];
     // Batch-içi dedup anahtarı DB'nin GERÇEK unique indeksiyle aynı olmalı:
-    //   idx_raw_posts_hash_day UNIQUE (clean_hash, post_date) WHERE clean_hash IS NOT NULL
+    //   idx_raw_posts_hash_msgdate UNIQUE (clean_hash, message_date)
+    //                              WHERE clean_hash IS NOT NULL
     // ÖNCEDEN anahtar (hash,phone,date) idi → telefon içerdiği için, aynı gün
     // aynı metni FARKLI iki kişi paylaştığında uygulama bunları ayrı satır sanıyor,
     // DB ise 23505 ile TÜM chunk'ı reddediyordu. Nakliye gruplarında aynı yükün
@@ -373,7 +373,6 @@ export async function POST(request: NextRequest) {
         processing_status: 'pending',
         detected_ad_count: 1,
         message_date: c.msgDate,
-        post_date: c.msgDate,
       });
 
       // Repost meta'sı satırın İÇİNDE taşınmıyor (DB'ye sızmasın diye);
@@ -439,18 +438,18 @@ export async function POST(request: NextRequest) {
         // ŞİMDİ: tek sorguyla "hangileri zaten var" öğrenilir, sadece kalanlar
         // yeniden denenir → çakışan chunk başına 100 istek yerine 2 istek.
         //
-        // Çakışma testi (clean_hash, post_date) ÇİFTİ üzerinden yapılır — tek başına
-        // `clean_hash` DEĞİL. Gerçek indeks idx_raw_posts_hash_day (clean_hash, post_date);
+        // Çakışma testi (clean_hash, message_date) ÇİFTİ üzerinden yapılır — tek başına
+        // `clean_hash` DEĞİL. Gerçek indeks idx_raw_posts_hash_msgdate (clean_hash, message_date);
         // sadece hash'e bakmak, aynı içeriğin BAŞKA bir güne ait meşru repost'unu da
         // "zaten var" sayıp sessizce eler.
         if (error.code === '23505') {
           const { data: cakisanlar } = await supabase
-            .from('raw_posts').select('clean_hash, post_date')
+            .from('raw_posts').select('clean_hash, message_date')
             .in('clean_hash', chunk.map(r => r.clean_hash));
           const cakisanSet = new Set(
-            (cakisanlar || []).map(r => `${r.clean_hash}__${r.post_date}`),
+            (cakisanlar || []).map(r => `${r.clean_hash}__${r.message_date}`),
           );
-          const kalan = chunk.filter(r => !cakisanSet.has(`${r.clean_hash}__${r.post_date}`));
+          const kalan = chunk.filter(r => !cakisanSet.has(`${r.clean_hash}__${r.message_date}`));
           skipped += chunk.length - kalan.length;
 
           if (kalan.length === 0) continue;
