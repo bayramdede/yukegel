@@ -327,7 +327,13 @@ export async function POST(request: NextRequest) {
     let skipped = 0, spamEngel = 0;
     const toInsert: any[] = [];
     const phoneUpdates: Array<{ rawPostId: string; phone: string }> = [];
-    const batchKeys = new Set<string>(); // intra-batch dedup: aynı (hash,phone,date) batch içinde çakışmasın
+    // Batch-içi dedup anahtarı DB'nin GERÇEK unique indeksiyle aynı olmalı:
+    //   idx_raw_posts_hash_day UNIQUE (clean_hash, post_date) WHERE clean_hash IS NOT NULL
+    // ÖNCEDEN anahtar (hash,phone,date) idi → telefon içerdiği için, aynı gün
+    // aynı metni FARKLI iki kişi paylaştığında uygulama bunları ayrı satır sanıyor,
+    // DB ise 23505 ile TÜM chunk'ı reddediyordu. Nakliye gruplarında aynı yükün
+    // iletilmesi çok yaygın olduğu için 23505 fırtınasının asıl kaynağı buydu.
+    const batchKeys = new Set<string>();
     // batchKey (hash__phone__date) → kopyalanacak kaynak raw_post id'si.
     // Dizi indeksi yerine doğal anahtar kullanılıyor: insert dönüşü eksik/sırasız
     // gelirse indeks eşlemesi kayar ve YANLIŞ ilanlar repost olarak kopyalanırdı.
@@ -350,9 +356,12 @@ export async function POST(request: NextRequest) {
         continue;
       }
 
-      const batchKey = `${c.hash}__${c.phone ?? ''}__${c.msgDate}`;
-      if (batchKeys.has(batchKey)) { skipped++; continue; }
-      batchKeys.add(batchKey);
+      const dedupAnahtari = `${c.hash}__${c.msgDate}`;      // DB unique indeksiyle birebir
+      if (batchKeys.has(dedupAnahtari)) { skipped++; continue; }
+      batchKeys.add(dedupAnahtari);
+      // Insert dönüşünü geri eşlemek için kullanılan anahtar AYRI: PostgREST
+      // yalnızca yazdığı kolonları döndürdüğü için telefonu da içermesi gerekiyor.
+      const satirAnahtar = `${c.hash}__${c.phone ?? ''}__${c.msgDate}`;
 
       let isRepost = false;
       let sourceRawPostId: string | null = null;
@@ -385,7 +394,7 @@ export async function POST(request: NextRequest) {
       // Repost meta'sı satırın İÇİNDE taşınmıyor (DB'ye sızmasın diye);
       // insert sonrası doğal anahtarla (hash|phone|date) geri eşleştirilecek.
       if (isRepost && sourceRawPostId) {
-        repostPlan.set(batchKey, sourceRawPostId);
+        repostPlan.set(satirAnahtar, sourceRawPostId);
       }
     }
 
@@ -451,16 +460,22 @@ export async function POST(request: NextRequest) {
         // ── Chunk başarısız ───────────────────────────────────────────────────
         // En eski hali `continue` diyordu → tek çakışma yüzünden 99 geçerli kayıt
         // sessizce kayboluyordu. Sonraki hali satır satır retry ediyordu → çakışma
-        // yoğun olduğunda (repost'lar; `clean_hash` UNIQUE olduğu için her repost
-        // çakışıyor) chunk başına ~100 ekstra istek çıkarıp 60sn'i yiyordu.
+        // yoğun olduğunda chunk başına ~100 ekstra istek çıkarıp 60sn'i yiyordu.
         // ŞİMDİ: tek sorguyla "hangileri zaten var" öğrenilir, sadece kalanlar
         // yeniden denenir → çakışan chunk başına 100 istek yerine 2 istek.
+        //
+        // Çakışma testi (clean_hash, post_date) ÇİFTİ üzerinden yapılır — tek başına
+        // `clean_hash` DEĞİL. Gerçek indeks idx_raw_posts_hash_day (clean_hash, post_date);
+        // sadece hash'e bakmak, aynı içeriğin BAŞKA bir güne ait meşru repost'unu da
+        // "zaten var" sayıp sessizce eler.
         if (error.code === '23505') {
           const { data: cakisanlar } = await supabase
-            .from('raw_posts').select('clean_hash')
+            .from('raw_posts').select('clean_hash, post_date')
             .in('clean_hash', chunk.map(r => r.clean_hash));
-          const cakisanSet = new Set((cakisanlar || []).map(r => r.clean_hash));
-          const kalan = chunk.filter(r => !cakisanSet.has(r.clean_hash));
+          const cakisanSet = new Set(
+            (cakisanlar || []).map(r => `${r.clean_hash}__${r.post_date}`),
+          );
+          const kalan = chunk.filter(r => !cakisanSet.has(`${r.clean_hash}__${r.post_date}`));
           skipped += chunk.length - kalan.length;
 
           if (kalan.length === 0) continue;
