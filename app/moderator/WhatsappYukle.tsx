@@ -354,6 +354,11 @@ export default function WhatsappYukle() {
                         {sonuc.aliases_count !== undefined && ` · ${sonuc.aliases_count} alias`}
                         {sonuc.total_messages === 0 && ' ⚠️ Mesaj parse edilemedi — format kontrol et'}
                       </span>
+                      {sonuc.insert_failed > 0 && (
+                        <span style={{ color: '#f87171' }}>
+                          ⚠️ {sonuc.insert_failed} kayıt yazılamadı
+                        </span>
+                      )}
                       {sonuc.debug?.length > 0 && (
                         <button onClick={() => setDebugAcik(d => !d)}
                           style={{ background: 'none', border: '1px solid #30363d', color: '#6b7280', borderRadius: 4, padding: '2px 8px', cursor: 'pointer', fontSize: '0.72rem' }}>
