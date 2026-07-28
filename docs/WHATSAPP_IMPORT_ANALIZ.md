@@ -143,6 +143,14 @@ const { data: inserted, error } = await supabase
 `ignoreDuplicates` sayesinde çakışan satır atlanır, kalanlar yazılır. Ayrıca response'a
 `failed_chunks: number` ve `errors: string[]` alanları eklenmeli.
 
+**UYGULAMADA SAPMA:** `upsert` yerine **satır satır retry** tercih edildi. Sebep:
+`onConflict` için `raw_posts`'taki unique constraint'in kolonlarını yazmak gerekiyor,
+ama bu constraint `docs/` altında hiçbir yerde tanımlı değil — yanlış kolon adı yazmak
+tüm insert'i patlatırdı. Uygulanan çözüm constraint'ten bağımsız: chunk `23505` alırsa
+satırlar tek tek denenir, yalnızca gerçekten çakışan satır düşer. `23505` dışı hatalar
+artık yutulmuyor; `insert_failed` + `errors[]` olarak response'a ve `structuredLog`'a
+yansıyor. Constraint kolonları doğrulanırsa `upsert`'e geçmek daha az sorgu üretir.
+
 ### A5 — Repost eşleştirmesi dizi indeksine güveniyor
 
 `route.ts:369-378` `inserted[idx]` ↔ `meta[idx]` eşlemesi yapıyor. PostgREST insert sırasını
