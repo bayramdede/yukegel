@@ -256,9 +256,10 @@ function ProfilTamamlaIci() {
     }
 
     await authLog('kayit_tamamlandi', userType);
-    // SPRINT_01 A7 — hedef tüketildi, cookie'yi temizle.
+    // SPRINT_01 A7 — hedefi OKU, sonra cookie'yi temizle (tek kullanımlık).
+    const hedef = guvenliRedirect(redirect) ?? guvenliRedirect(redirectCookieOku());
     redirectCookieSil();
-    router.push(guvenliRedirect(redirect) ?? guvenliRedirect(redirectCookieOku()) ?? '/panel');
+    router.push(hedef ?? '/panel');
     setYukleniyor(false);
   }
 
