@@ -389,14 +389,23 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // ── 7. Phone güncellemelerini PARALEL yap ────────────────────────────────
-    if (phoneUpdates.length > 0) {
-      await Promise.all(phoneUpdates.map(u =>
-        Promise.all([
+    // ── 7. Phone güncellemeleri (sınırlı eşzamanlılık) ───────────────────────
+    // ÖNCEDEN: `Promise.all(phoneUpdates.map(...))` — büyük bir yeniden yüklemede
+    // yüzlerce eşleşme çıkıyor ve 2×N istek AYNI ANDA açılıyordu; havuz tıkanınca
+    // hepsi sıraya giriyor ve tek başına 60sn'i yiyebiliyordu. Artık tavanlı ve
+    // süre bütçesine tabi — bütçe dolarsa güncellemeler bir sonraki yüklemede yapılır
+    // (idempotent: koşul "telefon boşsa yaz").
+    const benzersizGuncellemeler = [...new Map(phoneUpdates.map(u => [u.rawPostId, u])).values()];
+    let telefonGuncellendi = 0;
+    if (benzersizGuncellemeler.length > 0 && Date.now() - baslangic < SURE_BUTCESI_MS) {
+      await sirayla(benzersizGuncellemeler, ESZAMANLI, async u => {
+        if (Date.now() - baslangic > SURE_BUTCESI_MS) return;
+        await Promise.all([
           supabase.from('raw_posts').update({ contact_phone: u.phone }).eq('id', u.rawPostId),
           supabase.from('listings').update({ contact_phone: u.phone }).eq('raw_post_id', u.rawPostId),
-        ])
-      ));
+        ]);
+        telefonGuncellendi++;
+      });
     }
 
     // ── 8. Yeni kayıtları BATCH INSERT (100'lük chunk'lar) ───────────────────
