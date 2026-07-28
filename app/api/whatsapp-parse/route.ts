@@ -331,7 +331,6 @@ export async function POST(request: NextRequest) {
     // ── 6. Her adayı değerlendir ─────────────────────────────────────────────
     let skipped = 0, spamEngel = 0;
     const toInsert: any[] = [];
-    const phoneUpdates: Array<{ rawPostId: string; phone: string }> = [];
     // Batch-içi dedup anahtarı DB'nin GERÇEK unique indeksiyle aynı olmalı:
     //   idx_raw_posts_hash_day UNIQUE (clean_hash, post_date) WHERE clean_hash IS NOT NULL
     // ÖNCEDEN anahtar (hash,phone,date) idi → telefon içerdiği için, aynı gün
@@ -348,10 +347,6 @@ export async function POST(request: NextRequest) {
       const exactKey = `${c.hash}__${c.msgDate}`;
       const exactMatch = existingMap.get(exactKey);
       if (exactMatch) {
-        if (!exactMatch.contact_phone && c.phone) {
-          phoneUpdates.push({ rawPostId: exactMatch.id, phone: c.phone });
-          debugLog.push(`PHONE_UPDATE queued: ${exactMatch.id} → ${c.phone}`);
-        }
         skipped++;
         continue;
       }
@@ -403,24 +398,14 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // ── 7. Phone güncellemeleri (sınırlı eşzamanlılık) ───────────────────────
-    // ÖNCEDEN: `Promise.all(phoneUpdates.map(...))` — büyük bir yeniden yüklemede
-    // yüzlerce eşleşme çıkıyor ve 2×N istek AYNI ANDA açılıyordu; havuz tıkanınca
-    // hepsi sıraya giriyor ve tek başına 60sn'i yiyebiliyordu. Artık tavanlı ve
-    // süre bütçesine tabi — bütçe dolarsa güncellemeler bir sonraki yüklemede yapılır
-    // (idempotent: koşul "telefon boşsa yaz").
-    const benzersizGuncellemeler = [...new Map(phoneUpdates.map(u => [u.rawPostId, u])).values()];
-    let telefonGuncellendi = 0;
-    if (benzersizGuncellemeler.length > 0 && Date.now() - baslangic < SURE_BUTCESI_MS) {
-      await sirayla(benzersizGuncellemeler, ESZAMANLI, async u => {
-        if (Date.now() - baslangic > SURE_BUTCESI_MS) return;
-        await Promise.all([
-          supabase.from('raw_posts').update({ contact_phone: u.phone }).eq('id', u.rawPostId),
-          supabase.from('listings').update({ contact_phone: u.phone }).eq('raw_post_id', u.rawPostId),
-        ]);
-        telefonGuncellendi++;
-      });
-    }
+    // ── 7. (KALDIRILDI) Telefon geriye-doldurma ──────────────────────────────
+    // Burada, mevcut ama `contact_phone`'u boş olan satırlara telefon yazılıyordu.
+    // İçe aktarmanın DOĞRULUĞUNU hiç etkilemiyor (yeni satırlar telefonu zaten
+    // dolu geliyor) ama satır başına 2 UPDATE atıyor ve tam da süre bütçesinin
+    // dolduğu yerde duruyordu. Ayrı bir işe taşındı:
+    //   POST /api/raw-posts/telefon-doldur
+    // Orası içe aktarma bağlamına ihtiyaç duymaz — `contact_phone IS NULL` olan
+    // satırları kendisi bulup `raw_text`'ten telefonu yeniden çıkarır.
 
     // ── 8. Yeni kayıtları BATCH INSERT (100'lük chunk'lar) ───────────────────
     // Dönen satırları doğal anahtarla (clean_hash|contact_phone|message_date)
@@ -535,7 +520,6 @@ export async function POST(request: NextRequest) {
       output_status: insertHatasi > 0 || tamamlanmadi ? 'partial' : 'success',
       tamamlanmadi,
       unprocessed: islenmeyen,
-      phone_updates: telefonGuncellendi,
       source_group: groupName,
       file_count: fileContents.length,
       total_messages: totalMessages,
