@@ -1,8 +1,12 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { createClient } from '../../lib/supabase';
+import { ilanGuncelle, ilanTamamlandiToggle } from './actions';
 
-const supabase = createClient();
+// SPRINT_01 L1e — anon supabase istemcisi bu dosyadan KALDIRILDI.
+// Tüm `listings` yazmaları `./actions.ts` üzerinden sunucuda, sahiplik kontrolü
+// ve kolon beyaz listesiyle yapılıyor. Buraya `createClient()` geri eklemeyin:
+// `contact_phone` yetkisi anon/authenticated rollerinden revoke edildi, istemciden
+// yazma denemesi sessizce 403 döner.
 
 const ARAC_TIPLERI = ['TIR', 'Kırkayak', 'Kamyon', 'Kamyonet', 'Panelvan'];
 const UTSYAPI = ['Tenteli', 'Açık Kasa', 'Kapalı Kasa', 'Frigorifik', 'Damperli', 'Lowbed', 'Liftli', 'Silo'];
