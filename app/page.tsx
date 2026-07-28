@@ -43,9 +43,14 @@ async function fetchInitialIlanlar() {
 
     const { data, error } = await serviceSupabase
       .from('listings')
+      // ⚠️ SPRINT_01 L1 — `contact_phone` BURADA ÇEKİLMEZ.
+      // Bu sayfa ISR'li (revalidate=30): çıktı tüm ziyaretçiler arasında paylaşılıyor,
+      // dolayısıyla oturuma göre koşullu render mümkün değil. Client component'e prop
+      // olarak geçen her alan flight payload'ı ile HTML'e gömülür ve misafir kullanıcı
+      // sayfa kaynağından okuyabilir. Telefon yalnızca /api/ilan/[id]/telefon üzerinden.
       .select(`
         id, listing_type, origin_city, origin_district,
-        contact_phone, price_offer, source, created_at,
+        price_offer, source, created_at,
         trust_level, user_id, vehicle_type, body_type,
         available_date, date_flexible,
         listing_stops ( listing_id, stop_order, city, district, vehicle_count, cargo_type, weight_ton, pallet_count )
