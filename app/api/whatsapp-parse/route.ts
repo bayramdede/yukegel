@@ -303,10 +303,6 @@ export async function POST(request: NextRequest) {
 
     // Lookup map'leri oluştur (O(1) erişim)
     const existingMap = new Map<string, { id: string; contact_phone: string | null }>();
-    // clean_hash üzerinde UNIQUE index var — aynı hash farklı tarihle de yazılamaz.
-    // Bu set sayesinde repost adayları insert'e hiç gönderilmez (yoksa her repost
-    // 23505 alıp satır-satır retry'a düşüyordu: chunk başına ~100 ekstra istek).
-    const mevcutHashler = new Set<string>();
     const phoneSet = new Set(allPhones);
     const repostMap = new Map<string, { id: string; message_date: string }>();
 
