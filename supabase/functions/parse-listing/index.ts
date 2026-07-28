@@ -26,6 +26,30 @@ function edgeLog(
 // -------------------------
 // Mesaj temizleme (LLM öncesi token tasarrufu)
 // -------------------------
+// PostgREST varsayılan olarak sorgu başına EN FAZLA 1000 satır döndürür
+// (Supabase `db.max-rows`). Sınır aşıldığında HATA YOK — sorgu sessizce kesilir.
+// `aliases` tablosu 1000'i geçtiği için bu fonksiyon şehir/araç tespitini
+// alias'ların yarısını hiç görmeden yapıyordu. `.range()` ile sayfalanır.
+// NOT: aynı düzeltme app/api/whatsapp-parse/route.ts içinde de var
+// (`tumSatirlar`); Deno/Next sınırı yüzünden ortak modüle alınamıyor.
+const SAYFA_BOYU = 1000
+
+async function tumAliaslar(): Promise<Alias[]> {
+  const hepsi: Alias[] = []
+  for (let baslangic = 0; ; baslangic += SAYFA_BOYU) {
+    const { data, error } = await supabase
+      .from('aliases')
+      .select('*')
+      .eq('is_active', true)
+      .order('id', { ascending: true })   // sayfalar arası tutarlılık için ŞART
+      .range(baslangic, baslangic + SAYFA_BOYU - 1)
+    if (error) throw new Error(error.message)
+    const parca = (data || []) as Alias[]
+    hepsi.push(...parca)
+    if (parca.length < SAYFA_BOYU) return hepsi
+  }
+}
+
 const BLACKLIST_PHRASES = [
   'komisyon yok', 'komisyonsuz', 'kdv dahil', 'kdv haric',
   'whatsapp uzerinden iletildi', 'chatbridge', 'toplu gonderildi',
@@ -671,15 +695,15 @@ Deno.serve(async (req) => {
         .catch(() => {});
     }
 
-    // Alias'ları yükle
-    const { data: aliases } = await supabase.from('aliases').select('*').eq('is_active', true)
+    // Alias'ları yükle (SAYFALANARAK — tek sorgu 1000'de sessizce kesiliyordu)
+    const aliases = await tumAliaslar()
 
     // Telefonu ham metinden çıkar (cleanMessage telefon satırlarını siliyor)
     const phonesFromRaw = extractPhones(rawText)
 
     // Parse için mesajı temizle
     const cleanedText = cleanMessage(rawText)
-    const result = parseMessage(cleanedText, aliases || [])
+    const result = parseMessage(cleanedText, aliases)
 
     edgeLog('INFO', 'LLM parse tamamlandı', {
       raw_post_id,
