@@ -78,7 +78,7 @@ export default function SahiplenPage({ params }: { params: Promise<{ id: string 
   }, []);
 
   async function otpGonder() {
-    if (!id) return;
+    if (!id || bekleme > 0) return;
     setIslemYukleniyor(true);
     setHata('');
     try {
@@ -88,8 +88,14 @@ export default function SahiplenPage({ params }: { params: Promise<{ id: string 
         body: JSON.stringify({ adim: 'gonder' }),
       });
       const veri = await res.json().catch(() => ({}));
-      if (!res.ok) setHata(veri?.error || 'SMS gönderilemedi. Lütfen tekrar deneyin.');
-      else setAdim('otp');
+      if (!res.ok) {
+        setHata(veri?.error || 'SMS gönderilemedi. Lütfen tekrar deneyin.');
+        // 429 → sunucudaki kalan süreyi sayaca yansıt.
+        if (res.status === 429 && typeof veri?.kalan === 'number') setBekleme(veri.kalan);
+      } else {
+        setAdim('otp');
+        setBekleme(typeof veri?.bekleme === 'number' ? veri.bekleme : 60);
+      }
     } catch {
       setHata('Bağlantı hatası.');
     } finally {
