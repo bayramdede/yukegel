@@ -60,24 +60,35 @@ WHERE d.refobjid = 'public.raw_posts'::regclass
   );
 
 -- =============================================================================
--- ⛔ ADIM 0 SONUCU (28 Tem 2026): 1453 / 59533 satır AYRIŞMIŞ
+-- ADIM 0 SONUCU (28 Tem 2026): 1543 / 59533 satır ayrışmış — TEŞHİS EDİLDİ
 -- =============================================================================
--- Beklenen 0 idi, çıkan 1453 (%2,4). Yani `post_date` ile `message_date` her zaman
--- aynı DEĞİL — kolonlardan biri bir yerlerde farklı yazılıyor ya da geçmişte
--- farklı yazılmış. ADIM 1'e GEÇME; önce aşağıdaki 0b teşhis sorguları çalıştırılıp
--- ayrışmanın karakteri anlaşılmalı.
+-- Beklenen 0 idi, çıkan 1543 (%2,6). ADIM 0b sorguları çalıştırıldı, sonuçlar:
 --
--- Neden önemli: unique indeksi `message_date` üzerine taşımak, bu 1453 satırın
--- benzersizlik davranışını değiştirir. İki olasılık var ve tedavileri farklı:
---   (a) post_date NULL, message_date dolu → bu satırlar bugün hash_day indeksinin
---       DIŞINDA (btree'de NULL'lar birbirinden farklı sayılır). Taşıma sonrası
---       ANİDEN kural kapsamına girerler; aralarında kopya varsa
---       CREATE UNIQUE INDEX komutu hata verir (zararsız ama iş durur).
---   (b) İkisi de dolu ama farklı gün → hangisinin "doğru" tarih olduğuna karar
---       vermeden taşıma yapılırsa yanlış tarih otorite olur.
+--   • Hepsi `source = 'whatsapp'`; NULL yok (post_date_bos = 0, message_date_bos = 0),
+--     yani 1543'ün TAMAMI "ikisi de dolu ama farklı gün" durumunda.
+--   • 1543/1543 satırda  post_date = created_at::date  ve  post_date > message_date.
+--     post_date_daha_eski = 0. Yani `post_date` mesajın gününü değil, İÇE AKTARMA
+--     GÜNÜNÜ tutuyor. Bu kolonun "doğru tarih" olma iddiası yok — otorite
+--     `message_date`.
+--   • Ayrışma penceresi KAPALI: 12–20 Mayıs 2026 arası. O tarihten sonra yeni
+--     ayrışma üretilmemiş, yani bugünkü kod bu hatayı yapmıyor.
+--   • information_schema.columns → her iki kolonda da column_default = NULL.
+--     Yani ayrışmanın sebebi bir DEFAULT değil; o hafta çalışan eski bir kod
+--     sürümü `post_date`'e açıkça o günün tarihini yazmış.
+--   • 0b.3 (kopya kontrolü) SATIR DÖNDÜRMEDİ → (clean_hash, message_date) zaten
+--     tablo genelinde benzersiz → yeni unique indeks HATASIZ kurulur.
+--
+-- KARAR: taşıma güvenli. Tablo 59.533 satır / 54 MB olduğundan ADIM 1'de
+-- SEÇENEK A (CONCURRENTLY'siz, Supabase SQL editöründe) yeterli — saniyeler sürer.
+--
+-- İSTEĞE BAĞLI TEMİZLİK (kolonu düşürmeden önce arşiv tutarlılığı isteniyorsa):
+--   UPDATE public.raw_posts
+--   SET post_date = message_date
+--   WHERE post_date IS DISTINCT FROM message_date;
+-- Kolon zaten ADIM 2'de düşeceği için şart değil.
 
 -- =============================================================================
--- ADIM 0b — TEŞHİS (ADIM 1'den önce çalıştır)
+-- ADIM 0b — TEŞHİS (çalıştırıldı 28 Tem 2026, sonuçlar yukarıda)
 -- =============================================================================
 
 -- 0b.1 — Ayrışma hangi karakterde ve hangi kaynaktan geliyor?
@@ -118,7 +129,7 @@ LIMIT 20;
 -- =============================================================================
 -- ADIM 1 — Yeni indeksi message_date üzerine kur
 -- =============================================================================
--- ⛔ ADIM 0b sonuçları değerlendirilmeden ÇALIŞTIRMA.
+-- ✅ ADIM 0b sonuçları değerlendirildi (yukarı bak) — çalıştırılabilir.
 -- ⚠️ Supabase SQL editörü her çalıştırmayı bir TRANSACTION'a sarar; bu yüzden
 --    `CREATE INDEX CONCURRENTLY` orada ÇALIŞMAZ:
 --        ERROR: 25001: CREATE INDEX CONCURRENTLY cannot run inside a transaction block
