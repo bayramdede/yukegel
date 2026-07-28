@@ -41,20 +41,47 @@ ORDER BY alias;
 -- =============================================================================
 -- ADIM 2 — Ölçüm: hangi alias gerçekte kaç mesajda "şehir" sanılıyor?
 -- =============================================================================
--- Şüpheli kelimenin son 30 günün mesajlarında kaç kez KELİME olarak geçtiğini
--- sayar. Yüksek sayı = o alias gatekeeper'ı bozuyor demektir.
-SELECT a.alias, a.normalized, count(*) AS gecen_mesaj
+-- ⚠️ İLK HALİ ZAMAN AŞIMINA UĞRADI. Sebebi: `JOIN ... ON raw_text ~* alias`
+-- her (alias, mesaj) ÇİFTİ için ayrı regex derliyordu → 1887 × N karşılaştırma.
+-- Doğru yol: mesajları BİR KEZ kelimelere böl, sonra alias'la EŞİTLİK üzerinden
+-- join et (hash join). Aşağıdaki sürüm saniyeler içinde döner.
+
+WITH ornek AS (
+  -- Örneklem: son 30 günden en fazla 3000 mesaj. Homonim tespiti için fazlasıyla
+  -- yeterli; tam tarama gerekmiyor. Yavaşsa LIMIT'i düşür.
+  SELECT id,
+         translate(lower(replace(raw_text, 'İ', 'i')), 'ıçğöşü', 'icgosu') AS metin
+  FROM public.raw_posts
+  WHERE created_at > now() - interval '30 days'
+    AND raw_text IS NOT NULL
+  LIMIT 3000
+),
+kelimeler AS (
+  -- Mesaj başına BENZERSİZ kelimeler → sayım "kaç mesajda geçti" anlamına gelir,
+  -- "kaç kez geçti" değil.
+  SELECT DISTINCT id, regexp_split_to_table(metin, '[^a-z0-9]+') AS kelime
+  FROM ornek
+),
+sayim AS (
+  SELECT kelime, count(*) AS gecen_mesaj
+  FROM kelimeler
+  WHERE length(kelime) >= 3
+  GROUP BY kelime
+)
+SELECT a.alias, a.normalized, a.district, s.gecen_mesaj
 FROM public.aliases a
-JOIN public.raw_posts r
-  ON r.raw_text ~* ('(^|[^a-zçğıöşü])' || a.alias || '([^a-zçğıöşü]|$)')
+JOIN sayim s
+  ON translate(lower(replace(a.alias, 'İ', 'i')), 'ıçğöşü', 'icgosu') = s.kelime
 WHERE a.type = 'city'
   AND a.is_active = true
-  AND length(a.alias) <= 8
-  AND r.created_at > now() - interval '30 days'
-GROUP BY a.alias, a.normalized
-HAVING count(*) > 50
-ORDER BY count(*) DESC
+ORDER BY s.gecen_mesaj DESC
 LIMIT 40;
+
+-- Nasıl okunur: listenin TEPESİ şüpheli. Gerçek bir il/ilçe adının 3000 mesajın
+-- yüzlercesinde geçmesi normal değildir — "arac", "olur", "merkez" gibi günlük
+-- kelimeler oraya çıkar. İl adları (istanbul, mersin, ankara) da yüksek çıkar
+-- ama onlar DOĞRU eşleşmedir; ayırt etmek için `district` kolonuna bak:
+-- dolu olan satırlar ilçe alias'ıdır ve yüksek sayı orada şüphelidir.
 
 -- =============================================================================
 -- ADIM 3 — Pasifleştir (SİLME, is_active = false yeterli ve geri alınabilir)
