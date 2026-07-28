@@ -1,9 +1,32 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { createClient } from '../../../lib/supabase';
 import { useRouter } from 'next/navigation';
 
 const supabase = createClient();
+
+/**
+ * SPRINT_01 R1 — bu sayfa eskiden formu KOŞULSUZ gösteriyordu.
+ *
+ * İki ayrı sorun vardı:
+ *  1) Sıfırlama linki olmadan gelen kullanıcı formu dolduruyor, "Şifre güncellenemedi"
+ *     diye anlamsız bir hata alıp ne yapacağını bilemiyordu.
+ *  2) Daha kötüsü: tarayıcıda NORMAL (recovery olmayan) bir oturum açıksa
+ *     `updateUser({ password })` BAŞARIYLA çalışıyordu. Yani birinin açık kalmış
+ *     oturumuna erişen kişi, eski şifreyi bilmeden şifreyi değiştirebiliyordu.
+ *
+ * Artık form yalnızca gerçek bir PASSWORD_RECOVERY oturumu varsa gösteriliyor.
+ */
+type Durum = 'kontrol' | 'hazir' | 'gecersiz';
+
+// URL'deki recovery işaretini supabase-js hash'i TÜKETMEDEN ÖNCE yakala.
+// (Modül seviyesinde okuyoruz; supabase istemcisi hash'i ilk fırsatta siliyor.)
+function urlRecoveryIsareti(): boolean {
+  if (typeof window === 'undefined') return false;
+  const hash = window.location.hash || '';
+  const arama = window.location.search || '';
+  return hash.includes('type=recovery') || arama.includes('type=recovery') || arama.includes('code=');
+}
 
 export default function SifreSifirla() {
   const [sifre, setSifre] = useState('');
@@ -11,7 +34,36 @@ export default function SifreSifirla() {
   const [hata, setHata] = useState('');
   const [tamamlandi, setTamamlandi] = useState(false);
   const [yukleniyor, setYukleniyor] = useState(false);
+  // Lazy initializer — effect içinde setState etme (react-hooks/set-state-in-effect).
+  const [durum, setDurum] = useState<Durum>(() => (urlRecoveryIsareti() ? 'kontrol' : 'gecersiz'));
   const router = useRouter();
+
+  useEffect(() => {
+    if (durum === 'gecersiz') return;
+    let bitti = false;
+
+    // PASSWORD_RECOVERY: supabase-js recovery hash'ini çözdüğünde tetiklenir.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event: string) => {
+      if (bitti) return;
+      if (event === 'PASSWORD_RECOVERY') { bitti = true; setDurum('hazir'); }
+    });
+
+    // PKCE akışında hash yerine `?code=` gelir; oturumu elle takas et.
+    const kod = new URLSearchParams(window.location.search).get('code');
+    if (kod) {
+      supabase.auth.exchangeCodeForSession(kod)
+        .then(({ error }) => { if (!bitti && !error) { bitti = true; setDurum('hazir'); } })
+        .catch(() => {});
+    }
+
+    // Emniyet supabası: 4 sn içinde recovery olayı gelmediyse link geçersiz/süresi dolmuş.
+    const zamanlayici = setTimeout(() => {
+      if (!bitti) { bitti = true; setDurum('gecersiz'); }
+    }, 4000);
+
+    return () => { clearTimeout(zamanlayici); subscription.unsubscribe(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const inp = {
     width: '100%', background: '#0d1117', color: '#e2e8f0',
