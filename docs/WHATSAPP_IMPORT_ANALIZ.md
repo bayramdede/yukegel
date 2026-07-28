@@ -462,6 +462,10 @@ telefon dahil değildir.
 > ⚠️ Bu bölümün ilk hali "`clean_hash` tek başına UNIQUE" diyordu. **YANLIŞTI** —
 > `idx_raw_posts_clean_hash` unique DEĞİL, sıradan bir btree indeksi.
 
+> 📌 **Güncelleme (28 Tem 2026):** `idx_raw_posts_hash_day` düşürüldü, yerine
+> `idx_raw_posts_hash_msgdate UNIQUE (clean_hash, message_date) WHERE clean_hash IS NOT NULL`
+> kuruldu. Bağlayıcı kural artık `(clean_hash, message_date)`. Gerekçe: §7.6.
+
 **`upsert` neden kullanılamıyor:** her iki indeks de **kısmi** (`WHERE ...`).
 PostgreSQL kısmi bir indeksi `ON CONFLICT` hedefi olarak ancak ifadede indeksin
 predicate'ini ima eden bir `WHERE` varsa çıkarsayabilir; PostgREST böyle bir cümle
@@ -481,8 +485,8 @@ buluyordu, dolayısıyla aynı içeriğin **başka bir güne ait meşru repost'u
 "zaten var" sayıp sessizce eliyordu.
 
 **Düzeltme:** batch-içi anahtar `hash__tarih`'e çekildi (DB indeksiyle birebir),
-`existingMap` `post_date` üzerinden kuruldu ve kurtarma bloğu `(clean_hash, post_date)`
-çifti üzerinden çakışma testi yapıyor. Insert dönüşünü geri eşlemek için kullanılan
+`existingMap` indeksin tarih kolonu üzerinden kuruldu ve kurtarma bloğu aynı çift
+üzerinden çakışma testi yapıyor (§7.6 sonrası bu kolon `message_date`). Insert dönüşünü geri eşlemek için kullanılan
 anahtar (`satirAnahtar`, telefon içerir) ayrı tutuldu.
 
 ### 7.5 Telefon geriye-doldurma ayrıldı
@@ -494,3 +498,36 @@ Kendi başına çalışan bir işe taşındı: **`POST /api/raw-posts/telefon-do
 `contact_phone IS NULL` olan satırları kendisi bulur, `raw_text`'ten numarayı yeniden
 çıkarır, `.is('contact_phone', null)` koşuluyla yazar (yarış koşuluna karşı) ve
 idempotenttir. Telefon regex'i `lib/whatsapp/telefon.ts`'te tek kaynağa alındı.
+
+### 7.6 `post_date` kolonu kaldırılıyor
+
+`raw_posts`'ta iki tarih kolonu vardı ve kod ikisine de aynı değeri yazıyordu
+(`post_date: c.msgDate`). "Hangisine göre tekilleştiriyoruz" sorusu belirsiz kalıyordu
+ve bu belirsizlik §7.4'teki hataya doğrudan katkı yaptı.
+
+Sadeleştirmeden önce çalıştırılan doğrulama beklenen 0 yerine **1543 ayrışmış satır**
+döndürdü (59.533 içinde). Teşhis:
+
+| Bulgu | Sonuç |
+|---|---|
+| `post_date = created_at::date` | 1543 / 1543 |
+| `post_date > message_date` | 1543 / 1543 (`daha_eski` = 0) |
+| NULL var mı | Hayır, ikisi de dolu |
+| Ayrışma penceresi | 12–20 May 2026 — **kapalı**, bugünkü kod üretmiyor |
+| `column_default` | İkisinde de `NULL` — sebep DEFAULT değil, o hafta çalışan eski kod |
+| `(clean_hash, message_date)` kopyası | **Yok** → yeni unique indeks hatasız kurulur |
+
+Yani `post_date` mesajın gününü değil **içe aktarma gününü** tutuyordu; "doğru tarih"
+olma iddiası hiç olmamış. Otorite `message_date`.
+
+**Uygulama sırası** (bozulursa tüm insert'ler kırılır):
+
+1. ✅ Unique indeksi taşı — `idx_raw_posts_hash_msgdate` kur, `idx_raw_posts_hash_day` düşür.
+   Tablo 54 MB olduğu için `CONCURRENTLY` gerekmedi (Supabase SQL editörü her çalıştırmayı
+   transaction'a sardığı için zaten kullanılamıyor: `ERROR 25001`).
+2. ✅ Kodu dağıt — `post_date` insert payload'ından çıktı; `existingMap` ve 23505 kurtarma
+   bloğu `message_date` kullanıyor.
+3. ⏳ Kolonu düşür — `ALTER TABLE public.raw_posts DROP COLUMN post_date;` (dağıtım canlıda
+   doğrulandıktan sonra).
+
+Ayrıntı ve geri alma adımları: `docs/20260728_raw_posts_post_date_sadelestirme.sql`.
