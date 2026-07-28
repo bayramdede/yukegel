@@ -526,9 +526,12 @@ export default function Moderator() {
 
   async function duzenleKaydet(id: string, mod: 'onayla' | 'sadece_kaydet') {
     setIslem(id);
+    // ⚠️ SPRINT_01 L1e — `contact_phone` bu update'te YOK.
+    // Anon istemcinin o kolon üzerinde artık yetkisi yok; numara aşağıda
+    // ilanTelefonGuncelle() server action'ıyla ayrıca yazılıyor.
     const updateData: any = {
       listing_type: duzenleData.listing_type, origin_city: duzenleData.origin_city,
-      origin_district: duzenleData.origin_district, contact_phone: duzenleData.contact_phone,
+      origin_district: duzenleData.origin_district,
       price_offer: duzenleData.price_offer || null, notes: duzenleData.notes,
       vehicle_type: duzenleData.vehicle_type, body_type: duzenleData.body_type,
     };
@@ -540,6 +543,12 @@ export default function Moderator() {
       updateData.is_shadow_banned = false;
     }
     await supabase.from('listings').update(updateData).eq('id', id);
+
+    const telSonuc = await ilanTelefonGuncelle(id, duzenleData.contact_phone || null);
+    if (!telSonuc.ok) {
+      // Numara kaydedilemedi — moderatör bunu bilmeli, diğer alanlar kaydedildi.
+      alert('Telefon kaydedilemedi: ' + telSonuc.hata);
+    }
     for (let i = 0; i < duzenleData.stops.length; i++) {
       const stop = duzenleData.stops[i];
       if (stop.id) {
