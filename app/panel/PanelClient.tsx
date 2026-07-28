@@ -74,7 +74,13 @@ export default function PanelClient({ userId, userEmail, profil, ilanlar, aracla
               <span style={{ color: C.green }}>YÜKE</span><span style={{ color: C.text }}>GEL</span>
             </span>
           </a>
-          <a href="/cikis" style={{ color: C.dim, fontSize: '0.85rem', textDecoration: 'none' }}>Çıkış</a>
+          {/* SPRINT_01 C1 — çıkış artık POST. Link olarak bırakılırsa prefetch veya
+              dış sitedeki <img src="/cikis"> kullanıcıyı istemsiz çıkış yaptırıyordu. */}
+          <form method="post" action="/cikis" style={{ margin: 0 }}>
+            <button type="submit" style={{ background: 'none', border: 'none', padding: 0, color: C.dim, fontSize: '0.85rem', cursor: 'pointer', fontFamily: 'inherit' }}>
+              Çıkış
+            </button>
+          </form>
         </div>
       </nav>
 
