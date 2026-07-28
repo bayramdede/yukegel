@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { requireStaff } from '../../../lib/auth';
 import { structuredLog } from '../../../lib/logger';
+// Sohbet ayrıştırma TEK KAYNAKTAN gelir — tarayıcı tarafı (WhatsappYukle.tsx) da
+// aynı modülü kullanır. İkisi ayrışırsa mesajlar sessizce kaybolur.
+import { parseChatTxt, grupAdiTuret, sohbetTxtSec } from '../../../lib/whatsapp/chatParser';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60; // Çoklu ZIP parse + hash + DB batch işlemleri için
