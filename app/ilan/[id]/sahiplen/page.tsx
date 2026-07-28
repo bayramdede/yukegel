@@ -36,6 +36,15 @@ export default function SahiplenPage({ params }: { params: Promise<{ id: string 
   const [islemYukleniyor, setIslemYukleniyor] = useState(false);
   const [hata, setHata] = useState('');
   const [maskeliTelefon, setMaskeliTelefon] = useState('');
+  // SPRINT_01 A4b — sunucu 60 sn bekletiyor; sayaç burada sadece görsel karşılığı.
+  // Gerçek kontrol /api/ilan/[id]/sahiplen içinde (istemci sayacı devtools'la sıfırlanabilir).
+  const [bekleme, setBekleme] = useState(0);
+
+  useEffect(() => {
+    if (bekleme <= 0) return;
+    const sayac = setInterval(() => setBekleme(s => Math.max(0, s - 1)), 1000);
+    return () => clearInterval(sayac);
+  }, [bekleme]);
 
   useEffect(() => {
     async function init() {
