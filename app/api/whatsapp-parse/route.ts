@@ -333,6 +333,10 @@ export async function POST(request: NextRequest) {
     const toInsert: any[] = [];
     const phoneUpdates: Array<{ rawPostId: string; phone: string }> = [];
     const batchKeys = new Set<string>(); // intra-batch dedup: aynı (hash,phone,date) batch içinde çakışmasın
+    // batchKey (hash__phone__date) → kopyalanacak kaynak raw_post id'si.
+    // Dizi indeksi yerine doğal anahtar kullanılıyor: insert dönüşü eksik/sırasız
+    // gelirse indeks eşlemesi kayar ve YANLIŞ ilanlar repost olarak kopyalanırdı.
+    const repostPlan = new Map<string, string>();
 
     for (const c of candidates) {
       const exactKey = `${c.hash}__${c.msgDate}`;
