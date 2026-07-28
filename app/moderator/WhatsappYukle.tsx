@@ -1,7 +1,7 @@
 'use client';
 import { useState, useRef } from 'react';
 // Sohbet ayrıştırma/kırpma mantığı sunucuyla ORTAK modülden gelir (lib/whatsapp/chatParser).
-import { eskiIcerigiKirp, grupAdiTuret, sohbetTxtSec } from '../../lib/whatsapp/chatParser';
+import { eskiIcerigiKirp, grupAdiTuret, sohbetTxtSec, mesajBasligiCoz } from '../../lib/whatsapp/chatParser';
 
 export default function WhatsappYukle() {
   const [acik, setAcik] = useState(false);
@@ -60,6 +60,30 @@ export default function WhatsappYukle() {
     return new File([kirpilmis], file.name.replace(/\.zip$/i, '.txt'), { type: 'text/plain' });
   }
 
+  // Tek bir dosyayı mesaj sınırından ikiye böler. Bir grup tek dosyaya inmesine
+  // rağmen hâlâ zaman aşımına uğruyorsa bölünecek başka bir şey kalmıyordu; artık
+  // dosyanın kendisi bölünebiliyor. Kesim MUTLAKA bir mesaj başlangıcında yapılır,
+  // yoksa çok satırlı bir ilan ikiye bölünüp iki yarım ilana dönüşür.
+  async function dosyayiBol(f: File): Promise<[File, File] | null> {
+    let metin: string;
+    try { metin = await f.text(); } catch { return null; }
+    const satirlar = metin.split('\n');
+    if (satirlar.length < 4) return null;
+
+    const orta = Math.floor(satirlar.length / 2);
+    let kesim = -1;
+    for (let i = orta; i < satirlar.length; i++) {
+      if (mesajBasligiCoz(satirlar[i])) { kesim = i; break; }
+    }
+    if (kesim <= 0 || kesim >= satirlar.length) return null;
+
+    const ad = f.name.replace(/\.txt$/i, '');
+    return [
+      new File([satirlar.slice(0, kesim).join('\n')], ad + '.1.txt', { type: 'text/plain' }),
+      new File([satirlar.slice(kesim).join('\n')], ad + '.2.txt', { type: 'text/plain' }),
+    ];
+  }
+
   async function yukle() {
     if (dosyalar.length === 0) return;
     setYukleniyor(true);
@@ -75,22 +99,21 @@ export default function WhatsappYukle() {
     setHazirlaniyor(false);
 
     // Boyuta duyarlı gruplama: hem dosya sayısı hem toplam byte sınırı aşılınca yeni grup açılır
-    // (tek başına devasa bir dosya varsa yine de kendi grubunda tek başına gider — bölünemez)
-    const chunks: File[][] = [];
+    const kuyruk: File[][] = [];
     let acikGrup: File[] = [];
     let acikGrupBytes = 0;
     for (const f of hazirDosyalar) {
       const sayiAsimi = acikGrup.length >= CHUNK_SIZE;
       const boyutAsimi = acikGrup.length > 0 && acikGrupBytes + f.size > MAX_CHUNK_BYTES;
       if (sayiAsimi || boyutAsimi) {
-        chunks.push(acikGrup);
+        kuyruk.push(acikGrup);
         acikGrup = [];
         acikGrupBytes = 0;
       }
       acikGrup.push(f);
       acikGrupBytes += f.size;
     }
-    if (acikGrup.length > 0) chunks.push(acikGrup);
+    if (acikGrup.length > 0) kuyruk.push(acikGrup);
 
     const toplamSonuc = {
       success: true,
@@ -102,18 +125,45 @@ export default function WhatsappYukle() {
       reposted: 0,
       insert_failed: 0,
       aliases_count: 0,
+      bolunme: 0,
       debug: [] as string[],
       errors: [] as string[],
       error: '',
     };
 
-    for (let ci = 0; ci < chunks.length; ci++) {
-      setProgress({ current: ci + 1, total: chunks.length });
+    // ── İş kuyruğu + otomatik ikiye bölme ────────────────────────────────────
+    // Bir grup zaman aşımına uğrarsa (504 / sunucunun `tamamlanmadi` bayrağı) tüm
+    // yükleme iptal EDİLMEZ: grup ikiye bölünüp kuyruğun başına konur ve yeniden
+    // denenir. Sunucu tarafı hash bazlı tekilleştirme yaptığı için aynı içeriği
+    // tekrar göndermek güvenlidir — daha önce yazılanlar `skipped` olarak döner.
+    // Böylece parti büyüklüğü sihirli sabitlerle değil, ölçülen davranışla ayarlanır.
+    const MAX_BOLUNME = 8; // sonsuz döngü emniyeti
+    let tamamlanan = 0;
+
+    while (kuyruk.length > 0) {
+      const grup = kuyruk.shift()!;
+      setProgress({ current: tamamlanan + 1, total: tamamlanan + kuyruk.length + 1 });
 
       const formData = new FormData();
-      chunks[ci].forEach(f => formData.append('files', f));
+      grup.forEach(f => formData.append('files', f));
       formData.append('group_name', grupAdi || 'Bilinmiyor');
       formData.append('saat_filtre', saatFiltre.toString());
+
+      // Grubu ikiye bölüp kuyruğun BAŞINA koyar. Bölünemiyorsa false döner.
+      const bolVeKuyruklaAsync = async (): Promise<boolean> => {
+        if (toplamSonuc.bolunme >= MAX_BOLUNME) return false;
+        if (grup.length > 1) {
+          const orta = Math.ceil(grup.length / 2);
+          kuyruk.unshift(grup.slice(0, orta), grup.slice(orta));
+          toplamSonuc.bolunme++;
+          return true;
+        }
+        const yarilar = await dosyayiBol(grup[0]);
+        if (!yarilar) return false;
+        kuyruk.unshift([yarilar[0]], [yarilar[1]]);
+        toplamSonuc.bolunme++;
+        return true;
+      };
 
       try {
         const res = await fetch('/api/whatsapp-parse', { method: 'POST', body: formData });
@@ -122,12 +172,14 @@ export default function WhatsappYukle() {
         try {
           data = JSON.parse(raw);
         } catch {
+          // 504/413 → platform JSON değil HTML döner. Küçült ve tekrar dene.
+          if ((res.status === 504 || res.status === 413) && await bolVeKuyruklaAsync()) continue;
           toplamSonuc.success = false;
           toplamSonuc.error = res.status === 413
-            ? `Dosyalar çok büyük (grup ${ci + 1}/${chunks.length}) — sunucu isteği reddetti. Daha az dosya seçip tekrar dene.`
+            ? 'Dosyalar çok büyük — sunucu isteği reddetti ve daha fazla bölünemedi.'
             : res.status === 504
-            ? `Sunucu zaman aşımı (grup ${ci + 1}/${chunks.length}) — dosyalar çok uzun sürdü.`
-            : `Sunucu hatası (HTTP ${res.status}, grup ${ci + 1}/${chunks.length}) — JSON dönmedi.`;
+            ? 'Sunucu zaman aşımı — parça daha fazla bölünemedi.'
+            : `Sunucu hatası (HTTP ${res.status}) — JSON dönmedi.`;
           break;
         }
         if (!res.ok || !data.success) {
@@ -135,6 +187,7 @@ export default function WhatsappYukle() {
           toplamSonuc.error = data.error || 'Bilinmeyen hata';
           break;
         }
+
         toplamSonuc.total_messages += data.total_messages || 0;
         toplamSonuc.unparsed_timestamps += data.unparsed_timestamps || 0;
         toplamSonuc.saved_to_db   += data.saved_to_db   || 0;
@@ -145,6 +198,13 @@ export default function WhatsappYukle() {
         toplamSonuc.aliases_count  = data.aliases_count || toplamSonuc.aliases_count;
         if (data.debug) toplamSonuc.debug.push(...data.debug);
         if (data.errors?.length) toplamSonuc.errors.push(...data.errors);
+
+        // Sunucu süre bütçesini doldurup kısmi kaydetti → kalanı için tekrar sıraya al.
+        if (data.tamamlanmadi) {
+          if (await bolVeKuyruklaAsync()) continue;
+          toplamSonuc.errors.push(`${data.islenmeyen || 0} kayıt süre yetmediği için işlenemedi ve parça daha fazla bölünemedi.`);
+        }
+        tamamlanan++;
       } catch (e: any) {
         toplamSonuc.success = false;
         toplamSonuc.error = e.message || 'Ağ hatası';
