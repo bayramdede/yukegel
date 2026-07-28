@@ -52,7 +52,7 @@ export default function SifreSifirla() {
     const kod = new URLSearchParams(window.location.search).get('code');
     if (kod) {
       supabase.auth.exchangeCodeForSession(kod)
-        .then(({ error }) => { if (!bitti && !error) { bitti = true; setDurum('hazir'); } })
+        .then(({ error }: { error: unknown }) => { if (!bitti && !error) { bitti = true; setDurum('hazir'); } })
         .catch(() => {});
     }
 
