@@ -175,8 +175,10 @@ export default function WhatsappYukle() {
         toplamSonuc.skipped       += data.skipped       || 0;
         toplamSonuc.spam_blocked  += data.spam_blocked  || 0;
         toplamSonuc.reposted      += data.reposted      || 0;
+        toplamSonuc.insert_failed += data.insert_failed || 0;
         toplamSonuc.aliases_count  = data.aliases_count || toplamSonuc.aliases_count;
         if (data.debug) toplamSonuc.debug.push(...data.debug);
+        if (data.errors?.length) toplamSonuc.errors.push(...data.errors);
       } catch (e: any) {
         toplamSonuc.success = false;
         toplamSonuc.error = e.message || 'Ağ hatası';
