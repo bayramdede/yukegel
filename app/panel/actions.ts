@@ -163,7 +163,7 @@ export async function ilanTamamlandiToggle(
   tamamlandi: boolean
 ): Promise<PanelSonuc<{ completed_at: string | null }>> {
   const kontrol = await sahipMi(ilanId)
-  if ('hata' in kontrol) return { ok: false, hata: kontrol.hata }
+  if (!kontrol.ok) return { ok: false, hata: kontrol.hata }
 
   const deger = tamamlandi ? new Date().toISOString() : null
   const { error } = await kontrol.service
