@@ -738,6 +738,10 @@ Deno.serve(async (req) => {
         vehicle_type: firstLane.vehicle ? [firstLane.vehicle] : null,
         body_type: firstLane.body_type ? [firstLane.body_type] : null,
         shadow_profile_id: shadowProfileId,
+        // Repost bayrağı raw_posts'tan taşınır. ÖNCEDEN whatsapp-parse route'u
+        // orijinal ilanı ayrıca kopyalıyordu; trigger de bu fonksiyonu çağırdığı
+        // için aynı mesaj İKİ ilan üretiyordu. Artık tek üretici burasıdır.
+        is_repost: rawPost.is_repost === true,
       }).select().single()
 
       if (listing) {
