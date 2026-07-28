@@ -4,7 +4,8 @@
 > Kapsam: `app/moderator/WhatsappYukle.tsx`, `app/api/whatsapp-parse/route.ts`,
 > `supabase/functions/parse-listing/index.ts`, `app/api/admin/reprocess-no-lane/route.ts`
 > Not: DB trigger'ının (`raw_posts` INSERT → `parse-listing`) SQL'i `docs/` altında bulunamadı;
-> aşağıdaki bazı bulgular (özellikle B2, C4) trigger davranışının doğrulanmasını gerektiriyor.
+> aşağıdaki bazı bulgular (özellikle B2, C4) trigger davranışının doğrulanmasını gerektiriyordu.
+> **Doğrulandı (28 Tem 2026):** `on_raw_post_insert` bir `AFTER INSERT ... FOR EACH ROW` trigger'ı ve **WHEN koşulu taşımıyor** — `raw_posts`'a giren her satır `trigger_parse_listing()`'i tetikliyor.
 
 ---
 
@@ -373,7 +374,7 @@ testi, ileriki her değişikliği güvenli hale getirir.
 | 2 | A4 — Chunk insert sessiz veri kaybı | Veri kaybı | ~30 dk | ✅ kapandı |
 | 3 | A3 — Desteklenmeyen tarih formatları | Sessiz tam kayıp | ~2 sa | ✅ kapandı |
 | 4 | A2 — Saat dilimi kayması | Yanlış veri + kayıp | ~1 sa | ✅ kapandı |
-| 5 | B2 — Repost çift ilan | Veri kirliliği | doğrulama + ~1 sa | ✅ kapandı (trigger SQL doğrulanmalı) |
+| 5 | B2 — Repost çift ilan | Veri kirliliği | doğrulama + ~1 sa | ✅ kapandı ve doğrulandı (trigger koşulsuz) |
 | 6 | A5 — Repost indeks eşleşmesi | A4 sonrası kritik | ~30 dk | ✅ kapandı |
 | 7 | B5 — Zombi `pending` + retry yok | Sessiz kayıp | ~2 sa | ⬜ açık |
 | 8 | B1 — Sabit hat numaraları | Kaçırılan ilan | ~30 dk | ⬜ açık |
