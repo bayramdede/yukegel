@@ -22,42 +22,8 @@ export default function WhatsappYukle() {
 
   const buyukDosyalar = dosyalar.filter(f => f.size > BUYUK_DOSYA_ESIK);
 
-  // Sohbet metnindeki mesaj başlangıcı regex'leri — sunucudaki parseChatTxt (whatsapp-parse/route.ts) ile birebir aynı.
-  const TS_ANDROID = /^\[(\d{1,2}\.\d{1,2}\.\d{4}[,\s]\d{1,2}:\d{1,2}(?::\d{1,2})?)\]\s(.+?):\s(.*)$/;
-  const TS_IOS = /^(\d{1,2}\.\d{1,2}\.\d{4}[,\s]\d{1,2}:\d{1,2})\s?-\s(.+?):\s(.*)$/;
-
-  function zamanDamgasiCoz(raw: string): Date | null {
-    const tsClean = raw.replace(',', '').replace(/\s+/g, ' ').trim();
-    const parts = tsClean.split(' ');
-    if (parts.length < 2) return null;
-    const [datePart, timePart] = parts;
-    const ds = datePart.split('.');
-    if (ds.length < 3) return null;
-    const [day, month, year] = ds;
-    const isoDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-    const d = new Date(`${isoDate}T${timePart}`);
-    return isNaN(d.getTime()) ? null : d;
-  }
-
-  // Metni SONDAN başa doğru tarar, cutoff'tan (+ güvenlik payı) eski ilk mesajı bulunca durur —
-  // öncesindeki (muhtemelen çok daha büyük) eski geçmişi hiç okumaya/işlemeye gerek kalmaz.
-  // Sunucu zaten `saat_filtre` cutoff'undan eskisini atıyordu; bu adım aynı filtreyi göndermeden ÖNCE tarayıcıda uygular.
-  function eskiIcerigiKirp(text: string, saatFiltreSaat: number): string {
-    const GUVENLIK_PAYI_SAAT = 6; // saat dilimi/gecikme farklarına karşı tampon — sınırdaki mesajı yanlışlıkla atmamak için
-    const cutoff = new Date(Date.now() - (saatFiltreSaat + GUVENLIK_PAYI_SAAT) * 60 * 60 * 1000);
-    const lines = text.split('\n');
-    let kesimIndex = 0;
-    for (let i = lines.length - 1; i >= 0; i--) {
-      const trimmed = lines[i].replace(/[‎‪‬‏​]/g, '').trim();
-      if (!trimmed) continue;
-      const match = TS_ANDROID.exec(trimmed) || TS_IOS.exec(trimmed);
-      if (!match) continue; // devam satırı (mesaj başlangıcı değil) — atla, aramaya devam
-      const d = zamanDamgasiCoz(match[1]);
-      if (!d) continue;
-      if (d < cutoff) { kesimIndex = i + 1; break; } // bu mesajdan öncesi eski — burada dur
-    }
-    return kesimIndex === 0 ? text : lines.slice(kesimIndex).join('\n');
-  }
+  // Sohbet ayrıştırma TEK KAYNAKTAN gelir — sunucu (api/whatsapp-parse) da aynı modülü
+  // kullanır. Burada kopya regex/tarih mantığı TUTULMAZ; ayrışırlarsa mesaj sessizce kaybolur.
 
   // ZIP'in içinden SADECE sohbet .txt'inin metnini çıkarır — foto/video hiç sunucuya gitmez.
   // Bu işlem tarayıcıda çalışır, Vercel'in 60sn süresine dahil değil.
@@ -66,11 +32,7 @@ export default function WhatsappYukle() {
       const JSZip = (await import('jszip')).default;
       const buffer = await file.arrayBuffer();
       const zip = await JSZip.loadAsync(buffer);
-      const allTxts = Object.keys(zip.files).filter(name => !zip.files[name].dir && name.toLowerCase().endsWith('.txt'));
-      const chatFile = allTxts.find(n => n.toLowerCase().includes('_chat')) ||
-                       allTxts.find(n => n.toLowerCase().includes('chat')) ||
-                       allTxts.find(n => n.toLowerCase().includes('sohbet')) ||
-                       (allTxts.length === 1 ? allTxts[0] : null);
+      const chatFile = sohbetTxtSec(Object.keys(zip.files).filter(name => !zip.files[name].dir));
       if (!chatFile) return null; // sohbet txt'i bulunamadı — orijinali gönder, sunucu eskisi gibi atlar
       return await zip.files[chatFile].async('string');
     } catch {
