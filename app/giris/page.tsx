@@ -547,9 +547,10 @@ function GirisIci() {
                 </div>
                 {bilgi && <div style={{ color: '#22c55e', fontSize: '0.82rem', marginBottom: 12, background: '#0d2b1a', border: '1px solid #166534', borderRadius: 6, padding: '10px 12px' }}>✓ {bilgi}</div>}
                 {hata && <div style={{ color: '#ef4444', fontSize: '0.82rem', marginBottom: 12 }}>⚠️ {hata}</div>}
-                <button type="submit" disabled={yukleniyor}
-                  style={{ width: '100%', padding: '12px', borderRadius: 8, border: 'none', background: yukleniyor ? '#166534' : '#22c55e', color: '#000', fontWeight: 800, fontSize: '1rem', cursor: 'pointer' }}>
-                  {yukleniyor ? 'Gönderiliyor...' : 'Kod Gönder →'}
+                {/* SPRINT_01 A4b — bekleme sürerken buton kilitli */}
+                <button type="submit" disabled={yukleniyor || bekleme > 0}
+                  style={{ width: '100%', padding: '12px', borderRadius: 8, border: 'none', background: (yukleniyor || bekleme > 0) ? '#166534' : '#22c55e', color: '#000', fontWeight: 800, fontSize: '1rem', cursor: (yukleniyor || bekleme > 0) ? 'not-allowed' : 'pointer' }}>
+                  {yukleniyor ? 'Gönderiliyor...' : bekleme > 0 ? `Tekrar göndermek için ${bekleme} sn` : 'Kod Gönder →'}
                 </button>
               </form>
             ) : (
