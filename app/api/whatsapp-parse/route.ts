@@ -112,20 +112,11 @@ function gatekeeper_sync(message: string, aliases: any[]): { isAd: boolean; scor
   return { isAd, score, phones, cities: foundCities, vehicles: foundVehicles };
 }
 
-async function repostListings(sourceRawPostId: string, newRawPostId: string): Promise<void> {
-  const { data: originalListings } = await supabase.from('listings').select('*, listing_stops(*)').eq('raw_post_id', sourceRawPostId);
-  if (!originalListings || originalListings.length === 0) return;
-  for (const original of originalListings) {
-    const stops = original.listing_stops || [];
-    const { listing_stops, id, created_at, updated_at, ...listingFields } = original;
-    const { data: newListing } = await supabase.from('listings').insert({ ...listingFields, raw_post_id: newRawPostId, is_repost: true, moderation_status: 'pending', status: 'active', created_at: new Date().toISOString() }).select().single();
-    if (!newListing) continue;
-    for (const stop of stops) {
-      const { id: stopId, listing_id, created_at: stopCreated, ...stopFields } = stop;
-      await supabase.from('listing_stops').insert({ ...stopFields, listing_id: newListing.id });
-    }
-  }
-}
+// NOT: Eskiden burada `repostListings()` vardı — repost tespit edilen mesaj için
+// orijinal ilanı listings'e KOPYALIYORDU. Ancak raw_posts INSERT trigger'ı zaten
+// parse-listing Edge Function'ı çağırıyor ve o da aynı mesajdan bir ilan üretiyor;
+// sonuç: tek mesaj → İKİ ilan. Artık tek üretici parse-listing'dir ve repost
+// bayrağını raw_posts.is_repost üzerinden kendisi taşır.
 
 export async function POST(request: NextRequest) {
   // ── 0. Yetki kontrolü ─────────────────────────────────────────────────────
