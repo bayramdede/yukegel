@@ -416,12 +416,29 @@ export async function POST(request: NextRequest) {
       `${r.clean_hash}__${r.contact_phone ?? ''}__${r.message_date}`;
 
     let savedToDb = 0, reposted = 0, insertHatasi = 0;
+    let tamamlanmadi = false, islenmeyen = 0;
     const hatalar: string[] = [];
     const eklenenSatirlar: Array<{ id: string; anahtar: string }> = [];
 
     if (toInsert.length > 0) {
       const CHUNK = 100;
       for (let i = 0; i < toInsert.length; i += CHUNK) {
+        // ── Süre bütçesi ──────────────────────────────────────────────────────
+        // Bütçe dolduysa DUR. Vercel'in bizi 60sn'de öldürmesi HTML hata sayfası
+        // döndürüyor ve o ana kadar yazdıklarımız hakkında hiçbir bilgi kalmıyordu.
+        // Böyle çıkınca elimizdeki sayaçlar düzgün JSON olarak gidiyor.
+        if (Date.now() - baslangic > SURE_BUTCESI_MS) {
+          tamamlanmadi = true;
+          islenmeyen = toInsert.length - i;
+          structuredLog('WARN', 'whatsapp-import', 'Süre bütçesi doldu — kısmi kayıt', {
+            output_status: 'partial',
+            processed: i,
+            remaining: islenmeyen,
+            duration_ms: Date.now() - baslangic,
+          });
+          break;
+        }
+
         const chunk = toInsert.slice(i, i + CHUNK);
         const { data: inserted, error } = await supabase
           .from('raw_posts').insert(chunk).select(SELECT_KOLONLARI);
@@ -432,20 +449,42 @@ export async function POST(request: NextRequest) {
         }
 
         // ── Chunk başarısız ───────────────────────────────────────────────────
-        // ÖNCEDEN: `continue` deniyordu — tek bir çakışan satır yüzünden chunk'taki
-        // 99 geçerli kayıt da sessizce kaybolıyordu. ARTIK: satır satır tekrar
-        // denenir, yalnızca gerçekten çakışan satır düşer.
+        // En eski hali `continue` diyordu → tek çakışma yüzünden 99 geçerli kayıt
+        // sessizce kayboluyordu. Sonraki hali satır satır retry ediyordu → çakışma
+        // yoğun olduğunda (repost'lar; `clean_hash` UNIQUE olduğu için her repost
+        // çakışıyor) chunk başına ~100 ekstra istek çıkarıp 60sn'i yiyordu.
+        // ŞİMDİ: tek sorguyla "hangileri zaten var" öğrenilir, sadece kalanlar
+        // yeniden denenir → çakışan chunk başına 100 istek yerine 2 istek.
         if (error.code === '23505') {
-          const tekTekSonuc = await Promise.all(
-            chunk.map(async row => {
-              const { data, error: satirHata } = await supabase
-                .from('raw_posts').insert(row).select(SELECT_KOLONLARI).maybeSingle();
-              if (satirHata || !data) return null;
-              return { id: data.id, anahtar: satirAnahtari(data) };
-            })
-          );
+          const { data: cakisanlar } = await supabase
+            .from('raw_posts').select('clean_hash')
+            .in('clean_hash', chunk.map(r => r.clean_hash));
+          const cakisanSet = new Set((cakisanlar || []).map(r => r.clean_hash));
+          const kalan = chunk.filter(r => !cakisanSet.has(r.clean_hash));
+          skipped += chunk.length - kalan.length;
+
+          if (kalan.length === 0) continue;
+
+          const { data: ikinciDeneme, error: ikinciHata } = await supabase
+            .from('raw_posts').insert(kalan).select(SELECT_KOLONLARI);
+
+          if (!ikinciHata) {
+            for (const row of ikinciDeneme || []) eklenenSatirlar.push({ id: row.id, anahtar: satirAnahtari(row) });
+            continue;
+          }
+
+          // Hâlâ çakışıyor → unique kısıt `clean_hash`ten farklı bir kolon setinde.
+          // Son çare: satır satır, ama TAVANLI ve süre bütçesine tabi.
+          const tekTekSonuc = await sirayla(kalan, ESZAMANLI, async row => {
+            if (Date.now() - baslangic > SURE_BUTCESI_MS) return 'butce' as const;
+            const { data, error: satirHata } = await supabase
+              .from('raw_posts').insert(row).select(SELECT_KOLONLARI).maybeSingle();
+            if (satirHata || !data) return null;
+            return { id: data.id, anahtar: satirAnahtari(data) };
+          });
           for (const r of tekTekSonuc) {
-            if (r) eklenenSatirlar.push(r);
+            if (r === 'butce') { islenmeyen++; tamamlanmadi = true; }
+            else if (r) eklenenSatirlar.push(r);
             else skipped++; // çakışan (zaten var olan) satır — tekrar sayılır
           }
           continue;
