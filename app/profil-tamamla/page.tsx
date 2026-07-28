@@ -2,8 +2,23 @@
 import { useState, useEffect, useCallback, Suspense } from 'react';
 import { createClient } from '../../lib/supabase';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { REDIRECT_COOKIE, guvenliRedirect } from '../../lib/redirect';
+import { profilKaydet } from './actions';
 
 const supabase = createClient();
+
+// SPRINT_01 A7 — bkz. lib/redirect.ts. Proxy giriş öncesi hedefi cookie'ye yazıyor;
+// query param Google/magic-link zincirinde kayboluyor, cookie sağ çıkıyor.
+function redirectCookieOku(): string | null {
+  if (typeof document === 'undefined') return null;
+  const eslesme = document.cookie.match(new RegExp(`(?:^|; )${REDIRECT_COOKIE}=([^;]*)`));
+  return eslesme ? decodeURIComponent(eslesme[1]) : null;
+}
+
+function redirectCookieSil() {
+  if (typeof document === 'undefined') return;
+  document.cookie = `${REDIRECT_COOKIE}=; path=/; max-age=0`;
+}
 
 // SPRINT_01 A1 — bkz. app/giris/page.tsx'teki aynı fonksiyon.
 // Sessiz catch kaldırıldı; endpoint 404 dönerse artık konsolda görünür.
