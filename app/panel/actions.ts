@@ -88,7 +88,7 @@ function sayiYada(v: unknown): number | null {
 
 export async function ilanGuncelle(girdi: IlanGuncelleGirdi): Promise<PanelSonuc<{ duraklar: unknown[] }>> {
   const kontrol = await sahipMi(girdi.id)
-  if ('hata' in kontrol) return { ok: false, hata: kontrol.hata }
+  if (!kontrol.ok) return { ok: false, hata: kontrol.hata }
   const { service } = kontrol
 
   // ── Doğrulama (istemcidekinin aynısı; istemciye GÜVENME) ────────────
