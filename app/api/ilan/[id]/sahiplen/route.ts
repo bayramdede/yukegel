@@ -112,12 +112,21 @@ export async function POST(
     const supabase = await getServerSupabase()
 
     if (adim === 'gonder') {
+      const kalan = beklemeKalan(id)
+      if (kalan > 0) {
+        return NextResponse.json(
+          { error: `Yeni kod istemek için ${kalan} saniye bekleyin.`, kalan },
+          { status: 429, headers: { 'Retry-After': String(kalan) } }
+        )
+      }
       const { error } = await supabase.auth.signInWithOtp({ phone: telefon })
       if (error) {
         console.error('sahiplen OTP gönderilemedi:', error.message)
         return NextResponse.json({ error: 'SMS gönderilemedi. Lütfen tekrar deneyin.' }, { status: 502 })
       }
-      return NextResponse.json({ success: true })
+      // Sayacı yalnızca SMS GERÇEKTEN gittiyse başlat; sağlayıcı hatası kullanıcıyı kilitlemesin.
+      otpSonGonderim.set(id, Date.now())
+      return NextResponse.json({ success: true, bekleme: OTP_BEKLEME_MS / 1000 })
     }
 
     if (adim !== 'dogrula') {
