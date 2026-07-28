@@ -81,6 +81,12 @@ WHERE d.refobjid = 'public.raw_posts'::regclass
 -- KARAR: taşıma güvenli. Tablo 59.533 satır / 54 MB olduğundan ADIM 1'de
 -- SEÇENEK A (CONCURRENTLY'siz, Supabase SQL editöründe) yeterli — saniyeler sürer.
 --
+-- ✅ ADIM 1 UYGULANDI (28 Tem 2026, Seçenek A). idx_raw_posts_hash_msgdate kuruldu,
+--    idx_raw_posts_hash_day düşürüldü.
+-- ✅ KOD DAĞITIMI HAZIR: app/api/whatsapp-parse/route.ts artık `post_date` YAZMIYOR;
+--    existingMap ve 23505 kurtarma bloğu `message_date` üzerinden çalışıyor.
+--    → Dağıtım canlıda doğrulandıktan sonra ADIM 2 çalıştırılabilir.
+--
 -- İSTEĞE BAĞLI TEMİZLİK (kolonu düşürmeden önce arşiv tutarlılığı isteniyorsa):
 --   UPDATE public.raw_posts
 --   SET post_date = message_date
