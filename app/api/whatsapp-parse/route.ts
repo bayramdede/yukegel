@@ -40,6 +40,47 @@ function rateLimitAsildi(userId: string): boolean {
   return false;
 }
 
+// ── Süre bütçesi ──────────────────────────────────────────────────────────────
+// Vercel maxDuration 60sn. 60'a dayanınca fonksiyon ÖLDÜRÜLÜR ve platform JSON
+// değil HTML hata sayfası döner → frontend'de "Unexpected token" patlaması.
+// Bu yüzden 45sn'de kendimiz durup ELİMİZDEKİ sonucu düzgün JSON olarak döneriz;
+// `tamamlanmadi: true` görünce istemci kalanı yeniden gönderir (hash dedup
+// sayesinde tekrar göndermek güvenli — zaten yazılanlar `skipped` olur).
+const SURE_BUTCESI_MS = 45_000;
+
+// PostgREST `.in(...)` filtreyi URL'e gömer. Binlerce hash tek sorguya konunca
+// URL onlarca KB'a çıkıyor ve sorgu ya reddediliyor ya da çok yavaşlıyor.
+const IN_PARCA_BOYU = 150;
+
+// Supabase bağlantı havuzunu tıkamamak için eşzamanlı istek tavanı.
+const ESZAMANLI = 6;
+
+function parcala<T>(dizi: T[], boyut: number): T[][] {
+  const parcalar: T[][] = [];
+  for (let i = 0; i < dizi.length; i += boyut) parcalar.push(dizi.slice(i, i + boyut));
+  return parcalar;
+}
+
+/** Sınırlı eşzamanlılıkla çalıştırır. Promise.all(500 istek) havuzu tıkar ve
+ *  paralellik sanılan şey sıraya girip toplam süreyi uzatır. */
+async function sirayla<T, R>(
+  ogeler: T[],
+  tavan: number,
+  isle: (oge: T) => Promise<R>
+): Promise<R[]> {
+  const sonuclar: R[] = new Array(ogeler.length);
+  let sonraki = 0;
+  const isciler = Array.from({ length: Math.min(tavan, ogeler.length) }, async () => {
+    for (;;) {
+      const i = sonraki++;
+      if (i >= ogeler.length) return;
+      sonuclar[i] = await isle(ogeler[i]);
+    }
+  });
+  await Promise.all(isciler);
+  return sonuclar;
+}
+
 async function cleanHash(text: string): Promise<string> {
   const normalized = text.toLowerCase().replace(/\s+/g, ' ').trim();
   const encoder = new TextEncoder();
