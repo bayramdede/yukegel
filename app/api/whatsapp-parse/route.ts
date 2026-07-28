@@ -405,34 +405,69 @@ export async function POST(request: NextRequest) {
     }
 
     // ── 8. Yeni kayıtları BATCH INSERT (100'lük chunk'lar) ───────────────────
-    let savedToDb = 0, reposted = 0;
-    if (toInsert.length > 0) {
-      const repostMeta = toInsert.map(r => ({ sourceRawPostId: r._sourceRawPostId, isRepost: r._isRepost }));
-      const cleanRows = toInsert.map(({ _sourceRawPostId, _isRepost, ...rest }) => rest);
+    // Dönen satırları doğal anahtarla (clean_hash|contact_phone|message_date)
+    // geri eşleştiriyoruz — böylece hangi kaydın repost olduğu indekse bağlı kalmıyor.
+    const SELECT_KOLONLARI = 'id, clean_hash, contact_phone, message_date';
+    const satirAnahtari = (r: { clean_hash: string; contact_phone: string | null; message_date: string }) =>
+      `${r.clean_hash}__${r.contact_phone ?? ''}__${r.message_date}`;
 
+    let savedToDb = 0, reposted = 0, insertHatasi = 0;
+    const hatalar: string[] = [];
+    const eklenenSatirlar: Array<{ id: string; anahtar: string }> = [];
+
+    if (toInsert.length > 0) {
       const CHUNK = 100;
-      for (let i = 0; i < cleanRows.length; i += CHUNK) {
-        const chunk = cleanRows.slice(i, i + CHUNK);
-        const meta = repostMeta.slice(i, i + CHUNK);
-        const { data: inserted, error } = await supabase.from('raw_posts').insert(chunk).select('id');
-        if (error) {
-          if (error.code !== '23505') console.error('batch insert hatası:', error.message);
+      for (let i = 0; i < toInsert.length; i += CHUNK) {
+        const chunk = toInsert.slice(i, i + CHUNK);
+        const { data: inserted, error } = await supabase
+          .from('raw_posts').insert(chunk).select(SELECT_KOLONLARI);
+
+        if (!error) {
+          for (const row of inserted || []) eklenenSatirlar.push({ id: row.id, anahtar: satirAnahtari(row) });
           continue;
         }
-        savedToDb += (inserted || []).length;
 
-        // Repost olanlar için listing kopyala (paralel)
-        await Promise.all(
-          (inserted || []).map((row, idx) => {
-            const m = meta[idx];
-            if (m.isRepost && m.sourceRawPostId) {
-              reposted++;
-              return repostListings(m.sourceRawPostId, row.id);
-            }
-            return Promise.resolve();
-          })
-        );
+        // ── Chunk başarısız ───────────────────────────────────────────────────
+        // ÖNCEDEN: `continue` deniyordu — tek bir çakışan satır yüzünden chunk'taki
+        // 99 geçerli kayıt da sessizce kaybolıyordu. ARTIK: satır satır tekrar
+        // denenir, yalnızca gerçekten çakışan satır düşer.
+        if (error.code === '23505') {
+          const tekTekSonuc = await Promise.all(
+            chunk.map(async row => {
+              const { data, error: satirHata } = await supabase
+                .from('raw_posts').insert(row).select(SELECT_KOLONLARI).maybeSingle();
+              if (satirHata || !data) return null;
+              return { id: data.id, anahtar: satirAnahtari(data) };
+            })
+          );
+          for (const r of tekTekSonuc) {
+            if (r) eklenenSatirlar.push(r);
+            else skipped++; // çakışan (zaten var olan) satır — tekrar sayılır
+          }
+          continue;
+        }
+
+        // 23505 dışı hata — sessizce yutma, kullanıcıya bildir
+        insertHatasi += chunk.length;
+        const mesaj = `Chunk ${Math.floor(i / CHUNK) + 1}: ${error.message}`;
+        if (!hatalar.includes(mesaj)) hatalar.push(mesaj);
+        structuredLog('ERROR', 'whatsapp-import', 'raw_posts batch insert hatası', {
+          output_status: 'error',
+          error_code: error.code,
+          error_message: error.message,
+          chunk_size: chunk.length,
+        });
       }
+
+      savedToDb = eklenenSatirlar.length;
+
+      // ── Repost olanlar için listing kopyala (anahtar bazlı eşleşme) ─────────
+      const repostEdilecekler = eklenenSatirlar
+        .map(r => ({ yeniId: r.id, kaynakId: repostPlan.get(r.anahtar) }))
+        .filter((r): r is { yeniId: string; kaynakId: string } => Boolean(r.kaynakId));
+
+      reposted = repostEdilecekler.length;
+      await Promise.all(repostEdilecekler.map(r => repostListings(r.kaynakId, r.yeniId)));
     }
 
     return NextResponse.json({
