@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test:parser": "npx tsx lib/whatsapp/__tests__/chatParser.test.ts"
   },
   "dependencies": {
     "@next/third-parties": "^16.2.6",
