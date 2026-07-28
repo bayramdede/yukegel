@@ -157,6 +157,28 @@ async function repostListings(sourceRawPostId: string, newRawPostId: string): Pr
 }
 
 export async function POST(request: NextRequest) {
+  // ── 0. Yetki kontrolü ─────────────────────────────────────────────────────
+  // Bu route service-role ile raw_posts'a yazıyor ve raw_posts INSERT'i trigger
+  // üzerinden listings üretiyor. proxy.ts '/api/' yolunu açık rota saydığı için
+  // yetkilendirme burada yapılmak ZORUNDA — aksi halde endpoint herkese açık.
+  const yetki = await requireStaff();
+  if (!yetki.ok) {
+    structuredLog('WARN', 'whatsapp-parse yetkisiz erişim denemesi', {
+      context: 'whatsapp-import',
+      status: yetki.status,
+    });
+    return NextResponse.json({ error: yetki.error }, { status: yetki.status });
+  }
+
+  if (rateLimitAsildi(yetki.user.id)) {
+    return NextResponse.json(
+      { error: 'Çok fazla istek — bir dakika bekleyip tekrar dene.' },
+      { status: 429 }
+    );
+  }
+
+  const baslangic = Date.now();
+
   try {
     const formData = await request.formData();
     const files = formData.getAll('files') as File[];
