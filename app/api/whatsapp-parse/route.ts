@@ -204,12 +204,24 @@ function aliasEslesiyorMu(
 type AliasKaydi = { norm: string; normalized: string; anahtar: string };
 type AliasDizini = { blacklist: string[]; sehir: AliasKaydi[]; arac: AliasKaydi[] };
 
+// `tokenKumeleri` mesajı `[\s.>-]+` ile böler; alias tarafı bölünmediği için
+// içinde nokta/tire geçen alias'lar HİÇBİR ZAMAN eşleşemiyordu. Ölü alias'lar:
+// 'G.Antep', 'K.Maraş', 'M.Kemalpaşa', 'İst.Avr', 'İst.And', 'İst.Anadolu',
+// 'k.paşa', '13.60' — yani WhatsApp yük ilanlarında en sık kullanılan
+// kısaltmalar. Alias'ı da aynı ayraçlarla bölüp boşlukla birleştiriyoruz:
+// 'm.kemalpasa' → 'm kemalpasa' → ikili token kümesinde bulunur.
+function aliasAnahtari(alias: string): string {
+  return trNorm(alias).split(/[\s.>-]+/).filter(Boolean).join(' ');
+}
+
 function aliasDiziniKur(aliases: any[]): AliasDizini {
   const dizin: AliasDizini = { blacklist: [], sehir: [], arac: [] };
   for (const a of aliases) {
-    const norm = trNorm(a.alias);
-    if (a.type === 'blacklist') dizin.blacklist.push(norm);
-    else if (a.type === 'city') dizin.sehir.push({ norm, normalized: a.normalized, anahtar: trNorm(a.normalized) });
+    // Blacklist `norm.includes(bl)` ile alt dize araması yapar, token'lamaz —
+    // orada ham trNorm doğru olan.
+    if (a.type === 'blacklist') { dizin.blacklist.push(trNorm(a.alias)); continue; }
+    const norm = aliasAnahtari(a.alias);
+    if (a.type === 'city') dizin.sehir.push({ norm, normalized: a.normalized, anahtar: trNorm(a.normalized) });
     else if (a.type === 'vehicle') dizin.arac.push({ norm, normalized: a.normalized, anahtar: trNorm(a.normalized) });
   }
   return dizin;
