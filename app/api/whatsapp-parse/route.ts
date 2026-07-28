@@ -277,46 +277,55 @@ export async function POST(request: NextRequest) {
     const allPhones = [...new Set(candidates.map(c => c.phone).filter(Boolean) as string[])];
     const birSaatOnce = new Date(Date.now() - 60 * 60 * 1000).toISOString();
 
-    const [existingPostsRes, recentByPhoneRes, repostCandidatesRes] = await Promise.all([
-      // 5a. Aynı hash'e sahip tüm mevcut kayıtlar
-      supabase.from('raw_posts')
-        .select('id, clean_hash, message_date, contact_phone')
-        .in('clean_hash', allHashes),
+    // Sorgular PARÇALANARAK atılır: `.in()` filtresi URL'e gömüldüğü için binlerce
+    // hash'i tek sorguya koymak URL'i onlarca KB yapıyor ve sorguyu ya patlatıyor
+    // ya da dakikalara çıkarıyordu — 60sn timeout'un ana sebeplerinden biri buydu.
+    const [mevcutSatirlar, sonSaatTelefonlar] = await Promise.all([
+      // 5a. Aynı hash'e sahip tüm mevcut kayıtlar.
+      //     (Eski 5c sorgusu KALDIRILDI: repost tespiti için gereken tüm kolonlar
+      //      —id, clean_hash, contact_phone, message_date— zaten burada dönüyor.)
+      sirayla(parcala(allHashes, IN_PARCA_BOYU), ESZAMANLI, async parca => {
+        const { data } = await supabase.from('raw_posts')
+          .select('id, clean_hash, message_date, contact_phone')
+          .in('clean_hash', parca);
+        return data || [];
+      }).then(r => r.flat()),
       // 5b. Son 1 saatte bu telefonlardan kaç kayıt var (spam kontrolü)
-      allPhones.length > 0
-        ? supabase.from('raw_posts')
+      allPhones.length === 0 ? Promise.resolve([] as any[]) :
+        sirayla(parcala(allPhones, IN_PARCA_BOYU), ESZAMANLI, async parca => {
+          const { data } = await supabase.from('raw_posts')
             .select('contact_phone')
-            .in('contact_phone', allPhones)
-            .gte('created_at', birSaatOnce)
-        : Promise.resolve({ data: [] as any[], error: null }),
-      // 5c. Repost tespiti: aynı hash + aynı telefon ama farklı tarih
-      allPhones.length > 0
-        ? supabase.from('raw_posts')
-            .select('id, clean_hash, contact_phone, message_date')
-            .in('clean_hash', allHashes)
-            .in('contact_phone', allPhones)
-        : Promise.resolve({ data: [] as any[], error: null }),
+            .in('contact_phone', parca)
+            .gte('created_at', birSaatOnce);
+          return data || [];
+        }).then(r => r.flat()),
     ]);
 
     // Lookup map'leri oluştur (O(1) erişim)
     const existingMap = new Map<string, { id: string; contact_phone: string | null }>();
-    for (const row of existingPostsRes.data || []) {
+    // clean_hash üzerinde UNIQUE index var — aynı hash farklı tarihle de yazılamaz.
+    // Bu set sayesinde repost adayları insert'e hiç gönderilmez (yoksa her repost
+    // 23505 alıp satır-satır retry'a düşüyordu: chunk başına ~100 ekstra istek).
+    const mevcutHashler = new Set<string>();
+    const phoneSet = new Set(allPhones);
+    const repostMap = new Map<string, { id: string; message_date: string }>();
+
+    for (const row of mevcutSatirlar) {
       existingMap.set(`${row.clean_hash}__${row.message_date}`, { id: row.id, contact_phone: row.contact_phone });
+      mevcutHashler.add(row.clean_hash);
+      // Repost map: (hash + phone) → en son kayıt id'si
+      if (row.contact_phone && phoneSet.has(row.contact_phone)) {
+        const key = `${row.clean_hash}__${row.contact_phone}`;
+        const oncekiKayit = repostMap.get(key);
+        if (!oncekiKayit || row.message_date > oncekiKayit.message_date)
+          repostMap.set(key, { id: row.id, message_date: row.message_date });
+      }
     }
 
     const phoneCountMap = new Map<string, number>();
-    for (const row of recentByPhoneRes.data || []) {
+    for (const row of sonSaatTelefonlar) {
       if (row.contact_phone)
         phoneCountMap.set(row.contact_phone, (phoneCountMap.get(row.contact_phone) || 0) + 1);
-    }
-
-    // Repost map: (hash + phone) → en son kayıt id'si
-    const repostMap = new Map<string, { id: string; message_date: string }>();
-    for (const row of repostCandidatesRes.data || []) {
-      const key = `${row.clean_hash}__${row.contact_phone}`;
-      const existing = repostMap.get(key);
-      if (!existing || row.message_date > existing.message_date)
-        repostMap.set(key, { id: row.id, message_date: row.message_date });
     }
 
     // ── 6. Her adayı değerlendir ─────────────────────────────────────────────
