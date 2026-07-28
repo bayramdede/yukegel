@@ -411,13 +411,11 @@ export async function POST(request: NextRequest) {
 
       savedToDb = eklenenSatirlar.length;
 
-      // ── Repost olanlar için listing kopyala (anahtar bazlı eşleşme) ─────────
-      const repostEdilecekler = eklenenSatirlar
-        .map(r => ({ yeniId: r.id, kaynakId: repostPlan.get(r.anahtar) }))
-        .filter((r): r is { yeniId: string; kaynakId: string } => Boolean(r.kaynakId));
-
-      reposted = repostEdilecekler.length;
-      await Promise.all(repostEdilecekler.map(r => repostListings(r.kaynakId, r.yeniId)));
+      // ── Repost sayımı (anahtar bazlı eşleşme) ──────────────────────────────
+      // Sadece RAPORLAMA için sayılır; ilanı trigger → parse-listing üretir ve
+      // is_repost bayrağını raw_posts satırından taşır. Dizi indeksi yerine doğal
+      // anahtar kullanılıyor: insert dönüşü eksik/sırasız gelirse indeks kayar.
+      reposted = eklenenSatirlar.filter(r => repostPlan.has(r.anahtar)).length;
     }
 
     structuredLog(insertHatasi > 0 ? 'WARN' : 'INFO', 'whatsapp-import', 'ZIP/TXT import tamamlandı', {
