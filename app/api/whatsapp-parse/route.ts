@@ -286,7 +286,7 @@ export async function POST(request: NextRequest) {
       //      —id, clean_hash, contact_phone, message_date— zaten burada dönüyor.)
       sirayla(parcala(allHashes, IN_PARCA_BOYU), ESZAMANLI, async parca => {
         const { data } = await supabase.from('raw_posts')
-          .select('id, clean_hash, message_date, contact_phone')
+          .select('id, clean_hash, message_date, post_date, contact_phone')
           .in('clean_hash', parca);
         return data || [];
       }).then(r => r.flat()),
@@ -307,7 +307,12 @@ export async function POST(request: NextRequest) {
     const repostMap = new Map<string, { id: string; message_date: string }>();
 
     for (const row of mevcutSatirlar) {
-      existingMap.set(`${row.clean_hash}__${row.message_date}`, { id: row.id, contact_phone: row.contact_phone });
+      // Anahtar `post_date` üzerinden kurulur, `message_date` üzerinden DEĞİL:
+      // benzersizliği dayatan indeks idx_raw_posts_hash_day (clean_hash, post_date).
+      // Kod ikisine de aynı değeri yazıyor ama eski satırlarda ayrışmış olabilir;
+      // indeksle aynı kolonu kullanmak "önce kontrol ettim, yine de 23505 aldım"
+      // durumunu ortadan kaldırır.
+      existingMap.set(`${row.clean_hash}__${row.post_date}`, { id: row.id, contact_phone: row.contact_phone });
       // Repost map: (hash + phone) → en son kayıt id'si
       if (row.contact_phone && phoneSet.has(row.contact_phone)) {
         const key = `${row.clean_hash}__${row.contact_phone}`;
