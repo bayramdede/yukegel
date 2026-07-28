@@ -166,7 +166,9 @@ function ekSoy(token: string): string {
 
 /** Normalize metinden tekil (ekli/eksiz) ve ikili token kümeleri üretir. */
 function tokenKumeleri(norm: string): { tekil: Set<string>; ikili: Set<string> } {
-  const tokenlar = norm.split(' ').filter(t => t.length >= 2);
+  // trNorm çıktısında boşluk dışında `.`, `>`, `-` de kalıyor ("bala-cerkes",
+  // "ist>ankara"). Bunlar da sınır sayılmazsa iki şehir tek token'a yapışır.
+  const tokenlar = norm.split(/[\s.>-]+/).filter(t => t.length >= 2);
   const tekil = new Set<string>();
   for (const t of tokenlar) {
     tekil.add(t);
