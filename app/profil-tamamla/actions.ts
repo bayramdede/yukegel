@@ -134,6 +134,7 @@ export async function profilKaydet(girdi: ProfilGirdi): Promise<ProfilSonuc> {
   // Buraya yazılan her kolon istemcinin dolaylı olarak etkileyebildiği bir kolon olur.
   // ASLA eklenmemesi gerekenler: role, is_active, merged_into, trust_level,
   // is_shadow_banned, moderation_status.
+  // (is_active bilinçli olarak YOK — DB varsayılanı geçerli. Yukarıdaki askı kontrolüne bak.)
   const kayit: Record<string, unknown> = {
     id: user.id,                       // ← oturumdan, gövdeden DEĞİL
     email: user.email,                 // ← oturumdan, gövdeden DEĞİL
