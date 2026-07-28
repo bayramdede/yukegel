@@ -20,6 +20,30 @@ function redirectCookieSil() {
   document.cookie = `${REDIRECT_COOKIE}=; path=/; max-age=0`;
 }
 
+// SPRINT_01 A4b — OTP tekrar gönderme bekleme süresi.
+// Eskiden "Kod Gönder" butonuna basılı tutmak her seferinde yeni SMS gönderiyordu:
+// hem Twilio faturası (mesaj başına ücret), hem de bir numarayı SMS'e boğma aracı.
+// Bitiş anını sessionStorage'da tutuyoruz ki sayfa yenilenince sayaç sıfırlanmasın.
+const OTP_BEKLEME_SN = 60;
+const OTP_BEKLEME_ANAHTAR = 'yk_otp_bekleme';
+
+function otpKalanSaniye(): number {
+  if (typeof window === 'undefined') return 0;
+  try {
+    const bitis = Number(window.sessionStorage.getItem(OTP_BEKLEME_ANAHTAR) || 0);
+    if (!bitis) return 0;
+    return Math.max(0, Math.ceil((bitis - Date.now()) / 1000));
+  } catch {
+    return 0; // gizli sekmede sessionStorage kilitli olabilir
+  }
+}
+
+function otpBeklemeYaz() {
+  try {
+    window.sessionStorage.setItem(OTP_BEKLEME_ANAHTAR, String(Date.now() + OTP_BEKLEME_SN * 1000));
+  } catch { /* sessionStorage yoksa sadece bellek-içi sayaç çalışır */ }
+}
+
 type Mod = 'giris' | 'kayit' | 'reset' | 'reset_tamam' | 'dogrulama_bekle' | 'merge_onay';
 type Sekme = 'telefon' | 'eposta';
 
