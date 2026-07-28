@@ -172,6 +172,44 @@ Tam analiz: `docs/WHATSAPP_IMPORT_ANALIZ.md` (bulgu kodları A1–A5, B1–B8, C
 Tam analiz: `docs/LANDING_AUTH_ANALIZ.md` (bulgu kodları L1–L5, A1–A7, K1–K3). Hiçbiri kod
 değişikliği içermiyor — yalnızca statik okuma. Canlı DB/RLS doğrulaması yapılmadı.
 
+> **🏃 SPRINT PLANI: `docs/SPRINT_01.md`** — 30 madde / 78 puan, 5 dalgaya (W0–W4) bölünmüş.
+> Her maddede dosya:satır, kabul kriteri, efor ve bağımlılık var. Aşağıdaki liste bulgu
+> envanteri; **çalışma sırası için SPRINT_01.md'yi kullan.**
+>
+> W0 (blocker, 17p): L1 · A2 · **M1** · K1  —  W1 (auth bütünlüğü, 21p): A1 · A3 · A4 · A7 · K2 · **R1** · **C1**
+> W2 (güvenlik, 15p): **G1** · **G2** · **M2** · **C2** · K2b  —  W3 (SEO/huni, 14p): **S1–S4** · L2 · L3
+> W4 (cila, 11p): K3 · **R2** · **F1** · **F2** · L4 · L5 · A5 · A6
+
+### 🔴 Yeni kritik bulgu (geniş tarama, 28 Tem 2026)
+- [ ] **M1** — `/moderator-giris` çıkış yapmışken **erişilemiyor**. `proxy.ts:19` `KORUNMALI`
+      listesinde `/moderator` var ve `:72` `startsWith` kullanıyor →
+      `'/moderator-giris'.startsWith('/moderator') === true`. `ACIK_ROTALAR`'da da yok.
+      Oturumsuz moderatör kendi giriş ekranına ulaşamıyor, `/giris?redirect=/moderator-giris`'e
+      atılıyor. Düzeltme: `ACIK_ROTALAR`'a `/moderator-giris` ekle + prefix'i `/moderator/` yap.
+
+### 🟠 Diğer yeni bulgular
+- [ ] **M2** — `app/moderator-giris/page.tsx:20-30` giriş sonrası rol kontrolü yok; normal
+      kullanıcı da giriş yapıp `/moderator`'a itiliyor.
+- [ ] **R1** — `app/auth/reset/page.tsx` recovery oturumu kontrol etmiyor; tokensız açılışta
+      form gösteriyor, submit'te belirsiz hata veriyor. `PASSWORD_RECOVERY` dinlenmiyor.
+- [ ] **C1** — `app/cikis/route.ts:5-7` GET kabul ediyor → link prefetch / üçüncü taraf
+      `<img src>` ile istemsiz oturum kapanması. Yalnız POST bırak + Origin kontrolü.
+- [ ] **C2** — `/cikis` `sb-` cookie'lerini açıkça temizlemiyor (proxy'deki pattern ile tutarsız).
+- [ ] **G1** — Şifreli girişte (özellikle `/moderator-giris`) rate limit / lockout yok.
+- [ ] **G2** — OTP gönderiminde bot koruması yok → rastgele numaralara SMS tetiklenebilir (maliyet).
+- [ ] **S1** — `app/layout.tsx:22-26` metadata'da `metadataBase`, OpenGraph, Twitter card,
+      canonical yok → WhatsApp/sosyal paylaşımda önizleme kartı çıkmıyor.
+- [ ] **S2** — `/giris`, `/profil-tamamla`, `/moderator-giris`, `/auth/reset` indekslenebilir
+      (`noindex` yok).
+- [ ] **S3** — `app/sitemap.ts:29-35` `/yol-rehberi` ve `/u/[username]` profillerini içermiyor.
+- [ ] **S4** — `public/robots.txt` tutarsız: ClaudeBot bloğunda `/moderator-giris/` disallow yok;
+      `User-agent: *` bloğu `/panel/`, `/admin/`, `/api/`, `/moderator/`'e açık.
+- [ ] **R2** — Şifre güç göstergesi 3 kriter gösteriyor, doğrulama yalnız uzunluk uyguluyor
+      (`auth/reset/page.tsx:30` vs `:74`; `giris/page.tsx:258` vs `:497`).
+- [ ] **F1** — `Footer.tsx:29` "Kayıt Ol" linki `/giris` (mod param yok, `:28` ile birebir aynı).
+- [ ] **F2** — `Footer.tsx:20-37` 7 link `<a>` ile → her tıklamada tam sayfa yenilemesi.
+- [ ] **K2b** — TCKN/VKN doğrulaması yalnız client'ta; sunucuda tekrarlanmıyor (K2 ile birlikte).
+
 ### 🔴 Kritik
 - [ ] **L1** — Misafire kapalı olması gereken `contact_phone` değerleri RSC payload'ında açıkta.
       `app/page.tsx:92` numarayı map'leyip client component'e prop geçiyor → Next.js flight
