@@ -174,6 +174,9 @@ function IlanKart({ ilan, onGuncelle }: { ilan: any; onGuncelle: (id: string, pa
             </a>
           </div>
         </div>
+        {kartHata && (
+          <div style={{ color: '#ef4444', fontSize: '0.78rem', marginTop: 10 }}>⚠️ {kartHata}</div>
+        )}
       </div>
 
       {/* Düzenleme formu */}
