@@ -1,5 +1,9 @@
 import { NextResponse } from 'next/server'
 import { getServerSupabase, getServiceSupabase } from '../../../../../lib/auth'
+// SPRINT_01 G2 — ilan başına 60 sn yetmiyordu: bir saldırgan FARKLI ilan id'leriyle
+// dolaşıp her birine ayrı ayrı SMS attırabiliyordu (her ilan kendi sayacında).
+// IP bazlı kota bu dolaşmayı kesiyor.
+import { istekIp, kotaDene } from '../../../../../lib/kota'
 
 /**
  * SPRINT_01 L1d — ilan sahiplenme akışının sunucu tarafı.
