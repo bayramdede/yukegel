@@ -378,7 +378,9 @@ function GirisIci() {
 
   // ── E-posta giriş ───────────────────────────────────────────────
   async function epostaGiris(e: React.FormEvent) {
-    e.preventDefault(); setYukleniyor(true); temizle();
+    e.preventDefault();
+    etkilesimRef.current = true; // A9 — açılış kontrolü artık araya girmesin
+    setYukleniyor(true); temizle();
     const { error } = await supabase.auth.signInWithPassword({ email: eposta, password: sifre });
     if (error) {
       if (error.message.includes('Invalid login')) setHata('E-posta veya şifre hatalı.');
