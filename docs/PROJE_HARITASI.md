@@ -363,6 +363,10 @@ Açık rotalar: /giris, /auth/, /profil-tamamla, /nasil-calisir, /hakkimizda,
   sb- cookie'lerine yazılır. Uygulandığı yer: `app/auth/devir/route.ts`.
   (`app/api/auth/switch-account/route.ts` hâlâ `action_link` döndürüyor — istemci tarafı
   akış olduğu için orada sorun çıkarmıyor, ama sunucu tarafında ASLA o yolu kullanma.)
+- Supabase implicit-flow linki oturumu `#access_token=…&refresh_token=…` olarak bırakır ve
+  client bunu okuduktan sonra **URL'yi TEMİZLEMEZ** — token'lar adres çubuğunda, tarayıcı
+  geçmişinde ve kullanıcının kopyaladığı her linkte kalır. `HomeClient.tsx` oturum çözüldükten
+  sonra `history.replaceState` ile fragment'ı siliyor (emniyet kemeri; asıl çözüm `/auth/devir`).
 - Emekli oturumu `/auth/devir`'e gönderirken **sb- cookie'lerini silme**: devir, devri
   yetkilendirmek için emekli oturumun `merged_into` zincirini okumak zorunda. Temizliği
   (kurtarılamayan hâllerde) devir route'u kendisi yapar.
