@@ -969,24 +969,40 @@ export default function Moderator() {
                     {EditForm({ rawForLlm: raw.raw_text })}
                     <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
                       <button onClick={async () => {
-                        // SPRINT_01 L1e — insert'te `contact_phone` YOK; hemen ardından
-                        // server action ile yazılıyor (anon key'in kolon yetkisi kaldırıldı).
-                        const { data: listing } = await supabase.from('listings').insert({ listing_type: duzenleData.listing_type, origin_city: duzenleData.origin_city, origin_district: duzenleData.origin_district || null, source: raw.source || 'whatsapp', moderation_status: 'approved', status: 'active', trust_level: 'social', raw_post_id: raw.id, raw_text: raw.raw_text, notes: duzenleData.notes, vehicle_type: duzenleData.vehicle_type, body_type: duzenleData.body_type, reviewed_at: new Date().toISOString() }).select().single();
-                        if (listing) {
-                          if (duzenleData.contact_phone) {
-                            const telSonuc = await ilanTelefonGuncelle(listing.id, duzenleData.contact_phone);
-                            if (!telSonuc.ok) alert('Telefon kaydedilemedi: ' + telSonuc.hata);
-                          }
-                          for (let i = 0; i < duzenleData.stops.length; i++) {
-                            const s = duzenleData.stops[i];
-                            await supabase.from('listing_stops').insert({ listing_id: listing.id, stop_order: i + 1, city: s.city, district: s.district || null, weight_ton: s.weight_ton || null, pallet_count: s.pallet_count || null, vehicle_count: s.vehicle_count || 1, cargo_type: s.cargo_type || null });
-                          }
-                          await supabase.from('raw_posts').update({ processing_status: 'processed' }).eq('id', raw.id);
-                          await aliasOgren(duzenleData);
-                          setDuzenleId('');
-                          setNoLaneListesi(prev => prev.filter(r => r.id !== raw.id));
-                          getIstatistik();
-                        }
+                        // ILAN_VER_ANALIZ W1+ — burada eskiden TARAYICIDAN atılan bir
+                        // `listings` INSERT'i ve ardından `listing_stops` için bir `for`
+                        // döngüsü vardı. Üç sorunu birden taşıyordu: alanlar beyaz listeden
+                        // geçmiyordu (V1), durak insert'i patlarsa duraksız ilan kalıyordu
+                        // (V5) ve `moderation_status`/`trust_level` gibi ayrıcalıklı alanlar
+                        // istemciden yazılıyordu. Hepsi `moderatorIlanOlustur()`'a taşındı;
+                        // o da `ilan_olustur()` RPC'siyle tek transaction'da yazıyor.
+                        // Telefon + `raw_posts` işaretlemesi de artık server action'ın işi.
+                        const sonuc = await moderatorIlanOlustur({
+                          listing_type: duzenleData.listing_type,
+                          origin_city: duzenleData.origin_city,
+                          origin_district: duzenleData.origin_district || null,
+                          kaynak: raw.source || 'whatsapp',
+                          raw_post_id: raw.id,
+                          raw_text: raw.raw_text,
+                          notes: duzenleData.notes,
+                          vehicle_type: duzenleData.vehicle_type,
+                          body_type: duzenleData.body_type,
+                          contact_phone: duzenleData.contact_phone || null,
+                          stops: duzenleData.stops.map((s: any) => ({
+                            city: s.city,
+                            district: s.district || null,
+                            weight_ton: s.weight_ton || null,
+                            pallet_count: s.pallet_count || null,
+                            vehicle_count: s.vehicle_count || 1,
+                            cargo_type: s.cargo_type || null,
+                            notes: s.notes || null,
+                          })),
+                        });
+                        if (!sonuc.ok) { alert('İlan oluşturulamadı: ' + sonuc.hata); return; }
+                        await aliasOgren(duzenleData);
+                        setDuzenleId('');
+                        setNoLaneListesi(prev => prev.filter(r => r.id !== raw.id));
+                        getIstatistik();
                       }} style={{ padding: '7px 16px', borderRadius: 6, border: 'none', background: '#22c55e', color: '#000', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer' }}>✅ Kaydet ve Onayla</button>
                       <button onClick={() => setDuzenleId('')} style={{ padding: '7px 16px', borderRadius: 6, border: '1px solid #374151', background: '#1f2937', color: '#9ca3af', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer' }}>✕ İptal</button>
                     </div>
