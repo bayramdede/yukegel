@@ -2,6 +2,7 @@ import { createClient as createSupabase } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 import { createServerClient } from '@supabase/ssr';
 import { redirect } from 'next/navigation';
+import { girisAdresi } from '../../lib/redirect';
 import PanelClient from './PanelClient';
 
 export const dynamic = 'force-dynamic';
