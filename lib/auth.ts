@@ -37,11 +37,24 @@ export async function getServerSupabase() {
  * Sadece admin/moderator kontrol edildikten sonra kullan.
  */
 export function getServiceSupabase() {
-  return createSupabaseClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false } }
-  );
+  // 🚨 `process.env.X!` sadece TypeScript'i susturur, çalışma zamanında hiçbir şey
+  // garanti etmez (29 Tem 2026). Anahtar eksik/boşsa supabase-js'in kendi hatası
+  // gelir: "supabaseKey is required." — hangi env değişkeni, hangi ortam, hangi
+  // çağıran belli değildir. Server action içinde bu istisna kullanıcıya "An error
+  // occurred in the Server Components render..." olarak, `useEffect` içinde ise
+  // HİÇBİR ŞEY olarak (sessizce reddedilen promise) yansır. Adını söyleyerek
+  // patlamak, sessizce yanlış davranmaktan iyidir.
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) {
+    throw new Error(
+      `getServiceSupabase: ortam değişkeni eksik — ${[
+        !url && 'NEXT_PUBLIC_SUPABASE_URL',
+        !key && 'SUPABASE_SERVICE_ROLE_KEY',
+      ].filter(Boolean).join(', ')}. Vercel → Settings → Environment Variables (Production kapsamı işaretli mi?).`
+    );
+  }
+  return createSupabaseClient(url, key, { auth: { persistSession: false } });
 }
 
 /**
