@@ -252,8 +252,11 @@ ip, user_agent, created_at
 ```
 - Insert **yalnız service-role** (`app/api/auth/log/route.ts`); select yalnız admin/moderator (RLS).
 - ⛔ Telefon, e-posta, şifre **yazılmaz**.
-- ⏳ Migration: `docs/20260728_auth_events.sql` — **deploy'dan ÖNCE** çalıştırılmalı. Tablo
-  yoksa endpoint her çağrıda ERROR loglar (akışı bloklamaz, fire-and-forget).
+- ✅ Migration: `docs/20260728_auth_events.sql` çalıştırıldı (29 Tem 2026) — tablo canlıda.
+- 🔎 G1/G2 kotaları tetiklendiğinde `structuredLog('WARN','auth',…)` düşer; kalıcı iz için
+  `login_failed` olayları bu tabloda birikir. "Şu IP'den 15 dakikada kaç hata?" sorgusu:
+  `select ip_masked, count(*) from auth_events where event='login_failed'
+   and created_at > now() - interval '15 min' group by 1 order by 2 desc;`
 
 ### `raw_posts`, `aliases`, `vehicles`
 
