@@ -411,6 +411,17 @@ export default function TopluYukle({ onGeri }: { onGeri: () => void }) {
         }}>
           ← Yeniden Yükle
         </button>
+        {/* Şablonda tarih sütunu yok; sunucu geçmiş tarihi reddediyor (V1). */}
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#8b949e', fontSize: '0.82rem' }}>
+          Yükleme tarihi
+          <input
+            type="date"
+            min={bugun()}
+            value={tarih}
+            onChange={e => setTarih(e.target.value)}
+            style={{ ...inp, padding: '8px 10px' }}
+          />
+        </label>
         <button
           onClick={onayla}
           disabled={hataSayisi > 0 || yukleniyor}
