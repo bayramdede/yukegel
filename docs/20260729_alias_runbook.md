@@ -178,21 +178,122 @@ sonraki adımlara geçme.
 
 ---
 
-## Adım 8 — K / BÖLÜM 6: geçmiş `listings` onarımı
+## Adım 8 — geçmiş konum verisinin onarımı (K / BÖLÜM 6 **yetersiz**)
 
-Alias düzelse de **zaten kaydedilmiş** ilanlar bozuk kalır. Adım 0.2'yi
-önizleme olarak zaten aldın; sayı anlamlıysa iki `UPDATE`'i uygula
-(`origin_city` ve `destination_city`).
+> 🚨 **K / BÖLÜM 6'yı olduğu gibi çalıştırmak işi bitirmez.** O bölüm yalnız
+> `listings.origin_city` ve `listings.destination_city`'yi onarıyor. Oysa:
+>
+> - **`listings.destination_city` ölü bir kolon.** Uygulama kodunda tek bir
+>   yazma/okuma yok (Adım 0.4 ile teyit et). Onarmak boşa iş.
+> - **Varış verisi `public.listing_stops` içinde.** Ana sayfa varış filtresi
+>   (`app/_components/HomeClient.tsx:696`) tam olarak `listing_stops.city`'yi
+>   okuyor. Yani kullanıcının "İstanbul'a yük" aramasını bozan kolon burada ve
+>   BÖLÜM 6 ona **hiç dokunmuyor**.
+> - **`listings.origin_district` de onarılmıyor.**
+>
+> Bu haliyle temizlik bitse bile bozuk varışlar bozuk kalır. Aşağıdaki dört
+> kolonu birlikte onar.
 
-Ardından Adım 0.1'i **tekrar** çalıştır ve ilk değerle karşılaştır:
+Onarım için elle `CASE` listesi yazmak yerine **`aliases` tablosunu sözlük**
+olarak kullan: Adım 2-7 bittiğinde `normalized` ve `district` kolonları doğru
+yazımı tutuyor. Katlanmış anahtarı eşleşen ama ham yazımı farklı olan her
+konum değeri, sözlükteki doğru yazıma çekilir.
+
+**8.1 — Şehir kolonları (`listings.origin_city`, `listing_stops.city`).**
+Önce `SELECT` ile bak, sonra `UPDATE`'e çevir:
 
 ```sql
-SELECT count(*) FROM public.listings WHERE origin_city = destination_city;
+WITH sozluk AS (
+  SELECT translate(lower(replace(normalized,'İ','i')),'ıçğöşü','icgosu') AS anahtar,
+         min(normalized) AS dogru
+  FROM public.aliases
+  WHERE type = 'city' AND is_active = true AND normalized IS NOT NULL
+  GROUP BY 1
+  HAVING count(DISTINCT normalized) = 1   -- belirsiz anahtarları elle bırak
+)
+SELECT 'listings.origin_city' AS kolon, l.id, l.origin_city AS mevcut, z.dogru
+FROM public.listings l
+JOIN sozluk z ON z.anahtar = translate(lower(replace(l.origin_city,'İ','i')),'ıçğöşü','icgosu')
+WHERE l.origin_city IS NOT NULL AND l.origin_city <> z.dogru
+UNION ALL
+SELECT 'listing_stops.city', s.listing_id, s.city, z.dogru
+FROM public.listing_stops s
+JOIN sozluk z ON z.anahtar = translate(lower(replace(s.city,'İ','i')),'ıçğöşü','icgosu')
+WHERE s.city IS NOT NULL AND s.city <> z.dogru;
 ```
 
-Bu fark, D4 + veri temizliğinin ölçülebilir çıktısı. Kalan satırlar geçmişte
-üretilmiş sahte güzergâhlardır; ne yapılacağına (silme / moderasyona düşürme)
-ayrı karar verilmeli — **bu runbook'un kapsamında değil**.
+`HAVING count(DISTINCT normalized) = 1` şartı önemli: aynı katlanmış anahtara
+iki farklı doğru yazım düşüyorsa (Adım 7 boş dönmediyse olur) o anahtar
+sözlüğe **girmez** ve o satırlar onarılmadan kalır — yanlış yazımı yanlış
+yazımla değiştirmekten iyidir.
+
+Liste beklendiği gibiyse uygula:
+
+```sql
+-- WITH sozluk AS ( ... yukarıdaki CTE aynen ... )
+-- UPDATE public.listings l SET origin_city = z.dogru
+-- FROM sozluk z
+-- WHERE z.anahtar = translate(lower(replace(l.origin_city,'İ','i')),'ıçğöşü','icgosu')
+--   AND l.origin_city IS NOT NULL AND l.origin_city <> z.dogru;
+
+-- WITH sozluk AS ( ... aynı CTE ... )
+-- UPDATE public.listing_stops s SET city = z.dogru
+-- FROM sozluk z
+-- WHERE z.anahtar = translate(lower(replace(s.city,'İ','i')),'ıçğöşü','icgosu')
+--   AND s.city IS NOT NULL AND s.city <> z.dogru;
+```
+
+**8.2 — İlçe kolonları (`listings.origin_district`, `listing_stops.district`).**
+Aynı kalıp, sözlük `aliases.district`'ten kuruluyor:
+
+```sql
+WITH sozluk AS (
+  SELECT translate(lower(replace(district,'İ','i')),'ıçğöşü','icgosu') AS anahtar,
+         min(district) AS dogru
+  FROM public.aliases
+  WHERE type = 'city' AND is_active = true AND district IS NOT NULL
+  GROUP BY 1
+  HAVING count(DISTINCT district) = 1
+)
+SELECT 'listings.origin_district' AS kolon, l.id, l.origin_district AS mevcut, z.dogru
+FROM public.listings l
+JOIN sozluk z ON z.anahtar = translate(lower(replace(l.origin_district,'İ','i')),'ıçğöşü','icgosu')
+WHERE l.origin_district IS NOT NULL AND l.origin_district <> z.dogru
+UNION ALL
+SELECT 'listing_stops.district', s.listing_id, s.district, z.dogru
+FROM public.listing_stops s
+JOIN sozluk z ON z.anahtar = translate(lower(replace(s.district,'İ','i')),'ıçğöşü','icgosu')
+WHERE s.district IS NOT NULL AND s.district <> z.dogru;
+```
+
+`UPDATE` karşılıkları 8.1 ile birebir aynı kalıp — kolon adlarını değiştir.
+
+**8.3 — `destination_city`.** Adım 0.4 sıfır döndüyse dokunma. Sıfırdan farklı
+döndüyse de onarma: kolonu kimse okumadığı için onarım kullanıcıya hiçbir şey
+kazandırmaz. Doğru iş, kolonu düşürmek için ayrı bilet açmak.
+
+**8.4 — Tekrar ölç.** Adım 0.1'i **aynen** tekrar çalıştır:
+
+```sql
+SELECT count(*) AS sahte_aday_satir, count(DISTINCT l.id) AS etkilenen_ilan
+FROM public.listings l
+JOIN public.listing_stops s ON s.listing_id = l.id
+WHERE translate(lower(replace(l.origin_city,'İ','i')),'ıçğöşü','icgosu')
+    = translate(lower(replace(s.city,'İ','i')),'ıçğöşü','icgosu')
+  AND l.origin_city <> s.city;
+```
+
+**Bu sorgu artık 0 dönmeli.** Çünkü 8.1 iki kolonu da aynı sözlüğe çektiğine
+göre katlanmış anahtarı eşit olan iki değerin ham yazımı da eşittir. 0
+dönmüyorsa 8.1'in sözlüğüne girmeyen (`HAVING` şartına takılan) anahtarlar var
+demektir — o satırları listele ve elle karara bırak.
+
+⚠️ Dikkat: 8.4'ün 0 dönmesi "sahte güzergâh kalmadı" demek **değil**. Sadece
+"yazım farkından doğan sahteler kalmadı" demek. Adım 0.2 ile ölçtüğün
+**şehir içi taşımalar meşrudur** ve 8.1'den sonra da durmaya devam edecek —
+onlara dokunma. Geçmişte üretilmiş gerçekten sahte güzergâhların (aynı şehir +
+aynı ilçe, tek duraklı, AI üretimi) ne yapılacağı ayrı bir karar; **bu
+runbook'un kapsamında değil**.
 
 ---
 
