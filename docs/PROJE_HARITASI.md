@@ -247,6 +247,8 @@ yukegel/
 ├── lib/auth.ts + supabase.ts             # auth.ts: requireStaff() → API route'lar için (redirect atmaz)
 ├── lib/redirect.ts                       # 🔒 SPRINT_01 A7 — guvenliRedirect(): yalnız `/` ile başlayan,
 │                                         #    `//` ve `\` içermeyen yollar (açık yönlendirme koruması) ✅
+│                                         # 🔗 girisAdresi(yol, mod?) — `/giris?redirect=…` üretir. Giriş
+│                                         #    bağlantısı kuran HER yer bunu çağırır (29 Tem 2026) ✅
 ├── lib/kota.ts                           # 🔒 SPRINT_01 G1/G2 — kotaDene()/kotaSifirla()/istekIp():
 │                                         #    bellek içi kayan pencere sayacı. `deger` verilirse FARKLI
 │                                         #    değer sayar, `sayma:true` sadece bakar. ⚠️ process-local ✅
