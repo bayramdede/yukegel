@@ -96,6 +96,21 @@ export function sayiAralik(v: unknown, min: number, max: number): number | null 
 }
 
 /**
+ * `sayiAralik` + TAM SAYIYA yuvarlama.
+ *
+ * ⚠️ `public.ilan_olustur()` içinde `pallet_count` ve `vehicle_count`
+ * `(… ->> '…')::int` ile cast ediliyor. Ondalıklı bir değer ("2.5") oraya
+ * ulaşırsa Postgres `22P02` verir ve **tüm transaction geri sarılır** — kullanıcı
+ * yalnızca "İlan kaydedilemedi" görür, sebebini asla öğrenemez. Excel'den gelen
+ * palet hücresi pekâlâ ondalıklı olabilir. Kesirli palet zaten anlamsız; kırpmak
+ * ilanı düşürmekten iyidir.
+ */
+export function tamSayiAralik(v: unknown, min: number, max: number): number | null {
+  const n = sayiAralik(v, min, max);
+  return n === null ? null : Math.round(n);
+}
+
+/**
  * Türkiye'de bugün (YYYY-AA-GG).
  * ⚠️ `PROJE_HARITASI §9` (A2): offset'siz `new Date()` host TZ'ye göre kayar.
  * Sunucu UTC'de koşar; sabit +03:00 eklemezsek gece 00:00–03:00 arası DÜNÜ döner
