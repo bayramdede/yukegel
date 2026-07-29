@@ -26,8 +26,8 @@
 > kapatıldı: L1c, L1d, L1f (aynı sınıf telefon sızıntıları), A2b (merge route çöküyordu),
 > A4b-hane (sahiplen OTP 6 hane bekliyordu, Twilio 4 gönderiyor). Ayrıntılar aşağıda.
 >
-> **Bayram'ın çalıştırması gereken tek şey:** `docs/20260728_kvkk_onay.sql`
-> (K1 kodu bu kolon olmadan `kvkk_onay_at` yazamaz → upsert hata verir).
+> ~~**Bayram'ın çalıştırması gereken tek şey:** `docs/20260728_kvkk_onay.sql`~~
+> ✅ **Çalıştırıldı** (29 Tem 2026).
 >
 > **Hâlâ açık kalan tek telefon vektörü:** L1e (DB seviyesi) — aşağıda, W1'e taşındı.
 
