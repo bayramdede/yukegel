@@ -128,7 +128,14 @@ export default function IlanVer() {
   useEffect(() => {
     async function init() {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { window.location.href = '/giris?redirect=/ilan-ver'; return; }
+      if (!user) {
+        // SPRINT_01 L2 — `?tip=` giriş turunda KAYBOLMASIN. Eskiden sabit `/ilan-ver`
+        // yazılıyordu: kullanıcı "Aracım boşta"ya tıklayıp giriş yaptığında forma
+        // "yük" seçili dönüyordu. `guvenliRedirect` query param'ı koruyor (bkz. A7).
+        const hedef = encodeURIComponent('/ilan-ver' + window.location.search);
+        window.location.href = `/giris?redirect=${hedef}`;
+        return;
+      }
       const telefon = await kullanicitelefon();
       if (telefon) setTel(telefon);
     }
