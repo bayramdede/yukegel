@@ -258,7 +258,8 @@ export default function TopluYukle({ onGeri }: { onGeri: () => void }) {
         </button>
       </div>
     </div>
-  );
+    );
+  }
 
   // ── Render: Preview ──
   if (adim === 'preview') return (
