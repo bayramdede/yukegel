@@ -154,9 +154,12 @@ düzeltiyor).
    Doğru satır (`id=1844`) tabloda zaten var.
 4. Kopya BÖLÜM 4.2-4.6
 5. Kopya BÖLÜM 5 doğrulama — **iki sorgu da boş dönmeli**; dönmüyorsa dur ve raporla
-6. Geçmiş `listings` onarımı (BÖLÜM 6) — **önce ölç, sonra UPDATE**
-7. `SELECT count(*) FROM listings WHERE origin_city = destination_city;`
-   — **düzeltmeden ÖNCE de al**, yoksa D4'ün etkisi ölçülemez
+6. Geçmiş konum onarımı — 🚨 **BÖLÜM 6'yı KULLANMA**, `20260729_alias_runbook.md`
+   Adım 8'i kullan. BÖLÜM 6 ölü `destination_city`'yi onarıp canlı `listing_stops.city`
+   ile `listing_stops.district` ve `listings.origin_district`'i atlıyor.
+7. Sahte güzergâh ölçümü — runbook Adım 0.1 (`listings` ⋈ `listing_stops`, katlanmış
+   anahtar eşit + ham yazım farklı). **Düzeltmeden ÖNCE de al**, yoksa D4'ün etkisi
+   ölçülemez. Meşru şehir içi taşıma tabanını 0.2 ile ayrı tut.
 8. D3 indeksini **en son** kur
 
 ⚠️ Hiçbir adım satır **silmiyor** — hepsi `UPDATE` ya da `is_active = false`, geri
