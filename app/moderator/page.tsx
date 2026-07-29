@@ -48,7 +48,9 @@ function skorRenk(ilan: any): { border: string; badge: string; label: string; pu
   if (stops.length > 0) skor += 15;
   if (ilan.vehicle_type?.length > 0) skor += 20;
   if (ilan.body_type?.length > 0) skor += 10;
-  if (stops[0]?.weight_ton) skor += 5;
+  // `stops[0]` DEĞİL `some`: ilk durakta tonaj yoksa ama ikincide varsa ilan
+  // eksik değildir — eskiden 5 puanı boş yere kaybediyordu.
+  if (stops.some((s: any) => s?.weight_ton)) skor += 5;
   if (ilan.notes) skor += 5;
   if (skor >= 75) return { border: '#166534', badge: '🟢', label: 'Hazır', puan: skor };
   if (skor >= 45) return { border: '#854d0e', badge: '🟡', label: 'Kontrol Et', puan: skor };
