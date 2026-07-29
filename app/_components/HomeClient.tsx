@@ -358,7 +358,23 @@ function IlanKart({ ilan, kullanici }: { ilan: any; kullanici: any }) {
               {telHata && <div style={{ color: '#f87171', fontSize: '0.68rem', marginTop: 4, maxWidth: 140 }}>{telHata}</div>}
             </>
           ) : (
-            <button onClick={e => { e.preventDefault(); e.stopPropagation(); window.location.href = '/giris'; }}
+            /* SPRINT_01 L3 — misafir "Ara"ya bastığında NEREYE döneceği artık belli.
+               Eskiden düz `/giris`'e atılıyordu: kullanıcı giriş yapıyor, ANA SAYFAYA
+               düşüyor ve baktığı ilanı listede yeniden bulmak zorunda kalıyordu —
+               ilanlar sürekli aktığı için çoğu zaman bulamıyordu da.
+               Artık aynı ilana dönüyor (401 dalıyla — yukarıdaki `araTikla` — birebir aynı hedef).
+
+               Not: ARAMA SONUÇLARI misafire zaten açık; filtreleme istemci tarafında
+               yüklenmiş liste üzerinde çalışıyor. Duvar yalnızca NUMARADA, ve bu
+               bilinçli (L1: numara hiçbir misafir yüzeyine gönderilmez). */
+            <button
+              title="Numarayı görmek için giriş yapın"
+              onClick={e => {
+                e.preventDefault();
+                e.stopPropagation();
+                olayGonder('telefon_giris_duvari', { tip: ilan.tip });
+                window.location.href = `/giris?redirect=${encodeURIComponent(`/ilan/${ilan.id}`)}`;
+              }}
               style={{ display: 'block', background: '#1a2a3a', color: '#60a5fa', border: '1px solid #1e3a5f', borderRadius: 6, padding: '6px 12px', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
               🔐 Ara
             </button>
