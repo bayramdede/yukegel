@@ -190,10 +190,10 @@ export default function Hakkimizda() {
           <p style={{ color: '#e2e8f0', fontWeight: 700, fontSize: '1.1rem', margin: '0 0 8px' }}>Platforma katılın</p>
           <p style={{ color: '#8b949e', fontSize: '0.85rem', margin: '0 0 24px' }}>Binlerce nakliyeci ve yük sahibiyle aynı platformda buluşun.</p>
           <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
-            <a href="/giris"
+            <GirisLink mod="kayit"
               style={{ background: '#22c55e', color: '#000', fontWeight: 800, fontSize: '0.95rem', padding: '12px 28px', borderRadius: 8, textDecoration: 'none' }}>
               Ücretsiz Başla →
-            </a>
+            </GirisLink>
             <a href="/nasil-calisir"
               style={{ background: '#161b22', color: '#e2e8f0', fontWeight: 600, fontSize: '0.95rem', padding: '12px 28px', borderRadius: 8, textDecoration: 'none', border: '1px solid #30363d' }}>
               Nasıl Çalışır?
