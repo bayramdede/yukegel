@@ -146,6 +146,11 @@ export default function TopluYukle({ onGeri }: { onGeri: () => void }) {
   });
   const ilanSayisi = groups.size;
 
+  // `MAX_SATIR` dosya okunurken bakılıyor ama `MAX_ILAN` bakılmıyordu: 60 gruplu bir
+  // dosyada buton "✅ Onayla ve Yayınla (60 ilan)" diyor, kullanıcı basıyor, sunucu
+  // 400 dönüyor ve HİÇBİR ilan oluşmuyor. Sınırı burada, basmadan önce göster.
+  const ilanAsimi = ilanSayisi > MAX_ILAN;
+
   // ── Onayla ve yayınla ──
   async function onayla() {
     setYukleniyor(true);
