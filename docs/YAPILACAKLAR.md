@@ -10,8 +10,11 @@
 > `lib/alias-normalize.ts` üzerinden geçiyor (409 çakışma) · **D4** `findPlaces` karşılaştırma
 > anahtarları katlandı (5/5 kabul testi; HEAD 3/5 başarısız) · **D5** runbook · **D3** trigger+indeks SQL'i.
 > ⏳ **BAYRAM — sırayla çalıştırılacak, HİÇBİRİ ÇALIŞTIRILMADI:**
-> 1. `docs/20260729_alias_runbook.md` → Adım 0-9 (Adım 0 ölçümü **atlanamaz**: `origin_city =
->    destination_city` sayısı düzeltmeden önce alınmazsa D4'ün etkisi bir daha ölçülemez)
+> 1. `docs/20260729_alias_runbook.md` → Adım 0-9 (Adım 0 ölçümü **atlanamaz**: sahte güzergâh
+>    sayısı — `listings.origin_city` ile `listing_stops.city` katlanmış anahtarı eşit, ham yazımı
+>    farklı — düzeltmeden önce alınmazsa D4'ün etkisi bir daha ölçülemez. ⚠️ Adım 8 **eski
+>    `20260728_alias_kopya_temizligi.sql` BÖLÜM 6'yı geçersiz kılıyor**: o bölüm ölü
+>    `destination_city`'yi onarıp canlı `listing_stops`'u atlıyor)
 > 2. `docs/20260729_alias_normalize_trigger.sql` → **en son**; runbook Adım 9 yapılmadan indeks
 >    23505 ile reddedilir.
 > Her adımın önizleme `SELECT`'i var, `UPDATE`'ler yorumda, hiçbir adım satır silmiyor.
