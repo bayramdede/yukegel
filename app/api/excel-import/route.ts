@@ -116,8 +116,8 @@ export async function POST(request: NextRequest) {
       // Araç/üst yapı İSTEĞE BAĞLI → tanınmazsa 'warn', boşsa 'empty'; ilan yine kurulur.
       const kalkisIliStatus: AlanDurumu = kalkisIliNorm ? 'ok' : 'error';
       const varisIliStatus: AlanDurumu = varisIliNorm ? 'ok' : 'error';
-      const aracTipiStatus = durumEtiketi(aracTipi, aracTipiNorm, false);
-      const ustYapiStatus = durumEtiketi(ustYapi, ustYapiNorm, false);
+      const aracTipiStatus = durumEtiketi(aracTipi, aracTipiNorm);
+      const ustYapiStatus = durumEtiketi(ustYapi, ustYapiNorm);
 
       return {
         seferNo: String(r?.seferNo ?? ''),
@@ -125,9 +125,11 @@ export async function POST(request: NextRequest) {
         varisIli, varisIlce: String(r?.varisIlce ?? ''),
         durakTipi: String(r?.durakTipi ?? ''),
         aracTipi, ustYapi,
-        tonaj: String(r?.tonaj ?? ''),
-        palet: String(r?.palet ?? ''),
-        fiyat: String(r?.fiyat ?? ''),
+        // Sayısal hücreler ÖNİZLEMEDE çözülüyor: kullanıcı kaydedilecek değeri
+        // görsün. "5.000" yazan biri `Number()` yüzünden 5 TL'lik ilan veriyordu.
+        tonaj: sayiMetniCoz(r?.tonaj),
+        palet: sayiMetniCoz(r?.palet),
+        fiyat: sayiMetniCoz(r?.fiyat),
         yukCinsi: String(r?.yukCinsi ?? ''),
         not: String(r?.not ?? ''),
         rowIndex: i,
