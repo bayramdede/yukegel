@@ -43,7 +43,12 @@ export default function PublicIlanListesi() {
       const res = await fetch(`/api/ilan/${ilanId}/telefon`);
       const veri = await res.json().catch(() => ({}));
       if (!res.ok) {
-        if (res.status === 401) { window.location.assign(`/giris?redirect=/ilan/${ilanId}`); return; }
+        // 🚨 29 Tem 2026 — hedef `/ilan/<id>` DEĞİL, BU SAYFA.
+        // Bu adres paylaşılmak için var: bir kullanıcı ilanlarının tamamını tek
+        // bağlantıyla gönderiyor. Gelen kişi bir ilanın numarasını isteyip giriş
+        // yapınca, paylaşılan LİSTEYE dönmeli — tek bir ilanın detayına değil,
+        // ana sayfaya hiç değil. Diğer ilanlara bakmaya devam edebilsin.
+        if (res.status === 401) { window.location.assign(girisAdresi(window.location.pathname)); return; }
         if (veri?.redirect) { window.location.assign(veri.redirect); return; }
         setTelHata(veri?.error || 'Numara alınamadı');
         return;
