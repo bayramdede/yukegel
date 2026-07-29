@@ -102,6 +102,29 @@ export default function IlanVer() {
   const [yukleniyor, setYukleniyor] = useState(false);
   const [hata, setHata] = useState('');
 
+  // SPRINT_01 L2 — `?tip=yuk` / `?tip=arac` ile ön-seçim.
+  //
+  // ESKİ SORUN: ana sayfadaki iki CTA farklı persona'ya sesleniyordu ("Yük vereceğim"
+  // / "Aracım boşta") ama İKİSİ DE düz `/ilan-ver`'e gidiyordu. Kullanıcı doğru yere
+  // geldiğini hissetmiyordu (formda tekrar tip seçmesi gerekiyordu) ve GA'da hangi
+  // persona'nın dönüştüğü ölçülemiyordu.
+  //
+  // Not: `HomeClient.tsx` zaten bir bağlantıda `?tip=arac` gönderiyordu ama sayfa
+  // param'ı HİÇ OKUMUYORDU — link sessizce etkisizdi.
+  //
+  // `useSearchParams` yerine `window.location` bilinçli: bu sayfa Suspense sınırı
+  // içinde değil; `useSearchParams` eklemek tüm ağacı CSR bailout'a sokardı.
+  // Değer sadece ilk yüklemede okunuyor, `useEffect` içinde okumak yeterli.
+  useEffect(() => {
+    const gelenTip = new URLSearchParams(window.location.search).get('tip');
+    // Beyaz liste: URL'den gelen değer doğrudan state'e yazılmaz.
+    if (gelenTip === 'yuk' || gelenTip === 'arac') {
+      setTip(gelenTip);
+      // Huni ölçümü: hangi persona ilan verme ekranına GELDİ.
+      olayGonder('ilan_ver_giris', { tip: gelenTip });
+    }
+  }, []);
+
   useEffect(() => {
     async function init() {
       const { data: { user } } = await supabase.auth.getUser();
