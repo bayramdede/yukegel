@@ -45,26 +45,6 @@ const KULLANICI_TIPLERI = [
 const ARAC_TIPLERI = ['TIR', 'Kırkayak', 'Kamyon', 'Kamyonet', 'Panelvan'];
 const UTSYAPI = ['Tenteli', 'Açık Kasa', 'Kapalı Kasa', 'Frigorifik', 'Damperli', 'Lowbed', 'Liftli'];
 
-function tcknGecerli(tckn: string): boolean {
-  if (!/^\d{11}$/.test(tckn) || tckn[0] === '0') return false;
-  const d = tckn.split('').map(Number);
-  const t1 = (d[0] + d[2] + d[4] + d[6] + d[8]) * 7 - (d[1] + d[3] + d[5] + d[7]);
-  if (((t1 % 10) + 10) % 10 !== d[9]) return false;
-  const t2 = d.slice(0, 10).reduce((a, b) => a + b, 0);
-  return t2 % 10 === d[10];
-}
-
-function vknGecerli(vkn: string): boolean {
-  if (!/^\d{10}$/.test(vkn)) return false;
-  const d = vkn.split('').map(Number);
-  let toplam = 0;
-  for (let i = 0; i < 9; i++) {
-    const tmp = (d[i] + 10 - (i + 1)) % 10;
-    toplam += tmp === 9 ? 9 : (tmp * Math.pow(2, 10 - (i + 1))) % 9;
-  }
-  return d[9] === (10 - (toplam % 10)) % 10;
-}
-
 async function tekilKontrol(
   alan: 'telefon' | 'tckn' | 'vkn',
   deger: string,
