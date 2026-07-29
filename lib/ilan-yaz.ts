@@ -379,7 +379,7 @@ export async function ilanYaz(
     // Trigger zaten `is_shadow_banned` + `archived` yaptı; dokunma, sadece dürüst ol.
     durum = 'reddedildi';
     mesaj = 'İlanınız otomatik kontrolden geçemedi ve yayına alınmadı. Panelinizden düzenleyip tekrar gönderebilirsiniz.';
-  } else if (skor >= autoPublishScoreMax) {
+  } else if (skor >= autoPublishScoreMax || KANAL_POLITIKA[kaynak].daimaIncele) {
     const { error: modError } = await svc
       .from('listings')
       .update({ moderation_status: 'pending', status: 'passive' })
