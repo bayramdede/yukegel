@@ -70,16 +70,57 @@ export async function ilanKaydet(formData: IlanKaydetGirdi): Promise<IlanKaydetS
   }
 }
 
-export async function kullanicitelefon(): Promise<string | null> {
-  const user = await oturumKullanicisi();
-  if (!user) return null;
+/**
+ * `ILAN_VER_ANALIZ` U-telefon (29 Tem 2026).
+ *
+ * 🚨 Eskiden `Promise<string | null>` dönüyordu ve `page.tsx` şöyle kullanıyordu:
+ * `if (telefon) setTel(telefon)` → `📞 {tel || 'Yükleniyor...'}`. Bu, ÜÇ ayrı
+ * durumu tek bir ekrana çöküyordu:
+ *   1. oturum yok      → null
+ *   2. profilde numara yok → null
+ *   3. fonksiyon FIRLATTI  → `useEffect` içindeki promise sessizce reddedilir,
+ *      `setTel` hiç çalışmaz, error boundary de tetiklenmez
+ * Üçünde de kullanıcı sonsuza kadar "Yükleniyor..." görüyordu — yani gerçek bir
+ * arıza (ör. `SUPABASE_SERVICE_ROLE_KEY` eksik/dönmüş) masum bir yükleme
+ * animasyonu gibi görünüyordu. Aynı fırlatma `ilanKaydet()` içinde olunca da
+ * "An error occurred in the Server Components render..." çıkıyor; iki belirti
+ * tek kök. Artık durum açıkça dönüyor ve hata LOGLANIYOR.
+ */
+export type TelefonDurumu =
+  | { durum: 'var'; tel: string }
+  | { durum: 'oturum-yok' }
+  | { durum: 'numara-yok' }
+  | { durum: 'hata' };
 
-  // maybeSingle() — admin veya yeni kullanıcıda users satırı olmayabilir
-  const { data } = await getServiceSupabase()
-    .from('users')
-    .select('phone')
-    .eq('id', user.id)
-    .maybeSingle();
+export async function kullanicitelefon(): Promise<TelefonDurumu> {
+  try {
+    const user = await oturumKullanicisi();
+    if (!user) return { durum: 'oturum-yok' };
 
-  return data?.phone || null;
+    // maybeSingle() — admin veya yeni kullanıcıda users satırı olmayabilir
+    const { data, error } = await getServiceSupabase()
+      .from('users')
+      .select('phone')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    if (error) {
+      structuredLog('ERROR', 'phone-privacy', 'kullanicitelefon sorgusu başarısız', {
+        user_id: user.id,
+        supabase_error: error.message,
+        error_code: error.code ?? null,
+      });
+      return { durum: 'hata' };
+    }
+
+    return data?.phone ? { durum: 'var', tel: data.phone } : { durum: 'numara-yok' };
+  } catch (e) {
+    const hata = e as { message?: string; name?: string; stack?: string };
+    structuredLog('ERROR', 'phone-privacy', 'kullanicitelefon beklenmeyen istisna', {
+      error_name: hata?.name ?? null,
+      error_message: hata?.message ?? String(e),
+      stack: typeof hata?.stack === 'string' ? hata.stack.slice(0, 1200) : null,
+    });
+    return { durum: 'hata' };
+  }
 }
