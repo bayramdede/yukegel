@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { ilanGuncelle, ilanTamamlandiToggle } from './actions';
+import { durakToplami } from '../../lib/ilan-liste';
 
 // SPRINT_01 L1e — anon supabase istemcisi bu dosyadan KALDIRILDI.
 // Tüm `listings` yazmaları `./actions.ts` üzerinden sunucuda, sahiplik kontrolü
