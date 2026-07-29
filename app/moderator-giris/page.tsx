@@ -17,13 +17,19 @@ export default function ModeratorGiris() {
     setYukleniyor(true);
     setHata('');
 
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password: sifre,
-    });
+    // SPRINT_01 G1 — şifre denemesi ARTIK SUNUCUDA (`/api/auth/giris`).
+    // Bu ekran özellikle değerli bir hedefti: yönetici hesaplarına karşı sınırsız
+    // sözlük saldırısı yapılabiliyordu. Kota sunucuda (e-posta başına 5 / 15 dk,
+    // IP başına 20 / 15 dk).
+    const res = await fetch('/api/auth/giris', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ eposta: email, sifre }),
+    }).catch(() => null);
+    const json = await res?.json().catch(() => null);
 
-    if (error || !data?.user) {
-      setHata('E-posta veya şifre hatalı.');
+    if (!res?.ok) {
+      setHata(json?.error || 'E-posta veya şifre hatalı.');
       setYukleniyor(false);
       return;
     }
@@ -35,22 +41,19 @@ export default function ModeratorGiris() {
     //
     // Not: bu kontrol bir GÜVENLİK SINIRI DEĞİL — asıl sınır `proxy.ts` + `requireStaff()`.
     // Buradaki amaç doğru davranış ve sızıntıyı azaltmak.
-    const { data: profil } = await supabase
-      .from('users')
-      .select('role')
-      .eq('id', data.user.id)
-      .maybeSingle();
-
-    const rol = profil?.role;
+    const rol = json?.rol;
     if (rol !== 'admin' && rol !== 'moderator') {
       // Oturumu AÇIK BIRAKMA: kullanıcı moderatör ekranında yetkisiz bir oturumla kalmasın.
+      // Cookie sunucuda yazıldı; `/cikis` POST'u onu sunucuda siler (C1/C2).
+      await fetch('/cikis', { method: 'POST' }).catch(() => {});
       await supabase.auth.signOut().catch(() => {});
       setHata('Bu hesabın moderatör yetkisi yok. Normal giriş için "Kullanıcı girişine dön".');
       setYukleniyor(false);
       return;
     }
 
-    router.push(rol === 'admin' ? '/admin' : '/moderator');
+    // Oturum cookie'si sunucudan geldi → tam sayfa yüklemesi (bkz. G1 notu, /giris).
+    window.location.assign(rol === 'admin' ? '/admin' : '/moderator');
   };
 
   return (
