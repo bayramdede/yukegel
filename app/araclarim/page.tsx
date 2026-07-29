@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import { createClient } from '../../lib/supabase';
 import { aracEkle, aracSil, aracGuncelle } from './actions';
+import { girisAdresi } from '../../lib/redirect';
 
 const supabase = createClient();
 
