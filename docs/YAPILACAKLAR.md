@@ -287,6 +287,31 @@ W1+ (yazma yolu birleştirme) sonrası duman testi:
 - [ ] `/ilan-ver` hatası: Vercel loglarında `ilanKaydet beklenmeyen istisna` ara —
       `error_message` + `stack` artık kaydediliyor.
 
+### 🔴 "Telefon numarası Yükleniyor..." — sessiz arıza (29 Tem 2026) ✅ kod tarafı tamam
+
+**Belirti (Bayram, canlı):** `/ilan-ver` İLETİŞİM kartı sonsuza kadar "Yükleniyor..."
+gösteriyor. Aynı sayfada ilan kaydederken de "An error occurred in the Server Components
+render..." çıkıyordu. **İkisi tek kök.**
+
+**Neden görünmüyordu:** `useEffect(() => { init() }, [])` — `init()` bir promise döner,
+reddedilirse hiçbir yerde yakalanmaz. Error boundary tetiklenmez, kullanıcı hata görmez,
+`setTel` sadece hiç çalışmaz. Ekranda kalan tek iz masum bir yükleme yazısı.
+`kullanicitelefon()` üç ayrı sonucu (oturum yok / numara yok / FIRLATTI) tek bir `null`'a
+çöküyordu; `📞 {tel || 'Yükleniyor...'}` de üçünü aynı gösteriyordu.
+
+**Yapılanlar:**
+- `kullanicitelefon()` artık `TelefonDurumu` ayrık birleşimi dönüyor
+  (`var` / `oturum-yok` / `numara-yok` / `hata`), try/catch + `structuredLog('phone-privacy')`.
+- `page.tsx` her durumu ayrı gösteriyor; `numara-yok` → `/profil-tamamla` bağlantısı.
+  `init().catch(...)` eklendi.
+- `getServiceSupabase()` `process.env.X!` yerine açık kontrol yapıyor; eksik değişkenin
+  **adını** söyleyerek fırlatıyor.
+
+**Kalan (Bayram):** `SUPABASE_SERVICE_ROLE_KEY` Vercel'de **ada göre var**, ama değeri
+dönmüş/yanlış ortama işaretlenmiş olabilir. Kontrol: Settings → Environment Variables →
+anahtarın **Production** kutusu işaretli mi + Supabase panelindeki güncel `service_role`
+anahtarıyla aynı mı. Deploy sonrası logda `phone-privacy` ara.
+
 ## ⚠️ BUGLAR
 - [x] **A10 — "Hesabınız birleştirildi" sonsuz giriş döngüsü** ✅ (29 Tem 2026)
   Belirti: giriş yapılıyor → "Hesabınız başka bir hesabınızla birleştirildi… tekrar giriş
