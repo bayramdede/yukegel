@@ -63,7 +63,7 @@ export default function TopluYukle({ onGeri }: { onGeri: () => void }) {
 
       if (data.length < 2) throw new Error('Excel çok az satır içeriyor');
 
-      const rows = data
+      const rows: HamSatir[] = data
         .slice(1)
         .filter((row: any[]) => row.some((c: any) => String(c ?? '').trim()))
         .map((row: any[]) => ({
