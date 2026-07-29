@@ -41,11 +41,15 @@ export default async function Footer() {
           <div>
             <div style={{ color: '#6b7280', fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 10 }}>Hesap</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <Link href="/giris" style={bag}>Giriş Yap</Link>
+              {/* 29 Tem 2026 — `<Link href="/giris">` DEĞİL `<GirisLink>`: footer her
+                  sayfada var, dolayısıyla bu iki bağlantı giriş sonrası "ana sayfaya
+                  düşme" şikâyetinin en yaygın kaynağıydı. Bileşen bulunduğu sayfayı
+                  `?redirect=` olarak kendisi ekler (bkz. lib/redirect.ts → girisAdresi). */}
+              <GirisLink style={bag}>Giriş Yap</GirisLink>
               {/* SPRINT_01 F1 — eskiden bu da düz `/giris`e gidiyordu, yani "Kayıt Ol"
-                  ile "Giriş Yap" AYNI ekranı açıyordu. `?mod=kayit` doğrudan e-posta
+                  ile "Giriş Yap" AYNI ekranı açıyordu. `mod=kayit` doğrudan e-posta
                   sekmesindeki kayıt formunu açar (bkz. app/giris/page.tsx). */}
-              <Link href="/giris?mod=kayit" style={bag}>Kayıt Ol</Link>
+              <GirisLink mod="kayit" style={bag}>Kayıt Ol</GirisLink>
               <Link href="/panel" style={bag}>Panelim</Link>
             </div>
           </div>
