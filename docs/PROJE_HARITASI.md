@@ -313,11 +313,18 @@ contact_phone — 🔒 anon/authenticated için REVOKE edildi (SPRINT_01 L1e). Y
 > İlan + duraklarını TEK transaction'da yazar, trigger'ın hesapladığı
 > `id, audit_score, moderation_status, is_shadow_banned` ile döner. `security invoker`
 > (bilerek — `definer` olsaydı ayrıcalık yükseltme yüzeyi olurdu), EXECUTE yalnız
-> `service_role`da. Migration: `docs/20260729_ilan_olustur_rpc.sql`, sonra
-> `docs/20260729_listings_vehicle_id.sql` (kolon + `create or replace` ile RPC'yi tazeler).
-> 🚨 **RPC'ye kolon eklerken iki yeri birlikte güncelle:** fonksiyon gövdesi ve
-> `lib/ilan-yaz.ts`'teki `p_listing` nesnesi. Fonksiyon jsonb aldığı için ayrışma
-> **derleme zamanında görünmez** — alan sessizce NULL yazılır.
+> `service_role`da. Migration SIRASI: `docs/20260729_ilan_olustur_rpc.sql` →
+> `docs/20260729_listings_vehicle_id.sql` (kolon + `create or replace` ile RPC'yi tazeler) →
+> `docs/20260729_ilan_olustur_v2.sql`.
+> **v2 (29 Tem 2026, W1+)** dört OPSİYONEL alan ekledi — `raw_post_id`, `shadow_profile_id`,
+> `is_repost`, `reviewed_at` — böylece moderatör paneli ve Edge Function da bu RPC'yi
+> kullanabiliyor. Ayrıca `listing_stops.vehicle_count` artık ÖNCE durağın kendi değerine
+> bakıyor, yoksa ilan geneline (`arac_adet`) düşüyor; `moderation_status`/`status`/
+> `trust_level` alan gelmezse `pending`/`passive`/`social`'a coalesce ediliyor.
+> 🚨 **RPC'ye kolon eklerken ÜÇ çağıranı birlikte güncelle:** fonksiyon gövdesi,
+> `lib/ilan-yaz.ts`, `app/moderator/actions.ts`, `supabase/functions/parse-listing/index.ts`.
+> Fonksiyon jsonb aldığı için ayrışma **derleme zamanında görünmez** — alan sessizce NULL
+> yazılır. Edge Function `tsconfig.json`'da `exclude`'da olduğu için `tsc` onu HİÇ görmez.
 > ⚠️ `contact_phone` (28 Tem 2026, `SPRINT_01` L1e): PostgREST kolon yetkisi `anon` ve
 > `authenticated` rollerinden alındı. İstemci tarafı hiçbir `select`/`update`/`insert`
 > bu kolonu içeremez → `42501 permission denied`. Okuma/yazma yolları:
