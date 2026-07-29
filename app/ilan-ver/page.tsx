@@ -484,7 +484,8 @@ export default function IlanVer() {
             <div style={{ display: 'grid', gridTemplateColumns: tip === 'yuk' ? '1fr 1fr' : '1fr', gap: 12, marginBottom: 16 }}>
               <div>
                 <label style={s.label}>{tip === 'arac' ? 'Müsaitlik Tarihi' : 'Yükleme Tarihi'} <span style={s.zorunlu}>*</span></label>
-                <input type="date" value={tarih} onChange={e => setTarih(e.target.value)} required style={s.input} />
+                {/* min: sunucu geçmiş tarihi reddediyor — takvimde de seçtirmiyoruz. */}
+                <input type="date" min={bugun()} value={tarih} onChange={e => setTarih(e.target.value)} required style={s.input} />
                 <label style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, cursor: 'pointer' }}>
                   <input type="checkbox" checked={tarih_esnek} onChange={e => setTarihEsnek(e.target.checked)} />
                   <span style={{ color: '#8b949e', fontSize: '0.8rem' }}>Tarih esnek</span>
