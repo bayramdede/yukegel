@@ -228,13 +228,20 @@ export async function ilanYaz(
   const telSonuc = await ilanTelefonu(userId, girdi.tel);
   if (!telSonuc.ok) return { ok: false, hata: telSonuc.hata };
 
-  // ── INSERT ────────────────────────────────────────────────────────────────
+  // ── ATOMİK YAZMA (V5) ─────────────────────────────────────────────────────
+  // İlan ve durakları TEK transaction'da yazılır: `public.ilan_olustur()` RPC'si.
+  //
+  // Eskiden iki ayrı PostgREST isteğiydi ve her istek kendi transaction'ıydı;
+  // durak insert'i patlarsa geriye DURAKSIZ ilan kalıyordu. Telafi edici bir
+  // `delete` konmuştu ama o istek de patlayabilir — telafi ≠ atomiklik.
+  //
   // `moderation_status`/`status` burada iyimser yazılıyor; nihai karar aşağıda,
   // trigger'ın hesapladığı `audit_score` okunduktan sonra veriliyor (V3).
+  //
+  // ⚠️ Migration: `docs/20260729_ilan_olustur_rpc.sql` — KODDAN ÖNCE çalışmalı.
   const aiIle = Boolean(girdi.ai_parsed || girdi.raw_text);
-  const { data: listing, error } = await svc
-    .from('listings')
-    .insert({
+  const { data: rpcSonuc, error } = await svc.rpc('ilan_olustur', {
+    p_listing: {
       listing_type: tip,
       origin_city: kalkis,
       origin_district: kisaMetin(girdi.kalkis_ilce),
@@ -252,46 +259,44 @@ export async function ilanYaz(
       user_id: userId,
       vehicle_type: aracTipi,
       body_type: utsyapi.length > 0 ? utsyapi : null,
-    })
-    .select('id, audit_score, moderation_status, is_shadow_banned')
-    .single();
-
-  if (error || !listing) {
-    structuredLog('ERROR', 'db-transaction', 'İlan oluşturma hatası', {
-      user_id: userId,
-      error_message: error?.message ?? 'listing null',
-      listing_type: tip,
-      origin_city: kalkis,
-      source: kaynak,
-    });
-    return { ok: false, hata: 'İlan kaydedilemedi. Lütfen tekrar deneyin.' };
-  }
-
-  // ── Duraklar ──────────────────────────────────────────────────────────────
-  const { error: stopError } = await svc.from('listing_stops').insert(
-    duraklar.map((d, i) => ({
-      listing_id: listing.id,
-      stop_order: i + 1,
+      // `stop_order` fonksiyon içinde `with ordinality` ile üretiliyor;
+      // araç adedi tüm duraklara aynı yazılıyor (mevcut davranış korundu).
+      arac_adet: aracAdet,
+    },
+    p_stops: duraklar.map(d => ({
       city: d.city,
       district: d.district,
-      vehicle_count: aracAdet,
       cargo_type: d.yuk_cinsi,
       weight_ton: d.ton,
       pallet_count: d.palet,
       notes: d.notlar,
-    }))
-  );
+    })),
+  });
 
-  if (stopError) {
-    // Duraksız ilan hiçbir işe yaramaz — "nereye?" sorusuna cevap veremez.
-    // Tam çözüm tek RPC (V5); şimdilik telafi edici silme ile yetim kayıt bırakmıyoruz.
-    await svc.from('listings').delete().eq('id', listing.id);
-    structuredLog('ERROR', 'db-transaction', 'İlan durak oluşturma hatası — ilan geri alındı', {
+  const listing = rpcSonuc as {
+    id: string;
+    audit_score: number | null;
+    moderation_status: string | null;
+    is_shadow_banned: boolean | null;
+  } | null;
+
+  if (error || !listing?.id) {
+    structuredLog('ERROR', 'db-transaction', 'İlan oluşturma hatası', {
       user_id: userId,
-      listing_id: listing.id,
-      error_message: stopError.message,
+      error_message: error?.message ?? 'rpc null döndü',
+      error_code: error?.code,
+      listing_type: tip,
+      origin_city: kalkis,
+      stop_count: duraklar.length,
+      source: kaynak,
     });
-    return { ok: false, hata: 'İlan kaydedilemedi (duraklar yazılamadı). Lütfen tekrar deneyin.' };
+    // PGRST202 = fonksiyon yok → migration çalıştırılmamış. Ayırt edilebilir olsun.
+    return {
+      ok: false,
+      hata: error?.code === 'PGRST202'
+        ? 'İlan kaydedilemedi: sunucu güncellemesi eksik. Lütfen yöneticiye bildirin.'
+        : 'İlan kaydedilemedi. Lütfen tekrar deneyin.',
+    };
   }
 
   // ── V3: moderasyon kararı ─────────────────────────────────────────────────
