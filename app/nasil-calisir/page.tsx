@@ -196,10 +196,10 @@ export default function NasilCalisir() {
           <div style={{ color: '#e2e8f0', fontWeight: 700, fontSize: '1.1rem', marginBottom: 8 }}>Hazır mısınız?</div>
           <div style={{ color: '#8b949e', fontSize: '0.85rem', marginBottom: 24 }}>Dakikalar içinde üye olun, hemen ilan verin.</div>
           <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
-            <a href="/giris"
+            <GirisLink mod="kayit"
               style={{ background: '#22c55e', color: '#000', fontWeight: 800, fontSize: '0.95rem', padding: '12px 28px', borderRadius: 8, textDecoration: 'none' }}>
               Ücretsiz Başla →
-            </a>
+            </GirisLink>
             <a href="/"
               style={{ background: '#161b22', color: '#e2e8f0', fontWeight: 600, fontSize: '0.95rem', padding: '12px 28px', borderRadius: 8, textDecoration: 'none', border: '1px solid #30363d' }}>
               İlanları Gör
