@@ -227,11 +227,23 @@ function GirisIci() {
     if (bekleme > 0) { setHata(`${bekleme} saniye sonra tekrar deneyebilirsiniz.`); return; }
     etkilesimRef.current = true; // A9 — açılış kontrolü artık araya girmesin
     setYukleniyor(true); temizle();
-    const temiz = telefon.replace(/\D/g, '');
-    const fmt = temiz.startsWith('90') ? `+${temiz}` : temiz.startsWith('0') ? `+9${temiz}` : `+90${temiz}`;
-    const { error } = await supabase.auth.signInWithOtp({ phone: fmt });
-    if (error) {
-      setHata('SMS gönderilemedi. Numarayı kontrol edin.');
+    // SPRINT_01 G2 — SMS gönderimi ARTIK SUNUCUDA (`/api/auth/otp`).
+    // İstemciden `signInWithOtp` çağırmak, ücretli SMS tetikleyicisini herkese açık
+    // anon key'in arkasına koymak demekti: kayıtsız biri döngüyle rastgele numaralara
+    // sınırsız SMS attırabiliyordu. Buradaki 60 sn bekleme yalnız UX; gerçek kota sunucuda.
+    const res = await fetch('/api/auth/otp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ telefon }),
+    }).catch(() => null);
+    const json = await res?.json().catch(() => null);
+
+    if (!res?.ok) {
+      setHata(json?.error || 'SMS gönderilemedi. Numarayı kontrol edin.');
+      // Sunucu daha uzun bir bekleme dayattıysa (IP kotası) sayacı ona göre kur —
+      // kullanıcı boşuna butona basıp durmasın.
+      if (res?.status === 429 && typeof json?.bekle === 'number') beklemeBaslat(json.bekle);
+      authLog('otp_failed', 'otp', json?.error);
     } else {
       setOtpAdim(true);
       beklemeBaslat();
