@@ -237,7 +237,7 @@ değişikliği içermiyor — yalnızca statik okuma. Canlı DB/RLS doğrulamas�
       tekil alanlar `users_email_key` ihlali yaratıyordu, `auth_providers`'a `'phone'` hardcode'du.
 - [x] **M1** — `proxy.ts` artık segment sınırında eşleştiriyor (`korunmaliMi()`).
 - [x] **K1** — KVKK açık rıza checkbox'ı + `users.kvkk_onay_at`.
-- [ ] **K1b** ⏳ **BAYRAM:** `docs/20260728_kvkk_onay.sql` çalıştırılmalı — **deploy'dan önce.**
+- [x] **K1b** ✅ `docs/20260728_kvkk_onay.sql` çalıştırıldı (Bayram, 29 Tem 2026).
 - [x] **A4b-hane** — `sahiplen` OTP girişi 6 hane bekliyordu, Twilio 4 gönderiyor → akış
       fiilen tamamlanamıyordu. 4'e çekildi.
 
