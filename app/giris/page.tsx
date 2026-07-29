@@ -38,9 +38,9 @@ function otpKalanSaniye(): number {
   }
 }
 
-function otpBeklemeYaz() {
+function otpBeklemeYaz(saniye: number = OTP_BEKLEME_SN) {
   try {
-    window.sessionStorage.setItem(OTP_BEKLEME_ANAHTAR, String(Date.now() + OTP_BEKLEME_SN * 1000));
+    window.sessionStorage.setItem(OTP_BEKLEME_ANAHTAR, String(Date.now() + saniye * 1000));
   } catch { /* sessionStorage yoksa sadece bellek-içi sayaç çalışır */ }
 }
 
