@@ -184,62 +184,71 @@ export async function POST(req: NextRequest) {
   }
 
   // ── 4. Listing oluştur ────────────────────────────────────────────────────
-  const contactPhone = parsed.contact_phone || phone.replace('+90', '0');
+  //
+  // 🚨 Burada eskiden kendi `listings` INSERT'i + ayrı `listing_stops` INSERT'i
+  // vardı. Yani `ILAN_VER_ANALIZ`'in W0/W1'de kapattığı üç delik bu kanalda
+  // AÇIK kalmıştı ve en kötü yerde açıktı: WhatsApp girdisi bir formdan değil,
+  // LLM'in serbest metinden çıkardığı yorumdan geliyor.
+  //   V1 — `vehicle_type` beyaz listeden geçmiyordu: LLM "Tır Dorse" derse kolona
+  //        öyle yazılıyor, filtrelerde hiçbir zaman eşleşmeyen ölü ilan doğuyordu.
+  //   V2 — `contact_phone` LLM'in metinden okuduğu numaraydı; mesajı gönderen
+  //        kişinin profil numarası değil. Yani ilanın telefonu BAŞKASININ olabilirdi.
+  //   V5 — durak INSERT'i patlarsa geriye duraksız ilan kalıyordu.
+  // `ilanYaz()` üçünü de kapatıyor; `KANAL_POLITIKA.whatsapp.daimaIncele` de
+  // buradaki "her ilan kuyruğa girer" davranışını koruyor.
+  const duraklar: DurakGirdi[] = (Array.isArray(parsed.stops) ? parsed.stops : [])
+    .filter((s: any) => typeof s?.city === 'string' && s.city.trim())
+    .map((s: any) => ({
+      sehir: String(s.city),
+      ilce: s.district ? String(s.district) : undefined,
+      ton: s.weight_ton ?? null,
+      palet: s.pallet_count ?? null,
+      yuk_cinsi: s.cargo_type ? String(s.cargo_type) : null,
+    }));
 
-  const { data: listing, error: listingErr } = await svc
-    .from('listings')
-    .insert({
-      user_id: userId,
-      source: 'whatsapp',
-      listing_type: parsed.listing_type || 'yuk',
-      origin_city: parsed.origin_city || null,
-      origin_district: parsed.origin_district || null,
-      vehicle_type: parsed.vehicle_type ? [parsed.vehicle_type] : null,
-      body_type: parsed.body_type?.length ? parsed.body_type : null,
-      price_offer: parsed.price || null,
-      price_negotiable: !parsed.price,
-      available_date: parsed.available_date || null,
-      date_flexible: parsed.date_flexible ?? false,
-      contact_phone: contactPhone,
-      notes: parsed.notes || null,
-      raw_text: messageBody,    // kota sayımı için zorunlu (countAiListingsLast24h)
-      moderation_status: 'pending',
-      status: 'active',
-    })
-    .select('id')
-    .single();
+  // LLM tarih uydurabilir ya da hiç bulamayabilir; geçmiş/boş tarihte ilanı
+  // reddetmek yerine bugüne çekiyoruz — kullanıcı WhatsApp'ta tarih düzeltemez.
+  const tarihHam = typeof parsed.available_date === 'string' ? parsed.available_date : '';
+  const bugun = bugunISO();
+  const tarih = /^\d{4}-\d{2}-\d{2}$/.test(tarihHam) && tarihHam >= bugun ? tarihHam : bugun;
 
-  if (listingErr || !listing) {
-    structuredLog('ERROR', 'whatsapp-webhook', 'listing insert hatası', { user_id: userId, error: listingErr?.message });
-    return twiml('İlan kaydedilirken bir hata oluştu. Lütfen tekrar deneyin.');
-  }
+  const sonuc = await ilanYaz(
+    userId,
+    {
+      tip: parsed.listing_type === 'arac' ? 'arac' : 'yuk',
+      kalkis: String(parsed.origin_city ?? ''),
+      kalkis_ilce: parsed.origin_district ? String(parsed.origin_district) : undefined,
+      fiyat: parsed.price ?? null,
+      fiyat_pazarlik: !parsed.price,
+      tarih,
+      tarih_esnek: Boolean(parsed.date_flexible),
+      genel_not: parsed.notes ? String(parsed.notes) : undefined,
+      arac_tipi: parsed.vehicle_type ? String(parsed.vehicle_type) : undefined,
+      utsyapi: Array.isArray(parsed.body_type) ? parsed.body_type.map(String) : [],
+      duraklar,
+      raw_text: messageBody,   // kota sayımı için zorunlu (countAiListingsLast24h)
+      ai_parsed: true,
+    },
+    'whatsapp',
+  );
 
-  // listing_stops
-  if (Array.isArray(parsed.stops) && parsed.stops.length > 0) {
-    const stops = parsed.stops
-      .filter((s: any) => s?.city?.trim())
-      .map((s: any, i: number) => ({
-        listing_id: listing.id,
-        city: s.city,
-        district: s.district || null,
-        stop_order: i + 1,
-        weight_ton: s.weight_ton || null,
-        pallet_count: s.pallet_count || null,
-        cargo_type: s.cargo_type || null,
-      }));
-
-    if (stops.length > 0) await svc.from('listing_stops').insert(stops);
+  if (!sonuc.ok) {
+    structuredLog('WARN', 'whatsapp-webhook', 'İlan oluşturulamadı', {
+      user_id: userId, hata: sonuc.hata, origin: parsed.origin_city,
+    });
+    return twiml(`İlanınız oluşturulamadı: ${sonuc.hata}`);
   }
 
   structuredLog('INFO', 'whatsapp-webhook', 'WhatsApp ilan oluşturuldu', {
     user_id: userId,
-    listing_id: listing.id,
+    listing_id: sonuc.id,
     origin: parsed.origin_city,
+    durum: sonuc.durum,
     quota_used: kullanim + 1,
     quota_limit: quota,
   });
 
   return twiml(
-    `İlanınız yayına alındı! ✅\n\nDetay ve düzenleme: https://www.yukegel.com/ilan/${listing.id}\n\nKalan günlük limit: ${quota - kullanim - 1}/${quota}`
+    `${sonuc.mesaj} ✅\n\nDetay ve düzenleme: https://www.yukegel.com/ilan/${sonuc.id}\n\nKalan günlük limit: ${quota - kullanim - 1}/${quota}`
   );
 }
