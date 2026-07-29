@@ -448,11 +448,10 @@ where table_name='users' and grantee in ('authenticated','anon') order by grante
 
 ## Bayram'ın yapması gerekenler (kod dışı)
 
-### 🔴 DEPLOY'DAN ÖNCE — Supabase SQL Editor
-1. **K1b:** `docs/20260728_kvkk_onay.sql`
-   Bu kolon açılmadan profil-tamamla formu `kvkk_onay_at` yazamaz → upsert hata verir.
-2. **A1b:** `docs/20260728_auth_events.sql`
-   Tablo yoksa `/api/auth/log` her çağrıda ERROR loglar (akışı bloklamaz ama log dolar).
+### ✅ DEPLOY'DAN ÖNCE — Supabase SQL Editor (TAMAMLANDI, 29 Tem 2026)
+1. ~~**K1b:** `docs/20260728_kvkk_onay.sql`~~ ✅ çalıştırıldı.
+2. ~~**A1b:** `docs/20260728_auth_events.sql`~~ ✅ çalıştırıldı — `auth_events` canlıda,
+   denetim izi gerçekten birikiyor.
 
 ### 🔴 DEPLOY'DAN SONRA — Supabase SQL Editor
 3. **L1e:** `docs/20260728_contact_phone_revoke.sql`
