@@ -1,33 +1,19 @@
 'use client';
 import { useState, useRef } from 'react';
-import { createClient } from '../../lib/supabase';
+// 🚨 `ILAN_VER_ANALIZ` B1 — istemci↔route sözleşmesi TEK dosyadan. Bu import
+// olmadan iki taraf yine sessizce ayrışabilir; `satisfies` mühürleri aşağıda.
+import {
+  SABLON_HEADERS, MAX_SATIR,
+  type HamSatir, type OnizlemeSatiri, type TopluYukleIstek, type TopluYukleYanit,
+  type KayitSonucu,
+} from '../../lib/toplu-yukle-sozlesme';
+import { ILLER } from '../../lib/ilan-sabitler';
 
-const ILLER = [
-  'Adana','Adıyaman','Afyonkarahisar','Ağrı','Amasya','Ankara','Antalya','Artvin',
-  'Aydın','Balıkesir','Bilecik','Bingöl','Bitlis','Bolu','Burdur','Bursa','Çanakkale',
-  'Çankırı','Çorum','Denizli','Diyarbakır','Edirne','Elazığ','Erzincan','Erzurum',
-  'Eskişehir','Gaziantep','Giresun','Gümüşhane','Hakkari','Hatay','Isparta','Mersin',
-  'İstanbul','İzmir','Kars','Kastamonu','Kayseri','Kırklareli','Kırşehir','Kocaeli',
-  'Konya','Kütahya','Malatya','Manisa','Kahramanmaraş','Mardin','Muğla','Muş',
-  'Nevşehir','Niğde','Ordu','Rize','Sakarya','Samsun','Siirt','Sinop','Sivas',
-  'Tekirdağ','Tokat','Trabzon','Tunceli','Şanlıurfa','Uşak','Van','Yozgat',
-  'Zonguldak','Aksaray','Bayburt','Karaman','Kırıkkale','Batman','Şırnak','Bartın',
-  'Ardahan','Iğdır','Yalova','Karabük','Kilis','Osmaniye','Düzce',
-];
+type PreviewRow = OnizlemeSatiri;
 
-interface PreviewRow {
-  rowIndex: number;
-  seferNo: string;
-  kalkisIli: string; kalkisIlce: string;
-  varisIli: string; varisIlce: string;
-  durakTipi: string;
-  aracTipi: string; ustYapi: string;
-  tonaj: string; palet: string; fiyat: string; yukCinsi: string; not: string;
-  kalkisIliNorm: string | null; kalkisIliStatus: 'ok' | 'error' | 'empty';
-  varisIliNorm: string | null; varisIliStatus: 'ok' | 'error' | 'empty';
-  aracTipiNorm: string | null; aracTipiStatus: 'ok' | 'warn' | 'empty';
-  ustYapiNorm: string | null; ustYapiStatus: 'ok' | 'warn' | 'empty';
-  hasErrors: boolean;
+/** Türkiye +03:00 — `PROJE_HARITASI §9` (A2). Sunucu `bugunISO()` ile aynı olmak zorunda. */
+function bugun(): string {
+  return new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString().split('T')[0];
 }
 
 type Overrides = Record<number, { kalkisIliNorm?: string; varisIliNorm?: string }>;
