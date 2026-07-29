@@ -96,22 +96,44 @@ git_push() {
   git commit -m "auto: $(date '+%Y-%m-%d %H:%M:%S')" --quiet \
     || { log "✗ git commit başarısız"; return; }
 
-  if git push --quiet 2>> "$LOG_FILE"; then
-    log "✓ git push OK"
+  # 🚨 29 Tem 2026 — DAEMON ARTIK `main`'E PUSH ETMEZ, `yedek` DALINA PUSH EDER.
+  #
+  # NEDEN: Vercel Hobby'de KAYAN 24 SAATTE 100 DEPLOYMENT sınırı var. Bu daemon
+  # her dosya kaydında commit + push atıyor → günde ~256 push → 24 saat dolmadan
+  # kota bitiyor ve Vercel HİÇBİR deployment oluşturmuyor; `deploy:` commit'i de
+  # dahil. Belirti sinsi: dashboard'da hiçbir kayıt YOK (Canceled bile değil),
+  # hata da yok — push başarılı görünüyor ama site güncellenmiyor.
+  #
+  # ⚠️ `vercel.json → ignoreCommand` bunu ÇÖZMEZ. O, build'i iptal eder ama
+  #    deployment ZATEN OLUŞTURULMUŞTUR ve kotadan DÜŞER. Yani "Canceled" satırlar
+  #    build dakikası harcamaz, kota harcar. Kotayı korumanın tek yolu Vercel'in
+  #    deployment'ı hiç OLUŞTURMAMASI: push'un izlenen dala gitmemesi.
+  #
+  # ÇÖZÜM İKİ PARÇA, İKİSİ DE GEREKLİ:
+  #   1. burada: daemon `HEAD:yedek`'e push eder → `main` sessiz kalır
+  #   2. `vercel.json → git.deploymentEnabled.yedek = false` → Vercel bu dal için
+  #      deployment OLUŞTURMAZ (aksi halde her push Preview deployment'ı olur ve
+  #      kota yine dolar — Preview de sayılır)
+  #
+  # Yedeklemeden VAZGEÇİLMEDİ: her kaydetme hâlâ GitHub'a çıkıyor, sadece başka
+  # dala. Disk giderse commit'ler `yedek` dalında duruyor. Canlıya çıkış tek kapı:
+  # `npm run deploy` → `main` → 1 deployment.
+  if git push --quiet origin HEAD:"$YEDEK_DAL" 2>> "$LOG_FILE"; then
+    log "✓ yedek push OK ($YEDEK_DAL)"
     bildirim_temizle push
     return
   fi
 
-  # 🚨 Reddedilen push'tan sonra TOPARLAN. Kullanıcı aynı anda push ettiyse
-  # ("cannot lock ref" / non-fast-forward) eski sürüm bir daha denemiyordu ve
-  # yerel commit'ler birikip her turda tekrar reddediliyordu.
-  log "… push reddedildi, rebase ile tekrar deneniyor"
-  if git pull --rebase --quiet 2>> "$LOG_FILE" && git push --quiet 2>> "$LOG_FILE"; then
-    log "✓ git push OK (rebase sonrası)"
+  # 🚨 Reddedilen push'tan sonra TOPARLAN. `yedek` yalnızca bir aynadır: `main`
+  # rebase'lendiyse ileri sarmaz. `--force-with-lease` kullanılır — düz `--force`
+  # DEĞİL: uzaktaki dalı son gördüğümüzden beri başkası değiştirdiyse yine durur.
+  log "… yedek push reddedildi, --force-with-lease ile tekrar deneniyor"
+  if git push --quiet --force-with-lease origin HEAD:"$YEDEK_DAL" 2>> "$LOG_FILE"; then
+    log "✓ yedek push OK (force-with-lease)"
     bildirim_temizle push
   else
-    log "✗ git push FAILED (rebase sonrası da)"
-    bildir push "git push başarısız — elle müdahale gerekiyor"
+    log "✗ yedek push FAILED"
+    bildir push "yedek dalına push başarısız — elle müdahale gerekiyor"
   fi
 }
 
