@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { getConfig } from '../../lib/config';
+import GirisLink from './GirisLink';
 
 /**
  * SPRINT_01 F2 — buradaki bağlantılar `<a href>` idi, artık `next/link`.
