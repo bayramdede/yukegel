@@ -451,7 +451,7 @@ ZIP/TXT → raw_posts → DB trigger → parse-listing Edge Fn → listings → 
 | `/api/moderator/toplu-islem` | Bulk ops |
 | `/api/ilan/duzelt` | Kullanıcı düzeltme + re-scan |
 | `/api/admin/guvenlik` | safety_rules + blacklist CRUD |
-| `/api/excel-import` | Excel toplu yükleme (auto_published) |
+| `/api/excel-import` | Excel toplu yükleme. `POST` JSON, `action: 'preview' \| 'commit'`. Sözleşme: `lib/toplu-yukle-sozlesme.ts`. Kimlik OTURUMDAN (`userId` gövdede YOK). Kayıt `ilanYaz()` üzerinden → V1/V3 aynen geçerli. `MAX_SATIR=300`, `MAX_ILAN=50`, `maxDuration=60` |
 | `/api/auth/tekil-kontrol` | telefon/tckn/vkn tekillik (service role) |
 | `/api/auth/log` | 🔒 Auth denetim izi → `auth_events` (service role). Fire-and-forget, IP+UA yazar, telefon/şifre yazmaz |
 | `/api/auth/otp` | 🔒 **TEK** SMS OTP gönderim yolu (G2). POST + Origin. 3 kota: numara 1/60sn, IP 5 farklı numara/saat, IP 15 toplam/saat. 429 + `Retry-After` |
