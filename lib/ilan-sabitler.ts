@@ -47,6 +47,8 @@ export function ilKey(v: string): string {
 }
 
 const IL_INDEKS = new Map<string, string>(ILLER.map(il => [ilKey(il), il]));
+const ARAC_INDEKS = new Map<string, string>(ARAC_TIPLERI.map(a => [ilKey(a), a]));
+const UTS_INDEKS = new Map<string, string>(UTSYAPI.map(u => [ilKey(u), u]));
 
 /**
  * Serbest metni resmî il adına çevirir; tanınmazsa `null`.
@@ -57,4 +59,24 @@ export function ilNormalize(v: unknown): string | null {
   const temiz = v.trim();
   if (!temiz) return null;
   return IL_INDEKS.get(ilKey(temiz)) ?? null;
+}
+
+/**
+ * Serbest metni beyaz listedeki araç tipine çevirir; tanınmazsa `null`.
+ * `"tir"`, `"TIR"`, `"Tır"` → `'TIR'`. Excel'den gelen serbest yazım için şart
+ * (`ILAN_VER_ANALIZ` B9: eşleşmeyen değer sessizce düşüyordu).
+ */
+export function aracTipiNormalize(v: unknown): string | null {
+  if (typeof v !== 'string') return null;
+  const temiz = v.trim();
+  if (!temiz) return null;
+  return ARAC_INDEKS.get(ilKey(temiz)) ?? null;
+}
+
+/** Serbest metni beyaz listedeki üst yapıya çevirir; tanınmazsa `null`. */
+export function utsyapiNormalize(v: unknown): string | null {
+  if (typeof v !== 'string') return null;
+  const temiz = v.trim();
+  if (!temiz) return null;
+  return UTS_INDEKS.get(ilKey(temiz)) ?? null;
 }
