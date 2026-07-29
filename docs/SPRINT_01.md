@@ -457,10 +457,14 @@ where table_name='users' and grantee in ('authenticated','anon') order by grante
 2. ~~**A1b:** `docs/20260728_auth_events.sql`~~ ✅ çalıştırıldı — `auth_events` canlıda,
    denetim izi gerçekten birikiyor.
 
-### 🔴 DEPLOY'DAN SONRA — Supabase SQL Editor
-3. **L1e:** `docs/20260728_contact_phone_revoke.sql`
-   ⚠️ **Sıra önemli.** Kod deploy edilmeden çalıştırırsan panel ve moderatör ekranı
-   telefonu yazamaz. Dosyanın sonunda 5 adımlık duman testi ve geri alma bloğu var.
+### ⚠️ DEPLOY'DAN SONRA — Supabase SQL Editor (ÇALIŞTIRILDI, sıra teyit edilmeli)
+3. ~~**L1e:** `docs/20260728_contact_phone_revoke.sql`~~ ✅ çalıştırıldı (29 Tem 2026,
+   doğrulama select'i 0 satır → `anon`/`authenticated` artık `contact_phone`'u göremiyor).
+   ⚠️ **Ama sıra önemliydi:** bu SQL kod deploy'undan **sonra** çalışmalıydı. W1'in L1e
+   kodu (`app/panel/actions.ts`, `app/moderator/actions.ts`, `contact_phone`'suz
+   `app/moderator/page.tsx`) canlıda **değilse** panel ve moderatör ekranı şu anda
+   numarayı yazamıyor demektir. Bayram'ın 5 adımlık duman testini yapması gerekiyor;
+   kırıksa ya hemen deploy et ya da dosyanın sonundaki geri alma bloğunu çalıştır.
 
 ### Kontrol / karar
 4. ~~**K2 — `users.is_active` default'u**~~ ✅ **doğrulandı** (29 Tem 2026): default `true`,
