@@ -149,24 +149,29 @@ export default function TopluYukle({ onGeri }: { onGeri: () => void }) {
   // ── Onayla ve yayınla ──
   async function onayla() {
     setYukleniyor(true);
-    const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { alert('Oturum bulunamadı. Lütfen tekrar giriş yapın.'); setYukleniyor(false); return; }
+    try {
+      // ⚠️ `userId` GÖNDERİLMİYOR — kimlik oturumdan okunuyor (B1).
+      const finalRows = previewRows.map(row => ({
+        ...row,
+        kalkisIliNorm: overrides[row.rowIndex]?.kalkisIliNorm ?? row.kalkisIliNorm,
+        varisIliNorm:  overrides[row.rowIndex]?.varisIliNorm  ?? row.varisIliNorm,
+      }));
 
-    const finalRows = previewRows.map(row => ({
-      ...row,
-      kalkisIliNorm: overrides[row.rowIndex]?.kalkisIliNorm ?? row.kalkisIliNorm,
-      varisIliNorm:  overrides[row.rowIndex]?.varisIliNorm  ?? row.varisIliNorm,
-    }));
+      const istek = { action: 'commit', rows: finalRows, tarih } satisfies TopluYukleIstek;
+      const res = await fetch('/api/excel-import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(istek),
+      });
+      const data: TopluYukleYanit = await res.json();
+      if (!data.ok) throw new Error(data.hata);
+      if (data.action !== 'commit') throw new Error('Beklenmeyen sunucu yanıtı.');
 
-    const res = await fetch('/api/excel-import', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'commit', rows: finalRows, userId: user.id }),
-    });
-    const data = await res.json();
-    setSonuc({ created: data.created, errors: data.errors || [] });
-    setAdim('basarili');
+      setSonuc({ olusturulan: data.olusturulan, sonuclar: data.sonuclar });
+      setAdim('basarili');
+    } catch (err: any) {
+      alert('❌ ' + (err?.message || 'İlanlar kaydedilemedi.'));
+    }
     setYukleniyor(false);
   }
 
