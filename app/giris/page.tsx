@@ -22,6 +22,27 @@ function redirectCookieSil() {
   document.cookie = `${REDIRECT_COOKIE}=; path=/; max-age=0`;
 }
 
+/**
+ * 29 Tem 2026 — `?redirect=` ile GELEN hedefi cookie'ye de yaz.
+ *
+ * 🚨 A7'de cookie'yi YALNIZCA proxy yazıyordu. Ama giriş bağlantılarına hedef
+ * eklediğimizden beri (`lib/redirect.ts → girisAdresi`) kullanıcı buraya proxy'ye
+ * hiç uğramadan da gelebiliyor: header'daki "Giriş Yap" düz bir `<Link>`.
+ *
+ * O durumda hedef SADECE query param'da duruyordu ve Google ile giriş yapılınca
+ * kayboluyordu: `signInWithOAuth` yalnız `/auth/callback` adresine döner, callback
+ * de hedefi cookie'den okur. Yani "Google ile giriş" seçen herkes yine ana sayfaya
+ * düşüyordu — telefon/e-posta ile girenler doğru yere giderken. Sinsi bir fark.
+ *
+ * `guvenliRedirect` süzgeci burada da geçerli: doğrulanmamış hiçbir değer yazılmaz.
+ * `sameSite=lax` — Google'dan dönüşte cookie'nin gönderilmesi için gerekli.
+ */
+function redirectCookieYaz(hedef: string) {
+  if (typeof document === 'undefined') return;
+  document.cookie =
+    `${REDIRECT_COOKIE}=${encodeURIComponent(hedef)}; path=/; max-age=${REDIRECT_COOKIE_MAX_AGE}; samesite=lax`;
+}
+
 // SPRINT_01 A4b — OTP tekrar gönderme bekleme süresi.
 // Eskiden "Kod Gönder" butonuna basılı tutmak her seferinde yeni SMS gönderiyordu:
 // hem Twilio faturası (mesaj başına ücret), hem de bir numarayı SMS'e boğma aracı.
