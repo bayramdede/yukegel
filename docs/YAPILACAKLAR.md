@@ -221,8 +221,8 @@ değişikliği içermiyor — yalnızca statik okuma. Canlı DB/RLS doğrulamas�
 >
 > ~~W0 (blocker, 17p): L1 · A2 · **M1** · K1~~ **✅ TAMAMLANDI (28 Tem 2026)**
 > ~~W1 (auth bütünlüğü, 21p): **L1e** · A1 · A3 · A4 · A7 · K2 · **R1** · **C1**~~ **✅ TAMAMLANDI (28 Tem 2026)**
-> **Sıradaki → W2** (güvenlik, 15p): **G1** · **G2** · **M2** · **C2** · K2b
-> W3 (SEO/huni, 14p): **S1–S4** · L2 · L3  —  W4 (cila, 11p): K3 · **R2** · **F1** · **F2** · L4 · L5 · A5 · A6
+> ~~W2 (güvenlik, 15p): **G1** · **G2** · **M2** · **C2** · K2b~~ **✅ TAMAMLANDI (29 Tem 2026)**
+> **Sıradaki → W3** (SEO/huni, 14p): **S1–S4** · L2 · L3  —  W4 (cila, 11p): K3 · **R2** · **F1** · **F2** · L4 · L5 · A5 · A6
 
 ### ✅ W0 — Tamamlandı (28 Tem 2026)
 - [x] **L1** — Telefon sızıntısı. `app/page.tsx` ISR'li olduğu için "misafirse gizle" yapılamadı;
