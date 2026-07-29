@@ -654,9 +654,13 @@ imkânsızlaştır). D4 bağımsız, her an yapılabilir.
      yazılıyor**. Doğru satır (`id=1844`) tabloda zaten var.
   4. Kopya BÖLÜM 4.2-4.6 (`kazan`→Kahramankazan, `ömerli`, `kıraç`, `gölbaşı`, `kemalpaşa`).
   5. Kopya BÖLÜM 5 doğrulama — **iki sorgu da boş dönmeli**, dönmüyorsa durup bana getir.
-  6. Geçmiş `listings` onarımı (kopya BÖLÜM 6) — **önce ölç, sonra UPDATE**.
-  7. Sahte güzergâh ölçümü: `SELECT count(*) FROM listings WHERE origin_city = destination_city;`
-     — D4 öncesi ve sonrası karşılaştırılabilsin diye **düzeltmeden önce de** al.
+  6. Geçmiş konum onarımı — 🚨 **kopya BÖLÜM 6'yı KULLANMA** (ölü `destination_city`'yi
+     onarıp canlı `listing_stops.city`/`district` ve `listings.origin_district`'i atlıyor);
+     `20260729_alias_runbook.md` Adım 8 dört kolonu birlikte onarıyor.
+  7. Sahte güzergâh ölçümü: runbook Adım 0.1 — `listings` ⋈ `listing_stops`, katlanmış
+     anahtar eşit + ham yazım farklı. D4 öncesi ve sonrası karşılaştırılabilsin diye
+     **düzeltmeden önce de** al. ⚖️ Şehir içi taşıma meşrudur; "aynı şehir" sahtelik
+     sinyali değil (Adım 0.2 o tabanı ayrı ölçüyor).
   8. D3 indeksini **en son** kur.
 - **Kabul kriteri:** BÖLÜM 5'in iki doğrulama sorgusu boş dönüyor; D3 indeksi hatasız
   kuruluyor.
