@@ -296,13 +296,18 @@ shadow_profile_id (nullable FK → shadow_profiles.id) — kayıtsız kullanıc�
 vehicle_id (nullable FK → vehicles.id, on delete set null) — ILAN_VER_ANALIZ B3 (29 Tem 2026)
 contact_phone — 🔒 anon/authenticated için REVOKE edildi (SPRINT_01 L1e). Yalnız service-role.
 ```
-> 🚨 **YAZMA YOLU TEK: `lib/ilan-yaz.ts`** (29 Tem 2026, `ILAN_VER_ANALIZ` W0/W1). Uygulamada
-> `listings` INSERT'i **kopyalanmaz**; `ilanYaz()` çağrılır. Kanallar: `/ilan-ver` tekil form
-> (`app/ilan-ver/actions.ts` → yalnız auth kapısı) ve `/api/excel-import` toplu yükleme.
-> Kendi INSERT'ini yazan ikinci bir yol, W0'da kapatılan V1/V3 deliklerini yeniden açar —
-> excel-import'ta tam olarak bu oldu. (İstisna: `app/moderator/page.tsx:974` `raw_posts`'tan
-> ilan üretiyor — personel yolu, farklı semantik; V5 atomikliği oraya HENÜZ uygulanmadı,
-> `YAPILACAKLAR.md`'de bilet.)
+> 🚨 **YAZMA YOLU TEK** (29 Tem 2026, `ILAN_VER_ANALIZ` W0/W1). Uygulamada `listings` INSERT'i
+> **kopyalanmaz**. İki katmanlı bir kural:
+> - **Next tarafındaysan → `lib/ilan-yaz.ts` / `ilanYaz()`.** Kanallar: `/ilan-ver` tekil form
+>   (`app/ilan-ver/actions.ts` → yalnız auth kapısı), `/api/excel-import` toplu yükleme,
+>   `app/api/whatsapp/route.ts` Twilio webhook'u.
+> - **`ilanYaz()` kullanılamıyorsa → doğrudan `ilan_olustur()` RPC'si.** İki yol böyle:
+>   `app/moderator/actions.ts` → `moderatorIlanOlustur()` (manuel giriş; `user_id` NULL ve
+>   telefon profilden değil metinden geldiği için `ilanYaz()`'ın V2 sözleşmesine uymaz) ve
+>   `supabase/functions/parse-listing/index.ts` (Deno; TS modülünü import EDEMEZ).
+>
+> Kendi iki ayrı INSERT'ini yazan bir yol, W0/W1'de kapatılan V1/V3/V5 deliklerini yeniden
+> açar — excel-import'ta, WhatsApp webhook'unda ve moderatör panelinde tam olarak bu olmuştu.
 >
 > ⚡ **`public.ilan_olustur(p_listing jsonb, p_stops jsonb) → jsonb`** (29 Tem 2026, V5).
 > İlan + duraklarını TEK transaction'da yazar, trigger'ın hesapladığı
