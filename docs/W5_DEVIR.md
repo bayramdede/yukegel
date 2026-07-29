@@ -83,9 +83,14 @@ Aşağıdakiler 29 Tem 2026'da kaynak kodundan **okunarak** doğrulandı:
 
 ### Ölçülmemiş / açık sorular
 
-- `listings` tablosunda kaç satır `origin_city = destination_city`? **Henüz ölçülmedi.**
-  D5 adım 7 bunu düzeltmeden ÖNCE almayı şart koşuyor — yoksa D4'ün etkisi
-  ölçülemez hale gelir.
+- ~~`listings` tablosunda kaç satır `origin_city = destination_city`?~~ 🚨 **BU SORU
+  YANLIŞ KURULMUŞ** (Bayram düzeltti, 29 Tem 2026). Varışlar `listings`'te değil,
+  `public.listing_stops` satırlarında; `listings.destination_city` ölü kolon. Ayrıca
+  şehir içi taşıma meşru olduğu için "aynı şehir" sahtelik sinyali değil. Doğru soru:
+  `listings.origin_city` ile `listing_stops.city`'nin **katlanmış anahtarı eşit ama ham
+  yazımı farklı** kaç satır var? Sorgu: `docs/20260729_alias_runbook.md` Adım 0.1
+  (meşru şehir içi tabanı 0.2'de, ayrı tutulmalı). **Henüz ölçülmedi** — düzeltmeden
+  ÖNCE alınmalı, yoksa D4'ün etkisi ölçülemez.
 - Kopya temizlik scriptlerinin hangi bölümlerinin çalıştırıldığı **kesin değil**.
   Yeni oturum işe başlamadan Bayram'a sormalı ya da BÖLÜM 5 doğrulama sorgularını
   çalıştırtıp mevcut duruma bakmalı.
