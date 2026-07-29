@@ -459,9 +459,10 @@ where table_name='users' and grantee in ('authenticated','anon') order by grante
    telefonu yazamaz. Dosyanın sonunda 5 adımlık duman testi ve geri alma bloğu var.
 
 ### Kontrol / karar
-4. **K2 — `users.is_active` default'u:** İstemci artık `is_active: true` göndermiyor.
-   `select column_default from information_schema.columns where table_name='users' and column_name='is_active';`
-   → `true` değilse yeni kayıtlar pasif açılır.
+4. ~~**K2 — `users.is_active` default'u**~~ ✅ **doğrulandı** (29 Tem 2026): default `true`,
+   kolon nullable, NULL satır sayısı 0. Opsiyonel sertleştirme:
+   `alter table public.users alter column is_active set not null;`
+   (Nullable kaldığı sürece `.eq('is_active', true)` NULL satırları sessizce atlar.)
 5. ~~**A4 — Twilio Console:** Code Length kaç hane?~~ ✅ **4 hane, çalışıyor** (28 Tem 2026).
    Bu bilgi `sahiplen` sayfasındaki 6-hane bug'ını (A4b-hane) ortaya çıkardı.
 6. **S1 — Görsel:** 1200×630 OG görseli (logo + "Türkiye'nin Nakliye İlan Platformu")
