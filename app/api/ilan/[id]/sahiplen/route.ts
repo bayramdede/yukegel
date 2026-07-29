@@ -123,13 +123,30 @@ export async function POST(
           { status: 429, headers: { 'Retry-After': String(kalan) } }
         )
       }
+      // SPRINT_01 G2 — IP başına saatte 5 farklı numara. `sayma: true` → sadece bakar,
+      // SMS gerçekten gidene kadar kotayı yakmaz.
+      const ip = istekIp(request)
+      const ipKota = kotaDene({
+        ad: 'otp-ip-numara', anahtar: ip, limit: 5, pencereMs: 60 * 60 * 1000,
+        deger: telefon, sayma: true,
+      })
+      if (!ipKota.izinli) {
+        return NextResponse.json(
+          { error: 'Çok fazla farklı numaraya kod istendi. Bir süre sonra tekrar deneyin.', kalan: ipKota.bekleSn },
+          { status: 429, headers: { 'Retry-After': String(ipKota.bekleSn) } }
+        )
+      }
+
       const { error } = await supabase.auth.signInWithOtp({ phone: telefon })
       if (error) {
         console.error('sahiplen OTP gönderilemedi:', error.message)
         return NextResponse.json({ error: 'SMS gönderilemedi. Lütfen tekrar deneyin.' }, { status: 502 })
       }
-      // Sayacı yalnızca SMS GERÇEKTEN gittiyse başlat; sağlayıcı hatası kullanıcıyı kilitlemesin.
+      // Sayaçları yalnızca SMS GERÇEKTEN gittiyse işle; sağlayıcı hatası kullanıcıyı kilitlemesin.
       otpSonGonderim.set(id, Date.now())
+      // `/api/auth/otp` ile AYNI kova ('otp-ip-numara'): iki uç nokta arasında gidip gelerek
+      // kotayı ikiye katlamak mümkün olmasın.
+      kotaDene({ ad: 'otp-ip-numara', anahtar: ip, limit: 5, pencereMs: 60 * 60 * 1000, deger: telefon })
       return NextResponse.json({ success: true, bekleme: OTP_BEKLEME_MS / 1000 })
     }
 
