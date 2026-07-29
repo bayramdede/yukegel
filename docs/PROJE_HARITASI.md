@@ -17,7 +17,7 @@
 > **✅ PROXY PREFIX TUZAĞI (28 Tem 2026, `SPRINT_01` M1 — ÇÖZÜLDÜ):** `proxy.ts` düz `pathname.startsWith(r)` kullanıyordu; `KORUNMALI` içindeki `'/moderator'` girdisi `/moderator-giris`'i de yakalıyordu → moderatör giriş sayfası oturumsuz erişilemez hâldeydi. Artık `korunmaliMi()` **segment sınırında** eşleştiriyor: `pathname === kok || pathname.startsWith(kok + '/')`. `ACIK_ROTALAR`'a da `/moderator-giris` eklendi. **Kural: `KORUNMALI`'ya segment eklerken düz `startsWith`'e geri dönme** — `/profil` ↔ `/profil-tamamla` aynı tuzağı taşıyor.
 
 > **✅ EKSİK ROTALAR (28 Tem 2026, `LANDING_AUTH_ANALIZ` A1/A2 — ÇÖZÜLDÜ):**
-> (1) ~~`POST /api/auth/log` yok~~ — **AÇILDI.** `app/api/auth/log/route.ts` service-role ile `auth_events` tablosuna yazıyor (event, method, reason, user_id, ip, user_agent). Fire-and-forget: hiçbir zaman auth akışını bloklamaz. Telefon/şifre **yazılmaz**. ⏳ `docs/20260728_auth_events.sql` deploy öncesi çalıştırılmalı.
+> (1) ~~`POST /api/auth/log` yok~~ — **AÇILDI.** `app/api/auth/log/route.ts` service-role ile `auth_events` tablosuna yazıyor (event, method, reason, user_id, ip, user_agent). Fire-and-forget: hiçbir zaman auth akışını bloklamaz. Telefon/şifre **yazılmaz**. ✅ `docs/20260728_auth_events.sql` çalıştırıldı (29 Tem 2026) — tablo canlıda.
 > (2) ~~`/giris/merge`~~ — **ÇÖZÜLDÜ.** `app/auth/callback/route.ts` artık `/giris?merge_user_id=…&merge_name=…&merge_email=…` yönlendiriyor; `giris/page.tsx` bu paramları lazy `useState` initializer ile okuyup mevcut `merge_onay` moduna giriyor. Yeni route açılmadı.
 > **Tuzak (kalıcı):** Yeni endpoint çağrısı eklerken `.catch(()=>{})` ile sessizleştirme — en azından `console.warn` bırak; bu iki hata aylarca görünmez kaldı. `authLog()` çağrıları artık `console.warn` bırakıyor.
 
