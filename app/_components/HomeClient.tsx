@@ -77,6 +77,35 @@ function Chip({ label, bg = '#1f2937', color = '#94a3b8' }: { label: string; bg?
   );
 }
 
+/**
+ * Durakların bir alanının TOPLAMI (29 Tem 2026).
+ *
+ * 🚨 Eskiden kart `ilan.duraklar[0]?.ton` yazıyordu — yani ÇOK DURAKLI bir ilanda
+ * sadece BİRİNCİ durağın tonajı görünüyordu. Mersin 8t + Adana 12t + Hatay 5t olan
+ * bir ilan listede "⚖ 8 ton" diye çıkıyordu: yükün %68'i ekranda yok. Nakliyeci
+ * aracını 8 tona göre seçip ilana giriyor, gerçek yükü orada öğreniyordu.
+ * Aynı hata `palet` için de vardı.
+ *
+ * `weight_ton` Postgres'te `numeric` — PostgREST bunu bazen STRING döndürür
+ * ("8.50"), bu yüzden Number() zorunlu; düz `+` string birleştirir.
+ * Ondalık toplamda kayan nokta artığını (0.1+0.2=0.30000000000000004) kesmek için
+ * 2 haneye yuvarlanıp sondaki sıfırlar atılıyor.
+ */
+function durakToplami(duraklar: any[], alan: 'ton' | 'palet'): number | null {
+  if (!Array.isArray(duraklar) || duraklar.length === 0) return null;
+  let toplam = 0;
+  let varMi = false;
+  for (const d of duraklar) {
+    const n = Number(d?.[alan]);
+    if (Number.isFinite(n) && n > 0) {
+      toplam += n;
+      varMi = true;
+    }
+  }
+  if (!varMi) return null;
+  return Math.round(toplam * 100) / 100;
+}
+
 function HeroKayitsiz({ totalCount = 0 }: { totalCount?: number }) {
   const rotaDuraklari = SURUCU_HIZMETLERI.slice(0, 4);
   return (
