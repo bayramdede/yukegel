@@ -34,11 +34,15 @@ function yanit(v: TopluYukleYanit, status = 200) {
   return NextResponse.json(v, { status });
 }
 
-/** Boş/dolu/tanındı üçlüsünü tek yerde üretir. */
-function durumEtiketi(ham: string, norm: string | null, tanınmayanHata: boolean): AlanDurumu {
+/**
+ * İSTEĞE BAĞLI alanın durumu: boş → `empty`, tanındı → `ok`, tanınmadı → `warn`.
+ * (Zorunlu alanlar bu fonksiyondan geçmez; onlarda "boş" da `error`'dur — aksi hâlde
+ * istemci "hazır" der, sunucu commit'te reddeder ve kullanıcı düzeltemeyeceği bir
+ * yerde hatayla karşılaşır.)
+ */
+function durumEtiketi(ham: string, norm: string | null): AlanDurumu {
   if (!ham.trim()) return 'empty';
-  if (norm) return 'ok';
-  return tanınmayanHata ? 'error' : 'warn';
+  return norm ? 'ok' : 'warn';
 }
 
 export async function POST(request: NextRequest) {
