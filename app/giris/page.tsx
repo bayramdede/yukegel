@@ -141,6 +141,14 @@ function GirisIci() {
   // Sağlam çözüm: ölü/eksik oturumu TAMAMEN kapat (signOut → localStorage + cookie temizlenir)
   // ve temiz giriş formunu göster. Kullanıcı Google ile yeniden girer; PKCE akışı
   // /auth/callback üzerinden cookie'yi doğru set eder → /panel.
+  // SPRINT_01 A9 — kullanıcı formda bir giriş denemesi başlattıysa, aşağıdaki
+  // "açılıştaki oturum sağlık kontrolü" ARTIK yönlendirme YAPMAZ. Aksi halde:
+  // eski oturumu açık olan kullanıcı SMS kodunu isterken, gecikmeli çalışan bu
+  // kontrol araya girip onu eski oturumun hedefine (ör. /admin) fırlatıyordu.
+  // Kod girilmeden giriş yapılmış gibi görünüyordu — aslında oturum zaten vardı,
+  // ama davranış hem kafa karıştırıcı hem de hesap değiştirmeyi imkânsız kılıyordu.
+  const etkilesimRef = useRef(false);
+
   useEffect(() => {
     let islendi = false;
     // INITIAL_SESSION: Supabase istemcisi başlatıldıktan (ve URL'deki #access_token magic-link
