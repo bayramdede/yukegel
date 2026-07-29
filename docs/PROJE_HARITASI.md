@@ -128,20 +128,48 @@ mesajı `deploy:` ile başlayan bir commit atar (değişiklik yoksa `--allow-emp
 
 | Ne | Ne zaman | Sonuç |
 |---|---|---|
-| `scripts/auto-deploy.sh` (launchd + fswatch) | her dosya kaydetmesinde | `auto: <tarih>` commit + GitHub push + değişmişse Supabase edge function deploy |
-| `vercel.json` → `ignoreCommand` | her push'ta | commit mesajı `auto:` ile **başlıyorsa build ATLANIR |
-| `npm run deploy` | sen çalıştırınca | `deploy:` commit'i → Vercel build eder |
+| `scripts/auto-deploy.sh` (launchd + fswatch) | her dosya kaydetmesinde | `auto: <tarih>` commit → **`yedek` dalına** push + değişmişse Supabase edge function deploy |
+| `vercel.json` → `git.deploymentEnabled.yedek = false` | `yedek`'e push'ta | Vercel deployment'ı **hiç OLUŞTURMAZ** (kota harcanmaz) |
+| `vercel.json` → `ignoreCommand` | `main`'e push'ta | commit mesajı `auto:` ile başlıyorsa build ATLANIR (2. katman) |
+| `npm run deploy` | sen çalıştırınca | `main`'e push → Vercel build eder |
 
-🚨 **Neden:** Daemon her kaydetmede push atıyor, Vercel de `main`'e giden her push'ta
-build ediyordu → günde ~**79 deploy** (Hobby limiti 100/gün) ve **yarım kod canlıda**.
-17:47'deki `TelefonDurumu is not assignable` build hatası bunun kanıtı: daemon
-`actions.ts`'i (yeni tip) push etmiş, o tipi kullanan `page.tsx`'i henüz
-commit'lememişti. Vercel hiç var olmamış bir ara hali derledi.
+🚨 **Neden (1. tur):** Daemon her kaydetmede `main`'e push atıyor, Vercel de her
+push'ta build ediyordu → **yarım kod canlıda**. 17:47'deki `TelefonDurumu is not
+assignable` build hatası bunun kanıtı: daemon `actions.ts`'i (yeni tip) push etmiş,
+onu kullanan `page.tsx`'i henüz commit'lememişti. Vercel hiç var olmamış bir ara
+hali derledi. Çözüm: `ignoreCommand`.
+
+🔴 **Neden (2. tur — `ignoreCommand` YETMEDİ, 29 Tem 19:00):** Vercel Hobby'de
+**kayan 24 saatte 100 DEPLOYMENT** sınırı var ve **`ignoreCommand` ile iptal edilen
+("Canceled") deployment'lar da bu sayıya DAHİL.** `ignoreCommand` build dakikası
+kurtarır, **kota kurtarmaz** — deployment zaten oluşturulmuştur. Daemon 24 saatte
+**266 commit** push'ladı; kota 19:00'da bitti ve Vercel **hiçbir** deployment
+oluşturmamaya başladı, `deploy:` commit'i de dahil.
+
+> **Belirtiyi tanı:** dashboard'da yeni commit'ler için **hiçbir kayıt yok** —
+> "Canceled" bile değil. Hata yok, e-posta yok, `git push` başarılı. Site
+> güncellenmiyor, sebebi görünmüyor. (Tanı için Deployments → Status filtresini
+> **7/7** yap; "Canceled" varsayılan olarak GİZLİ ve onsuz tablo yanıltıyor.)
+
+**Gerçek çözüm — kotayı korumanın tek yolu deployment'ın hiç oluşturulmaması:**
+daemon artık `HEAD:yedek`'e push ediyor, `git.deploymentEnabled.yedek = false` de o
+dalı Vercel'e tamamen kapatıyor. Yedekleme kaybolmadı: her kaydetme hâlâ GitHub'a
+çıkıyor, sadece başka dala. `main`'e giden tek yol `npm run deploy`.
+
+⚠️ **`deploymentEnabled`'da branch'i açık bırakma.** Vercel varsayılan olarak
+**her** dala Preview deployment'ı üretir ve **Preview de kotadan düşer** — yedek
+dalını unutursan hiçbir şey değişmez.
 
 🚨 **Tuzak:** Yeni bir deploy yolu (GitHub Action, `vercel --prod`, ikinci branch)
-eklersen `ignoreCommand` sessizce devre dışı kalır ve günde 79 deploy'a dönülür.
-Edge function deploy'u hâlâ daemon'ın işi — Vercel'den bağımsız, `npm run deploy`
+eklersen bu iki katman da sessizce devre dışı kalır. Özellikle daemon'ı `main`'e
+geri döndürme.
+
+ℹ️ Edge function deploy'u hâlâ daemon'ın işi — Vercel'den bağımsız, `npm run deploy`
 onu tetiklemez.
+
+⚠️ `scripts/auto-deploy.sh`'i **düzenledikten sonra daemon'ı yeniden başlat**;
+çalışan bash süreci eski kodu tutar:
+`launchctl kickstart -k gui/$(id -u)/com.yukegel.autodeploy`
 
 ---
 
