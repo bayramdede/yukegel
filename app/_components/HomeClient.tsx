@@ -85,11 +85,16 @@ function HeroKayitsiz({ totalCount = 0 }: { totalCount?: number }) {
               Yükün mü var? Saniyeler içinde ilan ver.
             </p>
 
+            {/* SPRINT_01 L2 — CTA'lar persona'ya göre AYRI hedefe gidiyor.
+                Eskiden "Yük Vereceğim" düz `/ilan-ver`'e gidiyordu ve form varsayılan
+                olarak "yük"te açıldığı için tesadüfen doğru çalışıyordu; ama niyet
+                URL'e YAZILMADIĞI için GA'da hangi persona'nın dönüştüğü ölçülemiyordu.
+                `?tip=` artık hem ön-seçim hem ölçüm anahtarı (bkz. app/ilan-ver/page.tsx). */}
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 32 }}>
               <a href="#surucu-hizmetleri" className="hero-cta-primary" style={{ background: '#22c55e', color: '#000', fontWeight: 800, fontSize: '0.95rem', padding: '13px 26px', borderRadius: 10, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                 🚛 Sürücüyüm, Hizmetleri Gör
               </a>
-              <a href="/ilan-ver" className="hero-cta-secondary" style={{ background: '#161b22', color: '#e2e8f0', fontWeight: 700, fontSize: '0.95rem', padding: '13px 26px', borderRadius: 10, textDecoration: 'none', border: '1px solid #30363d', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+              <a href="/ilan-ver?tip=yuk" className="hero-cta-secondary" style={{ background: '#161b22', color: '#e2e8f0', fontWeight: 700, fontSize: '0.95rem', padding: '13px 26px', borderRadius: 10, textDecoration: 'none', border: '1px solid #30363d', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                 📦 Yük Vereceğim, İlan Ver
               </a>
             </div>
