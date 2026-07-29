@@ -251,7 +251,7 @@ değişikliği içermiyor — yalnızca statik okuma. Canlı DB/RLS doğrulamas�
 - [x] **L1e-SQL** ✅ `docs/20260728_contact_phone_revoke.sql` çalıştırıldı + duman testi geçti (Bayram, 29 Tem 2026).
       `anon`/`authenticated` artık `listings.contact_phone` kolonunu **hiç göremiyor** —
       numara yalnız service-role yollarından okunuyor. Sızıntı DB katmanında da kapandı.
-      ⚠️ Duman testi yapılmalı (panel + moderatör telefon kaydı).
+      Duman testi ✅ (misafir sayfalar + moderatör telefon düzenle/Onayla).
 - [x] **A1** — `app/api/auth/log/route.ts` *(yeni)*. Endpoint aylardır yoktu, 404 `.catch(()=>{})`
       içinde yutuluyordu → auth audit trail'i tamamen boştu.
 - [x] **A1b-SQL** ✅ `docs/20260728_auth_events.sql` çalıştırıldı (Bayram, 29 Tem 2026).
