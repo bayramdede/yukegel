@@ -238,6 +238,12 @@ iki farklı doğru yazım düşüyorsa (Adım 7 boş dönmediyse olur) o anahtar
 sözlüğe **girmez** ve o satırlar onarılmadan kalır — yanlış yazımı yanlış
 yazımla değiştirmekten iyidir.
 
+> 🚨 `min(normalized)` **doğru yazımı seçmiyor** — `HAVING` şartı yüzünden grupta
+> tek değer kaldığı için no-op. Şartı kaldırıp `min()`'e güvenmeye kalkma:
+> C/`en_US` collation'da `'I'` (0x49) < `'İ'` (0xC4B0), yani `min()` tam olarak
+> **bozuk ASCII yazımı** seçer. Sözlüğün doğruluğu Adım 2-7'nin `aliases`
+> tablosunu temizlemiş olmasına dayanıyor; **Adım 8 Adım 7'den sonra çalışır.**
+
 Liste beklendiği gibiyse uygula:
 
 ```sql
