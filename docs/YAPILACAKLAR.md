@@ -275,6 +275,18 @@ W0 sonrası eklenen doğrulamalar:
       numara `users.phone`'a geri yazılıyor mu (V2 kendini onaran dal)?
 - [ ] Gece 00:00–03:00 arası tarih alanının bugünü gösterdiğini doğrula (A2).
 
+W1+ (yazma yolu birleştirme) sonrası duman testi:
+- [ ] WhatsApp'tan ilan gönder → ilan `pending` + `passive`, durakları dolu.
+- [ ] Moderatör paneli → Çözümsüz → "Manuel Gir" → Kaydet ve Onayla → ilan + duraklar
+      birlikte oluştu mu, `raw_post_id` / `reviewed_at` dolu mu, telefon yazıldı mı,
+      `raw_posts.processing_status` `processed` oldu mu?
+- [ ] Bir WhatsApp grubundan ham mesaj düş → Edge Function ilanı RPC ile üretiyor mu
+      (`shadow_profile_id` + `is_repost` dolu mu)?
+- [ ] Yetim ilan kalmadı mı?
+      `select l.id, l.source from listings l where not exists (select 1 from listing_stops s where s.listing_id = l.id) order by l.created_at desc limit 20;`
+- [ ] `/ilan-ver` hatası: Vercel loglarında `ilanKaydet beklenmeyen istisna` ara —
+      `error_message` + `stack` artık kaydediliyor.
+
 ## ⚠️ BUGLAR
 - [x] **A10 — "Hesabınız birleştirildi" sonsuz giriş döngüsü** ✅ (29 Tem 2026)
   Belirti: giriş yapılıyor → "Hesabınız başka bir hesabınızla birleştirildi… tekrar giriş
