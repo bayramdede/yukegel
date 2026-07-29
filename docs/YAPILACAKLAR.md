@@ -1,6 +1,11 @@
 # Yükegel — Yapılacaklar Listesi
 
-> Son güncelleme: 29 Temmuz 2026 (SPRINT_01 **W0 + W1 + W2 + W3 + W4 tamamlandı** — telefon sızıntısı hem uygulama hem DB katmanında kapatıldı, auth denetim izi açıldı, iki ayrı yetki yükseltme açığı kolon beyaz listesiyle giderildi, `/auth/reset` ve `/cikis` sertleştirildi, `merged_into` giriş döngüsü `/auth/devir` ile kapandı, SMS ve şifre tetikleyicileri istemciden alınıp kotalı sunucu route'larına taşındı, paylaşım kartı + sitemap + robots + noindex katmanı kuruldu, iki CTA huni ölçümüyle ayrıştırıldı ve son dalgada kayıt/giriş/landing cilası yapıldı: şifre kuralı ve liste limiti tek kaynağa indi, sekme URL'e yansıdı, doğrulama e-postası tekrar gönderilebilir oldu.)
+> Son güncelleme: 29 Temmuz 2026 — **ILAN_VER_ANALIZ W0 + W1 tamamlandı** (34p/87). İlan
+> verme yolu sertleştirildi ve kırıkları onarıldı: `listings` yazan tek yol `lib/ilan-yaz.ts`,
+> ilan+durak yazımı `public.ilan_olustur()` RPC'siyle atomik, aylardır ölü olan toplu yükleme
+> ortak sözleşmeyle çalışır hâlde, yük cinsi durak bazlı, seçilen araç ilana bağlı.
+> ⚠️ **İki migration bekliyor** (bkz. W1 bölümü). Öncesi:
+> (SPRINT_01 **W0 + W1 + W2 + W3 + W4 tamamlandı** — telefon sızıntısı hem uygulama hem DB katmanında kapatıldı, auth denetim izi açıldı, iki ayrı yetki yükseltme açığı kolon beyaz listesiyle giderildi, `/auth/reset` ve `/cikis` sertleştirildi, `merged_into` giriş döngüsü `/auth/devir` ile kapandı, SMS ve şifre tetikleyicileri istemciden alınıp kotalı sunucu route'larına taşındı, paylaşım kartı + sitemap + robots + noindex katmanı kuruldu, iki CTA huni ölçümüyle ayrıştırıldı ve son dalgada kayıt/giriş/landing cilası yapıldı: şifre kuralı ve liste limiti tek kaynağa indi, sekme URL'e yansıdı, doğrulama e-postası tekrar gönderilebilir oldu.)
 >
 > **SPRINT_01 KODA DAİR KISMI BİTTİ.** Kalan işler: aşağıdaki "Diğer yeni bulgular" +
 > Bayram'ın kod dışı maddeleri (`docs/SPRINT_01.md` sonundaki liste).
