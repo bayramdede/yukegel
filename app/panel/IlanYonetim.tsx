@@ -93,6 +93,11 @@ function IlanKart({ ilan, onGuncelle }: { ilan: any; onGuncelle: (id: string, pa
   const tamamlandi = !!ilan.completed_at;
   const stops = [...(ilan.listing_stops || [])].sort((a: any, b: any) => a.stop_order - b.stop_order);
   const ilkStop = stops[0];
+  // Çip TÜM durakların toplamını gösterir; `ilkStop` yalnızca tekil alanlar için.
+  // Eskiden çip de `ilkStop`'tan okuyordu ve çok duraklı ilanda yükü eksik
+  // gösteriyordu — bkz. `lib/ilan-liste.ts → durakToplami`.
+  const toplamTon = durakToplami(stops, ['weight_ton']);
+  const toplamPalet = durakToplami(stops, ['pallet_count']);
 
   async function tamamlandiToggle() {
     setKartHata('');
