@@ -22,24 +22,81 @@ gibiyse `--` işaretlerini kaldırıp uygula.
 
 ## Adım 0 — Başlangıç ölçümleri (ATLAMA)
 
-Bu iki sayı düzeltmeden **önce** alınmazsa yapılan işin etkisi bir daha ölçülemez.
+Bu sayılar düzeltmeden **önce** alınmazsa yapılan işin etkisi bir daha ölçülemez.
+
+> 🚨 **ŞEMA DÜZELTMESİ (29 Tem 2026).** Bu bölümün ilk hâli `listings.destination_city`
+> üzerinden ölçüyordu. **Yanlıştı, iki sebepten:**
+>
+> 1. **Varış o kolonda değil.** Kalkış tek (`listings.origin_city`) ama uğramalar çok, o
+>    yüzden varışlar `public.listing_stops` satırlarında duruyor (`listing_id`, `stop_order`,
+>    `city`, `district`, …). `parse-listing` ilanı `origin_city` ile açıp her varışı
+>    `listing_stops`'a yazıyor (satır ~825); `destination_city`'yi **hiçbir uygulama kodu
+>    yazmıyor ve okumuyor** — tüm repoda yalnız bu SQL/doc dosyalarında geçiyor, yani eski
+>    ölü kolon. Varış filtresi de `listing_stops.city`'ye bakıyor (`HomeClient.tsx:696`).
+> 2. **Aynı şehirde taşıma MEŞRU.** Şehir içi nakliye gerçek bir iş; `kalkış = varış`
+>    olması tek başına sahte güzergâh demek değil. Eşitliği "sahte" saymak gerçek ilanları
+>    suçlar.
+>
+> Bug'ın **gerçek parmak izi** şu: kalkış ile durak **katlanmış anahtar olarak aynı şehir
+> AMA ham yazımları farklı** (`Istanbul` → `İstanbul`). Bu kombinasyon meşru şehir içi
+> taşımada oluşmaz, çünkü meşru kayıtta iki taraf da aynı yazımı kullanır. Ölçüm buna
+> göre yazıldı.
 
 ```sql
--- 0.1 Sahte güzergâh sayısı — D4'ün etkisini bununla kanıtlayacağız.
-SELECT count(*) AS ayni_sehir_ilan
-FROM public.listings
-WHERE origin_city = destination_city;
+-- 0.1 🎯 SAHTE GÜZERGÂH ADAYLARI — D4'ün etkisini bununla kanıtlayacağız.
+-- Katlanmış hâli aynı, ham yazımı FARKLI olan kalkış/durak çiftleri.
+SELECT count(*)            AS sahte_aday_satir,
+       count(DISTINCT l.id) AS etkilenen_ilan
+FROM public.listings l
+JOIN public.listing_stops s ON s.listing_id = l.id
+WHERE translate(lower(replace(l.origin_city,'İ','i')),'ıçğöşü','icgosu')
+    = translate(lower(replace(s.city,'İ','i')),'ıçğöşü','icgosu')
+  AND l.origin_city <> s.city;
 
--- 0.2 Bozuk ASCII yazımların listings'teki dağılımı (K BÖLÜM 6 önizlemesi).
-SELECT 'origin' AS yon, origin_city AS sehir, count(*) FROM public.listings
-WHERE origin_city IN ('Istanbul','Izmir','Mugla','Bingol') GROUP BY 1,2
+-- 0.1b Aynı sorgunun DÖKÜMÜ — ilçelere bakarak gerçekten sahte mi diye karar ver.
+-- İki taraf da ilçesizse güçlü sahte sinyali (bug ilçesiz eşleşmelerden doğuyordu).
+SELECT l.id, l.origin_city, l.origin_district, s.stop_order, s.city, s.district,
+       l.created_at::date AS tarih, l.source, l.moderation_status
+FROM public.listings l
+JOIN public.listing_stops s ON s.listing_id = l.id
+WHERE translate(lower(replace(l.origin_city,'İ','i')),'ıçğöşü','icgosu')
+    = translate(lower(replace(s.city,'İ','i')),'ıçğöşü','icgosu')
+  AND l.origin_city <> s.city
+ORDER BY l.created_at DESC
+LIMIT 100;
+
+-- 0.2 ⚖️ KARŞILAŞTIRMA TABANI — MEŞRU şehir içi taşıma (aynı şehir, aynı yazım).
+-- Bu sayı SAHTE DEĞİL; 0.1'i yorumlarken ölçek vermesi için alıyoruz.
+SELECT count(*)             AS sehir_ici_satir,
+       count(DISTINCT l.id) AS sehir_ici_ilan,
+       count(*) FILTER (WHERE l.origin_district IS DISTINCT FROM s.district) AS farkli_ilce
+FROM public.listings l
+JOIN public.listing_stops s ON s.listing_id = l.id
+WHERE l.origin_city = s.city;
+
+-- 0.3 Bozuk ASCII yazımların DÖRT canlı konum kolonundaki dağılımı (Adım 8 önizlemesi).
+SELECT 'listings.origin_city' AS kolon, origin_city AS deger, count(*)
+FROM public.listings      WHERE origin_city IN ('Istanbul','Izmir','Mugla','Bingol') GROUP BY 1,2
 UNION ALL
-SELECT 'destination', destination_city, count(*) FROM public.listings
-WHERE destination_city IN ('Istanbul','Izmir','Mugla','Bingol') GROUP BY 1,2
+SELECT 'listings.origin_district', origin_district, count(*)
+FROM public.listings      WHERE origin_district IS NOT NULL
+  AND origin_district <> translate(origin_district,'ıçğöşüİĞÜŞÖÇ','icgosuIGUSOC') IS FALSE GROUP BY 1,2
+UNION ALL
+SELECT 'listing_stops.city', city, count(*)
+FROM public.listing_stops WHERE city IN ('Istanbul','Izmir','Mugla','Bingol') GROUP BY 1,2
+UNION ALL
+SELECT 'listing_stops.district', district, count(*)
+FROM public.listing_stops WHERE district IS NOT NULL
+  AND district <> translate(district,'ıçğöşüİĞÜŞÖÇ','icgosuIGUSOC') IS FALSE GROUP BY 1,2
 ORDER BY 3 DESC;
+
+-- 0.4 `destination_city` gerçekten ölü mü? 0 dönerse kolon boş demektir; Adım 8'de
+-- ona dokunmaya gerek yok, ayrı bir "ölü kolonu düşür" bileti açılır.
+SELECT count(*) AS dolu_destination_city FROM public.listings WHERE destination_city IS NOT NULL;
 ```
 
-İki çıktıyı da bir yere kaydet (tarih + sayı yeter).
+Çıktıların hepsini bir yere kaydet (tarih + sayı yeter). **0.1 ile 0.2'yi karıştırma:**
+0.1 düzeltilecek hasar, 0.2 korunacak gerçek iş.
 
 ---
 
