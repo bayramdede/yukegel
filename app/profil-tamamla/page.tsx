@@ -104,7 +104,10 @@ function ProfilTamamlaIci() {
   useEffect(() => {
     async function init() {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { router.push('/giris'); return; }
+      // 29 Tem 2026 — çıplak `/giris` DEĞİL. Buraya oturum düşmüşken gelen kullanıcı
+      // giriş yaptıktan sonra profilini tamamlamaya devam etmeli; `redirect` varsa o da
+      // korunur, yoksa en azından bu sayfaya döner.
+      if (!user) { router.push(girisAdresi(guvenliRedirect(redirect) ?? '/profil-tamamla')); return; }
       setMevcutId(user.id);
 
       const { data: profil } = await supabase
