@@ -248,7 +248,7 @@ değişikliği içermiyor — yalnızca statik okuma. Canlı DB/RLS doğrulamas�
 - [x] **L1e** — `contact_phone`'un son istemci yazma yolu kapatıldı. `app/panel/actions.ts` ve
       `app/moderator/actions.ts` *(yeni)*; `IlanYonetim.tsx`'ten anon istemci tamamen kaldırıldı,
       `moderator/page.tsx`'in select/update/insert'lerinden kolon çıkarıldı.
-- [x] **L1e-SQL** ✅ `docs/20260728_contact_phone_revoke.sql` çalıştırıldı (Bayram, 29 Tem 2026).
+- [x] **L1e-SQL** ✅ `docs/20260728_contact_phone_revoke.sql` çalıştırıldı + duman testi geçti (Bayram, 29 Tem 2026).
       `anon`/`authenticated` artık `listings.contact_phone` kolonunu **hiç göremiyor** —
       numara yalnız service-role yollarından okunuyor. Sızıntı DB katmanında da kapandı.
       ⚠️ Duman testi yapılmalı (panel + moderatör telefon kaydı).
