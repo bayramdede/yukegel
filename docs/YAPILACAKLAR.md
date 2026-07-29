@@ -228,8 +228,33 @@ sessizce düşüyor. **Yan kazanım: B2 kısmî** — `maxDuration=60`, `MAX_SAT
 - [ ] **V7** — AI kotasının kapısı `parse`, sayacı `kayıt` — Anthropic sınırsız çağrılabiliyor · 4p
 - [ ] **V6** — İlan oluşturmada hız limiti / tekrar tespiti yok · 4p
 - [ ] **B2 kısmî** — ~~`maxDuration`~~ ✅ (60sn), ~~satır tavanı~~ ✅ (`MAX_SATIR=300`, `MAX_ILAN=50`); kalan: **satır bazlı süre bütçesi** (bütçe dolunca kalanları "işlenmedi" diye dönmek) · 1p
-- [ ] **Yeni (W1'de keşfedildi)** — `app/moderator/page.tsx:974` `raw_posts`'tan ilan üretirken hâlâ kendi `listings` INSERT'ini + ayrı `listing_stops` INSERT'ini yazıyor: V5 atomikliği personel yoluna uygulanmadı, duraksız ilan hâlâ üretilebilir. `ilan_olustur()` RPC'sine geçirilmeli (personel semantiği farklı: `trust_level:'social'`, `moderation_status:'approved'`, `raw_post_id`) · 3p
-- [ ] **Yeni (W1'de keşfedildi)** — İki OTOMATİK yol daha `ilanYaz()`'ı atlıyor: `app/api/whatsapp/route.ts:189-230` ve `supabase/functions/parse-listing/index.ts:803`. İkisi de kendi `listings` + ayrı `listing_stops` INSERT'ini yazıyor; yani **V1 (alan beyaz listesi), V3 (31–70 moderasyon bandı) ve V5 (atomiklik) bu yollarda YOK**. Bunlar insan formundan değil bot/entegrasyondan beslendiği için en denetimsiz girdi kaynağı — W0'da kapatılan delikler burada hâlâ açık. Edge Function Deno'da çalıştığı için `lib/ilan-yaz.ts`'yi import edemez; ortak zemin `ilan_olustur()` RPC'si olmalı (doğrulama SQL tarafına iner). WhatsApp route'u Next tarafında olduğu için doğrudan `ilanYaz()`'a geçebilir · 5p
+- [x] ~~**Yeni (W1'de keşfedildi)** — `app/moderator/page.tsx:974` `raw_posts`'tan ilan üretirken hâlâ kendi `listings` INSERT'ini + ayrı `listing_stops` INSERT'ini yazıyor~~ ✅ (29 Tem 2026) · 3p
+- [x] ~~**Yeni (W1'de keşfedildi)** — İki OTOMATİK yol daha `ilanYaz()`'ı atlıyor: `app/api/whatsapp/route.ts` ve `supabase/functions/parse-listing/index.ts`~~ ✅ (29 Tem 2026) · 5p
+
+**W1+ — Yazma yolu birleştirme ✅ (29 Tem 2026, 8p):**
+`listings`'e yazan BEŞ yolun tamamı artık tek zeminden geçiyor:
+
+| Yol | Nasıl |
+|-----|-------|
+| `/ilan-ver` formu | `ilanYaz()` |
+| `/api/excel-import` | `ilanYaz()` |
+| `app/api/whatsapp/route.ts` (Twilio) | `ilanYaz()` — **yeni** |
+| `app/moderator/actions.ts` `moderatorIlanOlustur()` | `ilan_olustur()` RPC — **yeni** |
+| `supabase/functions/parse-listing` (Deno) | `ilan_olustur()` RPC — **yeni** |
+
+- `lib/ilan-yaz.ts`'e `KANAL_POLITIKA` tablosu eklendi: `whatsapp.daimaIncele = true` →
+  audit skoru temiz olsa bile ilan yayına çıkmaz, kuyruğa girer. Politika bilerek
+  `girdi`nin İÇİNDE değil modülde; istemci gevşetemesin diye.
+- Moderatörün "Manuel Gir" akışı tarayıcıdan `moderation_status:'approved'` +
+  `trust_level:'social'` yazıyordu — RLS satır bazlı olduğu için kolon düzeyinde
+  engellenemiyordu. Artık `requireStaff()` kapısının arkasında.
+- Yeni migration: **`docs/20260729_ilan_olustur_v2.sql`** — RPC'ye `raw_post_id`,
+  `shadow_profile_id`, `is_repost`, `reviewed_at` (hepsi opsiyonel) eklendi; durak bazlı
+  `vehicle_count` artık eziliyor değil, önce durağın kendi değerine bakılıyor.
+  ⚠️ **SIRA:** `20260729_ilan_olustur_rpc.sql` → `20260729_listings_vehicle_id.sql` →
+  `20260729_ilan_olustur_v2.sql` → kod deploy.
+- ⚠️ `supabase/functions/**` `tsconfig.json`'da `exclude`'da: `tsc --noEmit` Edge
+  Function'ı HİÇ derlemez. Oradaki RPC çağrısı elle gözden geçirilmeli.
 
 ### W3 — Dönüşüm (14p) · W4 — Sağlamlaştırma (28p)
 U1–U10 ve V8–V10, B5–B9, M1–M5 için `docs/ILAN_VER_ANALIZ.md` §3–§5.
