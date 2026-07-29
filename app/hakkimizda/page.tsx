@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import GirisLink from '../_components/GirisLink';
 
 export const metadata: Metadata = {
   title: 'Hakkımızda | Yükegel — Türkiye\'nin Nakliye Platformu',
