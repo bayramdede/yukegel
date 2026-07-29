@@ -311,38 +311,58 @@ where table_name='users' and grantee in ('authenticated','anon') order by grante
 
 ---
 
-## W2 — Güvenlik & gözlemlenebilirlik (15 puan)
+## W2 — Güvenlik & gözlemlenebilirlik (15 puan) — ✅ TAMAMLANDI (29 Tem 2026)
 
-### G1 · Şifreli girişte rate limit / lockout yok 🟠 *(yeni)*
-- **Dosya:** `app/giris/page.tsx` (signInWithPassword), `app/moderator-giris/page.tsx:20`
-- Moderatör giriş ekranı özellikle riskli: sınırsız deneme, log yok (A1 nedeniyle), ikinci faktör yok.
-- **Yapılacak:** Server tarafında IP+e-posta bazlı sayaç (5 hata → 15 dk kilit). `auth_events` üzerinden okunabilir. Supabase Auth rate limit ayarlarını da kontrol et.
-- **Kabul kriteri:** [ ] 6. hatalı denemede kilit mesajı · [ ] Kilit süresi dolunca açılıyor
-- **Efor:** 5 puan · **Bağımlılık:** A1 (auth_events)
+> **Ortak altyapı:** `lib/kota.ts` *(yeni)* — kayan pencere sayacı. `kotaDene({ ad, anahtar,
+> limit, pencereMs, deger?, sayma? })`, `kotaSifirla(ad, anahtar)`, `istekIp(request)`.
+> `deger` verilirse **farklı değer** sayar; `sayma: true` sadece bakar, kaydetmez.
+> ⚠️ Sayaçlar process belleğinde: çok instance'ta gerçek limit ≈ (limit × instance),
+> deploy/soğuk başlangıç sıfırlar, `x-forwarded-for` doğrudan erişimde taklit edilebilir.
+> Bu bir savunma katmanı, tek başına kalkan değil. Trafik artınca `kotaDene`'nin gövdesi
+> Vercel KV / Upstash Redis'e taşınır — çağıran taraflar değişmez.
 
-### G2 · OTP gönderiminde bot koruması yok 🟠 *(yeni)*
-- Kayıtsız biri rastgele numaralara SMS tetikleyebilir → doğrudan para kaybı.
-- **Yapılacak:** Turnstile/hCaptcha veya en azından IP başına saatlik OTP kotası (server-side).
-- **Kabul kriteri:** [ ] Aynı IP'den saatte >5 farklı numaraya OTP engelleniyor
-- **Efor:** 4 puan · **Bağımlılık:** A4b
+### ✅ G1 · Şifreli girişte rate limit / lockout yok 🟠
+- **Uygulandı:** `app/api/auth/giris/route.ts` *(yeni)*. Şifre denemesi **istemciden alındı**;
+  `app/giris/page.tsx` (`epostaGiris`) ve `app/moderator-giris/page.tsx` artık bu route'u çağırıyor.
+- İki kova: e-posta başına **5 hata / 15 dk**, IP başına **20 hata / 15 dk** (credential stuffing).
+  IP limiti bilerek yüksek — NAT arkasındaki dürüst kullanıcılar birbirini kilitlemesin.
+- Yalnız **başarısız** denemeler sayılır; başarılı girişte iki kova da `kotaSifirla` ile temizlenir.
+  Kilitliyken gelen istek sayaca **yazılmaz** — yoksa saldırgan istek atmaya devam ederek kurbanı
+  süresiz kilitli tutabilirdi.
+- Kota anahtarı `trim().toLowerCase()` — `Ali@X.com` ile `ali@x.com` aynı kovaya düşsün.
+- Hesap sayımına karşı "yanlış şifre" ile "kullanıcı yok" aynı mesajı döndürüyor.
+- Oturum cookie'si **sunucuda** yazılıyor (SSR client) → proxy ilk istekte görüyor.
+- **Kabul kriteri:** [x] 6. hatalı denemede kilit mesajı · [x] Kilit süresi dolunca açılıyor
+- **Not:** `auth_events` üzerinden okunabilirlik `docs/20260728_auth_events.sql` çalıştırılana
+  kadar atıl; bellek içi kilit migration'dan bağımsız çalışıyor.
 
-### M2 · Moderatör girişinde rol doğrulaması yok 🟠 *(yeni)*
-- **Dosya:** `app/moderator-giris/page.tsx:20-30` — `signInWithPassword` başarılıysa koşulsuz `router.push('/moderator')`
-- Normal kullanıcı buradan giriş yapıp `/moderator`'a itiliyor; proxy oradan geri atıyor ama kullanıcı garip bir döngü yaşıyor ve moderatör ekranının varlığı doğrulanmış oluyor.
-- **Yapılacak:** Giriş sonrası `users.role` oku; `admin|moderator` değilse `signOut()` + "Bu hesabın moderatör yetkisi yok" mesajı.
-- **Kabul kriteri:** [ ] Normal kullanıcı burada giriş yapamıyor, açıklayıcı hata alıyor
-- **Efor:** 2 puan
+### ✅ G2 · OTP gönderiminde bot koruması yok 🟠
+- **Karar:** Turnstile değil, **sunucu tarafı kota** (Bayram, 29 Tem 2026).
+- **Uygulandı:** `app/api/auth/otp/route.ts` *(yeni)*. `signInWithOtp` istemciden kaldırıldı —
+  ücretli SMS tetikleyicisi herkese açık anon key'in arkasındaydı.
+- Üç katman: numara başına 1/60 sn · IP başına **5 farklı numara**/saat · IP başına 15 toplam/saat.
+- `app/api/ilan/[id]/sahiplen` **aynı** `'otp-ip-numara'` kovasını paylaşıyor: iki uç nokta
+  arasında gidip gelerek kotayı ikiye katlamak mümkün değil.
+- Kotalar `sayma: true` ile önce **bakılıyor**, yalnız SMS gerçekten gittiyse işleniyor —
+  sağlayıcı hatası kullanıcıyı kilitlemesin.
+- **Kabul kriteri:** [x] Aynı IP'den saatte >5 farklı numaraya OTP engelleniyor
 
-### C2 · `/cikis` `sb-` cookie'lerini açıkça temizlemiyor 🟡 *(yeni)*
-- `signOut()` yeterli olmalı ama `proxy.ts:60-64` ve `:95-97`'de zaten manuel temizleme pattern'i var — tutarlılık için burada da uygula. Kısmi çıkış hâllerini eler.
-- **Efor:** 1 puan · **Bağımlılık:** C1
+### ✅ M2 · Moderatör girişinde rol doğrulaması yok 🟠
+- **Uygulandı:** `app/moderator-giris/page.tsx` — giriş route'u `{ rol }` döndürüyor;
+  `admin|moderator` değilse `/cikis` POST + `signOut()` ve açıklayıcı mesaj.
+  Admin `/admin`'e, moderatör `/moderator`'a gidiyor (eskiden koşulsuz `/moderator`).
+- **Not:** Bu bir güvenlik sınırı DEĞİL — sınır `proxy.ts` + `requireStaff()`. Amaç doğru davranış.
+- **Kabul kriteri:** [x] Normal kullanıcı burada giriş yapamıyor, açıklayıcı hata alıyor
 
-### K2b · TCKN/VKN sunucu tarafında yeniden doğrulanmıyor 🟠
-- **Dosya:** `app/profil-tamamla/page.tsx` — `tcknGecerli()`/`vknGecerli()` yalnız client'ta
-- Client bypass edilerek geçersiz TCKN yazılabilir.
-- **Yapılacak:** K2'deki server action'a aynı algoritmayı taşı (`lib/kimlik.ts` olarak ortak modül).
-- **Kabul kriteri:** [ ] Doğrudan PostgREST çağrısıyla geçersiz TCKN yazılamıyor
-- **Efor:** 3 puan · **Bağımlılık:** K2
+### ✅ C2 · `/cikis` `sb-` cookie'lerini açıkça temizlemiyor 🟡
+- **Zaten C1 ile gelmişti.** `app/cikis/route.ts` `sb-` ile başlayan tüm cookie'leri siliyor.
+  Doğrulandı, ek değişiklik gerekmedi.
+
+### ✅ K2b · TCKN/VKN sunucu tarafında yeniden doğrulanmıyor 🟠
+- **Uygulandı:** `lib/kimlik.ts` *(yeni)* — `tcknGecerli`/`vknGecerli` TEK KAYNAK.
+  `app/profil-tamamla/actions.ts` ve `page.tsx` içindeki iki kopya kaldırıldı, ikisi de import ediyor.
+  (Sunucu doğrulaması K2 ile zaten vardı; buradaki iş kopyaların ayrışmasını önlemek.)
+- **Kabul kriteri:** [x] Doğrudan PostgREST çağrısıyla geçersiz TCKN yazılamıyor
 
 ---
 
