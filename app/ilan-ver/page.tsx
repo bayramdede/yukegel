@@ -10,7 +10,13 @@ import MetindenIlan, { ParsedListingResult } from './MetindenIlan';
 import { ILLER, UTSYAPI, ARAC_TIPLERI, ilNormalize } from '../../lib/ilan-sabitler';
 const supabase = createClient();
 
-interface Durak { sehir: string; ilce: string; ton: string; palet: string; notlar: string; }
+// `ILAN_VER_ANALIZ` B4 — `yuk_cinsi` durak bazında.
+// Eskiden tek bir üst-seviye yük cinsi vardı; AI çok duraklı metinden her durağın
+// cargo_type'ını çıkarıyor, sayfa ise onları `notlar`a gömüp ilk durağınkini
+// genel yük cinsi yapıyordu. Yani "İstanbul'a tekstil, Ankara'ya seramik" ilanı
+// veritabanına "hepsi tekstil" diye giriyordu. Artık her durak kendi cinsini taşır;
+// `ilanYaz()` boş bırakılanı genel yük cinsiyle doldurur.
+interface Durak { sehir: string; ilce: string; ton: string; palet: string; yuk_cinsi: string; notlar: string; }
 interface Vehicle { id: string; plate: string; vehicle_type: string; body_types: string[]; brand: string | null; model: string | null; capacity_ton: number | null; }
 type Yontem = null | 'tekil' | 'toplu' | 'metin';
 
