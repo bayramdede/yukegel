@@ -3,6 +3,9 @@ import { useState, useEffect, useCallback, Suspense } from 'react';
 import { createClient } from '../../lib/supabase';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { REDIRECT_COOKIE, guvenliRedirect } from '../../lib/redirect';
+// SPRINT_01 K2b — aynı doğrulayıcılar sunucuda da çalışıyor (`actions.ts`).
+// Buradaki kontrol yalnız UX; güvenlik sınırı sunucudaki.
+import { tcknGecerli, vknGecerli } from '../../lib/kimlik';
 import { profilKaydet } from './actions';
 
 const supabase = createClient();
