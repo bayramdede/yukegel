@@ -377,6 +377,30 @@ Açık rotalar: /giris, /auth/, /profil-tamamla, /nasil-calisir, /hakkimizda,
 - Emekli oturumu `/auth/devir`'e gönderirken **sb- cookie'lerini silme**: devir, devri
   yetkilendirmek için emekli oturumun `merged_into` zincirini okumak zorunda. Temizliği
   (kurtarılamayan hâllerde) devir route'u kendisi yapar.
+- 🚨 **Ücretli veya kaba-kuvvete açık auth işlemlerini İSTEMCİDEN çağırma** (G1/G2, 29 Tem 2026).
+  `signInWithOtp` (SMS = para) ve `signInWithPassword` (sözlük saldırısı) aylarca doğrudan
+  tarayıcıdan, herkese açık anon key ile çağrılıyordu. İstemcideki sayaçlar (sessionStorage)
+  saldırgan için yok hükmünde. İkisi de artık sunucu route'unda: `/api/auth/otp`,
+  `/api/auth/giris`. Yeni bir auth çağrısı eklerken kuralı tekrarla: **tetikleyici sunucuda,
+  kota sunucuda; istemcideki bekleme yalnız UX.**
+- Kota kovaları paylaşılabilir olmalı: `/api/auth/otp` ile `/api/ilan/[id]/sahiplen` **aynı**
+  `'otp-ip-numara'` kovasını kullanır. Ayrı kova verseydik saldırgan iki uç nokta arasında
+  gidip gelerek kotayı ikiye katlardı. Yeni bir SMS tetikleyicisi eklersen aynı kovaya bağla.
+- Kotalarda önce `sayma: true` ile **BAK**, işlem gerçekten başarılı/başarısız olduktan sonra
+  kaydet. Aksi halde sağlayıcı hatası (Twilio down) masum kullanıcıyı kilitler. Simetrik kural:
+  giriş kotası yalnız **başarısız** denemeyi sayar ve başarıda `kotaSifirla` ile temizlenir;
+  kilitliyken gelen istek sayaca YAZILMAZ, yoksa saldırgan istek atmaya devam ederek kurbanı
+  süresiz kilitli tutar.
+- Kota anahtarı olarak e-posta kullanırken **`trim().toLowerCase()`** uygula — aksi halde
+  `Ali@X.com` / `ali@x.com` ayrı kovalara düşer ve sayaç harf büyüklüğü değiştirilerek sıfırlanır.
+- ⚠️ `lib/kota.ts` sayaçları **process belleğinde**. Vercel'de çok instance → gerçek limit
+  ≈ (limit × instance sayısı); deploy/soğuk başlangıç sıfırlar; `x-forwarded-for` proxy
+  arkasında güvenilir, doğrudan erişimde taklit edilebilir. Tek savunma katmanı olarak sayma.
+  Trafik artınca `kotaDene`'nin gövdesini Vercel KV / Upstash Redis'e taşı — imza değişmez.
+- Oturum SUNUCUDA açıldığında (`/api/auth/giris`, `/auth/devir`) istemciye dönüşte
+  `router.push` değil **tam sayfa yüklemesi** (`window.location.assign`) yap: tarayıcıdaki
+  Supabase istemcisinin bellek içi durumu bayat kalabilir, tam yükleme header/proxy/server
+  component'leri aynı oturuma oturtur.
 - `maybeSingle()` — callback, proxy, actions her yerde
 - `is_shadow_banned = false` — page.tsx + u/[username]/page.tsx zorunlu
 - Audit trigger sadece INSERT; re-scan → `/api/ilan/duzelt`
