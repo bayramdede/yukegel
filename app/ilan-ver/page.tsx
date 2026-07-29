@@ -191,6 +191,9 @@ export default function IlanVer() {
     setYukleniyor(true); setHata('');
     try {
       await ilanKaydet({ tip, kalkis, kalkis_ilce, tel, fiyat, fiyat_pazarlik, tarih, tarih_esnek, genel_not, arac_tipi, utsyapi, arac_adet, yuk_cinsi, duraklar, raw_text: aiHamMetin || undefined });
+      // SPRINT_01 L2 — huninin DİBİ. `ilan_ver_giris` ile birlikte persona başına
+      // dönüşüm oranı hesaplanabiliyor. Kişisel veri gönderilmez (bkz. lib/analiz.ts).
+      olayGonder('ilan_olustur', { tip, yontem: yontem ?? 'tekil' });
       setGonderildi(true);
     } catch (err: any) {
       setHata(err.message || 'Bir hata oluştu.');
