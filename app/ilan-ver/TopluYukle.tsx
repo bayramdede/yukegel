@@ -193,7 +193,9 @@ export default function TopluYukle({ onGeri }: { onGeri: () => void }) {
     );
     if (status === 'error') return (
       <span style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-        <span style={{ color: '#f87171', fontSize: '0.78rem' }}>⚠ "{raw}"</span>
+        <span style={{ color: '#f87171', fontSize: '0.78rem' }}>
+          {raw.trim() ? `⚠ "${raw}"` : '⚠ boş'}
+        </span>
         <select
           defaultValue=""
           onChange={e => setOverride(rowIndex, field, e.target.value)}
