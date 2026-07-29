@@ -236,9 +236,11 @@ converted_user_id (nullable FK → auth.users.id)
 - API: `app/api/admin/crm/route.ts` (GET + PATCH), `app/api/admin/crm/[id]/route.ts` (GET detay)
 
 ### `users` — `role`, `is_active`, `user_type`, `phone_verified`, `company_name`, `ai_listing_quota_daily` (NULL = sistem default), `kvkk_onay_at`
-> `kvkk_onay_at timestamptz` (28 Tem 2026, `SPRINT_01` K1) — KVKK aydınlatma metni + kullanım koşullarının onay anı. NULL = onay alınmamış (eski kayıt). `profil-tamamla` upsert'i yazıyor. ⏳ Migration: `docs/20260728_kvkk_onay.sql` — **henüz çalıştırılmadı.** Eski kullanıcılardan onay toplamak ayrı iş (panele tek seferlik modal gerekiyor, ticket açılmalı).
-> ⚠️ `is_active` (28 Tem 2026, `SPRINT_01` K2): istemci artık `is_active: true` **göndermiyor**
-> (beyaz listede yok). Kolonun DB default'u `true` değilse yeni kayıtlar pasif açılır — Bayram doğrulayacak.
+> `kvkk_onay_at timestamptz` (28 Tem 2026, `SPRINT_01` K1) — KVKK aydınlatma metni + kullanım koşullarının onay anı. NULL = onay alınmamış (eski kayıt). `profil-tamamla` upsert'i yazıyor. ✅ Migration `docs/20260728_kvkk_onay.sql` çalıştırıldı (29 Tem 2026). Eski kullanıcılardan onay toplamak ayrı iş (panele tek seferlik modal gerekiyor, ticket açılmalı).
+> ✅ `is_active` (29 Tem 2026 doğrulandı): DB default `true`, kolon nullable ama NULL satır yok.
+> İstemci artık bu alanı **göndermiyor** (K2 beyaz listesinde yok) — default devreye giriyor.
+> ⚠️ Kolon nullable olduğu için `.eq('is_active', true)` NULL satırları sessizce atlar.
+> Opsiyonel sertleştirme: `alter table public.users alter column is_active set not null;`
 
 ### `auth_events` — Auth denetim izi (28 Tem 2026, `SPRINT_01` A1/A1b)
 ```
