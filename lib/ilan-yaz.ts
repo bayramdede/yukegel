@@ -214,7 +214,7 @@ export async function ilanYaz(
       city,
       district: kisaMetin(d.ilce),
       ton: sayiAralik(d.ton, 0, MAX_TON),
-      palet: sayiAralik(d.palet, 0, MAX_PALET),
+      palet: tamSayiAralik(d.palet, 0, MAX_PALET),
       notlar: kisaMetin(d.notlar, MAX_NOT),
       // B4: durağın kendi yük cinsi varsa o, yoksa ilan geneli.
       yuk_cinsi: kisaMetin(d.yuk_cinsi) ?? genelYukCinsi,
