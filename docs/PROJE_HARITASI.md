@@ -309,6 +309,8 @@ ZIP/TXT → raw_posts → DB trigger → parse-listing Edge Fn → listings → 
 | `/api/excel-import` | Excel toplu yükleme (auto_published) |
 | `/api/auth/tekil-kontrol` | telefon/tckn/vkn tekillik (service role) |
 | `/api/auth/log` | 🔒 Auth denetim izi → `auth_events` (service role). Fire-and-forget, IP+UA yazar, telefon/şifre yazmaz |
+| `/api/auth/otp` | 🔒 **TEK** SMS OTP gönderim yolu (G2). POST + Origin. 3 kota: numara 1/60sn, IP 5 farklı numara/saat, IP 15 toplam/saat. 429 + `Retry-After` |
+| `/api/auth/giris` | 🔒 **TEK** şifreli giriş yolu (G1). POST + Origin. Kota: e-posta 5 hata/15dk, IP 20 hata/15dk. Başarıda sayaç sıfırlanır, cookie SUNUCUDA yazılır, `{ rol }` döner |
 | `/api/ilan/[id]/telefon` | 🔒 **TEK** telefon kaynağı. GET, authed + profil tam + hesap aktif + ilan yayında. `logPhoneAccess`, 20/dk, `no-store` |
 | `/api/ilan/[id]/sahiplen` | 🔒 GET maskeli numara, POST `{adim:'gonder'\|'dogrula'}`. İlan başına 60 sn SMS cooldown (429 + `Retry-After`) |
 | `/api/parse-text` | Tekil kullanıcı metnini Haiku ile JSON'a çevirir + per-user günlük quota kontrolü (429) |
