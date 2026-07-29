@@ -1,6 +1,9 @@
 # Yükegel — Proje Haritası
 > **Kullanım:** Her sohbet başında sadece bu dosyayı oku. Kaynak dosyaları sadece o dosyada değişiklik yapacaksan oku.  
-> Son güncelleme: 28 Temmuz 2026 — **SPRINT_01 W0 tamamlandı.** Telefon sızıntısı 4 yüzeyde birden kapatıldı (`/`, `/ilan/[id]`, `/u/[username]`, `/ilan/[id]/sahiplen`), numara artık yalnız `/api/ilan/[id]/telefon` üzerinden dönüyor. Google merge 404'ü çözüldü, merge route'undaki 3 bug giderildi, proxy prefix tuzağı kökten kapatıldı, KVKK açık rıza onayı eklendi. ⏳ **`docs/20260728_kvkk_onay.sql` çalıştırılmayı bekliyor.** (bkz. `docs/SPRINT_01.md`)
+> Son güncelleme: 28 Temmuz 2026 — **SPRINT_01 W1 tamamlandı.** Auth audit trail açıldı (`/api/auth/log` + `auth_events`), `?hesap=` mesajları görünür oldu, `redirect` param'ı `lib/redirect.ts` ile güvenli şekilde korunuyor, profil upsert'i server action'a taşındı (kolon beyaz listesi), `/auth/reset` artık yalnız gerçek recovery oturumunda form gösteriyor, `/cikis` GET kapatıldı, OTP tekrar gönderimine **sunucu tarafı** 60 sn cooldown geldi. L1e ile `contact_phone`'un son istemci yazma yolu da kapandı — panel ve moderatör artık server action kullanıyor.
+> ⏳ **Bayram'ı bekleyen 3 SQL (sırası önemli):** deploy ÖNCESİ `20260728_kvkk_onay.sql` + `20260728_auth_events.sql`, deploy SONRASI `20260728_contact_phone_revoke.sql`. (bkz. `docs/SPRINT_01.md`)
+>
+> Önceki: 28 Temmuz 2026 — **SPRINT_01 W0 tamamlandı.** Telefon sızıntısı 4 yüzeyde birden kapatıldı (`/`, `/ilan/[id]`, `/u/[username]`, `/ilan/[id]/sahiplen`), numara artık yalnız `/api/ilan/[id]/telefon` üzerinden dönüyor. Google merge 404'ü çözüldü, merge route'undaki 3 bug giderildi, proxy prefix tuzağı kökten kapatıldı, KVKK açık rıza onayı eklendi.
 >
 > Önceki: 22 Temmuz 2026 — Ayrı auth kimliğiyle (telefon vs. Google) gelen KAYITLI kullanıcı artık profil-tamamla'ya düşmüyor. Magic-link self-heal SONSUZ DÖNGÜ yaratıyordu (implicit flow yalnız localStorage'ı günceller, SSR cookie eski oturumda kalır → proxy tekrar /giris'e atar); çözüm: proxy ölü oturumun sb- cookie'lerini siler, giriş sayfası ölü/eksik oturumu signOut ile kapatır → kullanıcı Google/e-posta ile temiz yeniden girer (PKCE → cookie doğru set). (bkz. 14. GÖREV DURUMU).
 
@@ -11,17 +14,26 @@
 
 > **✅ PROXY PREFIX TUZAĞI (28 Tem 2026, `SPRINT_01` M1 — ÇÖZÜLDÜ):** `proxy.ts` düz `pathname.startsWith(r)` kullanıyordu; `KORUNMALI` içindeki `'/moderator'` girdisi `/moderator-giris`'i de yakalıyordu → moderatör giriş sayfası oturumsuz erişilemez hâldeydi. Artık `korunmaliMi()` **segment sınırında** eşleştiriyor: `pathname === kok || pathname.startsWith(kok + '/')`. `ACIK_ROTALAR`'a da `/moderator-giris` eklendi. **Kural: `KORUNMALI`'ya segment eklerken düz `startsWith`'e geri dönme** — `/profil` ↔ `/profil-tamamla` aynı tuzağı taşıyor.
 
-> **⚠️ EKSİK ROTALAR (28 Tem 2026, `LANDING_AUTH_ANALIZ` A1/A2):**
-> (1) `POST /api/auth/log` — **HÂLÂ YOK.** `giris/page.tsx` ve `profil-tamamla/page.tsx` içindeki `authLog()` buraya POST atıyor, klasör yok; çağrı `.catch(()=>{})` ile sarmalı olduğu için 404 sessizce yutuluyor ve **auth audit trail'i tamamen boş**. → `SPRINT_01` A1 (W1).
+> **✅ EKSİK ROTALAR (28 Tem 2026, `LANDING_AUTH_ANALIZ` A1/A2 — ÇÖZÜLDÜ):**
+> (1) ~~`POST /api/auth/log` yok~~ — **AÇILDI.** `app/api/auth/log/route.ts` service-role ile `auth_events` tablosuna yazıyor (event, method, reason, user_id, ip, user_agent). Fire-and-forget: hiçbir zaman auth akışını bloklamaz. Telefon/şifre **yazılmaz**. ⏳ `docs/20260728_auth_events.sql` deploy öncesi çalıştırılmalı.
 > (2) ~~`/giris/merge`~~ — **ÇÖZÜLDÜ.** `app/auth/callback/route.ts` artık `/giris?merge_user_id=…&merge_name=…&merge_email=…` yönlendiriyor; `giris/page.tsx` bu paramları lazy `useState` initializer ile okuyup mevcut `merge_onay` moduna giriyor. Yeni route açılmadı.
-> **Tuzak:** Yeni endpoint çağrısı eklerken `.catch(()=>{})` ile sessizleştirme — en azından `console.warn` bırak; bu iki hata aylarca görünmez kaldı.
+> **Tuzak (kalıcı):** Yeni endpoint çağrısı eklerken `.catch(()=>{})` ile sessizleştirme — en azından `console.warn` bırak; bu iki hata aylarca görünmez kaldı. `authLog()` çağrıları artık `console.warn` bırakıyor.
 
 > **✅ TELEFON SIZINTISI (28 Tem 2026, `SPRINT_01` L1/L1b/L1c/L1d/L1f — UYGULAMA KATMANI ÇÖZÜLDÜ):**
 > Dört ayrı yüzeyde aynı sızıntı vardı: `/` (RSC flight payload + anon select), `/ilan/[id]` (wa.me linki + `Aksiyonlar` prop'u), `/u/[username]` (`tel:` href), `/ilan/[id]/sahiplen` (numarayı tam olarak ekrana yazıyordu).
 > **Yeni mimari:** `contact_phone` hiçbir public sorguda **seçilmez**. Numara yalnızca `GET /api/ilan/[id]/telefon` üzerinden döner (authed + profil tamam + hesap aktif + ilan yayında; `logPhoneAccess`; dk başına 20 istek; `no-store`). Sahiplenme akışı için `/api/ilan/[id]/sahiplen` var: `GET` maskeli numara, `POST` OTP gönder/doğrula — numara istemciye hiç gitmez.
 > **Kural 1:** misafire kapalı hiçbir alan client component prop'una **veya** anon key sorgusuna girmemeli.
 > **Kural 2 (ISR):** `app/page.tsx` `revalidate = 30` ile cache'li — çıktı tüm ziyaretçilerde ortak, **oturuma göre koşullu render imkânsız**. Hassas veriyi "misafirse gizle" ile değil, payload'dan tamamen çıkararak çöz. `/ilan/[id]` `cookies()` kullandığı için dinamik; orada koşullu render güvenli.
-> **⏳ Açık kalan:** `anon` rolünün `listings.contact_phone` üzerindeki `SELECT` yetkisi duruyor → PostgREST'e doğrudan gidilebilir (`SPRINT_01` L1e, W1). Revoke öncesi `panel/`, `moderator/`, `IlanYonetim.tsx` sorguları service-role'e taşınmalı.
+> **✅ DB KATMANI (28 Tem 2026, `SPRINT_01` L1e — KOD TARAFI BİTTİ):**
+> Uygulamayı düzeltmek yetmiyordu: `anon`/`authenticated` rollerinin `listings.contact_phone` üzerindeki PostgREST yetkisi durduğu sürece anon key'i olan herkes `GET /rest/v1/listings?select=id,contact_phone&limit=1000` çekebiliyordu.
+> **Kural (bunu unutma):** **RLS SATIR bazlıdır, KOLON bazlı değildir.** Satır zaten herkese açıksa (ilan listesi çalışsın diye) o satırın *yetkili* her kolonu da okunur. Arayüzde göstermemek koruma değildir.
+> Revoke'un önündeki engel istemciden yazma yollarıydı; ikisi de kapatıldı: `app/panel/actions.ts` ve `app/moderator/actions.ts` (yeni). Numara artık yalnız service-role kullanan sunucu yollarından okunur/yazılır.
+> ⏳ **Bayram:** `docs/20260728_contact_phone_revoke.sql` — **deploy'dan SONRA** çalıştır.
+> **Tuzak:** Tablo geneline verilmiş `GRANT`, kolon bazlı `REVOKE`'u **ezer**. Düz `revoke select (contact_phone) …` no-op olur. Migration önce tablo geneli yetkiyi alıp `contact_phone` hariç tüm kolonları programatik geri veriyor.
+
+> **✅ İSTEMCİ UPDATE'İ = KOLON BEYAZ LİSTESİ ŞART (28 Tem 2026, `SPRINT_01` K2 + L1e):**
+> Aynı sınıf hata iki yerde vardı: `profil-tamamla` `users` upsert'i ve `panel` `listings` update'i gövdeyi hiç filtrelemeden istemciden alıyordu. RLS "kendi satırın" der ama gövdeye `role: 'admin'`, `trust_level: 'verified'`, `moderation_status: 'approved'`, `is_shadow_banned: false` eklemeyi engellemez — devtools açmak kadar kolay.
+> **Kural:** İstemciden gelen her `update`/`upsert` gövdesi `'use server'` action içinde **beyaz listeden** geçmeli. Sahiplik kontrolü de sunucuda olmalı — `getServiceSupabase()` RLS'i bypass ettiği için "RLS nasılsa engeller" varsayımı geçersiz.
 
 ---
 
@@ -76,13 +88,19 @@ yukegel/
 │   │   ├── Footer.tsx                  # Server component — sirket_unvani config'den
 │   │   └── HomeClient.tsx              # Client component — eski page.tsx içeriği
 │   ├── giris/page.tsx
-│   ├── auth/callback/ + reset/
+│   ├── auth/callback/ + reset/           # 🔒 SPRINT_01 R1 — reset 3 durumlu: kontrol/hazir/gecersiz.
+│   │                                     #    Form YALNIZ gerçek PASSWORD_RECOVERY oturumunda ✅
 │   ├── profil-tamamla/page.tsx
+│   ├── profil-tamamla/actions.ts         # 🔒 SPRINT_01 K2 — users upsert'i sunucuda, KOLON BEYAZ LİSTESİ ✅
 │   ├── panel/ (page + PanelClient + IlanYonetim)
+│   ├── panel/actions.ts                  # 🔒 SPRINT_01 L1e — ilanGuncelle + ilanTamamlandiToggle.
+│   │                                     #    Sahiplik sunucuda, gövde beyaz listeden geçiyor ✅
 │   ├── ilan/[id]/ (page + Aksiyonlar + sahiplen)
 │   ├── ilan-ver/ (page + actions + TopluYukle + MetindenIlan)
 │   ├── araclarim/page.tsx
 │   ├── moderator/ + moderator-giris/
+│   ├── moderator/actions.ts              # 🔒 SPRINT_01 L1e — ilanTelefonlariGetir (toplu, ≤300) +
+│   │                                     #    ilanTelefonGuncelle. requireStaff + phone-privacy log ✅
 │   ├── admin/ (page + kullanicilar + sistem-ayarlari + guvenlik + crm + radar)
 │   ├── yol-rehberi/                      # 🗺️ POI Modülü ✅
 │   │   ├── page.tsx                      # Server component + metadata
@@ -96,11 +114,15 @@ yukegel/
 ├── api/
 │   ├── admin/kullanici/ + guvenlik/
 │   ├── auth/merge/ + switch-account/ + tekil-kontrol/
+│   ├── auth/log/route.ts                 # 🔒 SPRINT_01 A1 — auth_events'e service-role insert.
+│   │                                     #    Fire-and-forget, IP+UA yazılır, telefon/şifre YAZILMAZ ✅
 │   ├── excel-import/
 │   ├── ilan/[id]/telefon/route.ts        # 🔒 SPRINT_01 L1b — TEK telefon kaynağı. GET, authed+profil tam,
 │   │                                     #    logPhoneAccess, 20 istek/dk (in-memory → çok instance'ta zayıf) ✅
 │   ├── ilan/[id]/sahiplen/route.ts       # 🔒 SPRINT_01 L1d — GET maskeli numara, POST {adim:'gonder'|'dogrula'}
 │   │                                     #    OTP sunucuda; verifyOtp SSR client ile → cookie doğru set ✅
+│   │                                     # 🔒 SPRINT_01 A4b — ilan başına 60 sn SMS cooldown (429+Retry-After),
+│   │                                     #    sayaç yalnız SMS GERÇEKTEN gittiyse başlar. In-memory ✅
 │   ├── ilan/pasif/ + duzelt/
 │   ├── llm-parse/
 │   ├── moderator/kullanici-askiya/ + toplu-islem/
@@ -111,6 +133,8 @@ yukegel/
 │   └── whatsapp-parse/                   # 🔒 requireStaff + rate limit (10/dk) ✅
 │
 ├── lib/auth.ts + supabase.ts             # auth.ts: requireStaff() → API route'lar için (redirect atmaz)
+├── lib/redirect.ts                       # 🔒 SPRINT_01 A7 — guvenliRedirect(): yalnız `/` ile başlayan,
+│                                         #    `//` ve `\` içermeyen yollar (açık yönlendirme koruması) ✅
 ├── lib/whatsapp/chatParser.ts            # 📱 TEK KAYNAK sohbet parser (server + client ortak) ✅
 ├── lib/whatsapp/__tests__/chatParser.test.ts  # 29 assertion — `npm run test:parser` ✅
 ├── lib/whatsapp/telefon.ts               # 📱 TEK KAYNAK telefon regex (05XXXXXXXXX) ✅
@@ -182,7 +206,14 @@ status: 'active'|'passive'|'completed'|'expired'
 is_shadow_banned, audit_score, internal_audit_logs (JSONB)
 user_id (nullable), source: 'form'|'whatsapp'|'excel'
 shadow_profile_id (nullable FK → shadow_profiles.id) — kayıtsız kullanıcı ilanları için
+contact_phone — 🔒 anon/authenticated için REVOKE edildi (SPRINT_01 L1e). Yalnız service-role.
 ```
+> ⚠️ `contact_phone` (28 Tem 2026, `SPRINT_01` L1e): PostgREST kolon yetkisi `anon` ve
+> `authenticated` rollerinden alındı. İstemci tarafı hiçbir `select`/`update`/`insert`
+> bu kolonu içeremez → `42501 permission denied`. Okuma/yazma yolları:
+> `app/api/ilan/[id]/telefon`, `app/api/ilan/[id]/sahiplen`, `app/ilan/[id]/page.tsx`,
+> `app/panel/actions.ts`, `app/moderator/actions.ts`. Migration:
+> `docs/20260728_contact_phone_revoke.sql` — **deploy'dan SONRA** çalıştırılmalı.
 
 ### `shadow_profiles` — Gölge Profil / CRM
 ```
@@ -197,6 +228,22 @@ converted_user_id (nullable FK → auth.users.id)
 
 ### `users` — `role`, `is_active`, `user_type`, `phone_verified`, `company_name`, `ai_listing_quota_daily` (NULL = sistem default), `kvkk_onay_at`
 > `kvkk_onay_at timestamptz` (28 Tem 2026, `SPRINT_01` K1) — KVKK aydınlatma metni + kullanım koşullarının onay anı. NULL = onay alınmamış (eski kayıt). `profil-tamamla` upsert'i yazıyor. ⏳ Migration: `docs/20260728_kvkk_onay.sql` — **henüz çalıştırılmadı.** Eski kullanıcılardan onay toplamak ayrı iş (panele tek seferlik modal gerekiyor, ticket açılmalı).
+> ⚠️ `is_active` (28 Tem 2026, `SPRINT_01` K2): istemci artık `is_active: true` **göndermiyor**
+> (beyaz listede yok). Kolonun DB default'u `true` değilse yeni kayıtlar pasif açılır — Bayram doğrulayacak.
+
+### `auth_events` — Auth denetim izi (28 Tem 2026, `SPRINT_01` A1/A1b)
+```
+event      — giris_basarili | giris_hatali | otp_gonder | otp_hata | kayit | merge | cikis ...
+method     — sifre | otp | google | magic_link
+reason     — serbest metin (hata sebebi)
+user_id    — nullable (başarısız girişte kullanıcı bilinmeyebilir)
+ip, user_agent, created_at
+```
+- Insert **yalnız service-role** (`app/api/auth/log/route.ts`); select yalnız admin/moderator (RLS).
+- ⛔ Telefon, e-posta, şifre **yazılmaz**.
+- ⏳ Migration: `docs/20260728_auth_events.sql` — **deploy'dan ÖNCE** çalıştırılmalı. Tablo
+  yoksa endpoint her çağrıda ERROR loglar (akışı bloklamaz, fire-and-forget).
+
 ### `raw_posts`, `aliases`, `vehicles`
 
 ### `aliases` kolonözeti
@@ -254,6 +301,9 @@ ZIP/TXT → raw_posts → DB trigger → parse-listing Edge Fn → listings → 
 | `/api/admin/guvenlik` | safety_rules + blacklist CRUD |
 | `/api/excel-import` | Excel toplu yükleme (auto_published) |
 | `/api/auth/tekil-kontrol` | telefon/tckn/vkn tekillik (service role) |
+| `/api/auth/log` | 🔒 Auth denetim izi → `auth_events` (service role). Fire-and-forget, IP+UA yazar, telefon/şifre yazmaz |
+| `/api/ilan/[id]/telefon` | 🔒 **TEK** telefon kaynağı. GET, authed + profil tam + hesap aktif + ilan yayında. `logPhoneAccess`, 20/dk, `no-store` |
+| `/api/ilan/[id]/sahiplen` | 🔒 GET maskeli numara, POST `{adim:'gonder'\|'dogrula'}`. İlan başına 60 sn SMS cooldown (429 + `Retry-After`) |
 | `/api/parse-text` | Tekil kullanıcı metnini Haiku ile JSON'a çevirir + per-user günlük quota kontrolü (429) |
 | `/api/whatsapp` | Twilio WhatsApp webhook — kayıt/kota kontrolü + LLM parse + ilan oluştur |
 | `/api/admin/kullanici` | role / is_active / moderator_sources / **ai_listing_quota_daily** PATCH |
@@ -325,6 +375,11 @@ Açık rotalar: /giris, /auth/, /profil-tamamla, /nasil-calisir, /hakkimizda,
 - **Vercel'de 60 sn aşılırsa fonksiyon ÖLDÜRÜLÜR ve JSON değil HTML döner** — bu yüzden ağır route'lar kendi süre bütçesini tutmalı. `whatsapp-parse`: `SURE_BUTCESI_MS = 45_000`; dolduğunda döngü kırılır ve `{ tamamlanmadi: true, islenmeyen: N }` ile **geçerli JSON** döner. Sessiz ölüm yerine kısmi başarı raporlanır.
 - **Parti boyu sihirli sayıyla ayarlanmaz — istemci ikiye böler (bisection)** (28 Tem 2026). `WhatsappYukle.tsx` sıralı döngü yerine iş kuyruğu kullanır: 504/413 ya da `tamamlanmadi` gelirse parti ikiye bölünüp kuyruğun başına konur; grupta tek dosya kaldıysa `dosyayiBol()` dosyayı **mesaj başlığı sınırından** (satır ortasından değil) ikiye ayırır. `MAX_BOLUNME = 8`. Bu güvenlidir çünkü tekilleştirme hash tabanlı → yeniden gönderim idempotent, yazılmış satırlar `skipped` döner.
 - **`requireAdmin()` API route'ta KULLANILMAZ** — içeride `redirect()` çağırır, bu `NEXT_REDIRECT` fırlatır ve route 500 döner. API route'larda `requireStaff()` kullan (`{ ok, user }` / `{ ok, status, error }` döner).
+- **RLS SATIR bazlıdır, KOLON bazlı DEĞİLDİR** (28 Tem 2026, `SPRINT_01` L1e). İki ayrı sonucu var, ikisi de bizi ısırdı: **(1) Okuma:** satır herkese açıksa o satırın *yetkili* her kolonu da okunur — `contact_phone` aylarca `GET /rest/v1/listings?select=contact_phone` ile anon key üzerinden çekilebiliyordu; arayüzde göstermemek koruma değildi. Çözüm PostgREST kolon yetkisini revoke etmek. **(2) Yazma:** "sadece kendi satırın" politikası, gövdeye `role: 'admin'` / `trust_level: 'verified'` / `moderation_status: 'approved'` eklemeyi **engellemez**. İstemciden gelen her `update`/`upsert` `'use server'` action içinde **kolon beyaz listesinden** geçmeli. Örnekler: `app/panel/actions.ts`, `app/profil-tamamla/actions.ts`.
+- **Tablo geneline verilmiş `GRANT`, kolon bazlı `REVOKE`'u EZER** (28 Tem 2026). `revoke select (contact_phone) on listings from anon;` tek başına **no-op**'tur. Doğrusu: önce tablo geneli yetkiyi al, sonra hedef kolon hariç tüm kolonları `information_schema.columns` üzerinden programatik geri ver. Örnek: `docs/20260728_contact_phone_revoke.sql`.
+- **Kod ve migration'ın SIRASI önemlidir** — yetki daraltan migration'lar **deploy'dan SONRA**, yeni kolon/tablo açan migration'lar **deploy'dan ÖNCE** çalıştırılır. Ters sırada ya kod olmayan kolona yazar ya da yeni kod var olmayan yetkiyle çalışır. Migration dosyasının başına hangisi olduğunu YAZ.
+- **Bellek içi rate limit tek instance varsayar** — `api/ilan/[id]/telefon` (20/dk) ve `api/ilan/[id]/sahiplen` (60 sn OTP cooldown) `Map` kullanıyor. Çok instance'a ölçeklenirse limit instance sayısı kadar gevşer. Redis'e taşıma kararı `SPRINT_01` G2 ile birlikte. Ayrıca sayaç yalnızca işlem **gerçekten** başarılıysa başlatılmalı — sağlayıcı hatası kullanıcıyı kilitlememeli.
+- **Recovery oturumu ≠ normal oturum, ama Supabase ikisini de kabul eder** (28 Tem 2026, `SPRINT_01` R1). Tarayıcıda normal bir oturum açıkken `supabase.auth.updateUser({ password })` **eski şifre sorulmadan çalışır**. `/auth/reset` bu yüzden formu koşulsuz göstermemeli: `PASSWORD_RECOVERY` event'i (veya PKCE `?code=` takası) beklenmeli, işlem sonrası `signOut()` çağrılmalı.
 
 ---
 
@@ -369,6 +424,18 @@ Açık rotalar: /giris, /auth/, /profil-tamamla, /nasil-calisir, /hakkimizda,
 ## 14. GÖREV DURUMU
 
 ### ✅ Tamamlanan
+- **SPRINT_01 W1 — Auth akış bütünlüğü** (28 Temmuz 2026). Ayrıntı ve kabul kriterleri: `docs/SPRINT_01.md`.
+  - **A1 + A1b — auth denetim izi açıldı.** `app/api/auth/log/route.ts` (yeni) service-role ile `auth_events`'e yazıyor. Endpoint aylardır **yoktu**; `authLog()` çağrıları `.catch(()=>{})` içinde olduğu için 404 sessizce yutuluyordu. Artık `console.warn` bırakılıyor. ⏳ `docs/20260728_auth_events.sql`.
+  - **A3 — `?hesap=tasindi` / `?hesap=eslesme` mesajları görünür oldu.** Mesaj `onAuthStateChange`'ten bağımsız basılıyor; proxy cookie'yi sildiği için `!user` dalında da çalışması gerekiyordu.
+  - **A7 — `redirect` param'ı korunuyor.** `lib/redirect.ts` (yeni) `guvenliRedirect()`: yalnız `/` ile başlayan, `//` ve `\` içermeyen yollar → açık yönlendirme kapalı.
+  - **K2 — `users` upsert'i server action'a taşındı.** `app/profil-tamamla/actions.ts` (yeni) + kolon beyaz listesi. `role`, `is_active`, `phone_verified`, `merged_into`, `trust_level` istemciden yazılamıyor.
+  - **R1 — `/auth/reset` yeniden yazıldı.** Backlog'da yazandan daha kötü bir bulgu çıktı: tarayıcıda **normal** bir oturum açıkken `updateUser({password})` başarıyla çalışıyordu → açık kalmış oturuma erişen kişi eski şifreyi bilmeden şifreyi değiştirebiliyordu. Form artık yalnız gerçek `PASSWORD_RECOVERY` oturumunda; başarıdan sonra `signOut()`.
+  - **C1 — `/cikis` GET kapatıldı**, POST + Origin kontrolü. Link prefetch / üçüncü taraf `<img src>` ile istemsiz çıkış vektörü kapandı.
+  - **A4b — OTP cooldown SUNUCUDA.** `api/ilan/[id]/sahiplen` ilan başına 60 sn (429 + `Retry-After`); istemci sayacı yalnız görsel. Sayaç SMS gerçekten gittiyse başlıyor.
+  - **L1e — `contact_phone`'un son istemci yazma yolu kapandı.** `app/panel/actions.ts` ve `app/moderator/actions.ts` (yeni); `IlanYonetim.tsx`'ten anon istemci tamamen kaldırıldı, `moderator/page.tsx`'in select/update/insert'lerinden kolon çıkarıldı. ⏳ `docs/20260728_contact_phone_revoke.sql` (**deploy'dan SONRA**).
+  - **Keşif (backlog'da yoktu):** panel'in istemci `listings` update'i gövdeyi hiç filtrelemiyordu — kullanıcı kendi ilanına `trust_level: 'verified'` / `moderation_status: 'approved'` / `is_shadow_banned: false` yazabiliyordu. K2 ile aynı sınıf; beyaz listeyle kapandı.
+  - **Ayrıca:** panel "Araç Bulundu" toggle'ının hatası sessizce yutuluyordu (buton çalışmış görünüp sayfa yenilenince geri dönüyordu) — artık kart üstünde gösteriliyor. Moderatör telefon kaydı başarısız olursa `alert` çıkıyor.
+  - **Doğrulama:** `npx tsc --noEmit` temiz; değişen/yeni dosyalarda eslint 0 problem. `next build` bu ortamda tamamlanamadı (sandbox `.next` FUSE artefaktı + Google Fonts'a çıkış yok) — Bayram'ın makinesinde/CI'da doğrulanmalı.
 - **Kayıtlı kullanıcı ayrı auth kimliğiyle gelince profil-tamamla'ya düşüyordu — proxy + giriş self-heal ile çözüldü** (22 Temmuz 2026): Doğrulanan vaka — Bayram'ın 2 auth kimliği vardı: `0d7ac38c…` (email bayramdede@gmail.com, `public.users` satırı burada, `broker`) ve `4c509880…` (phone 905380855996, satırı YOK). SMS ile girince oturum `4c50…` oluyor, proxy o `id` için satır bulamıyor ve `/profil-tamamla`'ya atıyordu. Giriş formundaki merge yalnızca formdan geçildiğinde çalışıyordu; doğrudan korumalı rotaya gidince kaçıyordu.
   - `proxy.ts`: select'e `merged_into` eklendi. (a) `merged_into` dolu → sb- cookie'leri temizle + `/giris?hesap=tasindi`. (b) `user_type` yok ama aynı e-posta/telefonla (`+905xx`/`905xx`/`05xx`/`5xx` dört format) `merged_into IS NULL` canlı hesap varsa → `/profil-tamamla` yerine `/giris?hesap=eslesme`.
   - `app/giris/page.tsx`: açılış kontrolü `supabase.auth.onAuthStateChange` **INITIAL_SESSION** olayına bağlı (getUser DEĞİL). Neden: magic-link `#access_token` hash'i istemci başlatılırken TÜKETİLİR; INITIAL_SESSION bundan sonra tetiklendiği için eski/merged cookie yerine hash'ten gelen GÜNCEL oturumu görürüz — aksi halde getUser hash işlenmeden eski merged oturumu okuyup `signOut` ediyor, kullanıcı giriş ekranında takılıyordu (RACE). Mantık: sağlıklı canlı oturum (`user_type` var, `merged_into` yok) → `yonlendir()`; ölü/eksik oturum → `signOut()` + bilgi mesajı. Formla giriş (SIGNED_IN) bu bloktan ETKİLENMEZ; onları otpGonder/epostaGiris yönetir.

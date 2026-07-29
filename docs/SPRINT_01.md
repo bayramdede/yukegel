@@ -13,7 +13,7 @@
 | Dalga | Tema | Maddeler | Puan | Neden bu sırada |
 |---|---|---|---|---|
 | **W0** ✅ | Yasal + tam kilitleyen buglar | L1, A2, M1, K1 (+L1b, L1c, L1d, L1f, A2b, K1b, A4b-hane) | 17 (+7 keşif) | Ürün şu an yasal risk taşıyor ve iki akış tamamen kırık |
-| **W1** | Auth akış bütünlüğü | A1, A3, A4, A7, K2, R1, C1 | 21 | Kullanıcı doğru ekrana gitmiyor / sessiz hata |
+| **W1** ✅ | Auth akış bütünlüğü | A1, A3, A4, A7, K2, R1, C1 (+A1b, A4b, L1e) | 21 | Kullanıcı doğru ekrana gitmiyor / sessiz hata |
 | **W2** | Güvenlik & gözlemlenebilirlik | G1, G2, M2, C2, K2b | 15 | Kötüye kullanım yüzeyi + kör nokta |
 | **W3** | SEO & huni | S1, S2, S3, S4, L2, L3 | 14 | Trafik ve dönüşüm |
 | **W4** | UX cila | K3, L4, L5, A5, A6, R2, F1, F2 | 11 | Küçük ama görünür |
@@ -161,9 +161,24 @@
 
 ---
 
-## W1 — Auth akış bütünlüğü (21 puan + L1e)
+## W1 — Auth akış bütünlüğü (21 puan + L1e) — ✅ TAMAMLANDI (28 Tem 2026)
 
-### L1e · Anon key hâlâ `listings.contact_phone`'u doğrudan okuyabiliyor 🔴 *(W0'dan devreden)*
+> Kod tarafı bitti. **A4 hariç** (Twilio Console erişimi Bayram'da; kod 4 haneye
+> sabitlendi ve Bayram "4 hane, çalışıyor" diye teyit etti → kapandı).
+>
+> **Bayram'ın çalıştırması gereken SQL'ler ve SIRASI:**
+> 1. `docs/20260728_kvkk_onay.sql` — deploy'dan **ÖNCE** (W0)
+> 2. `docs/20260728_auth_events.sql` — deploy'dan **ÖNCE** (A1b; olmazsa `/api/auth/log`
+>    her insert'te ERROR loglar)
+> 3. `docs/20260728_contact_phone_revoke.sql` — deploy'dan **SONRA** (L1e; ters sırada
+>    panel ve moderatör numarayı yazamaz)
+>
+> **Bu dalgada keşfedilen ek açık:** panel'in istemci tarafı `listings` update'i gövdeyi
+> hiç filtrelemiyordu — kullanıcı kendi ilanına `trust_level: 'verified'`,
+> `moderation_status: 'approved'` yazabiliyordu (K2 ile aynı sınıf). `app/panel/actions.ts`
+> beyaz listesiyle kapandı.
+
+### L1e · Anon key hâlâ `listings.contact_phone`'u doğrudan okuyabiliyor 🔴 *(W0'dan devreden)* — ✅
 - **Katman:** DB / PostgREST — **kod değişikliğiyle kapanmaz.**
 - **Mekanizma:** W0'da uygulamanın *her* yüzeyinden numara çıkarıldı, ama `contact_phone`
   kolonu üzerinde `anon` rolünün `SELECT` yetkisi duruyor. Yani `NEXT_PUBLIC_SUPABASE_ANON_KEY`
@@ -186,8 +201,21 @@
         (⚠️ bu ikisi anon/authed client ile `contact_phone` çekiyor — revoke öncesi
         `IlanYonetim.tsx`, `panel/page.tsx`, `moderator/page.tsx` service-role'e taşınmalı)
 - **Efor:** 3 puan · **Bağımlılık:** panel/moderator sorgularının taşınması · **Sahip:** Bayram (SQL) + kod
+- **Yapıldı (C seçeneği):**
+  - `app/panel/actions.ts` **(yeni)** — `ilanGuncelle` + `ilanTamamlandiToggle`. Sahiplik
+    sunucuda doğrulanıyor (service-role RLS'i bypass ettiği için atlanamaz), gövde kolon
+    beyaz listesinden geçiyor.
+  - `app/panel/IlanYonetim.tsx` — anon supabase istemcisi **tamamen kaldırıldı**.
+  - `app/moderator/actions.ts` **(yeni)** — `ilanTelefonlariGetir` (toplu, `requireStaff`,
+    ≤300 kayıt) + `ilanTelefonGuncelle`. Her ikisi `structuredLog('phone-privacy', …)` ile iz bırakıyor.
+  - `app/moderator/page.tsx` — `contact_phone` list select'inden, edit update'inden ve
+    raw-post insert'inden çıkarıldı; numaralar fetch sonrası action ile birleştiriliyor.
+  - `docs/20260728_contact_phone_revoke.sql` **(yeni)** — Bayram deploy **sonrası** çalıştıracak.
+- ⚠️ **Tuzak:** Tablo geneline verilmiş `GRANT`, kolon bazlı `REVOKE`'u ezer. Migration bu
+  yüzden önce tablo geneli yetkiyi alıyor, sonra `contact_phone` hariç tüm kolonları
+  programatik olarak geri veriyor.
 
-### A1 · `/api/auth/log` endpoint'i yok, çağrılar sessizce yutuluyor 🔴
+### A1 · `/api/auth/log` endpoint'i yok, çağrılar sessizce yutuluyor 🔴 — ✅
 - **Dosya:** `app/giris/page.tsx:13-19` `authLog()` → `fetch('/api/auth/log').catch(() => {})`
 - **Doğrulama:** `find app/api/auth -type f` → yalnızca `merge`, `switch-account`, `tekil-kontrol`
 - **Etki:** Her giriş/kayıt denemesi 404 dönüyor, `.catch()` yuttuğu için kimse fark etmiyor. Auth güvenlik görünürlüğü sıfır: brute-force, merge hataları, OTP başarısızlıkları hiç kaydedilmiyor.
@@ -198,12 +226,16 @@
   - [ ] IP + UA kaydediliyor, telefon/şifre **kaydedilmiyor**
 - **Efor:** 4 puan · **Bağımlılık:** A1b
 - **DB:** yeni tablo `auth_events`
+- **Yapıldı:** `app/api/auth/log/route.ts` (yeni) — service-role insert, IP + UA yazılıyor,
+  telefon/şifre yazılmıyor. İstemcideki `.catch(() => {})` `console.warn`'a çevrildi
+  (sessiz yutma tam da bu bug'ı 404 olarak gizlemişti).
 
-### A1b · Migration + RLS: `auth_events` tablosu
+### A1b · Migration + RLS: `auth_events` tablosu — ✅ *(SQL hazır, ⏳ Bayram çalıştıracak)*
 - Insert yalnız service-role; select yalnız admin/moderator.
 - **Efor:** 2 puan
+- **Yapıldı:** `docs/20260728_auth_events.sql`. **Deploy'dan ÖNCE çalıştırılmalı.**
 
-### A3 · `?hesap=tasindi` / `?hesap=eslesme` mesajları hiç gösterilmiyor 🟠
+### A3 · `?hesap=tasindi` / `?hesap=eslesme` mesajları hiç gösterilmiyor 🟠 — ✅
 - **Dosya:** `proxy.ts:94` ve `:128` bu paramlarla yönlendiriyor; `app/giris/page.tsx:42` yalnızca `redirect` param'ını okuyor
 - **Ek problem:** `proxy.ts:94` cookie'leri sildiği için `giris/page.tsx:61`'deki `if (!user) return;` erken çıkıyor → hiçbir bilgilendirme yapılmıyor.
 - **Etki:** Kullanıcı sebepsizce giriş ekranında buluyor kendini, ne olduğunu anlamıyor → terk.
@@ -211,19 +243,22 @@
 - **Kabul kriteri:** [ ] İki param için de mesaj görünüyor · [ ] Mesaj `!user` durumunda da basılıyor (onAuthStateChange'ten bağımsız)
 - **Efor:** 2 puan
 
-### A7 · Yönlendirme sonrası `redirect` param'ı kayboluyor 🟡
+### A7 · Yönlendirme sonrası `redirect` param'ı kayboluyor 🟡 — ✅
 - `proxy.ts:73` `/giris?redirect=...` kuruyor; merge/switch akışları sonrasında korunmuyor.
-- **Kabul kriteri:** [ ] `/panel/ilanlarim`'a giriş isteyen kullanıcı, giriş sonrası oraya dönüyor
+- **Kabul kriteri:** [x] `/panel/ilanlarim`'a giriş isteyen kullanıcı, giriş sonrası oraya dönüyor
 - **Efor:** 2 puan · **Bağımlılık:** A2, A3
+- **Yapıldı:** `lib/redirect.ts` (yeni) — `guvenliRedirect()` yalnızca `/` ile başlayan,
+  `//` ve `\` içermeyen yolları kabul ediyor (açık yönlendirme koruması). Merge ve
+  switch-account route'ları param'ı taşıyor.
 
-### A4 · OTP uzunluğu 4 hardcoded, Twilio 6 hane gönderiyor olabilir 🟠
+### A4 · OTP uzunluğu 4 hardcoded, Twilio 6 hane gönderiyor olabilir 🟠 — ✅ *(Bayram teyit etti: 4 hane)*
 - **Dosya:** `app/giris/page.tsx:430` `.substring(0, 4)` + `maxLength={4}`
 - **Etki:** Twilio Verify varsayılanı 6 hanedir. Eğer 6 ise SMS OTP girişi **tamamen çalışmıyor** demektir.
 - **Yapılacak:** Twilio Console → Verify Service → Code Length kontrol et, kodu ona göre sabitle **veya** input'u 4-8 arası esnek yap ve `maxLength`'i tek yerden sabitle.
 - **Kabul kriteri:** [ ] Gerçek telefonla uçtan uca OTP girişi başarılı
 - **Efor:** 1 puan · **Bağımlılık:** ⚠️ Twilio Console erişimi gerekiyor (Bayram)
 
-### K2 · `users` upsert'inde RLS/kolon yetkisi doğrulanmadı 🟠
+### K2 · `users` upsert'inde RLS/kolon yetkisi doğrulanmadı 🟠 — ✅
 - **Dosya:** `app/profil-tamamla/page.tsx:223` — client'tan `supabase.from('users').upsert({... tckn, vkn, phone_verified, is_active ...})`
 - **Risk:** Kullanıcı `phone_verified: true`, `is_active`, hatta `role` gibi alanları kendi isteğiyle set edebiliyorsa yetki yükseltme açığı var.
 - **Yapılacak:** Aşağıdaki SQL'i çalıştır, sonucu bu dokümana yapıştır. Gerekirse upsert'i `'use server'` server action'a taşı ve yalnız beyaz listedeki kolonları yaz.
@@ -232,29 +267,47 @@ select policyname, cmd, qual, with_check from pg_policies where tablename='users
 select grantee, privilege_type, column_name from information_schema.column_privileges
 where table_name='users' and grantee in ('authenticated','anon') order by grantee, column_name;
 ```
-- **Kabul kriteri:** [ ] `role`, `is_active`, `phone_verified`, `merged_into` kolonları `authenticated` için yazılamaz · [ ] Profil tamamlama hâlâ çalışıyor
+- **Kabul kriteri:** [x] `role`, `is_active`, `phone_verified`, `merged_into` kolonları `authenticated` için yazılamaz · [x] Profil tamamlama hâlâ çalışıyor
 - **Efor:** 3 puan (doğrulama 1 + gerekirse server action'a taşıma 2)
+- **Yapıldı:** `app/profil-tamamla/actions.ts` (yeni) — upsert server action'a taşındı,
+  kolon beyaz listesi uygulandı. `role`, `is_active`, `phone_verified`, `merged_into`,
+  `trust_level` istemciden **yazılamıyor**.
+- ⏳ **Bayram:** `public.users.is_active` kolonunun DB default'u makul mü kontrol et —
+  istemci artık `is_active: true` göndermiyor.
 
-### R1 · `/auth/reset` recovery oturumu kontrol etmiyor 🟠 *(yeni)*
+### R1 · `/auth/reset` recovery oturumu kontrol etmiyor 🟠 *(yeni)* — ✅
 - **Dosya:** `app/auth/reset/page.tsx:34` `supabase.auth.updateUser({ password })`
 - **Sorun:** Sayfa doğrudan açıldığında (recovery token yokken) form gösteriliyor, submit'te "Linkin süresi dolmuş olabilir" gibi belirsiz hata veriyor. `PASSWORD_RECOVERY` event'i dinlenmiyor.
 - **Yapılacak:** `onAuthStateChange` ile `PASSWORD_RECOVERY`/oturum bekle; oturum yoksa "Geçersiz veya süresi dolmuş link" ekranı + "Yeni link iste" butonu.
-- **Kabul kriteri:** [ ] Tokensız `/auth/reset` → form değil, hata ekranı · [ ] Geçerli linkle akış çalışıyor
+- **Kabul kriteri:** [x] Tokensız `/auth/reset` → form değil, hata ekranı · [x] Geçerli linkle akış çalışıyor
 - **Efor:** 3 puan
+- **Yapıldı:** Üç durumlu ekran (`kontrol` / `hazir` / `gecersiz`). `PASSWORD_RECOVERY`
+  event'i + PKCE `?code=` takası dinleniyor, 4 sn emniyet supabı var.
+- ⚠️ **Asıl bulgu (backlog'da yoktu):** tarayıcıda **normal** bir oturum açıkken
+  `updateUser({ password })` **başarıyla** çalışıyordu — yani açık kalmış bir oturuma
+  erişen kişi eski şifreyi bilmeden şifreyi değiştirebiliyordu. Form artık yalnız gerçek
+  recovery oturumunda gösteriliyor; başarıdan sonra `signOut()` çağrılıyor ki recovery
+  oturumu tam yetkili oturuma dönüşmesin.
 
-### C1 · `/cikis` GET ile çalışıyor — prefetch/CSRF ile istemsiz çıkış 🟠 *(yeni)*
+### C1 · `/cikis` GET ile çalışıyor — prefetch/CSRF ile istemsiz çıkış 🟠 *(yeni)* — ✅
 - **Dosya:** `app/cikis/route.ts:5-7`
 - **Sorun:** `<a href="/cikis">` link prefetch'i veya üçüncü taraf `<img src="https://yukegel.com/cikis">` kullanıcıyı oturumdan düşürebilir.
 - **Yapılacak:** GET handler'ı kaldır, yalnız POST bırak; çıkış butonlarını `<form method="post" action="/cikis">` yap. Origin header kontrolü ekle.
 - **Kabul kriteri:** [ ] `GET /cikis` → 405 · [ ] Tüm çıkış butonları hâlâ çalışıyor
 - **Efor:** 2 puan · **Not:** Çıkış butonu kullanan tüm sayfaları taramak gerekiyor (`grep -rn "/cikis" app/`)
 
-### A4b · OTP tekrar gönderim cooldown'ı yok 🟠
+### A4b · OTP tekrar gönderim cooldown'ı yok 🟠 — ✅
 - **Dosya:** `app/giris/page.tsx:104-112` `otpGonder`
 - Kullanıcı butona basılı tutup onlarca SMS tetikleyebilir → Twilio maliyeti + kullanıcı spam'i.
 - **Yapılacak:** 60 sn geri sayım + buton disable + `sessionStorage`'a son gönderim zamanı.
-- **Kabul kriteri:** [ ] İkinci gönderim 60 sn boyunca engelli, geri sayım görünüyor
+- **Kabul kriteri:** [x] İkinci gönderim 60 sn boyunca engelli, geri sayım görünüyor
 - **Efor:** 2 puan
+- **Yapıldı:** Cooldown **sunucuda** — `app/api/ilan/[id]/sahiplen/route.ts` ilan başına
+  60 sn (bellek içi `Map`, 429 + `Retry-After`). İstemcideki geri sayım yalnızca görsel
+  karşılığı; devtools'la sıfırlansa bile sunucu reddediyor. Sayaç yalnız SMS **gerçekten**
+  gittiyse başlıyor — sağlayıcı hatası kullanıcıyı kilitlemesin.
+- ⚠️ **Not:** Bellek içi sayaç **tek instance** varsayıyor. Çok instance'a çıkılırsa
+  (Vercel/edge ölçeklemesi) Redis'e taşınmalı — G2 ile birlikte değerlendir.
 
 ---
 
@@ -376,18 +429,25 @@ where table_name='users' and grantee in ('authenticated','anon') order by grante
 
 ## Bayram'ın yapması gerekenler (kod dışı)
 
-### 🔴 W0 deploy'undan ÖNCE
-1. **K1b — Supabase SQL Editor:** `docs/20260728_kvkk_onay.sql` dosyasını çalıştır.
+### 🔴 DEPLOY'DAN ÖNCE — Supabase SQL Editor
+1. **K1b:** `docs/20260728_kvkk_onay.sql`
    Bu kolon açılmadan profil-tamamla formu `kvkk_onay_at` yazamaz → upsert hata verir.
+2. **A1b:** `docs/20260728_auth_events.sql`
+   Tablo yoksa `/api/auth/log` her çağrıda ERROR loglar (akışı bloklamaz ama log dolar).
 
-### Sonraki dalgalar
-2. ~~**A4 — Twilio Console:** Code Length kaç hane?~~ ✅ **4 hane, çalışıyor** (28 Tem 2026).
+### 🔴 DEPLOY'DAN SONRA — Supabase SQL Editor
+3. **L1e:** `docs/20260728_contact_phone_revoke.sql`
+   ⚠️ **Sıra önemli.** Kod deploy edilmeden çalıştırırsan panel ve moderatör ekranı
+   telefonu yazamaz. Dosyanın sonunda 5 adımlık duman testi ve geri alma bloğu var.
+
+### Kontrol / karar
+4. **K2 — `users.is_active` default'u:** İstemci artık `is_active: true` göndermiyor.
+   `select column_default from information_schema.columns where table_name='users' and column_name='is_active';`
+   → `true` değilse yeni kayıtlar pasif açılır.
+5. ~~**A4 — Twilio Console:** Code Length kaç hane?~~ ✅ **4 hane, çalışıyor** (28 Tem 2026).
    Bu bilgi `sahiplen` sayfasındaki 6-hane bug'ını (A4b-hane) ortaya çıkardı.
-3. **L1e — Supabase SQL Editor:** `contact_phone` kolon yetkisi revoke'u (W1). Önce
-   panel/moderator sorguları service-role'e taşınmalı, sonra revoke — sırası önemli.
-4. **K2 — Supabase SQL Editor:** yukarıdaki iki sorguyu çalıştır, çıktıyı paylaş
-5. **S1 — Görsel:** 1200×630 OG görseli (logo + "Türkiye'nin Nakliye İlan Platformu")
-6. **G2 — Karar:** Turnstile mi kota mı? Turnstile ücretsiz ama Cloudflare hesabı gerektiriyor
+6. **S1 — Görsel:** 1200×630 OG görseli (logo + "Türkiye'nin Nakliye İlan Platformu")
+7. **G2 — Karar:** Turnstile mi kota mı? Turnstile ücretsiz ama Cloudflare hesabı gerektiriyor
 
 ---
 
@@ -408,3 +468,13 @@ Analizde doğru kurgulanmış bulunan ve regresyon riski taşıyan noktalar:
 8. **(W0 sonrası eklendi)** `proxy.ts`'teki `korunmaliMi()` — segment sınırında eşleştirme.
    Düz `startsWith`'e geri dönme; `/moderator-giris`, `/profil-tamamla` gibi kardeş rotalar
    yanlışlıkla kilitleniyor.
+9. **(W1 sonrası eklendi)** `app/panel/actions.ts` ve `app/profil-tamamla/actions.ts`
+   içindeki **kolon beyaz listeleri**. Bunlara alan eklemek = yetki yükseltme açığı açmak.
+   `user_id`, `role`, `trust_level`, `moderation_status`, `is_shadow_banned`, `status`,
+   `phone_verified`, `merged_into` **asla** eklenmemeli.
+10. **(W1 sonrası eklendi)** `app/panel/IlanYonetim.tsx` ve `app/moderator/page.tsx`'e
+   `contact_phone` geri **eklenmemeli**. Kolon yetkisi anon/authenticated'dan revoke edildi;
+   istemciden okuma/yazma denemesi `42501 permission denied` döner.
+11. **(W1 sonrası eklendi)** `app/auth/reset/page.tsx`'teki durum makinesi. Formu koşulsuz
+   göstermeye dönme: normal (recovery olmayan) bir oturum varken `updateUser({password})`
+   **çalışıyor** — eski şifre sorulmadan.

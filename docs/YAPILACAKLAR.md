@@ -1,6 +1,14 @@
 # Yükegel — Yapılacaklar Listesi
 
-> Son güncelleme: 28 Temmuz 2026 (SPRINT_01 **W0 tamamlandı** — telefon sızıntısı 4 yüzeyde kapatıldı, Google merge çözüldü, KVKK onayı eklendi. ⏳ `docs/20260728_kvkk_onay.sql` bekliyor.)  
+> Son güncelleme: 28 Temmuz 2026 (SPRINT_01 **W0 + W1 tamamlandı** — telefon sızıntısı hem uygulama hem DB katmanında kapatıldı, auth denetim izi açıldı, iki ayrı yetki yükseltme açığı kolon beyaz listesiyle giderildi, `/auth/reset` ve `/cikis` sertleştirildi.)
+>
+> ⏳ **BAYRAM — 3 SQL, sırası önemli:**
+> 1. `docs/20260728_kvkk_onay.sql` — deploy'dan **ÖNCE**
+> 2. `docs/20260728_auth_events.sql` — deploy'dan **ÖNCE**
+> 3. `docs/20260728_contact_phone_revoke.sql` — deploy'dan **SONRA** (ters sırada panel ve moderatör telefonu yazamaz)
+>
+> Ayrıca kontrol: `public.users.is_active` kolonunun DB default'u `true` mu? İstemci artık bu alanı göndermiyor.
+>
 > Bu dosya tüm geçmiş sohbetler taranarak oluşturulmuştur.
 
 ---
@@ -181,9 +189,9 @@ değişikliği içermiyor — yalnızca statik okuma. Canlı DB/RLS doğrulamas�
 > envanteri; **çalışma sırası için SPRINT_01.md'yi kullan.**
 >
 > ~~W0 (blocker, 17p): L1 · A2 · **M1** · K1~~ **✅ TAMAMLANDI (28 Tem 2026)**
-> W1 (auth bütünlüğü, 21p): **L1e** · A1 · A3 · A4 · A7 · K2 · **R1** · **C1**
-> W2 (güvenlik, 15p): **G1** · **G2** · **M2** · **C2** · K2b  —  W3 (SEO/huni, 14p): **S1–S4** · L2 · L3
-> W4 (cila, 11p): K3 · **R2** · **F1** · **F2** · L4 · L5 · A5 · A6
+> ~~W1 (auth bütünlüğü, 21p): **L1e** · A1 · A3 · A4 · A7 · K2 · **R1** · **C1**~~ **✅ TAMAMLANDI (28 Tem 2026)**
+> **Sıradaki → W2** (güvenlik, 15p): **G1** · **G2** · **M2** · **C2** · K2b
+> W3 (SEO/huni, 14p): **S1–S4** · L2 · L3  —  W4 (cila, 11p): K3 · **R2** · **F1** · **F2** · L4 · L5 · A5 · A6
 
 ### ✅ W0 — Tamamlandı (28 Tem 2026)
 - [x] **L1** — Telefon sızıntısı. `app/page.tsx` ISR'li olduğu için "misafirse gizle" yapılamadı;
@@ -202,18 +210,31 @@ değişikliği içermiyor — yalnızca statik okuma. Canlı DB/RLS doğrulamas�
 - [x] **A4b-hane** — `sahiplen` OTP girişi 6 hane bekliyordu, Twilio 4 gönderiyor → akış
       fiilen tamamlanamıyordu. 4'e çekildi.
 
-### 🔴 W0'dan devreden — DB katmanı
-- [ ] **L1e** — `anon` rolü hâlâ `listings.contact_phone`'u PostgREST üzerinden okuyabiliyor.
-      Uygulama katmanı kapandı, DB katmanı açık. Revoke öncesi `panel/page.tsx`,
-      `panel/IlanYonetim.tsx`, `moderator/page.tsx` sorguları service-role'e taşınmalı.
+### ✅ W1 — Tamamlandı (28 Tem 2026)
+- [x] **L1e** — `contact_phone`'un son istemci yazma yolu kapatıldı. `app/panel/actions.ts` ve
+      `app/moderator/actions.ts` *(yeni)*; `IlanYonetim.tsx`'ten anon istemci tamamen kaldırıldı,
+      `moderator/page.tsx`'in select/update/insert'lerinden kolon çıkarıldı.
+- [ ] **L1e-SQL** ⏳ **BAYRAM:** `docs/20260728_contact_phone_revoke.sql` — **deploy'dan SONRA.**
+- [x] **A1** — `app/api/auth/log/route.ts` *(yeni)*. Endpoint aylardır yoktu, 404 `.catch(()=>{})`
+      içinde yutuluyordu → auth audit trail'i tamamen boştu.
+- [ ] **A1b-SQL** ⏳ **BAYRAM:** `docs/20260728_auth_events.sql` — **deploy'dan ÖNCE.**
+- [x] **A3** — `?hesap=tasindi` / `?hesap=eslesme` mesajları artık `!user` dalında da basılıyor.
+- [x] **A4** — Twilio kod uzunluğu 4 hane olarak teyit edildi (Bayram, 28 Tem 2026).
+- [x] **A7** — `lib/redirect.ts` *(yeni)* `guvenliRedirect()` — açık yönlendirme koruması dahil.
+- [x] **K2** — `app/profil-tamamla/actions.ts` *(yeni)* + kolon beyaz listesi. `role`, `is_active`,
+      `phone_verified`, `merged_into`, `trust_level` istemciden yazılamıyor.
+- [x] **R1** — `/auth/reset` 3 durumlu. **Backlog'da yazandan daha kötüsü çıktı:** normal
+      (recovery olmayan) bir oturum açıkken `updateUser({password})` çalışıyordu → açık kalmış
+      oturuma erişen kişi eski şifreyi bilmeden şifreyi değiştirebiliyordu.
+- [x] **C1** — `/cikis` GET kaldırıldı, POST + Origin kontrolü.
+- [x] **A4b** — OTP cooldown **sunucuda** (ilan başına 60 sn, 429 + `Retry-After`).
+- [x] **Keşif** — panel'in istemci `listings` update'i gövdeyi filtrelemiyordu; kullanıcı kendi
+      ilanına `trust_level: 'verified'` / `moderation_status: 'approved'` yazabiliyordu (K2 ile
+      aynı sınıf). Beyaz listeyle kapandı.
 
 ### 🟠 Diğer yeni bulgular
 - [ ] **M2** — `app/moderator-giris/page.tsx:20-30` giriş sonrası rol kontrolü yok; normal
       kullanıcı da giriş yapıp `/moderator`'a itiliyor.
-- [ ] **R1** — `app/auth/reset/page.tsx` recovery oturumu kontrol etmiyor; tokensız açılışta
-      form gösteriyor, submit'te belirsiz hata veriyor. `PASSWORD_RECOVERY` dinlenmiyor.
-- [ ] **C1** — `app/cikis/route.ts:5-7` GET kabul ediyor → link prefetch / üçüncü taraf
-      `<img src>` ile istemsiz oturum kapanması. Yalnız POST bırak + Origin kontrolü.
 - [ ] **C2** — `/cikis` `sb-` cookie'lerini açıkça temizlemiyor (proxy'deki pattern ile tutarsız).
 - [ ] **G1** — Şifreli girişte (özellikle `/moderator-giris`) rate limit / lockout yok.
 - [ ] **G2** — OTP gönderiminde bot koruması yok → rastgele numaralara SMS tetiklenebilir (maliyet).
@@ -230,35 +251,40 @@ değişikliği içermiyor — yalnızca statik okuma. Canlı DB/RLS doğrulamas�
 - [ ] **F2** — `Footer.tsx:20-37` 7 link `<a>` ile → her tıklamada tam sayfa yenilemesi.
 - [ ] **K2b** — TCKN/VKN doğrulaması yalnız client'ta; sunucuda tekrarlanmıyor (K2 ile birlikte).
 
+> ⚠️ Aşağıdaki "Kritik / Yüksek / Orta / Düşük" blokları **28 Tem 2026'daki ilk analizin
+> bulgu envanteridir** — açıklamaları o günkü kodu tarif eder, W0/W1 sonrası kod değişti.
+> Güncel durum yukarıdaki W0/W1 listelerinde ve `docs/SPRINT_01.md`'de. Envanteri silmiyoruz
+> çünkü "neden böyle yapmışız" sorusunun cevabı burada.
+
 ### 🔴 Kritik
-- [ ] **L1** — Misafire kapalı olması gereken `contact_phone` değerleri RSC payload'ında açıkta.
+- [x] **L1** ✅ (W0) — Misafire kapalı olması gereken `contact_phone` değerleri RSC payload'ında açıkta.
       `app/page.tsx:92` numarayı map'leyip client component'e prop geçiyor → Next.js flight
       payload'ı HTML'e gömüyor → `curl | grep` ile tüm numaralar okunabiliyor. `UyeBanner`'ın
       "telefonu görmek için üye ol" vaadi geçersiz + KVKK ihlali (numaraların bir kısmı hiç
       kayıt olmamış WhatsApp/Excel kaynaklı kişilere ait). `HomeClient.tsx:444` client sorgusu
       da anon key ile `contact_phone` seçiyor — ikinci kanal.
-- [ ] **A1** — `app/api/auth/log/route.ts` **YOK**. `giris/page.tsx:13` ve
+- [x] **A1** ✅ (W1) — `app/api/auth/log/route.ts` **YOK**. `giris/page.tsx:13` ve
       `profil-tamamla/page.tsx:8` bu endpoint'e POST atıyor, `.catch(()=>{})` 404'ü yutuyor.
       `login_success` / `login_failed` / `otp_failed` / `kayit_tamamlandi` olaylarının hiçbiri
       kaydedilmiyor → auth audit trail'i tamamen boş. (Route yazılırken `user_id` body'den
       DEĞİL sunucudaki oturumdan alınmalı.)
-- [ ] **A2** — `app/giris/merge/page.tsx` **YOK**, ama `auth/callback/route.ts` Google akışında
+- [x] **A2** ✅ (W0) — `app/giris/merge/page.tsx` **YOK**, ama `auth/callback/route.ts` Google akışında
       aynı e-postayla eski profil bulunca `${origin}/giris/merge?...`'e yönlendiriyor → **404**.
       `users_email_key` senaryosunun telefon ayağı çözülmüş (`merge_onay` modu), Google ayağı
       var olmayan sayfaya bağlanmış. Çözüm: callback'i `/giris?merge_user_id=...`'e çevirip
       mevcut `merge_onay` UI'ını kullan (`merge_user_id` sunucuda doğrulanmalı).
-- [ ] **K1** — Kayıt akışında KVKK aydınlatma / açık rıza / kullanım koşulları onayı **hiç yok**
+- [x] **K1** ✅ (W0) — Kayıt akışında KVKK aydınlatma / açık rıza / kullanım koşulları onayı **hiç yok**
       (`giris/page.tsx` kayıt formu ve `profil-tamamla` — `grep kvkk` sonuçsuz). `/kvkk` ve
       `/kullanim-kosullari` sayfaları var ama akışa bağlı değil. TCKN/VKN toplanırken savunulamaz.
       `terms_accepted_at` / `kvkk_accepted_at` kolonları da eklenmeli (ispat yükü platformda).
 
 ### 🟠 Yüksek
-- [ ] **K2** — `profil-tamamla/page.tsx:223` client'tan doğrudan `users.upsert()`. Güvenlik
+- [x] **K2** ✅ (W1) — `profil-tamamla/page.tsx:223` client'tan doğrudan `users.upsert()`. Güvenlik
       tamamen RLS'in kolon kapsamına bağlı; kolon kısıtlaması yoksa kullanıcı `role`,
       `is_active`, `ai_listing_quota_daily` gönderebilir. Ayrıca `phone_verified` değerini
       client state'i (`telefonKilitli`) belirliyor. **Önce doğrula:**
       `SELECT policyname, cmd, qual, with_check FROM pg_policies WHERE tablename='users';`
-- [ ] **A3** — `proxy.ts:94/128` `?hesap=tasindi` / `?hesap=eslesme` ile yönlendiriyor ama
+- [x] **A3** ✅ (W1) — `proxy.ts:94/128` `?hesap=tasindi` / `?hesap=eslesme` ile yönlendiriyor ama
       `giris/page.tsx` bu parametreyi hiç okumuyor. `tasindi` dalında proxy cookie'leri sildiği
       için `INITIAL_SESSION` handler'ı da `if (!user) return` ile çıkıyor → `setBilgi` çalışmıyor.
       Kullanıcı hiçbir açıklama görmeden giriş ekranına düşüyor.
