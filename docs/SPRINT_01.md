@@ -276,8 +276,10 @@ where table_name='users' and grantee in ('authenticated','anon') order by grante
 - **Yapıldı:** `app/profil-tamamla/actions.ts` (yeni) — upsert server action'a taşındı,
   kolon beyaz listesi uygulandı. `role`, `is_active`, `phone_verified`, `merged_into`,
   `trust_level` istemciden **yazılamıyor**.
-- ⏳ **Bayram:** `public.users.is_active` kolonunun DB default'u makul mü kontrol et —
-  istemci artık `is_active: true` göndermiyor.
+- ✅ **Bayram doğruladı** (29 Tem 2026): `public.users.is_active` default `true`, kolon
+  nullable, NULL satır sayısı 0 → istemci artık `is_active: true` göndermese de sorun yok.
+  Opsiyonel sertleştirme: `alter table public.users alter column is_active set not null;`
+  (Nullable kaldığı sürece `.eq('is_active', true)` NULL satırları sessizce atlar.)
 
 ### R1 · `/auth/reset` recovery oturumu kontrol etmiyor 🟠 *(yeni)* — ✅
 - **Dosya:** `app/auth/reset/page.tsx:34` `supabase.auth.updateUser({ password })`
