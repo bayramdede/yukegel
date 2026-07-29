@@ -17,17 +17,40 @@ export default function ModeratorGiris() {
     setYukleniyor(true);
     setHata('');
 
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password: sifre,
     });
 
-    if (error) {
+    if (error || !data?.user) {
       setHata('E-posta veya şifre hatalı.');
       setYukleniyor(false);
-    } else {
-      router.push('/moderator');
+      return;
     }
+
+    // SPRINT_01 M2 — giriş başarılı olması yetmez, ROL de doğrulanmalı.
+    // Eskiden koşulsuz `/moderator`'a itiliyordu: normal kullanıcı buradan giriş yapıyor,
+    // proxy onu geri atıyordu. Kullanıcı için anlamsız bir döngü, saldırgan için ise
+    // "bu hesap moderatör değil" bilgisi + moderatör panelinin varlığının doğrulanması.
+    //
+    // Not: bu kontrol bir GÜVENLİK SINIRI DEĞİL — asıl sınır `proxy.ts` + `requireStaff()`.
+    // Buradaki amaç doğru davranış ve sızıntıyı azaltmak.
+    const { data: profil } = await supabase
+      .from('users')
+      .select('role')
+      .eq('id', data.user.id)
+      .maybeSingle();
+
+    const rol = profil?.role;
+    if (rol !== 'admin' && rol !== 'moderator') {
+      // Oturumu AÇIK BIRAKMA: kullanıcı moderatör ekranında yetkisiz bir oturumla kalmasın.
+      await supabase.auth.signOut().catch(() => {});
+      setHata('Bu hesabın moderatör yetkisi yok. Normal giriş için "Kullanıcı girişine dön".');
+      setYukleniyor(false);
+      return;
+    }
+
+    router.push(rol === 'admin' ? '/admin' : '/moderator');
   };
 
   return (
