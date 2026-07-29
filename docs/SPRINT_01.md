@@ -14,7 +14,7 @@
 |---|---|---|---|---|
 | **W0** ✅ | Yasal + tam kilitleyen buglar | L1, A2, M1, K1 (+L1b, L1c, L1d, L1f, A2b, K1b, A4b-hane) | 17 (+7 keşif) | Ürün şu an yasal risk taşıyor ve iki akış tamamen kırık |
 | **W1** ✅ | Auth akış bütünlüğü | A1, A3, A4, A7, K2, R1, C1 (+A1b, A4b, L1e) | 21 | Kullanıcı doğru ekrana gitmiyor / sessiz hata |
-| **W2** | Güvenlik & gözlemlenebilirlik | G1, G2, M2, C2, K2b | 15 | Kötüye kullanım yüzeyi + kör nokta |
+| **W2** ✅ | Güvenlik & gözlemlenebilirlik | G1, G2, M2, C2, K2b (+A8, A10, `lib/kota.ts`) | 15 | Kötüye kullanım yüzeyi + kör nokta |
 | **W3** | SEO & huni | S1, S2, S3, S4, L2, L3 | 14 | Trafik ve dönüşüm |
 | **W4** | UX cila | K3, L4, L5, A5, A6, R2, F1, F2 | 11 | Küçük ama görünür |
 
