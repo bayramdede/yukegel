@@ -421,36 +421,41 @@ export default function HomeClient({ initialIlanlar = [], totalCount = 0 }: { in
   }
 
   // Auth — bir kez çalışır
+  //
+  // ⚠️ TUZAK (A8): `onAuthStateChange` callback'i, Supabase'in auth kilidi TUTULURKEN
+  // çalıştırılır. Callback'in içinde `await supabase.from(...)` veya `getSession()`
+  // çağırmak deadlock yaratır: konsolda
+  //   "Lock lock:sb-...-auth-token was not released within 5000ms"
+  // görünür, oturum hiç çözülmez ve giriş yapmış kullanıcıya navbar "Giriş Yap" gösterir.
+  // Bu yüzden DB işi setTimeout(0) ile kilidin DIŞINA atılıyor.
+  //
+  // Ayrıca ayrı bir `getSession()` çağrısına gerek yok: abone olunduğu anda
+  // INITIAL_SESSION olayı zaten mevcut oturumla (veya null ile) bir kez tetiklenir.
   useEffect(() => {
     let cancelled = false;
 
-    (async () => {
-      try {
-        const { data: { session }, error } = await supabase.auth.getSession();
-        if (error) await supabase.auth.signOut({ scope: 'local' });
-        if (cancelled) return;
-        if (!error && session?.user) {
-          const profil = await profilCek(session.user.id);
-          if (cancelled) return;
-          setKullanici(profil || { display_name: null, email: session.user.email ?? null, user_type: null });
-        }
-      } catch {
-        try { await supabase.auth.signOut({ scope: 'local' }); } catch { /* ignore */ }
-      } finally {
-        if (!cancelled) setAuthHazir(true);
-      }
-    })();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event: AuthChangeEvent, session: Session | null) => {
+    async function oturumUygula(session: Session | null) {
       if (cancelled) return;
-      if (session?.user) {
-        const profil = await profilCek(session.user.id);
-        if (cancelled) return;
-        setKullanici(profil || { display_name: null, email: session.user.email ?? null, user_type: null });
-      } else {
+      if (!session?.user) {
         setKullanici(null);
+        setAuthHazir(true);
+        return;
       }
-    });
+      // Önce oturumdan bildiğimizle doldur: profil sorgusu gecikse/başarısız olsa bile
+      // navbar doğru durumu gösterir.
+      setKullanici({ display_name: null, email: session.user.email ?? null, user_type: null });
+      setAuthHazir(true);
+      const profil = await profilCek(session.user.id);
+      if (cancelled || !profil) return;
+      setKullanici(profil);
+    }
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (_event: AuthChangeEvent, session: Session | null) => {
+        // Kilidin dışına çık — burada `await supabase.*` YAPMA.
+        setTimeout(() => { void oturumUygula(session); }, 0);
+      }
+    );
 
     return () => { cancelled = true; subscription.unsubscribe(); };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
