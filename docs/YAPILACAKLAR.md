@@ -339,6 +339,33 @@ Daemon her kaydetmede push atıyor, Vercel her push'ta build ediyordu → günde
       düzeltmeleri + RPC v2 geçişleri tek deploy'da çıkar. Kota kayan 24 saatlik pencere,
       sabit saatte sıfırlanmıyor.
 
+## ✅ Tonaj: sadece 1. durak gösteriliyordu — TOPLAM'a çevrildi (29 Tem 2026)
+
+**Belirti:** Ana ekranda ilan özeti çok duraklı bir ilanda tek durağın tonajını
+gösteriyordu. Mersin 8t + Adana 12t + Hatay 5t olan ilan listede **"⚖ 8 ton"**.
+
+**Kök:** Kart `ilan.duraklar[0]?.ton` okuyordu. Sorgu durakların HEPSİNİ çekiyordu —
+kırpma tamamen görüntüleme katmanındaydı, bu yüzden hiçbir hata/uyarı üretmiyordu.
+Yükün %68'i ekranda yokken ekran "çalışıyor" görünüyordu. Nakliyeci aracını 8 tona
+göre seçip ilana giriyor, gerçek yükü orada öğreniyordu.
+
+**Düzeltme** — toplam tek yerde: `lib/ilan-liste.ts → durakToplami(duraklar, alanlar[])`
+(`numeric` alanları `Number()`'la topluyor — PostgREST `"8.50"` STRING döndürebiliyor;
+ondalık artığı 2 haneye yuvarlıyor; hiç değer yoksa `0` değil `null`).
+
+- [x] `app/_components/HomeClient.tsx` — ton + palet toplamı; >1 durakta çipe `(3 durak)` eki
+- [x] `app/panel/IlanYonetim.tsx` — aynı kopyala-yapıştır hata, aynı düzeltme
+- [x] `app/ilan/[id]/page.tsx` — meta `description` ilk dolu durağı yazıyordu; **Google'a
+      da eksik tonaj gidiyordu**, artık toplam
+- [x] `app/moderator/page.tsx` — kalite skoru `stops[0].weight_ton` bakıyordu; ilk durakta
+      tonaj yoksa ilan 5 puanı boş yere kaybediyordu → `stops.some(...)`
+- [x] `durakToplami` birim testi: çok durak / string numeric / ondalık artık / boş / 0 / çöp
+- [x] `tsc --noEmit` temiz
+- [ ] **Bayram:** deploy sonrası ana sayfada çok duraklı bir ilanı gözle doğrula
+
+> **Doğru olan ve DEĞİŞMEYEN:** `/ilan/[id]` durak kartları ve `/u/[username]` durakları
+> tek tek listeliyor — orada her satır kendi tonajını gösterir, toplam yanlış olurdu.
+
 ## ⚠️ BUGLAR
 - [x] **A10 — "Hesabınız birleştirildi" sonsuz giriş döngüsü** ✅ (29 Tem 2026)
   Belirti: giriş yapılıyor → "Hesabınız başka bir hesabınızla birleştirildi… tekrar giriş

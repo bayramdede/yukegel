@@ -231,6 +231,8 @@ yukegel/
 │                                         #    ⚠️ Büyük harf: `\p{Lu}` + /u — `[A-Z]` Türkçe'de YANLIŞ ✅
 ├── lib/ilan-liste.ts                     # 📋 SPRINT_01 L4 — ILAN_LIMITI: SSR ve istemci sorgusu AYNI
 │                                         #    limiti kullanır. ⚠️ İstemci paketine girer, server-only YOK ✅
+│                                         #    ⚖ durakToplami(duraklar, alanlar[]) — TÜM durakların tonaj/palet
+│                                         #    toplamı. Kartlar eskiden stops[0]'ı okuyup yükü eksik gösteriyordu.
 ├── lib/ilan-sabitler.ts                  # 🚨 ILAN_VER_ANALIZ M2 (29 Tem 2026) — ilan alanlarının TEK KAYNAĞI.
 │                                         #    ILLER (81) · ARAC_TIPLERI · UTSYAPI · ARAC_TIPI_SETI ·
 │                                         #    UTSYAPI_SETI · ilKey() · ilNormalize() → resmî il adı | null
@@ -569,6 +571,19 @@ Açık rotalar: /giris, /auth/, /profil-tamamla, /nasil-calisir, /hakkimizda,
   Bir güzergâh sorgusu `JOIN public.listing_stops s ON s.listing_id = l.id` içermiyorsa
   yanlıştır. Bu tuzak bir kez gerçek zarar verdi: eski temizlik script'i (BÖLÜM 6) ölü
   kolonu onarıp kullanıcıya görünen `listing_stops.city`'yi atlamıştı.
+- 🚨 **`stops[0]` OKUMA — durak verisi ÇOKLU'dur** (29 Tem 2026). Yukarıdaki kuralın
+  arayüz tarafındaki devamı: sorgun `listing_stops`'u doğru çekse bile **ilk satırı
+  okumak veriyi sessizce kırpar**. Ana sayfa kartı `duraklar[0].ton` yazdığı için
+  Mersin 8t + Adana 12t + Hatay 5t olan bir ilan listede **"⚖ 8 ton"** görünüyordu —
+  yükün %68'i ekranda yok, nakliyeci aracını yanlış tonaja göre seçiyordu. Aynı
+  kopyala-yapıştır hata 3 yerdeydi: `HomeClient` kartı, `/panel` kartı, `/ilan/[id]`
+  meta `description`'ı (Google'a da eksik tonaj gidiyordu). Toplam **tek yerden**:
+  `lib/ilan-liste.ts → durakToplami(duraklar, alanlar[])`.
+  ⚠️ `weight_ton` Postgres'te `numeric` → **PostgREST bunu STRING döndürebilir**
+  (`"8.50"`); düz `+` toplamaz, birleştirir. `Number()` zorunlu.
+  ⚠️ Toplamı `null` ile ayır: `0` ile "veri yok" aynı çipi basmamalı.
+  ✅ Durakları **tek tek** listeleyen ekranlar (`/ilan/[id]` durak kartları,
+  `/u/[username]`) doğrudur — orada her satır kendi tonajını gösterir.
 - ⚖️ **"Aynı şehir" bozukluk sinyali değildir** (29 Tem 2026, W5). Şehir içi taşıma meşru
   bir hizmet; `origin_city = stops.city` olan ilanların çoğu gerçektir. Sahte güzergâhın
   parmak izi **yazım farkıdır**: katlanmış anahtar eşit ama ham string farklı
