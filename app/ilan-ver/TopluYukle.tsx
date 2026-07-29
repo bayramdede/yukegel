@@ -437,12 +437,12 @@ export default function TopluYukle({ onGeri }: { onGeri: () => void }) {
         </label>
         <button
           onClick={onayla}
-          disabled={hataSayisi > 0 || yukleniyor}
+          disabled={hataSayisi > 0 || ilanAsimi || yukleniyor}
           style={{
-            background: hataSayisi > 0 ? '#1f2937' : '#22c55e',
-            color: hataSayisi > 0 ? '#4b5563' : '#000',
+            background: hataSayisi > 0 || ilanAsimi ? '#1f2937' : '#22c55e',
+            color: hataSayisi > 0 || ilanAsimi ? '#4b5563' : '#000',
             border: 'none', borderRadius: 8,
-            padding: '10px 28px', cursor: hataSayisi > 0 ? 'not-allowed' : 'pointer',
+            padding: '10px 28px', cursor: hataSayisi > 0 || ilanAsimi ? 'not-allowed' : 'pointer',
             fontWeight: 800, fontSize: '0.95rem',
             opacity: yukleniyor ? 0.6 : 1,
           }}
@@ -451,6 +451,8 @@ export default function TopluYukle({ onGeri }: { onGeri: () => void }) {
             ? '⏳ Yayınlanıyor...'
             : hataSayisi > 0
             ? `⚠ ${hataSayisi} hata düzeltilmeli`
+            : ilanAsimi
+            ? `⚠ En fazla ${MAX_ILAN} ilan`
             : `✅ Onayla ve Yayınla (${ilanSayisi} ilan)`}
         </button>
       </div>
