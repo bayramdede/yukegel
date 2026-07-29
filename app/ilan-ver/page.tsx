@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import { ilanKaydet, kullanicitelefon } from './actions';
 import { createClient } from '../../lib/supabase';
+import { olayGonder } from '../../lib/analiz';
 import TopluYukle from './TopluYukle';
 import MetindenIlan, { ParsedListingResult } from './MetindenIlan';
 const supabase = createClient();
