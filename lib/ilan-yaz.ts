@@ -77,7 +77,26 @@ export interface IlanYazGirdi {
 }
 
 /** `listings.source` — hangi kanaldan geldi. Beyaz liste; istemci belirleyemez. */
-export type IlanKaynak = 'form' | 'excel' | 'whatsapp';
+export type IlanKaynak = 'form' | 'excel' | 'whatsapp' | 'moderator';
+
+/**
+ * Kanal politikası — `ILAN_VER_ANALIZ` W1+.
+ *
+ * 🚨 Bu tablo BİLEREK burada, `girdi`nin içinde DEĞİL. Politika istemciden gelen
+ * bir alan olursa istemci onu gevşetebilir; `kaynak` ise beyaz listeli ve çağıran
+ * sunucu kodu tarafından sabitleniyor.
+ *
+ * `daimaIncele`: audit skoru düşük olsa bile ilan yayına ÇIKMAZ, kuyruğa girer.
+ * WhatsApp için açık, çünkü oradaki metin bir formdan değil serbest sohbetten
+ * geliyor ve LLM'in yorumu doğrulanmamış; skorlayıcı "temiz" dese bile insan gözü
+ * görmeli. Form ve Excel'de kullanıcı ne yazdığını ekranda görüp onaylıyor.
+ */
+const KANAL_POLITIKA: Record<IlanKaynak, { daimaIncele: boolean }> = {
+  form:      { daimaIncele: false },
+  excel:     { daimaIncele: false },
+  whatsapp:  { daimaIncele: true  },
+  moderator: { daimaIncele: false },
+};
 
 // ── Yardımcılar ────────────────────────────────────────────────────────────
 
