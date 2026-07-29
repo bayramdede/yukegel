@@ -232,7 +232,7 @@ export async function ilanYaz(
     return { ok: false, hata: 'Geçersiz fiyat.' };
   }
 
-  const aracAdet = sayiAralik(girdi.arac_adet ?? 1, 1, MAX_ARAC_ADET);
+  const aracAdet = tamSayiAralik(girdi.arac_adet ?? 1, 1, MAX_ARAC_ADET);
   if (aracAdet === null) {
     return { ok: false, hata: `Araç adedi 1 ile ${MAX_ARAC_ADET} arasında olmalı.` };
   }
