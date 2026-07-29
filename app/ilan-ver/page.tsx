@@ -196,20 +196,20 @@ export default function IlanVer() {
     // Tip
     if (r.listing_type === 'arac' || r.listing_type === 'yuk') setTip(r.listing_type);
 
-    // Kalkış
-    if (r.origin_city) {
-      const eslen = ILLER.find(il => il.toLocaleLowerCase('tr') === String(r.origin_city).toLocaleLowerCase('tr'));
-      setKalkis(eslen || String(r.origin_city));
-    }
+    // Kalkış — tanınmayan şehir ARTIK ham hâliyle yazılmıyor (V8). Sunucu zaten
+    // reddediyor; alanı boş bırakıp kullanıcıya seçtirmek tek dürüst davranış.
+    if (r.origin_city) setKalkis(ilNormalize(r.origin_city) ?? '');
     if (r.origin_district) setKalkisIlce(String(r.origin_district));
 
     // İletişim (kullanıcının profil tel'i öncelikli, ama AI bulduysa ve profil boşsa AI'ninıkini kullan)
     if (r.contact_phone && !tel) setTel(String(r.contact_phone));
 
     // Araç
-    if (r.vehicle_type && ARAC_TIPLERI.includes(String(r.vehicle_type))) setAracTipi(String(r.vehicle_type));
+    const aracListesi: readonly string[] = ARAC_TIPLERI;
+    const utsListesi: readonly string[] = UTSYAPI;
+    if (r.vehicle_type && aracListesi.includes(String(r.vehicle_type))) setAracTipi(String(r.vehicle_type));
     if (Array.isArray(r.body_type)) {
-      const geçerli = r.body_type.filter((b): b is string => typeof b === 'string' && UTSYAPI.includes(b));
+      const geçerli = r.body_type.filter((b): b is string => typeof b === 'string' && utsListesi.includes(b));
       setUtsyapi(geçerli);
     }
 
