@@ -406,8 +406,18 @@ function IlanKart({ ilan, kullanici }: { ilan: any; kullanici: any }) {
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
             {ilan.aracTipleri.map((t: string) => <Chip key={'a-' + t} label={'🚛 ' + t} bg='#1a2535' color='#60a5fa' />)}
             {ilan.ustyapilari.map((u: string) => <Chip key={'u-' + u} label={u} />)}
-            {ilan.duraklar[0]?.ton && <Chip label={'⚖ ' + ilan.duraklar[0].ton + ' ton'} bg='#1a2a1a' color='#86efac' />}
-            {ilan.duraklar[0]?.palet && <Chip label={'📦 ' + ilan.duraklar[0].palet + ' palet'} bg='#1a2a1a' color='#86efac' />}
+            {/* TÜM durakların toplamı — bkz. `durakToplami` başlığındaki not.
+                Tek duraklı ilanda çıktı eskisiyle birebir aynı. */}
+            {toplamTon !== null && (
+              <Chip
+                label={'⚖ ' + toplamTon.toLocaleString('tr-TR') + ' ton' + (cokDurak ? ` (${ilan.duraklar.length} durak)` : '')}
+                bg='#1a2a1a' color='#86efac' />
+            )}
+            {toplamPalet !== null && (
+              <Chip
+                label={'📦 ' + toplamPalet.toLocaleString('tr-TR') + ' palet'}
+                bg='#1a2a1a' color='#86efac' />
+            )}
             {ilan.tarih && <Chip label={'📅 ' + new Date(ilan.tarih).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' }) + (ilan.tarihEsnek ? ' ±' : '')} />}
             <span style={{ color: '#4b5563', fontSize: '0.72rem', marginLeft: 'auto', alignSelf: 'center' }}>{ilan.sure}</span>
           </div>
