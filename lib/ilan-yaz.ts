@@ -64,6 +64,12 @@ export interface IlanYazGirdi {
   arac_tipi?: string;
   utsyapi?: string[];
   arac_adet?: number;
+  /**
+   * B3 — araç ilanında ilanı veren SPESİFİK aracın id'si (`vehicles.id`).
+   * ⚠️ İstemciden gelir ama SORGUSUZ YAZILMAZ: `ilanYaz()` aracın gerçekten
+   * bu kullanıcıya ait ve aktif olduğunu doğrular, değilse sessizce düşürür.
+   */
+  arac_id?: string | null;
   yuk_cinsi?: string;
   duraklar: DurakGirdi[];
   raw_text?: string;
