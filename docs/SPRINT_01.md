@@ -464,11 +464,13 @@ where table_name='users' and grantee in ('authenticated','anon') order by grante
 ### ⚠️ DEPLOY'DAN SONRA — Supabase SQL Editor (ÇALIŞTIRILDI, sıra teyit edilmeli)
 3. ~~**L1e:** `docs/20260728_contact_phone_revoke.sql`~~ ✅ çalıştırıldı (29 Tem 2026,
    doğrulama select'i 0 satır → `anon`/`authenticated` artık `contact_phone`'u göremiyor).
-   ⚠️ **Ama sıra önemliydi:** bu SQL kod deploy'undan **sonra** çalışmalıydı. W1'in L1e
-   kodu (`app/panel/actions.ts`, `app/moderator/actions.ts`, `contact_phone`'suz
-   `app/moderator/page.tsx`) canlıda **değilse** panel ve moderatör ekranı şu anda
-   numarayı yazamıyor demektir. Bayram'ın 5 adımlık duman testini yapması gerekiyor;
-   kırıksa ya hemen deploy et ya da dosyanın sonundaki geri alma bloğunu çalıştır.
+   ✅ **Duman testi geçti** (Bayram, 29 Tem 2026): çıkışta ana sayfa + `/ilan/[id]` açılıyor,
+   `/moderator` listesi telefon kolonuyla yükleniyor, moderatör telefon düzenle + Onayla
+   çalışıyor. Panel'de ayrı ilan-düzenleme adımı yok — numara profilden geliyor.
+   Kod taramasıyla da doğrulandı: `contact_phone`'a dokunan **her** okuma/yazma yolu
+   service-role kullanıyor (`app/panel/page.tsx`, `app/panel/actions.ts`,
+   `app/moderator/actions.ts`, `app/ilan/[id]/page.tsx`, `app/ilan-ver/actions.ts`,
+   `app/api/**`). Kırık yol kalmadı; geri alma bloğuna gerek yok.
 
 ### Kontrol / karar
 4. ~~**K2 — `users.is_active` default'u**~~ ✅ **doğrulandı** (29 Tem 2026): default `true`,
