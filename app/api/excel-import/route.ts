@@ -106,10 +106,12 @@ export async function POST(request: NextRequest) {
       const aracTipiNorm = aracCoz(aracTipi);
       const ustYapiNorm = utsCoz(ustYapi);
 
-      // Şehir zorunlu → tanınmazsa 'error' (kullanıcı listeden seçmeli).
-      // Araç/üst yapı isteğe bağlı → tanınmazsa 'warn' (boş geçilir, ilan kurulur).
-      const kalkisIliStatus = durumEtiketi(kalkisIli, kalkisIliNorm, true);
-      const varisIliStatus = durumEtiketi(varisIli, varisIliNorm, true);
+      // Şehir ZORUNLU → boş da tanınmayan da 'error'; kullanıcı listeden seçmeli.
+      // (Boşu 'empty' bırakmak istemcinin "hazır" demesine yol açıyordu, sunucu ise
+      //  reddediyordu — hata kullanıcıya kayıt anında, düzeltemeyeceği yerde çıkıyordu.)
+      // Araç/üst yapı İSTEĞE BAĞLI → tanınmazsa 'warn', boşsa 'empty'; ilan yine kurulur.
+      const kalkisIliStatus: AlanDurumu = kalkisIliNorm ? 'ok' : 'error';
+      const varisIliStatus: AlanDurumu = varisIliNorm ? 'ok' : 'error';
       const aracTipiStatus = durumEtiketi(aracTipi, aracTipiNorm, false);
       const ustYapiStatus = durumEtiketi(ustYapi, ustYapiNorm, false);
 
