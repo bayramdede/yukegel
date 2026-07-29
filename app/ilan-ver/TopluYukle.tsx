@@ -301,6 +301,12 @@ export default function TopluYukle({ onGeri }: { onGeri: () => void }) {
             ⚠ {hataSayisi} satırda tanımlanamayan şehir var. Lütfen açılır listeden seçin.
           </div>
         )}
+        {ilanAsimi && (
+          <div style={{ color: '#f87171', fontSize: '0.82rem', background: '#1a0a0a', border: '1px solid #7f1d1d', borderRadius: 6, padding: '8px 14px' }}>
+            ⚠ Tek seferde en fazla {MAX_ILAN} ilan oluşturulabilir; bu dosyada {ilanSayisi} ilan var.
+            Dosyayı bölüp parça parça yükleyin.
+          </div>
+        )}
       </div>
 
       {/* Grup kartları */}
