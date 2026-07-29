@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { createClient } from '../../../lib/supabase';
 import { useParams } from 'next/navigation';
+import { girisAdresi } from '../../../lib/redirect';
 
 const supabase = createClient();
 
