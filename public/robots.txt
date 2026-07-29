@@ -1,27 +1,89 @@
 # Yükegel - robots.txt
-# AI crawler izinleri (GPTBot, ClaudeBot, vb.)
+#
+# SPRINT_01 S4 (29 Tem 2026) — bloklar arasındaki tutarsızlık giderildi.
+#
+# ESKİ HALİNİN SORUNU:
+#   1. `User-agent: *` bloğu düpedüz `Allow: /` diyordu. Yani ClaudeBot/GPTBot için
+#      titizlikle yazılmış disallow listesi, kendini bu iki isimle tanıtmayan HER
+#      crawler için geçersizdi: /panel/, /admin/, /api/, /moderator/ genel taramaya açıktı.
+#   2. ClaudeBot bloğunda `/moderator-giris/` disallow'u YOKTU (GPTBot'ta vardı) —
+#      aynı kurallar iki yerde elle yazıldığı için doğal olarak birbirinden ayrıştı.
+#
+# ⚠️ robots.txt bir GÜVENLİK SINIRI DEĞİLDİR — dürüst crawler'lara verilen bir ricadır.
+#    Asıl sınır `proxy.ts` + `requireStaff()` + RLS. Buradaki amaç:
+#    (a) özel alanların arama sonuçlarında görünmemesi,
+#    (b) crawler bütçesinin herkese açık sayfalara harcanması.
+#    Bu yüzden disallow listesi "gizlensin" diye değil, "indekslenmesin" diye var.
+#
+# KURAL: yeni bir özel alan (panel benzeri) eklerken ÜÇ bloğu da güncelle.
+#        Listeler bilinçli olarak birebir aynı; farklılaşırlarsa bu bir hatadır.
 
-User-agent: GPTBot
-Allow: /ilan/
-Allow: /u/
+# --- Genel crawler'lar (isimli blokla eşleşmeyen HERKES buraya düşer) ---
+User-agent: *
+Allow: /
 Disallow: /admin/
 Disallow: /moderator/
 Disallow: /moderator-giris/
 Disallow: /panel/
 Disallow: /api/
+Disallow: /araclarim/
+Disallow: /profil-tamamla/
+Disallow: /auth/
+Disallow: /giris
+Disallow: /cikis
+# Telefon açılış akışı: her ilan için ayrı URL üretir, indekslenmesinin değeri yok.
+Disallow: /ilan/*/sahiplen
+
+# --- Google ---
+# `*` bloğuyla aynı; Google isimli blok bulduğunda `*` bloğunu TAMAMEN yok sayar,
+# bu yüzden kurallar burada tekrar edilmek ZORUNDA.
+User-agent: GoogleBot
+Allow: /
+Disallow: /admin/
+Disallow: /moderator/
+Disallow: /moderator-giris/
+Disallow: /panel/
+Disallow: /api/
+Disallow: /araclarim/
+Disallow: /profil-tamamla/
+Disallow: /auth/
+Disallow: /giris
+Disallow: /cikis
+Disallow: /ilan/*/sahiplen
+
+# --- AI crawler'ları ---
+# İlan ve profil sayfaları bilinçli olarak AÇIK: LLM'lerin Yükegel'i bilmesi işimize geliyor.
+# Telefon numarası bu sayfalarda zaten yok (SPRINT_01 L1/L1c/L1f), o yüzden risk düşük.
+User-agent: GPTBot
+Allow: /ilan/
+Allow: /u/
+Allow: /yol-rehberi
+Disallow: /admin/
+Disallow: /moderator/
+Disallow: /moderator-giris/
+Disallow: /panel/
+Disallow: /api/
+Disallow: /araclarim/
+Disallow: /profil-tamamla/
+Disallow: /auth/
+Disallow: /giris
+Disallow: /cikis
+Disallow: /ilan/*/sahiplen
 
 User-agent: ClaudeBot
 Allow: /ilan/
 Allow: /u/
+Allow: /yol-rehberi
 Disallow: /admin/
 Disallow: /moderator/
+Disallow: /moderator-giris/
 Disallow: /panel/
 Disallow: /api/
-
-User-agent: GoogleBot
-Allow: /
-
-User-agent: *
-Allow: /
+Disallow: /araclarim/
+Disallow: /profil-tamamla/
+Disallow: /auth/
+Disallow: /giris
+Disallow: /cikis
+Disallow: /ilan/*/sahiplen
 
 Sitemap: https://yukegel.com/sitemap.xml
