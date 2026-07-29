@@ -216,22 +216,35 @@ export default function TopluYukle({ onGeri }: { onGeri: () => void }) {
   }
 
   // ── Render: Başarı ──
-  if (adim === 'basarili') return (
+  // `ILAN_VER_ANALIZ` V4 — ekran ARTIK VARSAYMIYOR. Eskiden koşulsuz "moderatör
+  // onayına gönderildi" diyordu; oysa ilanların çoğu doğrudan yayına giriyordu.
+  if (adim === 'basarili') {
+    const basarililar = sonuc?.sonuclar.filter(s => s.ok) ?? [];
+    const hatalilar = sonuc?.sonuclar.filter(s => !s.ok) ?? [];
+    const yayinda = basarililar.filter(s => s.durum === 'yayinda').length;
+    const incelemede = basarililar.filter(s => s.durum === 'incelemede').length;
+    const reddedilen = basarililar.filter(s => s.durum === 'reddedildi').length;
+
+    return (
     <div style={{ maxWidth: 560, margin: '80px auto', padding: '0 16px', textAlign: 'center' }}>
-      <div style={{ fontSize: '3rem', marginBottom: 16 }}>✅</div>
+      <div style={{ fontSize: '3rem', marginBottom: 16 }}>{basarililar.length > 0 ? '✅' : '⚠️'}</div>
       <div style={{ color: '#e2e8f0', fontWeight: 800, fontSize: '1.3rem', marginBottom: 8 }}>
-        {sonuc?.created} ilan oluşturuldu!
+        {sonuc?.olusturulan ?? 0} ilan oluşturuldu
       </div>
-      <div style={{ color: '#8b949e', fontSize: '0.85rem', marginBottom: 24 }}>
-        İlanlarınız moderatör onayına gönderildi. Onaylandıktan sonra yayınlanacak.
+      <div style={{ color: '#8b949e', fontSize: '0.85rem', marginBottom: 24, lineHeight: 1.7 }}>
+        {yayinda > 0 && <div>✅ {yayinda} ilan yayında.</div>}
+        {incelemede > 0 && <div>🕓 {incelemede} ilan moderatör incelemesinde — onaylanınca yayına alınacak.</div>}
+        {reddedilen > 0 && <div>⚠️ {reddedilen} ilan otomatik kontrolden geçemedi.</div>}
       </div>
-      {(sonuc?.errors?.length ?? 0) > 0 && (
+      {hatalilar.length > 0 && (
         <div style={{ background: '#1a0a0a', border: '1px solid #7f1d1d', borderRadius: 8, padding: 16, marginBottom: 24, textAlign: 'left' }}>
           <div style={{ color: '#f87171', fontWeight: 700, fontSize: '0.85rem', marginBottom: 8 }}>
-            ⚠ {sonuc!.errors.length} satır işlenemedi:
+            ⚠ {hatalilar.length} ilan oluşturulamadı:
           </div>
-          {sonuc!.errors.map((e, i) => (
-            <div key={i} style={{ color: '#fca5a5', fontSize: '0.78rem', marginBottom: 4 }}>• {e}</div>
+          {hatalilar.map((e, i) => (
+            <div key={i} style={{ color: '#fca5a5', fontSize: '0.78rem', marginBottom: 4 }}>
+              • {e.seferNo ? `Sefer ${e.seferNo}: ` : ''}{e.hata}
+            </div>
           ))}
         </div>
       )}
