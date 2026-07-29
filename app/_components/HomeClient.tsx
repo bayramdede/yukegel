@@ -250,7 +250,8 @@ function YukVerenBanner() {
             <div style={{ color: '#e2e8f0', fontWeight: 800, fontSize: '1.05rem', marginBottom: 4 }}>📦 Yükünüz mü var?</div>
             <div style={{ color: '#8b949e', fontSize: '0.85rem' }}>İlanınızı saniyeler içinde yayınlayın, binlerce nakliyeciye ulaşın. Ücretsiz.</div>
           </div>
-          <a href="/ilan-ver" style={{ background: '#22c55e', color: '#000', fontWeight: 800, fontSize: '0.9rem', padding: '11px 22px', borderRadius: 8, textDecoration: 'none', whiteSpace: 'nowrap' }}>
+          {/* SPRINT_01 L2 — başlık "Yükünüz mü var?" olduğu için persona net: yük. */}
+          <a href="/ilan-ver?tip=yuk" style={{ background: '#22c55e', color: '#000', fontWeight: 800, fontSize: '0.9rem', padding: '11px 22px', borderRadius: 8, textDecoration: 'none', whiteSpace: 'nowrap' }}>
             İlan Ver →
           </a>
         </div>
