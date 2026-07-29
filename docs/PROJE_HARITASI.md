@@ -410,6 +410,11 @@ converted_user_id (nullable FK → auth.users.id)
 - Migration: `docs/20260601_shadow_profiles_crm.sql`
 - Upsert RPC: `upsert_shadow_profile(p_phone text) → uuid`
 - View: `shadow_profile_summary` (listing_count, last_listing_at, first_listing_at)
+  🔒 **29 Tem 2026:** `security_invoker = on` + yetki yalnız `service_role`. Eskiden
+  `authenticated`'a açıktı ve view sahibinin yetkisiyle çalıştığı için tablonun
+  admin-only RLS'ini bypass ediyordu — her üye tüm telefonları çekebiliyordu.
+  Migration: `docs/20260729_shadow_profile_summary_invoker.sql`. Tek tüketici
+  `app/api/admin/crm/route.ts` (requireAdmin + service-role), etkilenmez.
 - Admin UI: `/admin/crm` — tablo + detay drawer (ilan geçmişi, isim/not/şirket düzenleme, durum yönetimi)
 - API: `app/api/admin/crm/route.ts` (GET + PATCH), `app/api/admin/crm/[id]/route.ts` (GET detay)
 
