@@ -658,9 +658,23 @@ export default function IlanVer() {
         {(tip === 'yuk' || secilenArac) && (
           <div style={s.card}>
             <div style={{ color: '#8b949e', fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.08em', marginBottom: 12 }}>İLETİŞİM</div>
-            <div style={{ background: '#0d1117', border: '1px solid #30363d', borderRadius: 6, padding: '10px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ color: '#e2e8f0', fontWeight: 600 }}>📞 {tel || 'Yükleniyor...'}</span>
-              <span style={{ color: '#4b5563', fontSize: '0.75rem' }}>Profilinizdeki numara kullanılacak</span>
+            <div style={{ background: '#0d1117', border: '1px solid #30363d', borderRadius: 6, padding: '10px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+              <span style={{ color: telDurum === 'var' || tel ? '#e2e8f0' : '#f59e0b', fontWeight: 600 }}>
+                {tel
+                  ? `📞 ${tel}`
+                  : telDurum === 'yukleniyor'
+                    ? 'Yükleniyor...'
+                    : telDurum === 'numara-yok'
+                      ? '⚠️ Profilinizde telefon numarası yok'
+                      : '⚠️ Telefon numarası alınamadı'}
+              </span>
+              <span style={{ color: '#4b5563', fontSize: '0.75rem', textAlign: 'right' }}>
+                {tel || telDurum === 'yukleniyor'
+                  ? 'Profilinizdeki numara kullanılacak'
+                  : telDurum === 'numara-yok'
+                    ? <a href="/profil" style={{ color: '#3b82f6' }}>Profilden ekleyin →</a>
+                    : 'Sayfayı yenileyin; sürerse bize bildirin'}
+              </span>
             </div>
           </div>
         )}
