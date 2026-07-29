@@ -24,12 +24,8 @@ const inp: React.CSSProperties = {
   padding: '4px 8px', fontSize: '0.82rem', outline: 'none',
 };
 
-// ── Şablon sütunları ──
-const SABLON_HEADERS = [
-  'Sefer No', 'Kalkış İli', 'Kalkış İlçesi', 'Varış İli', 'Varış İlçesi',
-  'Durak Tipi', 'Araç Tipi', 'Üst Yapı', 'Tonaj (ton)', 'Palet',
-  'Fiyat (TL)', 'Yük Cinsi', 'Not',
-];
+// ── Şablon sütunları — sözleşme dosyasından. Route da AYNI listeyi görüyor;
+// şablon başlığı ile route'un beklediği ad ayrışamaz (B1'in ikinci kırığıydı).
 const SABLON_ORNEK: string[][] = [
   ['', 'istanbul', '', 'ankara', '', '', 'tir', 'tenteli', '18', '24', '5000', 'seramik', 'Kırılgan dikkat'],
   ['1', 'izmir', 'konak', 'konya', '', '', 'kamyon', '', '10', '', '3000', '', ''],
