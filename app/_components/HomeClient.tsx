@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { createClient } from '../../lib/supabase';
 import { olayGonder } from '../../lib/analiz';
-import { ILAN_LIMITI } from '../../lib/ilan-liste';
+import { ILAN_LIMITI, durakToplami } from '../../lib/ilan-liste';
 import type { AuthChangeEvent, Session } from '@supabase/supabase-js';
 
 const supabase = createClient();
