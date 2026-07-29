@@ -3,10 +3,10 @@ import { cookies } from 'next/headers';
 import { createServerClient } from '@supabase/ssr';
 import { getServiceSupabase } from '../../../lib/auth';
 import { structuredLog } from '../../../lib/logger';
-import { ilanYaz, bugunISO } from '../../../lib/ilan-yaz';
+import { ilanYaz, ilanTelefonu, bugunISO } from '../../../lib/ilan-yaz';
 import { ilNormalize, aracTipiNormalize, utsyapiNormalize, ilKey } from '../../../lib/ilan-sabitler';
 import {
-  MAX_SATIR, MAX_ILAN,
+  MAX_SATIR, MAX_ILAN, sayiMetniCoz,
   type TopluYukleIstek, type TopluYukleYanit,
   type HamSatir, type OnizlemeSatiri, type OnaySatiri, type KayitSonucu, type AlanDurumu,
 } from '../../../lib/toplu-yukle-sozlesme';
