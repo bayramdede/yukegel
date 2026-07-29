@@ -593,8 +593,13 @@ export default function HomeClient({ initialIlanlar = [], totalCount = 0 }: { in
           </div>
           {kullanici ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <a href="/panel" style={{ color: '#e2e8f0', fontSize: '0.85rem', textDecoration: 'none', fontWeight: 600 }}>👤 {ad}</a>
+              <a href="/panel?tab=profil" style={{ color: '#e2e8f0', fontSize: '0.85rem', textDecoration: 'none', fontWeight: 600 }}>👤 {ad}</a>
               <a href="/ilan-ver" style={{ background: '#22c55e', color: '#000', fontWeight: 700, fontSize: '0.85rem', padding: '6px 16px', borderRadius: 6, textDecoration: 'none' }}>+ İlan Ver</a>
+              {/* SPRINT_01 C1 — çıkış yan etkili bir işlem: link değil, POST formu.
+                  GET olsaydı dış sitedeki <img src="/cikis"> kullanıcıyı çıkış yaptırırdı. */}
+              <form method="post" action="/cikis" style={{ margin: 0 }}>
+                <button type="submit" style={{ background: 'none', border: '1px solid #30363d', color: '#8b949e', borderRadius: 6, padding: '5px 12px', fontSize: '0.8rem', cursor: 'pointer', fontFamily: 'inherit' }}>Çıkış</button>
+              </form>
             </div>
           ) : (
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
