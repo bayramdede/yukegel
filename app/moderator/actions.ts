@@ -2,6 +2,11 @@
 
 import { requireStaff, getServiceSupabase } from '../../lib/auth'
 import { structuredLog } from '../../lib/logger'
+import {
+  kisaMetin, sayiAralik, tamSayiAralik,
+  MAX_DURAK, MAX_TON, MAX_PALET, MAX_NOT, MAX_RAW_TEXT, MAX_ARAC_ADET,
+} from '../../lib/ilan-yaz'
+import { ARAC_TIPI_SETI, UTSYAPI_SETI, ilNormalize } from '../../lib/ilan-sabitler'
 
 /**
  * SPRINT_01 L1e — moderatör panelindeki `contact_phone` okuma/yazmaları sunucuya taşındı.
