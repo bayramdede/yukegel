@@ -195,9 +195,26 @@ yukegel/
 ├── lib/ilan-sabitler.ts                  # 🚨 ILAN_VER_ANALIZ M2 (29 Tem 2026) — ilan alanlarının TEK KAYNAĞI.
 │                                         #    ILLER (81) · ARAC_TIPLERI · UTSYAPI · ARAC_TIPI_SETI ·
 │                                         #    UTSYAPI_SETI · ilKey() · ilNormalize() → resmî il adı | null
+│                                         #    aracTipiNormalize() · utsyapiNormalize() (Excel serbest yazımı)
 │                                         #    ⚠️ Yalnız gösterim değil, SUNUCU BEYAZ LİSTESİ de bu dosya
-│                                         #    (`app/ilan-ver/actions.ts`). İstemci ve sunucu ayrışamaz.
+│                                         #    (`lib/ilan-yaz.ts`). İstemci ve sunucu ayrışamaz.
 │                                         #    ⚠️ ilKey(): İ (U+0130) → düz `i` ÖNCE, sonra toLowerCase (§9)
+├── lib/ilan-yaz.ts                       # 🚨 ILAN_VER_ANALIZ W0/W1 (29 Tem 2026) — `listings` yazan TEK YOL.
+│                                         #    `server-only`. ilanYaz(userId, girdi, kaynak) → ayrık birlik.
+│                                         #    Doğrulama + beyaz liste + sınırlar (MAX_DURAK=10, MAX_ARAC_ADET=50,
+│                                         #    MAX_FIYAT=1e8, MAX_TON=1e5, MAX_NOT=2000, MAX_RAW_TEXT=8000) ·
+│                                         #    ilanTelefonu() (V2: telefon users.phone'dan) ·
+│                                         #    V5: public.ilan_olustur() RPC ile ATOMİK ilan+durak yazma ·
+│                                         #    V3: audit_score geri okunup getAuditThresholds() ile karar ·
+│                                         #    B3: arac_id sahipliği (user_id + is_active) doğrulanır ·
+│                                         #    B4: durak bazlı yuk_cinsi, boşsa ilan geneli · bugunISO() (+03:00)
+│                                         #    🚨 YENİ İLAN KANALI EKLERKEN INSERT KOPYALAMA, BUNU ÇAĞIR.
+├── lib/toplu-yukle-sozlesme.ts           # 🚨 ILAN_VER_ANALIZ B1 (29 Tem 2026) — toplu yükleme
+│                                         #    istemci↔route SÖZLEŞMESİ. HamSatir · OnizlemeSatiri ·
+│                                         #    OnaySatiri · TopluYukleIstek/Yanit · AlanDurumu ·
+│                                         #    MAX_SATIR=300 · MAX_ILAN=50 · SABLON_HEADERS
+│                                         #    İki taraf da BURADAN import eder; istemci `satisfies` ile mühürler.
+│                                         #    ⚠️ `userId` sözleşmede YOK ve olmayacak — kimlik oturumdan.
 ├── lib/alias-normalize.ts                # 🚨 SPRINT_01 W5/D2 — alias yazma yolu TEK KAYNAK.
 │                                         #    aliasKey() (İ→i, lower, ıçğöşü→icgosu) · trTemizle() ·
 │                                         #    normalizeAliasFields() · aliasSatirlariniYukle() (sayfalı,
