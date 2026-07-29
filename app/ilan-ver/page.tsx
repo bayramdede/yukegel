@@ -144,9 +144,21 @@ export default function IlanVer() {
         return;
       }
       const telefon = await kullanicitelefon();
-      if (telefon) setTel(telefon);
+      if (telefon.durum === 'var') {
+        setTel(telefon.tel);
+        setTelDurum('var');
+      } else if (telefon.durum === 'numara-yok') {
+        setTelDurum('numara-yok');
+      } else {
+        // 'oturum-yok' buraya normalde düşmez (yukarıda /giris'e yönlendik);
+        // düşerse gerçek bir tutarsızlık var, hata gibi göster.
+        setTelDurum('hata');
+      }
     }
-    init();
+    // 🚨 `init()` bir promise döndürür; içindeki reddetme YAKALANMAZSA hiçbir yerde
+    // görünmez — ne error boundary tetiklenir ne de kullanıcı bir şey görür. Eskiden
+    // telefon çekilemeyince ekran sonsuza kadar "Yükleniyor..." kalıyordu; sebebi buydu.
+    init().catch(() => setTelDurum('hata'));
   }, []);
 
   useEffect(() => {
