@@ -434,8 +434,23 @@ export default function HomeClient({ initialIlanlar = [], totalCount = 0 }: { in
   useEffect(() => {
     let cancelled = false;
 
+    // SPRINT_01 A10 — implicit-flow artığını adres çubuğundan sil.
+    // Magic-link `action_link`'i oturumu `#access_token=…&refresh_token=…` olarak bırakır.
+    // Supabase client bunu okur ama URL'yi TEMİZLEMEZ: token'lar adres çubuğunda, tarayıcı
+    // geçmişinde, ekran görüntülerinde ve kullanıcının kopyaladığı her linkte kalır.
+    // (Asıl çözüm `/auth/devir` — token hiç tarayıcıya gelmiyor. Bu sadece emniyet kemeri:
+    //  eski linkler ve `/api/auth/switch-account` hâlâ bu formatta dönebiliyor.)
+    function urlTemizle() {
+      const h = window.location.hash;
+      if (h.includes('access_token=') || h.includes('refresh_token=')) {
+        window.history.replaceState(null, '', window.location.pathname + window.location.search);
+      }
+    }
+
     async function oturumUygula(session: Session | null) {
       if (cancelled) return;
+      // Oturum çözüldükten SONRA temizle — daha önce silersek client token'ı hiç göremez.
+      urlTemizle();
       if (!session?.user) {
         setKullanici(null);
         setAuthHazir(true);
