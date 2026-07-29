@@ -147,20 +147,14 @@ function GirisIci() {
     // hash'ini TÜKETTİKTEN) sonra bir kez tetiklenir. Böylece eski/merged cookie yerine hash'ten
     // gelen GÜNCEL oturumu değerlendiririz — race condition ortadan kalkar. Formla yapılan
     // (SIGNED_IN) girişleri ETKİLEMEZ; onları otpGonder/epostaGiris kendi akışında yönetir.
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event: string, session: { user?: { id: string } } | null) => {
-      if (event !== 'INITIAL_SESSION' || islendi) return;
-      // SPRINT_01 A2 — merge onayı bekleyen akışa DOKUNMA. Google callback'ten yeni gelen
-      // kimliğin users satırı henüz yok (user_type boş) → aşağıdaki "eksik oturum" dalı
-      // signOut() çağırıp merge ekranını kullanıcının elinden alırdı.
-      if (mergeUserId) { islendi = true; return; }
-      const user = session?.user;
-      if (!user) return; // oturum yok → temiz giriş formu, bekle
-      islendi = true;
-
+    // ⚠️ TUZAK (A8): callback Supabase'in auth kilidi tutulurken çalışır; içeride
+    // `await supabase.*` çağırmak deadlock yaratır. Gerçek iş setTimeout(0) ile
+    // kilidin dışına taşınıyor.
+    async function oturumDegerlendir(userId: string) {
       const { data: profil } = await supabase
         .from('users')
         .select('merged_into, user_type')
-        .eq('id', user.id)
+        .eq('id', userId)
         .maybeSingle();
 
       // Sağlıklı, tamamlanmış canlı oturum (magic-link'ten yeni gelmiş de olabilir) → yönlendir.
@@ -178,6 +172,18 @@ function GirisIci() {
       if (!hesapDurumu) {
         setBilgi('Hesabınıza tekrar giriş yapın. Kayıtlıysanız Google veya e-posta ile giriş yapmanız yeterli.');
       }
+    }
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event: string, session: { user?: { id: string } } | null) => {
+      if (event !== 'INITIAL_SESSION' || islendi) return;
+      // SPRINT_01 A2 — merge onayı bekleyen akışa DOKUNMA. Google callback'ten yeni gelen
+      // kimliğin users satırı henüz yok (user_type boş) → aşağıdaki "eksik oturum" dalı
+      // signOut() çağırıp merge ekranını kullanıcının elinden alırdı.
+      if (mergeUserId) { islendi = true; return; }
+      const user = session?.user;
+      if (!user) return; // oturum yok → temiz giriş formu, bekle
+      islendi = true;
+      setTimeout(() => { void oturumDegerlendir(user.id); }, 0);
     });
     return () => subscription.unsubscribe();
     // eslint-disable-next-line react-hooks/exhaustive-deps
