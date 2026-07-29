@@ -97,7 +97,7 @@ export default function IlanVer() {
   const [fiyat, setFiyat] = useState('');
   const [fiyat_pazarlik, setFiyatPazarlik] = useState(false);
   const [tel, setTel] = useState('');
-  const [duraklar, setDuraklar] = useState<Durak[]>([{ sehir: '', ilce: '', ton: '', palet: '', notlar: '' }]);
+  const [duraklar, setDuraklar] = useState<Durak[]>([{ sehir: '', ilce: '', ton: '', palet: '', yuk_cinsi: '', notlar: '' }]);
   const [gonderildi, setGonderildi] = useState(false);
   // ILAN_VER_ANALIZ V4 — sonuç ekranı artık VARSAYMIYOR, sunucunun döndürdüğü
   // gerçek durumu gösteriyor. Trigger ilanı kuyruğa alsa da shadow-ban'lasa da.
@@ -172,7 +172,7 @@ export default function IlanVer() {
     araclariCek();
   }, [tip]);
 
-  const durakEkle = () => setDuraklar([...duraklar, { sehir: '', ilce: '', ton: '', palet: '', notlar: '' }]);
+  const durakEkle = () => setDuraklar([...duraklar, { sehir: '', ilce: '', ton: '', palet: '', yuk_cinsi: '', notlar: '' }]);
   const durakSil = (i: number) => setDuraklar(duraklar.filter((_, idx) => idx !== i));
   const durakGuncelle = (i: number, alan: keyof Durak, deger: string) => {
     const yeni = [...duraklar]; yeni[i] = { ...yeni[i], [alan]: deger }; setDuraklar(yeni);
@@ -346,7 +346,7 @@ export default function IlanVer() {
     setAracTipi(''); setUtsyapi([]); setAracAdet(1); setYukCinsi('');
     setTarih(bugun()); setTarihEsnek(false);
     setGenelNot(''); setFiyat(''); setFiyatPazarlik(false);
-    setDuraklar([{ sehir: '', ilce: '', ton: '', palet: '', notlar: '' }]);
+    setDuraklar([{ sehir: '', ilce: '', ton: '', palet: '', yuk_cinsi: '', notlar: '' }]);
   };
 
   if (yontem === 'toplu') return (
