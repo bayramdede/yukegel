@@ -90,6 +90,8 @@ yukegel/
 │   ├── giris/page.tsx
 │   ├── auth/callback/ + reset/           # 🔒 SPRINT_01 R1 — reset 3 durumlu: kontrol/hazir/gecersiz.
 │   │                                     #    Form YALNIZ gerçek PASSWORD_RECOVERY oturumunda ✅
+│   ├── auth/devir/route.ts               # 🔒 SPRINT_01 A10 — emekli (merged_into) oturumu SUNUCUDA
+│   │                                     #    canlı hesaba devreder. hashed_token + verifyOtp → cookie ✅
 │   ├── profil-tamamla/page.tsx
 │   ├── profil-tamamla/actions.ts         # 🔒 SPRINT_01 K2 — users upsert'i sunucuda, KOLON BEYAZ LİSTESİ ✅
 │   ├── panel/ (page + PanelClient + IlanYonetim)
