@@ -111,6 +111,38 @@ ON CONFLICT (key) DO NOTHING;
 | Style | Inline CSS — `#0d1117` bg, `#22c55e` accent, `#161b22` card |
 | Font | IBM Plex Sans |
 
+### 🚀 Deploy nasıl olur (29 Tem 2026 — DEĞİŞTİ)
+
+**Canlıya çıkmak artık otomatik DEĞİL.** Tek kapı:
+
+```bash
+npm run deploy                     # → "deploy: elle deploy"
+npm run deploy -- "telefon fixi"   # → "deploy: telefon fixi"
+```
+
+`scripts/deploy.sh` sırayla: daemon'ın `.git/index.lock`'unu bekler → `tsc --noEmit`
+çalıştırır (**tip hatası varsa deploy'u DURDURUR**, Vercel kotası harcanmaz) →
+mesajı `deploy:` ile başlayan bir commit atar (değişiklik yoksa `--allow-empty`) → push'lar.
+
+**Arka planda ne dönüyor:**
+
+| Ne | Ne zaman | Sonuç |
+|---|---|---|
+| `scripts/auto-deploy.sh` (launchd + fswatch) | her dosya kaydetmesinde | `auto: <tarih>` commit + GitHub push + değişmişse Supabase edge function deploy |
+| `vercel.json` → `ignoreCommand` | her push'ta | commit mesajı `auto:` ile **başlıyorsa build ATLANIR |
+| `npm run deploy` | sen çalıştırınca | `deploy:` commit'i → Vercel build eder |
+
+🚨 **Neden:** Daemon her kaydetmede push atıyor, Vercel de `main`'e giden her push'ta
+build ediyordu → günde ~**79 deploy** (Hobby limiti 100/gün) ve **yarım kod canlıda**.
+17:47'deki `TelefonDurumu is not assignable` build hatası bunun kanıtı: daemon
+`actions.ts`'i (yeni tip) push etmiş, o tipi kullanan `page.tsx`'i henüz
+commit'lememişti. Vercel hiç var olmamış bir ara hali derledi.
+
+🚨 **Tuzak:** Yeni bir deploy yolu (GitHub Action, `vercel --prod`, ikinci branch)
+eklersen `ignoreCommand` sessizce devre dışı kalır ve günde 79 deploy'a dönülür.
+Edge function deploy'u hâlâ daemon'ın işi — Vercel'den bağımsız, `npm run deploy`
+onu tetiklemez.
+
 ---
 
 ## 2. PROJE DOSYA YAPISI
