@@ -611,6 +611,17 @@ export default function IlanVer() {
                       <input type="number" value={durak.palet} onChange={e => durakGuncelle(i, 'palet', e.target.value)} placeholder="Opsiyonel" style={s.input} />
                     </div>
                     <div>
+                      {/* B4 — durak bazlı yük cinsi. Boş bırakılırsa üstteki genel
+                          yük cinsi kullanılır (`ilanYaz()` dolduruyor). */}
+                      <label style={s.label}>Yük Cinsi</label>
+                      <input
+                        value={durak.yuk_cinsi}
+                        onChange={e => durakGuncelle(i, 'yuk_cinsi', e.target.value)}
+                        placeholder={yuk_cinsi || 'Genelle aynı'}
+                        style={s.input}
+                      />
+                    </div>
+                    <div style={{ gridColumn: '1 / -1' }}>
                       <label style={s.label}>Durak Notu</label>
                       <input value={durak.notlar} onChange={e => durakGuncelle(i, 'notlar', e.target.value)} placeholder="Opsiyonel" style={s.input} />
                     </div>
