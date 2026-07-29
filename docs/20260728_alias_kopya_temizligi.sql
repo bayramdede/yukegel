@@ -250,17 +250,37 @@ FROM public.aliases WHERE type = 'city' AND is_active = true AND district IS NOT
 GROUP BY 2 HAVING count(DISTINCT district) > 1;
 
 -- =============================================================================
--- BÖLÜM 6 — Geçmiş `listings` satırları
+-- BÖLÜM 6 — Geçmiş `listings` satırları  🚨 GEÇERSİZ — ÇALIŞTIRMA
 -- =============================================================================
--- Alias düzelse de ZATEN KAYDEDİLMİŞ ilanlar bozuk kalır. ÖNCE ÖLÇ:
-SELECT 'origin' AS yon, origin_city AS sehir, count(*) FROM public.listings
-WHERE origin_city IN ('Istanbul','Izmir','Mugla','Bingol') GROUP BY 1,2
-UNION ALL
-SELECT 'destination', destination_city, count(*) FROM public.listings
-WHERE destination_city IN ('Istanbul','Izmir','Mugla','Bingol') GROUP BY 1,2
-ORDER BY 3 DESC;
-
--- Sayı anlamlıysa (yorumu kaldır):
+-- 🚨🚨 BU BÖLÜM YANLIŞ TABLOYU ONARIYOR (29 Tem 2026, W5'te tespit edildi).
+--
+-- İki hata:
+--   1) `listings.destination_city` ÖLÜ KOLON. Uygulama kodunda tek bir yazma
+--      veya okuma yok. Varış verisi `public.listing_stops` satırlarında:
+--      yazan  supabase/functions/parse-listing/index.ts:825
+--      okuyan app/_components/HomeClient.tsx:696 (ana sayfa varış filtresi)
+--      Yani bu bölüm kullanıcıya GÖRÜNEN kolonu (`listing_stops.city`) hiç
+--      onarmıyor; onarım bittikten sonra bile varış aramaları bozuk kalır.
+--      `listings.origin_district` ve `listing_stops.district` de atlanıyor.
+--   2) `origin_city = destination_city` SAHTELİK SİNYALİ DEĞİL. Aynı şehir
+--      içinde taşıma meşru bir hizmettir. Sahte güzergâhın parmak izi yazım
+--      farkıdır: katlanmış anahtar eşit ama ham string farklı
+--      ('Istanbul' vs 'İstanbul').
+--
+-- ✅ YERİNE KULLAN: docs/20260729_alias_runbook.md → Adım 8.
+--    Dört konum kolonunu birlikte onarıyor ve elle CASE listesi yerine
+--    `aliases` tablosunu sözlük olarak kullanıyor (belirsiz anahtarlar
+--    HAVING count(DISTINCT …) = 1 ile elle bırakılıyor).
+--
+-- Aşağıdaki blok yalnızca TARİHSEL KAYIT olarak bırakıldı — tamamı yorumda.
+-- ---------------------------------------------------------------------------
+-- SELECT 'origin' AS yon, origin_city AS sehir, count(*) FROM public.listings
+-- WHERE origin_city IN ('Istanbul','Izmir','Mugla','Bingol') GROUP BY 1,2
+-- UNION ALL
+-- SELECT 'destination', destination_city, count(*) FROM public.listings
+-- WHERE destination_city IN ('Istanbul','Izmir','Mugla','Bingol') GROUP BY 1,2
+-- ORDER BY 3 DESC;
+--
 -- UPDATE public.listings SET origin_city = CASE origin_city
 --   WHEN 'Istanbul' THEN 'İstanbul' WHEN 'Izmir' THEN 'İzmir'
 --   WHEN 'Mugla' THEN 'Muğla' WHEN 'Bingol' THEN 'Bingöl' END
@@ -269,9 +289,7 @@ ORDER BY 3 DESC;
 --   WHEN 'Istanbul' THEN 'İstanbul' WHEN 'Izmir' THEN 'İzmir'
 --   WHEN 'Mugla' THEN 'Muğla' WHEN 'Bingol' THEN 'Bingöl' END
 -- WHERE destination_city IN ('Istanbul','Izmir','Mugla','Bingol');
-
--- Ayrıca origin_city = destination_city olan SAHTE güzergâhlar (BÖLÜM 1'deki
--- 'Istanbul'/'İstanbul' ikiliğinden doğmuş olabilir) — düzeltmeden SONRA bak:
+--
 -- SELECT count(*) FROM public.listings WHERE origin_city = destination_city;
 
 -- =============================================================================
