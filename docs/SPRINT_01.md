@@ -332,8 +332,9 @@ where table_name='users' and grantee in ('authenticated','anon') order by grante
 - Hesap sayımına karşı "yanlış şifre" ile "kullanıcı yok" aynı mesajı döndürüyor.
 - Oturum cookie'si **sunucuda** yazılıyor (SSR client) → proxy ilk istekte görüyor.
 - **Kabul kriteri:** [x] 6. hatalı denemede kilit mesajı · [x] Kilit süresi dolunca açılıyor
-- **Not:** `auth_events` üzerinden okunabilirlik `docs/20260728_auth_events.sql` çalıştırılana
-  kadar atıl; bellek içi kilit migration'dan bağımsız çalışıyor.
+- **Gözlemlenebilirlik:** `docs/20260728_auth_events.sql` ✅ çalıştırıldı (29 Tem 2026), yani
+  `login_failed` olayları gerçekten birikiyor. Kilit tetiklendiğinde ayrıca
+  `structuredLog('WARN','auth','Giriş kilidi …')` düşer.
 
 ### ✅ G2 · OTP gönderiminde bot koruması yok 🟠
 - **Karar:** Turnstile değil, **sunucu tarafı kota** (Bayram, 29 Tem 2026).
