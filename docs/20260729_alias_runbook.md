@@ -74,21 +74,32 @@ FROM public.listings l
 JOIN public.listing_stops s ON s.listing_id = l.id
 WHERE l.origin_city = s.city;
 
--- 0.3 Bozuk ASCII yazımların DÖRT canlı konum kolonundaki dağılımı (Adım 8 önizlemesi).
-SELECT 'listings.origin_city' AS kolon, origin_city AS deger, count(*)
-FROM public.listings      WHERE origin_city IN ('Istanbul','Izmir','Mugla','Bingol') GROUP BY 1,2
-UNION ALL
-SELECT 'listings.origin_district', origin_district, count(*)
-FROM public.listings      WHERE origin_district IS NOT NULL
-  AND origin_district <> translate(origin_district,'ıçğöşüİĞÜŞÖÇ','icgosuIGUSOC') IS FALSE GROUP BY 1,2
-UNION ALL
-SELECT 'listing_stops.city', city, count(*)
-FROM public.listing_stops WHERE city IN ('Istanbul','Izmir','Mugla','Bingol') GROUP BY 1,2
-UNION ALL
-SELECT 'listing_stops.district', district, count(*)
-FROM public.listing_stops WHERE district IS NOT NULL
-  AND district <> translate(district,'ıçğöşüİĞÜŞÖÇ','icgosuIGUSOC') IS FALSE GROUP BY 1,2
-ORDER BY 3 DESC;
+-- 0.3 Bozuk yazımların DÖRT canlı konum kolonundaki dağılımı (Adım 8 önizlemesi).
+-- Parmak izi 0.1 ile aynı: katlanmış anahtarı aynı, ham yazımı FARKLI olan
+-- değerler. "Türkçe harf içermiyor" testi kullanılamaz — 'Fatih' zaten doğru.
+WITH tum_degerler AS (
+  SELECT 'listings.origin_city'     AS kolon, origin_city     AS deger FROM public.listings
+  UNION ALL
+  SELECT 'listings.origin_district', origin_district          FROM public.listings
+  UNION ALL
+  SELECT 'listing_stops.city',       city                    FROM public.listing_stops
+  UNION ALL
+  SELECT 'listing_stops.district',   district                FROM public.listing_stops
+), sayim AS (
+  SELECT kolon, deger,
+         translate(lower(replace(deger,'İ','i')),'ıçğöşü','icgosu') AS anahtar,
+         count(*) AS adet
+  FROM tum_degerler WHERE deger IS NOT NULL AND deger <> ''
+  GROUP BY 1,2,3
+)
+SELECT kolon, anahtar,
+       count(*)                            AS farkli_yazim,
+       array_agg(deger ORDER BY adet DESC) AS yazimlar,
+       array_agg(adet  ORDER BY adet DESC) AS adetler
+FROM sayim
+GROUP BY kolon, anahtar
+HAVING count(*) > 1
+ORDER BY 3 DESC, 2;
 
 -- 0.4 `destination_city` gerçekten ölü mü? 0 dönerse kolon boş demektir; Adım 8'de
 -- ona dokunmaya gerek yok, ayrı bir "ölü kolonu düşür" bileti açılır.
