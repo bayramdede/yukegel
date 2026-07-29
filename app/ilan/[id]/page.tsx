@@ -51,7 +51,10 @@ export async function generateMetadata(
     '| Yükegel',
   ].filter(Boolean).join(' ');
 
-  const agirlik = stops.find((s: any) => s.weight_ton)?.weight_ton;
+  // 🚨 Eskiden `stops.find(s => s.weight_ton)?.weight_ton` idi: çok duraklı bir
+  // ilanda Google'a ve paylaşım önizlemesine SADECE ilk durağın tonajı gidiyordu
+  // (25 tonluk ilan "8 ton" diye indeksleniyordu). Artık toplam.
+  const agirlik = durakToplami(stops, ['weight_ton']);
   const kargoTip = stops.find((s: any) => s.cargo_type)?.cargo_type;
 
   const description = [
