@@ -314,8 +314,9 @@ function UyeBanner() {
 function IlanKart({ ilan, kullanici }: { ilan: any; kullanici: any }) {
   const kaynak = KAYNAK_ETIKET[ilan.kaynak] || KAYNAK_ETIKET.form;
   const isYuk = ilan.tip === 'yuk';
-  const toplamTon = durakToplami(ilan.duraklar, 'ton');
-  const toplamPalet = durakToplami(ilan.duraklar, 'palet');
+  // TÜM durakların toplamı — eskiden `duraklar[0]` idi, bkz. `durakToplami`.
+  const toplamTon = durakToplami(ilan.duraklar, ['ton', 'weight_ton']);
+  const toplamPalet = durakToplami(ilan.duraklar, ['palet', 'pallet_count']);
   const cokDurak = Array.isArray(ilan.duraklar) && ilan.duraklar.length > 1;
   const [telAliniyor, setTelAliniyor] = useState(false);
   const [telHata, setTelHata] = useState('');
