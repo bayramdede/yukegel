@@ -13,13 +13,23 @@
 # `page.tsx`'i henüz commit'lememişti — canlı build, var olmayan bir ara halde
 # derlenmeye çalıştı.
 #
-# `vercel.json` → `ignoreCommand` artık commit mesajı `auto:` ile başlıyorsa
-# build'i ATLIYOR. Yani daemon push'lamaya devam eder (kod GitHub'da yedekli
-# durur) ama canlı site değişmez. Bu script, mesajı `auto:` ile BAŞLAMAYAN bir
-# commit atarak Vercel'i bilerek tetikleyen tek kapıdır.
+# 🔴 İLK ÇÖZÜM YETMEDİ (aynı gün, 19:00). `vercel.json → ignoreCommand` build'i
+# atlıyordu ama DEPLOYMENT yine oluşuyordu ("Canceled" satırlar) — ve Vercel'in
+# KAYAN 24 SAATTE 100 DEPLOYMENT kotası Canceled'ları da sayıyor. 24 saatte 266
+# commit push'lanınca kota bitti; Vercel artık hiçbir deployment oluşturmuyordu,
+# `deploy:` commit'i de dahil. Dashboard'da hiçbir kayıt yok, hata da yok — push
+# başarılı görünüyor, site güncellenmiyor. Sessiz arıza.
 #
-# 🚨 Yeni bir deploy yolu ekleme. Eklersen `ignoreCommand` sessizce devre dışı
-#    kalır ve günde 79 deploy'a geri döneriz.
+# GERÇEK ÇÖZÜM: daemon artık `main`'e değil `yedek` dalına push ediyor
+# (`scripts/auto-deploy.sh`), `vercel.json → git.deploymentEnabled.yedek = false`
+# de o dal için deployment OLUŞTURULMASINI engelliyor. Kota harcanmıyor.
+# `ignoreCommand` ikinci katman olarak duruyor: bu script `main`'e push ederken
+# yanındaki `auto:` commit'leri de taşır, HEAD `deploy:` olduğu için build 1 kez olur.
+#
+# Bu script `main`'e giden TEK kapıdır.
+#
+# 🚨 Yeni bir deploy yolu ekleme — özellikle daemon'ı `main`'e geri döndürme.
+#    Dönersen kota gün içinde biter ve deploy edemez hale gelirsin.
 
 set -uo pipefail
 
