@@ -456,7 +456,12 @@ where table_name='users' and grantee in ('authenticated','anon') order by grante
 Analizde doğru kurgulanmış bulunan ve regresyon riski taşıyan noktalar:
 
 1. `giris/page.tsx` — `INITIAL_SESSION` event'ine bağlanma (magic-link hash'i bu event'ten önce tüketiliyor)
-2. `proxy.ts:94-98` — merge edilmiş oturumda `sb-` cookie silme (sonsuz döngüyü bu çözdü, magic-link ile değiştirmeye kalkma)
+2. ~~`proxy.ts:94-98` — merge edilmiş oturumda `sb-` cookie silme~~ **GEÇERSİZ (A10, 29 Tem 2026).**
+   Cookie silmek döngüyü çözmedi, yerini değiştirdi: kullanıcı aynı emekli kimlikle geri gelince
+   yine aynı satıra düşüyordu. Artık `/auth/devir` oturumu **sunucuda** devrediyor
+   (`hashed_token` + `verifyOtp`) ve proxy cookie SİLMİYOR — devir onları okumak zorunda.
+   Uyarının geçerli kalan kısmı: magic-link **`action_link`**'ini (implicit flow) sunucu tarafı
+   akışta ASLA kullanma; döngüyü o geri getirir.
 3. `giris/page.tsx:114-216` — 4 formatlı telefon eşleştirme (`+90…`, `90…`, `0…`, `5…`)
 4. `api/auth/tekil-kontrol` — service-role ile yalnız `{ mevcut: boolean }` dönmesi (enumeration'a kapalı)
 5. `profil-tamamla` — TCKN/VKN algoritmik doğrulama (K2b bunu **kaldırmıyor**, sunucuya *kopyalıyor*)
