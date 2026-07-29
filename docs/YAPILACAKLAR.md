@@ -248,7 +248,8 @@ değişikliği içermiyor — yalnızca statik okuma. Canlı DB/RLS doğrulamas�
 - [ ] **L1e-SQL** ⏳ **BAYRAM:** `docs/20260728_contact_phone_revoke.sql` — **deploy'dan SONRA.**
 - [x] **A1** — `app/api/auth/log/route.ts` *(yeni)*. Endpoint aylardır yoktu, 404 `.catch(()=>{})`
       içinde yutuluyordu → auth audit trail'i tamamen boştu.
-- [ ] **A1b-SQL** ⏳ **BAYRAM:** `docs/20260728_auth_events.sql` — **deploy'dan ÖNCE.**
+- [x] **A1b-SQL** ✅ `docs/20260728_auth_events.sql` çalıştırıldı (Bayram, 29 Tem 2026).
+      Denetim izi artık gerçekten yazılıyor; G1'in kilit olayları da buradan okunabilir.
 - [x] **A3** — `?hesap=tasindi` / `?hesap=eslesme` mesajları artık `!user` dalında da basılıyor.
 - [x] **A4** — Twilio kod uzunluğu 4 hane olarak teyit edildi (Bayram, 28 Tem 2026).
 - [x] **A7** — `lib/redirect.ts` *(yeni)* `guvenliRedirect()` — açık yönlendirme koruması dahil.
