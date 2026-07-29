@@ -169,6 +169,7 @@ function GirisIci() {
 
       // Sağlıklı, tamamlanmış canlı oturum (magic-link'ten yeni gelmiş de olabilir) → yönlendir.
       if (profil?.user_type && !profil?.merged_into) {
+        if (etkilesimRef.current) return; // sorgu sürerken kullanıcı forma başladıysa dokunma
         await yonlendir();
         return;
       }
