@@ -263,12 +263,31 @@ değişikliği içermiyor — yalnızca statik okuma. Canlı DB/RLS doğrulamas�
       ilanına `trust_level: 'verified'` / `moderation_status: 'approved'` yazabiliyordu (K2 ile
       aynı sınıf). Beyaz listeyle kapandı.
 
+### ✅ W2 — Tamamlandı (29 Tem 2026)
+- [x] **A10** — `merged_into` giriş döngüsü. `app/auth/devir/route.ts` *(yeni)* oturumu
+      **sunucuda** canlı hesaba devrediyor (`generateLink` → `hashed_token` → `verifyOtp`).
+      Token tarayıcıya hiç gelmiyor. Proxy artık cookie SİLMİYOR — devir onları okumak zorunda.
+      Zincir (A→B→C) `MAKS_ADIM=5` + döngü tespitiyle taranıyor; kurtarılamayan hâllerde
+      `/giris?hesap=tasindi`'ye temiz çıkış.
+- [x] **M2** — `app/moderator-giris/page.tsx` giriş sonrası rol doğruluyor; yetkisizse
+      oturum kapatılıp açıklayıcı mesaj gösteriliyor. Admin `/admin`'e, moderatör `/moderator`'a.
+- [x] **C2** — Zaten C1 ile gelmişti (`app/cikis/route.ts` `sb-` cookie'lerini açıkça siliyor);
+      doğrulandı, ek değişiklik gerekmedi.
+- [x] **K2b** — `lib/kimlik.ts` *(yeni)* `tcknGecerli`/`vknGecerli` TEK KAYNAK. İstemci ve
+      sunucudaki iki kopya kaldırıldı — ayrışırlarsa istemci "geçerli" derken sunucu reddeder
+      (ya da tersi, ki tehlikeli olan o).
+- [x] **G2** — SMS gönderimi istemciden alındı. `app/api/auth/otp/route.ts` *(yeni)*: POST +
+      Origin, 3 katmanlı kota (numara 1/60sn, IP 5 farklı numara/saat, IP 15 toplam/saat).
+      `sahiplen` endpoint'i **aynı** IP kovasını paylaşıyor — iki uç nokta arasında gidip gelerek
+      kotayı ikiye katlamak mümkün değil. Kotalar yalnız SMS gerçekten gittiyse işleniyor.
+- [x] **G1** — Şifreli giriş istemciden alındı. `app/api/auth/giris/route.ts` *(yeni)*: POST +
+      Origin, e-posta başına 5 hata/15 dk, IP başına 20 hata/15 dk. Yalnız **başarısız** denemeler
+      sayılır; başarıda `kotaSifirla`. Kilitliyken gelen istek sayacı UZATMAZ. Oturum cookie'si
+      sunucuda yazılıyor; `/giris` ve `/moderator-giris` ikisi de bu route'u kullanıyor.
+- [x] **Altyapı** — `lib/kota.ts` *(yeni)* ortak kayan pencere sayacı. ⚠️ Process belleğinde:
+      çok instance'ta delinir, soğuk başlangıçta sıfırlanır. Redis'e taşıma yolu dosya başında.
+
 ### 🟠 Diğer yeni bulgular
-- [ ] **M2** — `app/moderator-giris/page.tsx:20-30` giriş sonrası rol kontrolü yok; normal
-      kullanıcı da giriş yapıp `/moderator`'a itiliyor.
-- [ ] **C2** — `/cikis` `sb-` cookie'lerini açıkça temizlemiyor (proxy'deki pattern ile tutarsız).
-- [ ] **G1** — Şifreli girişte (özellikle `/moderator-giris`) rate limit / lockout yok.
-- [ ] **G2** — OTP gönderiminde bot koruması yok → rastgele numaralara SMS tetiklenebilir (maliyet).
 - [ ] **S1** — `app/layout.tsx:22-26` metadata'da `metadataBase`, OpenGraph, Twitter card,
       canonical yok → WhatsApp/sosyal paylaşımda önizleme kartı çıkmıyor.
 - [ ] **S2** — `/giris`, `/profil-tamamla`, `/moderator-giris`, `/auth/reset` indekslenebilir
