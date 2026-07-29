@@ -451,9 +451,18 @@ değişikliği içermiyor — yalnızca statik okuma. Canlı DB/RLS doğrulamas�
       değil — telefon alanı tipe bağlı gizlenmediği için şu an zararsız, ama alan görünürlüğü
       değişirse aynı yarış geri gelir. *(K3'ten çıkan yeni iş)*
 - [ ] **Geçmişte üretilmiş sahte güzergâhlı `listings` satırlarının kaderi** — runbook Adım 8
-      `origin_city`/`destination_city` yazımını onarıyor, ama düzeltme sonrası hâlâ
-      `origin_city = destination_city` kalan satırlar geçmişte üretilmiş **sahte** ilanlardır.
-      Silme mi, moderasyona düşürme mi? Karar verilmeli — runbook'un kapsamı dışında. *(W5/D5)*
+      dört konum kolonunun **yazımını** onarıyor (`listings.origin_city`/`origin_district`,
+      `listing_stops.city`/`district`). Onarım sonrası "aynı şehir" kalan satırlar
+      **otomatikman sahte değil**: şehir içi taşıma meşru bir iş. Sahte olan alt küme
+      "aynı şehir + aynı ilçe + tek durak + AI üretimi" — ayrıca sorgulanıp silme mi,
+      moderasyona düşürme mi karar verilmeli. Runbook'un kapsamı dışında. *(W5/D5)*
+- [ ] **`listings.destination_city` ölü kolon — düşürülmeli** (29 Tem 2026, W5). Uygulama
+      kodunda tek bir yazma/okuma yok; varış verisi `listing_stops` satırlarında
+      (`supabase/functions/parse-listing/index.ts:825` yazıyor, `HomeClient.tsx:696` okuyor).
+      Eski `20260728_alias_kopya_temizligi.sql` BÖLÜM 6 bu ölü kolonu onarmaya çalışıp asıl
+      canlı kolonu (`listing_stops.city`) atlıyor — runbook Adım 8 bunu düzeltti. Önce
+      `SELECT count(*) WHERE destination_city IS NOT NULL` ile boş olduğu teyit edilsin,
+      sonra `ALTER TABLE public.listings DROP COLUMN destination_city;`
 - [ ] **`is_active` / `is_approved` desenkronu** — `learn-aliases` `is_approved=false` öneri
       üretiyor ama eşleşme tarafı (`findPlaces`, `whatsapp-parse` gatekeeper) yalnız
       `is_active`'e bakıyor; onaylanmamış alias parse'a giriyor. W0-W4'ten devreden bilinen

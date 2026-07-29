@@ -131,8 +131,7 @@ export async function POST(request: NextRequest) {
         varisIliNorm, varisIliStatus,
         aracTipiNorm, aracTipiStatus,
         ustYapiNorm, ustYapiStatus,
-        hasErrors: kalkisIliStatus === 'error' || varisIliStatus === 'error'
-          || kalkisIliStatus === 'empty' || varisIliStatus === 'empty',
+        hasErrors: kalkisIliStatus === 'error' || varisIliStatus === 'error',
       };
     });
 
