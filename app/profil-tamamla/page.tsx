@@ -118,7 +118,11 @@ function ProfilTamamlaIci() {
 
       // Profil zaten tamamsa formu hiç göstermeden hedefe (son bulunulan yer veya panel) gönder
       if (profil?.user_type) {
-        router.push(redirect || '/panel');
+        // 🚨 29 Tem 2026 — burada `redirect` HAM haliyle kullanılıyordu:
+        // `/profil-tamamla?redirect=https://kotu.site` açık yönlendirme demekti.
+        // Aynı dosyanın 314. satırı zaten `guvenliRedirect`ten geçiriyordu; bu dal
+        // atlanmıştı. Cookie'yi de yedek kaynak olarak ekliyoruz (A7 zinciri).
+        router.push(guvenliRedirect(redirect) ?? guvenliRedirect(redirectCookieOku()) ?? '/panel');
         return;
       }
 
