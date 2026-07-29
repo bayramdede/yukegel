@@ -1,6 +1,23 @@
 # Yükegel — Proje Haritası
 > **Kullanım:** Her sohbet başında sadece bu dosyayı oku. Kaynak dosyaları sadece o dosyada değişiklik yapacaksan oku.  
-> Son güncelleme: 29 Temmuz 2026 — **SPRINT_01 W2 tamamlandı.** A10 ile `merged_into` giriş döngüsü kapandı: `/auth/devir` oturumu SUNUCUDA canlı hesaba geçiriyor (`hashed_token` + `verifyOtp`), token tarayıcıya hiç gelmiyor. M2 moderatör girişine rol doğrulaması ekledi. K2b TCKN/VKN doğrulayıcılarını `lib/kimlik.ts`'te tek kaynağa indirdi. **G2:** SMS gönderimi istemciden alınıp `/api/auth/otp`'ye taşındı (3 katmanlı kota). **G1:** şifreli giriş istemciden alınıp `/api/auth/giris`'e taşındı (e-posta 5 hata/15dk, IP 20 hata/15dk). Ortak kota altyapısı: `lib/kota.ts`.
+> Son güncelleme: 29 Temmuz 2026 — **SPRINT_01 W5 (alias veri bütünlüğü) kod tarafı tamamlandı.**
+> **W5:** Bozuk `aliases.normalized` yazımı (`Istanbul` 13 satır / `İstanbul` 154 satır) sahte
+> **İstanbul→İstanbul** güzergâhları üretiyordu. Kaynak iki katmanlıydı: `learn-aliases` prompt'unun
+> örnekleri ASCII'ye indirgenmişti (**D1** düzeltti) ve dört alias yazma noktasının hiçbiri
+> `normalized`/`district`'i normalize etmiyordu (**D2** → yeni `lib/alias-normalize.ts`, dört yolda
+> 409 çakışma kontrolü). **D4** `parse-listing/findPlaces`'teki `seen`/`sameCity`/lane dedup
+> anahtarlarını katlanmış forma geçirdi (5/5 kabul testi geçiyor; aynı testler HEAD'de 3/5 başarısız).
+> **D5** `docs/20260729_alias_runbook.md` — iki hazır SQL script'inin çalıştırma sırası (sıra
+> yanlışsa sessizce zarar veriyor). **D3** `docs/20260729_alias_normalize_trigger.sql` — normalize
+> trigger + **kısmi** UNIQUE indeks.
+> ⚠️ **SQL'lerin HİÇBİRİ ÇALIŞTIRILMADI** (Bayram'ın 29 Tem beyanı). Sıra: runbook Adım 0-9 → sonra
+> trigger dosyası. (bkz. `docs/W5_DEVIR.md`)
+>
+> Önceki: 29 Temmuz 2026 — **SPRINT_01 W3 + W4 tamamlandı.**
+> **W3 (SEO & huni):** `layout.tsx` metadata (metadataBase/OG/Twitter/canonical) + statik OG kartı, 4 auth sayfasına `noindex`, sitemap'e `/yol-rehberi` ve profil sayfaları, robots.txt dört bloğu tutarlı hale getirildi, iki CTA `?tip=` ile ayrıştı (`lib/analiz.ts`), misafirin "Ara" butonu artık `?redirect=` taşıyor.
+> **W4 (UX cila):** Şifre kuralları tek kaynağa indi (`lib/sifre.ts` — ⚠️ `\p{Lu}`, `[A-Z]` DEĞİL); liste limiti tek sabite indi (`lib/ilan-liste.ts`) ve sayaç artık ekrandakini sayıyor; sekme state'i URL'e yansıyor (pushState + popstate); `profil-tamamla`'da tip değişimi ortak alanları koruyor ve blur yarışına karşı epoch guard'ı var; giriş route'u makine okunur `kod` dönüyor; **yeni** `/api/auth/dogrulama-tekrar` doğrulama e-postasını kotalı biçimde tekrar gönderiyor; Footer tamamen `next/link`.
+>
+> Önceki: 29 Temmuz 2026 — **SPRINT_01 W2 tamamlandı.** A10 ile `merged_into` giriş döngüsü kapandı: `/auth/devir` oturumu SUNUCUDA canlı hesaba geçiriyor (`hashed_token` + `verifyOtp`), token tarayıcıya hiç gelmiyor. M2 moderatör girişine rol doğrulaması ekledi. K2b TCKN/VKN doğrulayıcılarını `lib/kimlik.ts`'te tek kaynağa indirdi. **G2:** SMS gönderimi istemciden alınıp `/api/auth/otp`'ye taşındı (3 katmanlı kota). **G1:** şifreli giriş istemciden alınıp `/api/auth/giris`'e taşındı (e-posta 5 hata/15dk, IP 20 hata/15dk). Ortak kota altyapısı: `lib/kota.ts`.
 >
 > Önceki: 28 Temmuz 2026 — **SPRINT_01 W1 tamamlandı.** Auth audit trail açıldı (`/api/auth/log` + `auth_events`), `?hesap=` mesajları görünür oldu, `redirect` param'ı `lib/redirect.ts` ile güvenli şekilde korunuyor, profil upsert'i server action'a taşındı (kolon beyaz listesi), `/auth/reset` artık yalnız gerçek recovery oturumunda form gösteriyor, `/cikis` GET kapatıldı, OTP tekrar gönderimine **sunucu tarafı** 60 sn cooldown geldi. L1e ile `contact_phone`'un son istemci yazma yolu da kapandı — panel ve moderatör artık server action kullanıyor.
 > ✅ **SPRINT_01'in 3 SQL'i de çalıştırıldı** (29 Tem 2026): `20260728_kvkk_onay.sql`, `20260728_auth_events.sql`, `20260728_contact_phone_revoke.sql`. Bekleyen migration yok. (bkz. `docs/SPRINT_01.md`)
@@ -13,6 +30,9 @@
 - `docs/LOG_VE_GUVENLIK_SPECLERI.md` — Log format standartları, audit trail, SecurityLogger kontrol listesi
 - `docs/LANDING_AUTH_ANALIZ.md` — Landing / kayıt / giriş analizi (28 Tem 2026), bulgu kodları L1–L5, A1–A7, K1–K3
 - `docs/SPRINT_01.md` — **Aktif sprint.** 30 madde / 78 puan, W0–W4 dalgaları. Yukarıdaki analiz + geniş tarama (M1–M2, R1–R2, C1–C2, G1–G2, S1–S4, F1–F2) birleşik backlog'u. Kabul kriterleri ve bağımlılıklar burada.
+- `docs/ILAN_VER_ANALIZ.md` — **İlan verme akışı analizi (29 Tem 2026).** 30 madde / 87 puan, bulgu kodları V1–V10 (veri bütünlüğü & güvenlik), B1–B9 (bozuk), U1–U10 (UX/dönüşüm), M1–M5 (mimari). W0–W4 dalgaları, kabul kriterleri ve canlı DB ile doğrulanacak 6 madde burada.
+
+> **🔴 İLAN VERME AKIŞI — SPRINT_01 SERTLEŞTİRMESİ BU YOLA UYGULANMADI (29 Tem 2026):** `app/ilan-ver/actions.ts` projenin **en ayrıcalıklı yazma yolu** (service-role `listings` INSERT) ama `app/panel/actions.ts`'teki üç kazanımın hiçbiri burada yok: sunucu tarafı kolon beyaz listesi yok, sahiplik/oturum kapısı yok (`user` okunuyor ama null'da durmuyor), sınır kontrolü/kota yok. Üç bulgu tek başına sprint hak ediyor: **(1)** toplu yükleme fiilen çalışmıyor — `TopluYukle.tsx:104,174` JSON `{action,rows,userId}` yolluyor, `/api/excel-import:38` yalnızca `formData().get('file')` okuyor (üstelik şablon `'Kalkış İli'`, route `'Kalkış Şehri'` bekliyor — iki bağımsız kırık); **(2)** 31–70 moderasyon bandı ölü — `actions.ts:63` `moderation_status: 'auto_published'` sabitliyor, `audit_listing_fn` ise yalnızca `score >= reject_min` dalında bu alana dokunuyor (`auto_pub_max` hesaplanıp loglanıyor ama hiçbir kararda kullanılmıyor); **(3)** AI kotasının kapısı ile sayacı farklı şeye bakıyor — `parse-text` çağrı öncesi `countAiListingsLast24h`'e bakıyor, o da `listings.raw_text IS NOT NULL` sayıyor; formu göndermeyen kullanıcı Anthropic'i sınırsız çağırıyor, üstelik `whatsapp/route.ts:191,204` aynı sayacı kirletiyor.
 
 > **✅ PROXY PREFIX TUZAĞI (28 Tem 2026, `SPRINT_01` M1 — ÇÖZÜLDÜ):** `proxy.ts` düz `pathname.startsWith(r)` kullanıyordu; `KORUNMALI` içindeki `'/moderator'` girdisi `/moderator-giris`'i de yakalıyordu → moderatör giriş sayfası oturumsuz erişilemez hâldeydi. Artık `korunmaliMi()` **segment sınırında** eşleştiriyor: `pathname === kok || pathname.startsWith(kok + '/')`. `ACIK_ROTALAR`'a da `/moderator-giris` eklendi. **Kural: `KORUNMALI`'ya segment eklerken düz `startsWith`'e geri dönme** — `/profil` ↔ `/profil-tamamla` aynı tuzağı taşıyor.
 
@@ -90,7 +110,18 @@ yukegel/
 │   ├── _components/
 │   │   ├── Footer.tsx                  # Server component — sirket_unvani config'den
 │   │   └── HomeClient.tsx              # Client component — eski page.tsx içeriği
+│   ├── layout.tsx                        # 🔍 SPRINT_01 S1 — metadataBase + OG + Twitter + canonical ✅
+│   ├── opengraph-image.jpg               # 🔍 SPRINT_01 S1 — 1200×630 paylaşım kartı (Bayram'ın
+│   │   + opengraph-image.alt.txt         #    tasarımı). JPEG q95 / 134 KB — WhatsApp büyük
+│   │                                     #    dosyada kartı sessizce göstermiyor. `.tsx` üreteci
+│   │                                     #    SİLİNDİ; aynı segmentte iki og dosyası build'i kırar ✅
+│   ├── sitemap.ts                        # 🔍 SPRINT_01 S3 — statik + ilan + PROFİL (`/u/{id}`) URL'leri ✅
 │   ├── giris/page.tsx
+│   ├── giris/layout.tsx                  # 🔍 SPRINT_01 S2 — noindex, follow:true ✅
+│   ├── moderator-giris/layout.tsx        # 🔍 SPRINT_01 S2 — noindex, nofollow ✅
+│   ├── profil-tamamla/layout.tsx         # 🔍 SPRINT_01 S2 — noindex, nofollow ✅
+│   ├── auth/layout.tsx                   # 🔍 SPRINT_01 S2 — SEGMENT geneli noindex+nofollow;
+│   │                                     #    yeni /auth/* rotaları otomatik miras alır ✅
 │   ├── auth/callback/ + reset/           # 🔒 SPRINT_01 R1 — reset 3 durumlu: kontrol/hazir/gecersiz.
 │   │                                     #    Form YALNIZ gerçek PASSWORD_RECOVERY oturumunda ✅
 │   ├── auth/devir/route.ts               # 🔒 SPRINT_01 A10 — emekli (merged_into) oturumu SUNUCUDA
@@ -145,6 +176,19 @@ yukegel/
 │                                         #    değer sayar, `sayma:true` sadece bakar. ⚠️ process-local ✅
 ├── lib/kimlik.ts                         # 🔒 SPRINT_01 K2b — tcknGecerli()/vknGecerli() TEK KAYNAK
 │                                         #    (istemci + sunucu aynı modülü import eder) ✅
+├── lib/analiz.ts                         # 📊 SPRINT_01 L2 — olayGonder(): GA olayları için tek kapı.
+│                                         #    SSR-güvenli, hataları yutar. ⚠️ KİŞİSEL VERİ GÖNDERME ✅
+├── lib/sifre.ts                          # 🔒 SPRINT_01 R2 — sifreKriterleri()/sifreHatasi()/SIFRE_KURAL_METNI.
+│                                         #    Gösterge ile kapı AYNI kaynaktan beslenir.
+│                                         #    ⚠️ Büyük harf: `\p{Lu}` + /u — `[A-Z]` Türkçe'de YANLIŞ ✅
+├── lib/ilan-liste.ts                     # 📋 SPRINT_01 L4 — ILAN_LIMITI: SSR ve istemci sorgusu AYNI
+│                                         #    limiti kullanır. ⚠️ İstemci paketine girer, server-only YOK ✅
+├── lib/alias-normalize.ts                # 🚨 SPRINT_01 W5/D2 — alias yazma yolu TEK KAYNAK.
+│                                         #    aliasKey() (İ→i, lower, ıçğöşü→icgosu) · trTemizle() ·
+│                                         #    normalizeAliasFields() · aliasSatirlariniYukle() (sayfalı,
+│                                         #    bayrak filtresi YOK) · aliasCakismaBul() → 409 ·
+│                                         #    baskinYazimaHizala() (yalnız AI keşif yolu).
+│                                         #    ⚠️ aliasKey() ile D3 indeks ifadesi BİREBİR aynı olmalı ✅
 ├── lib/whatsapp/chatParser.ts            # 📱 TEK KAYNAK sohbet parser (server + client ortak) ✅
 ├── lib/whatsapp/__tests__/chatParser.test.ts  # 29 assertion — `npm run test:parser` ✅
 ├── lib/whatsapp/telefon.ts               # 📱 TEK KAYNAK telefon regex (05XXXXXXXXX) ✅
@@ -152,7 +196,8 @@ yukegel/
 ├── supabase/functions/parse-listing/index.ts
 ├── proxy.ts
 │   └── api/ilanlar/[id]/route.ts       # Public AI-readable API ✅
-├── public/robots.txt                   # GPTBot + ClaudeBot izinleri ✅
+├── public/robots.txt                   # 🔍 SPRINT_01 S4 — 4 blok (*, GoogleBot, GPTBot, ClaudeBot),
+│                                       #    disallow listeleri BİREBİR AYNI olmak zorunda ✅
 └── docs/
 ```
 
@@ -273,6 +318,17 @@ priority   — öncelik puanı (90+ = yüksek)
 district   — ilçe adı (city tipi için, normalize ile ilişkilendirir)
 created_by_ai / is_approved / llm_confidence / source_listing_ids  (SLH kolonları)
 ```
+🚨 **W5 (29 Tem 2026) — yazım bütünlüğü.** `normalized`/`district` uzun süre iki yazımla birikti
+(`Istanbul`/`İstanbul`, `Izmir`/`İzmir`, `Mugla`/`Muğla`, `Bingol`/`Bingöl`). Yazma yolu artık
+`lib/alias-normalize.ts` üzerinden geçiyor. Bekleyen DB tarafı (henüz çalıştırılmadı):
+- `docs/20260729_alias_runbook.md` → Adım 0-9 (ölçüm → homonim pasifleştirme → yazım düzeltme →
+  NULL ilçe doldurma → `payas` → elle kararlar → doğrulama → geçmiş `listings` onarımı →
+  katlanmış kopyaları pasifleştirme)
+- `docs/20260729_alias_normalize_trigger.sql` → `aliases_normalize_trg` (BEFORE INSERT/UPDATE:
+  `alias` lowercase+trim, `normalized`/`district` trim, boş `district` → NULL) +
+  `aliases_katlanmis_anahtar_uniq`: **KISMİ** UNIQUE indeks
+  `(type, translate(lower(replace(alias,'İ','i')),'ıçğöşü','icgosu')) WHERE is_active = true`
+  ⚠️ İndeks ifadesi `lib/alias-normalize.ts::aliasKey()` ile birebir aynı olmak zorunda.
 ### `system_config` — `parse.auto_publish_score_max`, `parse.reject_score_min`, `llm.ai_listing_quota_default` ve diğerleri
 ### `safety_rules`, `blacklist`
 
@@ -321,6 +377,7 @@ ZIP/TXT → raw_posts → DB trigger → parse-listing Edge Fn → listings → 
 | `/api/auth/log` | 🔒 Auth denetim izi → `auth_events` (service role). Fire-and-forget, IP+UA yazar, telefon/şifre yazmaz |
 | `/api/auth/otp` | 🔒 **TEK** SMS OTP gönderim yolu (G2). POST + Origin. 3 kota: numara 1/60sn, IP 5 farklı numara/saat, IP 15 toplam/saat. 429 + `Retry-After` |
 | `/api/auth/giris` | 🔒 **TEK** şifreli giriş yolu (G1). POST + Origin. Kota: e-posta 5 hata/15dk, IP 20 hata/15dk. Başarıda sayaç sıfırlanır, cookie SUNUCUDA yazılır, `{ rol }` döner |
+| `/api/auth/dogrulama-tekrar` | 🔒 Doğrulama e-postasını tekrar gönder (A6). POST + Origin. 3 kota: adres 1/60sn, IP 5 farklı adres/saat, IP 10 toplam/saat. ⚠️ Yanıt **daima aynı** (hesap sayımına kapalı); sayaçlar hata yolunda da işlenir |
 | `/api/ilan/[id]/telefon` | 🔒 **TEK** telefon kaynağı. GET, authed + profil tam + hesap aktif + ilan yayında. `logPhoneAccess`, 20/dk, `no-store` |
 | `/api/ilan/[id]/sahiplen` | 🔒 GET maskeli numara, POST `{adim:'gonder'\|'dogrula'}`. İlan başına 60 sn SMS cooldown (429 + `Retry-After`) |
 | `/api/parse-text` | Tekil kullanıcı metnini Haiku ile JSON'a çevirir + per-user günlük quota kontrolü (429) |
@@ -439,6 +496,10 @@ Açık rotalar: /giris, /auth/, /profil-tamamla, /nasil-calisir, /hakkimizda,
 - **Kısmi unique indeks (`WHERE ...`) `upsert`/`onConflict` ile kullanılamaz** — PostgreSQL kısmi indeksi `ON CONFLICT` hedefi olarak ancak predicate'i ima eden bir `WHERE` varsa çıkarsar, PostgREST bunu üretmez. `raw_posts`'un iki unique indeksi de kısmi olduğu için constraint-agnostik 23505 yakalaması korunmak zorunda.
 - **Alias eşleşmesi SUBSTRING ile yapılmamalı** (28 Tem 2026). `gatekeeper_sync` `norm.includes(aliasNorm)` kullanıyordu: `"lojistik"` içindeki `"ist"` → İstanbul, `"getirin"` içindeki `"tir"` → TIR, `"balyası"` içindeki `"balya"` → Balıkesir. Neredeyse her mesaj 2+ şehir bulmuş sayılıyor, `isAd` kuralı (`telefon && (araç || şehir>=2)`) fiilen **"telefon var mı"**ya iniyordu — gatekeeper devre dışıydı. Düzeltme: token eşitliği + Türkçe hal eki soyma (`ekSoy`), tokenlar `[\s.>-]` sınırlarından ayrılır, 3 harften kısa alias yok sayılır. `parse-listing/findPlaces` zaten token bazlıydı; iki taraf hizalandı.
 - **İlçe adları günlük Türkçe kelimelerle çakışıyor (homonim)** — `araç`→Kastamonu, `olur`→Erzurum, `pazar`→Rize, `perşembe`→Ordu, `merkez`→onlarca il. Token eşleşmesi bunları TEMİZLEMEZ, veri tarafında pasifleştirmek gerekir: `docs/20260728_alias_homonim_temizligi.sql`. Hem gatekeeper'ı hem `parse-listing`'in gerçek güzergâh çıkarımını bozar.
+- 🚨 **LLM prompt'unun ÖRNEKLERİ kuraldan güçlüdür — bozuk örnek bozuk veri üretir** (29 Tem 2026, `SPRINT_01` W5/D1). `learn-aliases` prompt'unda kurallar Türkçe doğru yazımı istiyordu ama JSON **örnekleri** ASCII'ye indirgenmişti (`"Eskisehir"`, `"Istanbul"`, `"Tekirdag"`). Model kuralı değil örneği taklit etti; `aliases.normalized` aylarca iki yazımla doldu (`Istanbul` 13 satır / `İstanbul` 154 satır). **Kural:** prompt'a örnek yazarken örneğin kendisi üretmek istediğin çıktının birebir doğru hali olmalı. Ayrıca prompt'a mevcut kayıtlar bağlam olarak veriliyorsa "listede eski/bozuk kayıtlar olabilir, onları örnek alma" satırı şart — yoksa bozulma kendi kendini besler.
+- 🚨 **Karşılaştırma anahtarı ile SAKLANAN değer aynı şey değildir** (29 Tem 2026, `SPRINT_01` W5/D2+D4). `Istanbul` ve `İstanbul` **aynı şehir** ama string eşitliği bunu göremez. `parse-listing/findPlaces`'teki `seen` seti ham `normalized` üzerinde çalıştığı için iki yazım İKİ AYRI ŞEHİR sayılıyordu; `sameCity` koruması devreye girmiyor ve **sahte `İstanbul→İstanbul` ilanı** kaydediliyordu (aynı sebeple şehir filtresi de ilanların bir kısmını hiç göstermiyordu). Düzeltme: her karşılaştırma/dedup anahtarı katlanmış formdan geçer (`aliasKey` / `yerKey`), **saklanan değer Türkçe kalır**. ⚠️ Katlama fonksiyonu (`lib/alias-normalize.ts::aliasKey`) ile DB indeks ifadesi (`docs/20260729_alias_normalize_trigger.sql`) BİREBİR aynı olmalı: `translate(lower(replace(alias,'İ','i')),'ıçğöşü','icgosu')`. Sıra kritik — `İ` (U+0130) **önce** düz `i`ye çevrilmeli, yoksa Postgres `lower()` onu `i` + U+0307 olarak iki karaktere açar ve JS `toLowerCase()` ile ayrışır → uygulama "çakışma yok" derken DB 23505 atar.
+- ⚠️ **`normalized` her zaman şehir DEĞİL — otomatik yazım düzeltmesi yapma** (29 Tem 2026, W5/D2). `type='vehicle'` satırlarında `normalized` doğrudan `vehicle_type` olarak ilana yazılıyor; "tir" → "Tir" yapmak eşleşmeyi bozar. Bu yüzden ne `normalizeAliasFields` ne de DB trigger'ı `normalized`/`district` üzerinde büyük harfe çevirme / ASCII katlama yapıyor — yalnız boşluk temizliği. Yanlış yazım sessizce düzeltilmez, `aliasCakismaBul` **409 ile admine sorar** (öneri: çoğunluk yazımı — 154 satır `İstanbul` varken 13 satırlık `Istanbul` kazanmasın).
+- 🚨 **`alias` kolonundaki UNIQUE kısıtı HAM string üzerinde — katlanmış kopyaları engellemez** (29 Tem 2026, W5/D3). `Gebze`/`GEBZE`/`gebze`, `Çorlu`/`çorlu`/`corlu`, `Torbali`/`torbali`/`torbalı` üç ayrı satır olarak duruyor ve hepsi tek katlanmış anahtara düşüyor. Sonucu: planlanan tam UNIQUE indeks **kurulamaz** (23505). Ayrıca temizlik script'i bu satırları silmiyor, yalnız `normalized`/`district`'i tutarlı yapıyor — yani veri temizliği tamamlansa bile önkoşul karşılanmıyor. Çözüm iki parçalı: önce fazlalıkları `is_active = false` yap (runbook Adım 9; `row_number() OVER (PARTITION BY type, katlanmış ORDER BY id) > 1` — **silme yok**, `findPlaces` zaten `.order('id')` ile küçük id'yi seçtiği için bugünkü davranış değişmez), sonra indeksi **kısmi** kur (`WHERE is_active = true`) — pasifleştirilmiş kopyalar tabloda durduğu için tam indeks onları da ihlal sayardı.
 - **PostgREST tek sorguda EN FAZLA 1000 satır döndürür — ve bunu SÖYLEMEZ** (28 Tem 2026). Supabase'in `db.max-rows` ayarı. Sınırı aşan `select()` hata vermez, sessizce kesilir. `aliases` tablosu 1887 aktif satıra çıkmıştı; hem `app/api/whatsapp-parse` gatekeeper'ı hem `supabase/functions/parse-listing` şehir/araç tespitini alias'ların **%47'sini hiç görmeden** yapıyordu. Üstelik `ORDER BY` olmadığı için hangi 887 satırın düştüğü belirsizdi → aynı mesaj farklı zamanlarda farklı ayrıştırılabiliyordu. Düzeltme: `.range()` ile sayfalama + `.order('id')` (sıralama olmadan sayfalar çakışır/atlar). **Kural: bir tabloyu "hepsini çek" niyetiyle okuyan her sorgu sayfalanmalı.**
 - **`raw_posts.post_date` KALDIRILDI** (28 Tem 2026). Tek tarih otoritesi `message_date`; unique indeks de onun üzerinde. Kayıt: `docs/20260728_raw_posts_post_date_sadelestirme.sql`. Not: eski 1543 satırda `post_date` mesajın günü değil İÇE AKTARMA günüydü (12–20 May 2026 penceresi) — kolon baştan güvenilmezdi.
 - **Telefon geriye-doldurma içe aktarmanın PARÇASI DEĞİL** — `POST /api/raw-posts/telefon-doldur` ayrı işi yapar. Route'un içindeyken satır başına 2 UPDATE ile süre bütçesini yiyordu ve içe aktarmanın doğruluğuna hiç katkısı yoktu. Telefon regex'i tek kaynakta: `lib/whatsapp/telefon.ts` (⚠️ `supabase/functions/parse-listing/index.ts` içinde Deno tarafında ikinci bir kopya var, Deno/Next sınırı yüzünden import edilemiyor — birini değiştirirken diğerini de güncelle).
@@ -451,6 +512,27 @@ Açık rotalar: /giris, /auth/, /profil-tamamla, /nasil-calisir, /hakkimizda,
 - **Kod ve migration'ın SIRASI önemlidir** — yetki daraltan migration'lar **deploy'dan SONRA**, yeni kolon/tablo açan migration'lar **deploy'dan ÖNCE** çalıştırılır. Ters sırada ya kod olmayan kolona yazar ya da yeni kod var olmayan yetkiyle çalışır. Migration dosyasının başına hangisi olduğunu YAZ.
 - **Bellek içi rate limit tek instance varsayar** — `api/ilan/[id]/telefon` (20/dk) ve `api/ilan/[id]/sahiplen` (60 sn OTP cooldown) `Map` kullanıyor. Çok instance'a ölçeklenirse limit instance sayısı kadar gevşer. Redis'e taşıma kararı `SPRINT_01` G2 ile birlikte. Ayrıca sayaç yalnızca işlem **gerçekten** başarılıysa başlatılmalı — sağlayıcı hatası kullanıcıyı kilitlememeli.
 - **Recovery oturumu ≠ normal oturum, ama Supabase ikisini de kabul eder** (28 Tem 2026, `SPRINT_01` R1). Tarayıcıda normal bir oturum açıkken `supabase.auth.updateUser({ password })` **eski şifre sorulmadan çalışır**. `/auth/reset` bu yüzden formu koşulsuz göstermemeli: `PASSWORD_RECOVERY` event'i (veya PKCE `?code=` takası) beklenmeli, işlem sonrası `signOut()` çağrılmalı.
+- 🚨 **`/u/[username]` KLASÖR ADI YALAN SÖYLÜYOR — param `username` değil, kullanıcı `id`'si** (29 Tem 2026, `SPRINT_01` S3). `app/u/[username]/page.tsx` param'ı `.eq('id', userId)` ile kullanıyor, panel de linki `/u/${userId}` üretiyor. `users.username` kolonu **routing'de hiç kullanılmıyor**. Bu rotaya URL üreten her yer (sitemap, paylaş butonu, e-posta şablonu) **id** yazmak zorunda; `username` yazan toptan 404 basar. Klasörü yeniden adlandırmak isterse `[id]` olmalı.
+- 🚨 **`'use client'` sayfası `metadata` EXPORT EDEMEZ** (29 Tem 2026, `SPRINT_01` S2). Next bunu **hata vermeden yok sayar** — yazdığın `robots`/`title` hiçbir zaman HTML'e girmez, fark etmen aylar sürer. Tek çözüm: aynı route segmentinde sunucu tarafı bir `layout.tsx`. Mümkünse **segment seviyesine** koy (`app/auth/layout.tsx`), sayfa başına değil; yoksa yeni eklenen kardeş rotalar sessizce dışarıda kalır.
+- **OG görseli: aynı segmentte TEK dosya olabilir** (29 Tem 2026, `SPRINT_01` S1). `app/opengraph-image.{tsx,png,jpg}` bir arada bulunamaz — Next hangisini seçeceğini bilemez. Statik görsele geçerken `.tsx` üreteci **silinmek zorunda**. Alt metin ayrı dosyadan gelir: `app/opengraph-image.alt.txt`. ⚠️ **Dosya boyutu:** WhatsApp büyük görsellerde kartı sessizce göstermez; 1200×630 JPEG ~130 KB güvenli, aynı kadraj PNG olarak 650 KB'a çıkıyordu. ⚠️ Karttaki sayı/rozet (ör. "519 aktif ilan", "BETA") **donmuş** metindir; güncellenmesi elle yapılır.
+- 🚨 **`metadataBase` olmadan göreli OG/canonical URL'leri ÜRETİLMEZ** (29 Tem 2026, `SPRINT_01` S1). Next build'de uyarı verip sessizce atlar. WhatsApp/LinkedIn paylaşım kartının hiç görünmemesinin en sık sebebi budur. Ayrıca **canonical MİRAS ALINMAZ**: kök layout'un `alternates.canonical`'ı alt sayfalara geçmez, her sayfa kendi canonical'ından sorumludur.
+- 🚨 **robots.txt'te isimli blok, `*` bloğunun YERİNE GEÇER — birleşmez** (29 Tem 2026, `SPRINT_01` S4). GoogleBot/GPTBot/ClaudeBot kendi adını taşıyan bir blok görünce `User-agent: *` bloğunu **tamamen yok sayar**. Bu yüzden `public/robots.txt`'teki dört bloğun disallow listesi birebir aynı olmak zorunda; yeni bir özel alan eklerken dördünü birden güncelle. (Eski halinde `*` bloğu düpedüz `Allow: /` diyordu → `/panel/`, `/admin/`, `/api/` genel taramaya açıktı.) ⚠️ robots.txt bir güvenlik sınırı değildir; asıl sınır `proxy.ts` + `requireStaff()` + RLS.
+- 🚨 **Kota, KAPININ olduğu yerde sayılmalı** (29 Tem 2026, `ILAN_VER_ANALIZ` V7). `parse-text` ücretli Anthropic çağrısını istek başında kotayla kapatıyor ama sayaç (`countAiListingsLast24h`) `listings.raw_text IS NOT NULL` satırlarını sayıyor — yani **kayıt** anını. Ayrıştırıp formu göndermeyen kullanıcının sayacı hiç artmaz; ücretli endpoint sınırsız çağrılabilir. Aynı sayaç `whatsapp/route.ts:191,204` tarafından da besleniyor, yani kanallar birbirinin kotasını yiyor. **Kural:** ücretli/kaba-kuvvete açık her çağrıda kapı ile sayaç **aynı olayı** ölçer; `lib/kota.ts` ile önce `sayma: true` peek, işlem **başarılıysa** sayaç işlenir.
+- 🚨 **`moderation_status`'u uygulamada sabitlemek trigger'ın kararını ezer** (29 Tem 2026, `ILAN_VER_ANALIZ` V3). `ilanKaydet` INSERT'te `moderation_status: 'auto_published'` yazıyor; `audit_listing_fn` yalnızca `score >= reject_min` (71) dalında bu alana dokunuyor. Sonuç: 31–70 puanlık **orta bant fiilen yok** — şüpheli ilan doğrudan yayında. `auto_pub_max` fonksiyonda hesaplanıp `internal_audit_logs`'a yazılıyor ama hiçbir karar dalında kullanılmıyor (dal yazılmak istenmiş, unutulmuş). **Kural:** karar trigger'ın; uygulama bu alanı ya hiç yazmaz ya da eşiklerin üçünü de ele alan tek bir yerde yazar. Ek olarak, trigger sessizce `is_shadow_banned` yapabildiği için **başarı ekranı INSERT sonucunu okumadan "yayında" diyemez**.
+- ⚠️ **İstemci↔route sözleşmesi tek bir `type`'ta tanımlanmalı** (29 Tem 2026, `ILAN_VER_ANALIZ` B1). `TopluYukle.tsx` JSON `{action, rows, userId}` yolluyor, `/api/excel-import` yalnızca `formData().get('file')` okuyor; üstelik istemci şablonu `'Kalkış İli'`, route `'Kalkış Şehri'` bekliyor. Özellik aylardır **hiç çalışmıyor** ve TypeScript yakalayamadı çünkü `fetch` gövdesi `any`. Ortak `type` + `satisfies` ile derleme zamanında yakalanırdı. ⚠️ Ayrıca `userId` **asla istemciden alınmaz**, oturumdan okunur.
+- **`useSearchParams` Suspense sınırı olmayan sayfada TÜM AĞACI CSR bailout'a sokar** (29 Tem 2026, `SPRINT_01` L2). Yalnız ilk yüklemede okunacak bir query param için `useEffect` içinde `new URLSearchParams(window.location.search)` yeterli ve maliyetsiz. Ayrıca URL'den gelen değer state'e **beyaz listeden geçmeden** yazılmamalı.
+- **Giriş duvarına yönlendirirken `?redirect=` HER ZAMAN doldurulmalı** (29 Tem 2026, `SPRINT_01` L2/L3). Düz `/giris`'e atmak kullanıcıyı giriş sonrası ana sayfaya düşürür; akan ilan listesinde baktığı ilanı bir daha bulamaz. `lib/redirect.ts`'teki `guvenliRedirect` query string'i korur, o yüzden `/ilan-ver?tip=arac` gibi hedefler de güvenle taşınabilir.
+- ⚠️ **GA'ya kişisel veri gönderme** (`lib/analiz.ts`). Telefon, e-posta, TCKN/VKN, tam ad → GA'ya **gitmez**. Yalnız kategorik/sayısal alanlar (`tip: 'yuk' | 'arac'` gibi). KVKK gereği: GA verisi yurt dışına çıkar.
+- 🚨 **BÜYÜK HARF KONTROLÜNDE `/[A-Z]/` KULLANMA — Türkçe'de yanlış** (29 Tem 2026, `SPRINT_01` R2). "Şifre123" ve "Ölçü1234" tamamen geçerli parolalar ama `[A-Z]` bunları "büyük harf yok" diye reddeder; kullanıcı ne yaptığını anlamadan kayıt olamaz. Doğrusu `\p{Lu}` + `/u` bayrağı (Ç, Ğ, İ, Ö, Ş, Ü dahil). Aynı tuzak küçük harf (`\p{Ll}`) ve harf (`\p{L}`) kontrolleri için de geçerli. tsconfig `target: ES2017` bunu destekliyor. Şifre kuralları **tek kaynak**: `lib/sifre.ts`.
+- ⚠️ **İstemci şifre doğrulaması güvenlik değil UX'tir.** Gerçek zorunluluk Supabase Dashboard → Authentication → Policies → Password Requirements'ta ayarlanır. `lib/sifre.ts` yalnız kullanıcıya ne beklendiğini gösterir. Ayrıca **mevcut kullanıcıların girişine yeni kural uygulanmaz** — eski zayıf parolalılar kilitlenmesin (`epostaGiris` bilinçli olarak kapıya bağlı değil).
+- 🚨 **`pushState` TEK BAŞINA BOZUKTUR — `popstate` dinleyicisi zorunludur** (29 Tem 2026, `SPRINT_01` L5). URL'i elle değiştiren her yer geri/ileri tuşunu da dinlemeli; yoksa geri tuşu URL'i değiştirir ama React state'i eski kalır ve ekranla adres çubuğu çelişir. Ayrıca: istemci tarafı bir filtre için **`router.push` değil `history.pushState`** (`router.push` RSC payload'ı çeker, ISR sayfasını yeniden ister); varsayılan değer için parametre **silinmeli** (aynı liste için iki URL = yinelenen içerik); **geçersiz parametre `replaceState` ile temizlenmeli**, yoksa kullanıcı çalışmayan bir filtre uyguladığını sanıp o linki paylaşır.
+- 🚨 **Tip/mod değiştiren butonlar, açık input'u ÖNCE blur eder** (29 Tem 2026, `SPRINT_01` K3). Sıra: mousedown → blur → click. `onBlur`'da asenkron kontrol yapan bir alan varsa, istek uçarken form temizlenir ve dönen sonuç **temizlenmiş state'in üzerine** yazar. `profil-tamamla`'da bu, "Kaydet" butonunu kalıcı pasif bırakıyor ve **uyarı metni de görünmüyordu** (ilgili blok yeni tipte gizli) — sebebi görünmeyen sessiz çıkmaz. Çözüm: epoch/abort sayacı (`tipEpoch` ref); uçuştaki istek dönüşte epoch'u doğrulamazsa sonucunu yazmaz. Spinner yine de kapatılmalı.
+- 🚨 **Görünmeyen form alanı MUTLAKA temizlenmeli** (29 Tem 2026, `SPRINT_01` K3). `handleSubmit` alanı `x || undefined` ile gönderiyor ve `profil-tamamla/actions.ts` `company_name`'i **kullanıcı tipinden bağımsız** yazıyor — yani ekranda olmayan veri sessizce kaydediliyor. `ALAN_GORUNUR` haritası ile JSX koşulları **birbirinin aynası**; biri değişirse diğeri de değişmeli.
+- ⚠️ **Aynı sekmeye/moda tekrar tıklamak hiçbir şeyi sıfırlamamalı** (29 Tem 2026, `SPRINT_01` F1). Koşulsuz `setMod('giris')` yüzünden `?mod=kayit` ile gelen kullanıcı, zaten aktif olan sekmeye tekrar tıklayınca sessizce giriş formuna düşüyordu. Ayrıca URL param'ı ile mod kurarken **render koşulunun tamamını** kur: kayıt formu `sekme === 'eposta' && mod === 'kayit'` istiyor; yalnız `mod`'u kurmak sessiz bir no-op'tur.
+- ⚠️ **Liste sayacı, LİSTEYİ saymalı** (29 Tem 2026, `SPRINT_01` L4). `count: 'exact'` toplamı platform genelini verir (tüm sekmeler, kırpma öncesi); altındaki liste ise tek sekmenin ilk `ILAN_LIMITI` kaydı. Ekranda "519 ilan" yazıp 40 kart göstermek kullanıcıya sayfa bozuk hissi verir. Kırpma varsa **"en yeni" ön eki filtreden bağımsız** yazılmalı: filtre bu pencerenin içinde, istemcide çalışıyor — sunucuya gitmiyor. Limit tek yerden: `lib/ilan-liste.ts`.
+- 🚨 **Auth hata dallarında Türkçe METNE göre dallanma** (29 Tem 2026, `SPRINT_01` A5). Metin değişince dal sessizce ölür. Sunucu makine okunur `kod` dönmeli (`eposta_dogrulanmamis` | `kimlik_hatali`), istemci ona baksın. Hesap sayımı endişesi yok: GoTrue password grant'ta şifre, `Email not confirmed` kontrolünden **önce** doğrulanıyor.
+- 🚨 **`resend()` / `signUp()` çağrısında `emailRedirectTo` VERİLMEZSE** Supabase kendi "Site URL" ayarına düşer; kullanıcı `/auth/callback` yerine ana sayfaya çıkar, oturum takası **hiç yapılmaz** ve "linke tıkladım ama giremiyorum" der (29 Tem 2026, `SPRINT_01` A6). Değer `NEXT_PUBLIC_SITE_URL`'den gelmeli — **`request.url` kullanma**, Vercel'de proxy arkasındaki iç adres olabilir.
+- ⚠️ **E-posta gönderen uç noktalar hesap sayımına (enumeration) kapalı olmalı** (29 Tem 2026, `SPRINT_01` A6). `/api/auth/dogrulama-tekrar` adres kayıtlı olsun olmasın **aynı yanıtı** döner; sebep yalnız loga yazılır. Kotalar hata yolunda da işlenir — buradaki "hata"ların çoğu "böyle adres yok / zaten doğrulanmış", yani saldırganın aradığı bilgi; saymazsak o yol bedava olur. (`otp/route.ts`'ten bilinçli ayrılık: orada hata = sağlayıcı arızası, sayaç işlenmeden 502 döner.)
 
 ---
 
@@ -470,7 +552,7 @@ Açık rotalar: /giris, /auth/, /profil-tamamla, /nasil-calisir, /hakkimizda,
 | İlan detay | `/ilan/[id]` | ✅ kısmi |
 | Tekil ilan formu | `/ilan-ver` | ✅ |
 | Metinden ilan (LLM) | `/ilan-ver` (yöntem=metin) | ✅ |
-| Toplu yükleme | `/ilan-ver` | ✅ kısmi |
+| Toplu yükleme | `/ilan-ver` | ❌ **kırık** (istemci↔route sözleşmesi uyuşmuyor — `ILAN_VER_ANALIZ` B1) |
 | Atanan işlerim | `/panel/is/[id]` | 🔮 Faz 2 |
 | Puanlama | modal | 🔮 Faz 2 |
 | Profil / Araçlarım | `/panel` tab | ✅ kısmi |
@@ -484,17 +566,36 @@ Açık rotalar: /giris, /auth/, /profil-tamamla, /nasil-calisir, /hakkimizda,
 | 1 | `app/ilan/[id]/page.tsx` | `generateMetadata` — dinamik title/description/OG |
 | 2 | `app/ilan/[id]/page.tsx` | JSON-LD `<script type="application/ld+json">` — Schema.org/Service |
 | 3 | `app/ilan/[id]/page.tsx` | Semantik `<article>`, `<ol>` durak listesi, `data-ai-label` |
-| 4 | `public/robots.txt` | GPTBot, ClaudeBot izinleri + Sitemap path |
+| 4 | `public/robots.txt` | 4 blok, birebir aynı disallow listeleri + Sitemap path (S4) |
 | 5 | `app/api/ilanlar/[id]/route.ts` | Public JSON API (hassas veri yok, 5dk cache) |
 | 6 | `app/ilan/[id]/page.tsx` | `audit_score` → metadata + `data-quality-score` + görsel rozet |
+| 7 | `app/layout.tsx` | `metadataBase` + OG + Twitter card + `alternates.canonical` (S1) |
+| 8 | `app/opengraph-image.jpg` (+ `.alt.txt`) | 1200×630 paylaşım kartı, statik görsel (S1) |
+| 9 | `app/{giris,moderator-giris,profil-tamamla,auth}/layout.tsx` | Auth yüzeylerinde `noindex` (S2) |
 
-**Sitemap**: `app/sitemap.ts` ✅ — aktif+onaylı ilanlar, 5000 limit, statik sayfalar dahil.
+**Sitemap**: `app/sitemap.ts` ✅ — statik sayfalar (`/yol-rehberi` dahil) + aktif/onaylı ilanlar
+(5000 limit) + **yayında ilanı olan kullanıcıların profilleri** (`/u/{id}`, aynı sorgudan türetilir).
+
+**Site adresi tek kaynak:** `NEXT_PUBLIC_SITE_URL`, fallback `https://yukegel.com`.
+`app/layout.tsx` ve `app/sitemap.ts` **aynı** değişkeni + **aynı** fallback'i kullanır; ayrışırlarsa
+canonical ile sitemap farklı alan adı gösterir ve Google ikisini ayrı site sanar.
+
+⏭️ **Açık:** `/ilan/[id]` kendi `alternates.canonical`'ını vermiyor — Next canonical'ı alt
+sayfalara **miras bırakmaz**. Dinamik OG görseli de yok (kök karta düşüyor).
 
 ---
 
 ## 14. GÖREV DURUMU
 
 ### ✅ Tamamlanan
+- **SPRINT_01 W5 — Alias veri bütünlüğü (kod tarafı)** (29 Temmuz 2026). Devir notu: `docs/W5_DEVIR.md`.
+  - **D1 — `learn-aliases` prompt'u.** Altı bozuk JSON örneği doğru Türkçe yazıma çevrildi (`"Eskişehir"`, `"İzmit"`, `"İstanbul"`, `"İkitelli"`, `"Tekirdağ"`, `"Çorlu"`), prompt'un başına "EN ÖNEMLİ KURAL — TÜRKÇE YAZIM" bloğu eklendi ve **"mevcut alias listesindeki ASCII kayıtları örnek alma"** uyarısı yazıldı (liste bağlam olarak veriliyor, yoksa bozulma kendini besliyordu).
+  - **D2 — dört yazma noktası kapatıldı.** Yeni `lib/alias-normalize.ts`: `aliasKey()` (katlama), `trTemizle()`, `normalizeAliasFields()`, `aliasSatirlariniYukle()` (sayfalı, bayrak filtresi YOK), `aliasCakismaBul()` → **409 + çoğunluk yazımı önerisi**, `baskinYazimaHizala()` (yalnız AI keşif yolu; değişenler yanıtta `hizalanan_yazimlar` olarak raporlanır). Manuel `create`, AI keşif, PATCH `approve` ve PATCH alan güncelleme yollarının dördü de normalize+kontrol ediyor. 5b kopya kontrolü ham `in('alias',…)` yerine katlanmış anahtar setiyle çalışıyor.
+  - **D4 — `parse-listing/findPlaces` karşılaştırma anahtarları katlandı.** `yerKey`/`ayniSehir`/`ayniIlce`/`laneKey` eklendi; `seen` (bigram+unigram), `sameCity` koruması, Pass 2 hedef bulucu + `blockSeen`, Pass 2/3 `isDiff`, fallback ve son lane dedup — hepsi katlanmış anahtar kullanıyor, **saklanan değer ham kalıyor**. Kabul testi: yeni kod **5/5**, HEAD aynı testlerde **3/5 başarısız** (HEAD `hits=["Istanbul","İstanbul"]` ve sahte `Istanbul->İstanbul` lane'i üretiyor).
+  - **D5 — `docs/20260729_alias_runbook.md`.** İki hazır temizlik script'inin (`20260728_alias_homonim_temizligi.sql` / `20260728_alias_kopya_temizligi.sql`) çalıştırma sırası hiçbir yerde yazılı değildi ve **ters sıra sessizce zarar veriyor** (kopya BÖLÜM 3, BÖLÜM 2'nin düzelttiği değerleri kaynak alıyor). 11 adım, her adımın önizleme `SELECT`'i ve geri alması var, hiçbir adım satır silmiyor.
+  - **D3 — `docs/20260729_alias_normalize_trigger.sql`.** `aliases_normalize_trg` (BEFORE INSERT/UPDATE OF alias,normalized,district) + `aliases_katlanmis_anahtar_uniq` **kısmi** UNIQUE indeks. Trigger `normalizeAliasFields`'in DB ikizi — ayrışırlarsa uygulama "temiz" der, DB başka değer yazar.
+  - 🚨 **Devir notunda OLMAYAN bulgu:** `alias` UNIQUE'i ham string üzerinde olduğu için `Gebze`/`GEBZE`/`gebze` ayrı satırlar; hepsi tek katlanmış anahtara düşüyor ve temizlik script'i satır silmediği için D3 indeksi tam haliyle **hiç kurulamaz**. Çözüm: runbook Adım 9 (fazlalıkları `is_active=false`) + indeksin `WHERE is_active = true` ile kısmi olması.
+  - ⏳ **SQL'lerin hiçbiri çalıştırılmadı** (Bayram'ın beyanı). Doğrulama: `tsc --noEmit` temiz; lint HEAD'e göre gerilemedi (`learn-aliases` 15→13 hata, `parse-listing` 1→1, `lib/alias-normalize.ts` 0).
 - **SPRINT_01 W1 — Auth akış bütünlüğü** (28 Temmuz 2026). Ayrıntı ve kabul kriterleri: `docs/SPRINT_01.md`.
   - **A1 + A1b — auth denetim izi açıldı.** `app/api/auth/log/route.ts` (yeni) service-role ile `auth_events`'e yazıyor. Endpoint aylardır **yoktu**; `authLog()` çağrıları `.catch(()=>{})` içinde olduğu için 404 sessizce yutuluyordu. Artık `console.warn` bırakılıyor. ✅ `docs/20260728_auth_events.sql` çalıştırıldı (29 Tem 2026).
   - **A3 — `?hesap=tasindi` / `?hesap=eslesme` mesajları görünür oldu.** Mesaj `onAuthStateChange`'ten bağımsız basılıyor; proxy cookie'yi sildiği için `!user` dalında da çalışması gerekiyordu.

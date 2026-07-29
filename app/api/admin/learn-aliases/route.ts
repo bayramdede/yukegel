@@ -1,8 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin, getServiceSupabase } from '../../../../lib/auth';
+// W5/D2 — dört yazma noktasının tamamı bu yardımcıdan geçer; gerekçesi lib dosyasında.
+import {
+  aliasKey,
+  normalizeAliasFields,
+  aliasCakismaBul,
+  baskinYazimaHizala,
+  aliasSatirlariniYukle,
+} from '../../../../lib/alias-normalize';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60; // LLM keşif çağrısı için
+
+// ⚠️ `is_active` / `is_approved` TUZAĞI (W5/D2'de tespit edildi, bilinçli olarak
+// DEĞİŞTİRİLMEDİ — kapsam dışı):
+// `parse-listing/index.ts:44` ve `whatsapp-parse/route.ts:344` alias listesini
+// çekerken yalnız `.eq('is_active', true)` filtreliyor, `is_approved`'a BAKMIYOR.
+// Şu an güvenli, çünkü bu route'ta AI önerileri `is_active: false` doğuyor ve
+// onay anında ikisi birlikte `true` oluyor. Yani güvenlik iki bayrağın senkron
+// kalmasına bağlı — kırılgan varsayım. `is_active: true, is_approved: false` bir
+// satır herhangi bir yoldan oluşursa onaylanmamış alias canlı parse'a girer.
+// Değiştirilecekse eşleşme tarafına `is_approved` filtresi eklenmeli.
 
 async function yetkiKontrol() {
   try {
@@ -120,13 +138,25 @@ export async function POST(req: NextRequest) {
     if (!alias?.trim() || !normalized?.trim()) {
       return NextResponse.json({ error: 'alias ve normalized zorunlu' }, { status: 400 });
     }
+    // 🚨 W5/D2 — Bu yol eskiden alias'ı lowercase ETMİYORDU (AI yolu ve PATCH
+    // ediyordu). Büyük harfli alias eşleşme tarafında hiç tutmaz: `findPlaces` ve
+    // `whatsapp-parse` trNorm'lanmış metinle karşılaştırıyor. Sessizce ölü kayıt
+    // üretiyordu.
+    const tip = type ?? 'city';
+    const alanlar = normalizeAliasFields({ alias, normalized, district: body.district ?? null, type: tip });
+    const cakisma = await aliasCakismaBul(svc, { type: tip, ...alanlar });
+    if (cakisma) {
+      // 409: sessizce ezmiyoruz — hangi yazımın kazandığını admin görmeli.
+      return NextResponse.json({ error: cakisma.mesaj, conflict: cakisma }, { status: 409 });
+    }
+
     const { data, error } = await svc
       .from('aliases')
       .insert({
-        alias: alias.trim(),
-        normalized: normalized.trim(),
-        type: type ?? 'city',
-        district: body.district?.trim() || null,
+        alias: alanlar.alias,
+        normalized: alanlar.normalized,
+        type: tip,
+        district: alanlar.district ?? null,
         is_active: true,
         created_by_ai: false,
         is_approved: true,
@@ -178,7 +208,24 @@ export async function POST(req: NextRequest) {
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) return NextResponse.json({ error: 'ANTHROPIC_API_KEY eksik' }, { status: 500 });
 
+    // 🚨 W5/D1 — Prompt'un kendisi bozuk yazim ogretiyordu (29 Tem 2026).
+    // Eski surumde asagidaki orneklerin HEPSI ASCII'ye indirgenmisti ("Istanbul",
+    // "Eskisehir", "Tekirdag"...). LLM kurali degil ORNEGI taklit eder; boylece
+    // aliases.normalized'a hem "Istanbul" hem "İstanbul" yaziliyordu. Sonucu:
+    // findPlaces bunlari iki ayri sehir sayip sahte "İstanbul→İstanbul" guzergahi
+    // uretiyor, sehir filtresi de ilanlarin bir kismini hic gostermiyordu.
+    // Bu yuzden il/ilce ORNEKLERI dogru Turkce yazimda olmak ZORUNDA.
+    // ⚠️ Prompt govdesindeki TALIMAT metinleri (GOREV, KURALLAR) ASCII kalabilir —
+    // onlar veriye kopyalanmiyor, yalniz ornekler kopyalaniyor.
     const prompt = `Turk nakliye ilan metinlerinden YER ADI ALIAS'LARINI kesvet.
+
+EN ONEMLI KURAL — TURKCE YAZIM:
+"normalized" ve "district" degerleri Turkiye'deki RESMI yazimla yazilacak.
+Turkce karakterler (ı ğ ü ş ö ç İ) AYNEN korunacak, ASCII'ye indirgenmeyecek.
+DOGRU:  "İstanbul", "İzmir", "Eskişehir", "Tekirdağ", "Muğla", "Çorlu", "Bingöl"
+YANLIS: "Istanbul", "Izmir", "Eskisehir", "Tekirdag", "Mugla", "Corlu", "Bingol"
+Asagidaki MEVCUT ALIAS listesinde ASCII'ye indirgenmis ESKI kayitlar bulunabilir.
+Onlari ornek alma — her zaman dogru Turkce yazimi uret.
 
 MEVCUT ALIAS'LAR (bunlari tekrar onerme): ${mevcutMap || '(bos)'}
 
@@ -190,20 +237,20 @@ Bu metinlerde gecen yer isimlerinden standart Turkiye il/ilce listesinde OLMAYAN
 Bunlarin standart karsiligini bul.
 Ornekler:
 - "G.Antep"  => normalized:"Gaziantep", district:null     (il)
-- "eskiseh"  => normalized:"Eskisehir", district:null     (il)
-- "izmit"    => normalized:"Kocaeli",   district:"Izmit"  (ilce)
+- "eskiseh"  => normalized:"Eskişehir", district:null     (il)
+- "izmit"    => normalized:"Kocaeli",   district:"İzmit"  (ilce)
 - "gebze"    => normalized:"Kocaeli",   district:"Gebze"  (ilce)
-- "tuzla"    => normalized:"Istanbul",  district:"Tuzla"  (ilce)
-- "ikitelli" => normalized:"Istanbul",  district:"Ikitelli" (ilce)
-- "corlu"    => normalized:"Tekirdag",  district:"Corlu"  (ilce)
+- "tuzla"    => normalized:"İstanbul",  district:"Tuzla"  (ilce)
+- "ikitelli" => normalized:"İstanbul",  district:"İkitelli" (ilce)
+- "corlu"    => normalized:"Tekirdağ",  district:"Çorlu"  (ilce)
 - "antakya"  => normalized:"Hatay",     district:"Antakya" (ilce)
 
 SADECE GECERLI JSON ARRAY DONDUR, baska hicbir sey yazma:
 [
   {
     "alias": "bulunan_kelime_veya_kisaltma",
-    "normalized": "bagli_oldugu_il_adi_turkce",
-    "district": "ilce_adi_turkce_veya_null",
+    "normalized": "bagli_oldugu_il_adi_turkce_karakterlerle",
+    "district": "ilce_adi_turkce_karakterlerle_veya_null",
     "type": "city",
     "confidence": 85,
     "source_ids": ["id1"]
@@ -212,8 +259,9 @@ SADECE GECERLI JSON ARRAY DONDUR, baska hicbir sey yazma:
 
 KURALLAR:
 - type: her zaman "city" kullan
-- normalized: DAIMA il adi (ornek: "Istanbul", "Kocaeli", "Gaziantep")
-- district: eger alias bir ILCE ise ilcenin dogru Turkce adi; eger alias IL ise null
+- normalized: DAIMA il adi, Turkce karakterlerle (ornek: "İstanbul", "Kocaeli", "Muğla")
+- district: eger alias bir ILCE ise ilcenin dogru Turkce adi (Turkce karakterlerle);
+  eger alias IL ise null
 - confidence: 0-100. Sadece >=70 gonder.
 - Mevcut listede olan alias'lari tekrar onerme
 - Hic bulamazsan: [] dondur`;
@@ -273,20 +321,48 @@ KURALLAR:
       return NextResponse.json({ success: true, message: 'LLM yeni alias bulamadi', suggestions: [] });
     }
 
+    // 🚨 W5/D2 — Mevcut yazımlara hizalama için tam city indeksi.
+    // LLM prompt'una giden 500'lük örnek yetmez: canonical yazım o örneğin dışında
+    // kalabilir. Ayrıca `is_active`/`is_approved` filtresi YOK — pasif bir kopya da
+    // çakışmadır (D3 indeksi bayraklara bakmayacak).
+    const cityIndeksi = await aliasSatirlariniYukle(svc, 'city');
+    const mevcutNormDegerleri = cityIndeksi.map(s => s.normalized);
+    const mevcutDistrictDegerleri = cityIndeksi.map(s => s.district);
+    const hizalananlar: { alias: string; alan: string; llm: string; kullanilan: string }[] = [];
+
     // 5a. Confidence ≥70 olanları filtrele
     const adaylar = suggestions
       .filter((s: any) => s.alias && s.normalized && (s.confidence ?? 0) >= 70)
-      .map((s: any) => ({
-        alias: String(s.alias).trim().toLowerCase(),
-        normalized: String(s.normalized).trim(),
-        type: 'city',
-        district: s.district ? String(s.district).trim() : null,
-        is_active: false,
-        created_by_ai: true,
-        is_approved: false,
-        llm_confidence: Math.min(100, Math.max(0, Number(s.confidence ?? 80))),
-        source_listing_ids: Array.isArray(s.source_ids) ? s.source_ids : [],
-      }));
+      .map((s: any) => {
+        const alanlar = normalizeAliasFields({
+          alias: s.alias,
+          normalized: s.normalized,
+          district: s.district ?? null,
+          type: 'city',
+        });
+        // Öneriyi 409 ile reddetmek yerine mevcut baskın yazıma çekiyoruz: bunlar
+        // `is_approved=false` ÖNERİ, admin zaten tek tek onaylıyor. Ama neyin
+        // değiştiği yanıtta raporlanır — sessiz düzeltme yok.
+        const norm = baskinYazimaHizala(alanlar.normalized ?? null, mevcutNormDegerleri);
+        const dist = baskinYazimaHizala(alanlar.district ?? null, mevcutDistrictDegerleri);
+        if (norm !== alanlar.normalized) {
+          hizalananlar.push({ alias: alanlar.alias ?? '', alan: 'normalized', llm: alanlar.normalized ?? '', kullanilan: norm ?? '' });
+        }
+        if (dist !== alanlar.district) {
+          hizalananlar.push({ alias: alanlar.alias ?? '', alan: 'district', llm: alanlar.district ?? '', kullanilan: dist ?? '' });
+        }
+        return {
+          alias: alanlar.alias ?? '',
+          normalized: norm ?? '',
+          type: 'city',
+          district: dist,
+          is_active: false,
+          created_by_ai: true,
+          is_approved: false,
+          llm_confidence: Math.min(100, Math.max(0, Number(s.confidence ?? 80))),
+          source_listing_ids: Array.isArray(s.source_ids) ? s.source_ids : [],
+        };
+      });
 
     if (adaylar.length === 0) {
       await svc.from('raw_posts').update({ slh_scanned_at: now }).in('id', rawPostIds);
@@ -298,14 +374,13 @@ KURALLAR:
     }
 
     // 5b. Zaten onaylanmış alias'ları hariç tut — upsert bunları ezip is_approved=false yapmasın
-    const { data: mevcutOnaylilar } = await svc
-      .from('aliases')
-      .select('alias')
-      .in('alias', adaylar.map((a: any) => a.alias))
-      .eq('is_approved', true);
-
-    const onayliSet = new Set((mevcutOnaylilar ?? []).map((a: any) => a.alias));
-    const kayitlar = adaylar.filter((a: any) => !onayliSet.has(a.alias));
+    // ⚠️ W5/D2 — Karşılaştırma artık KATLANMIŞ anahtarla. Eskiden ham `in('alias', ...)`
+    // eşitliğiydi: onaylı "çorlu" varken LLM "corlu" önerirse ikisi ayrı sayılıp tabloya
+    // ikinci bir kopya giriyordu. Bu sorgu ayrıca kalktı — indeks yukarıda zaten yüklü.
+    const onayliKatlanmis = new Set(
+      cityIndeksi.filter(s => s.is_approved).map(s => aliasKey(s.alias)),
+    );
+    const kayitlar = adaylar.filter((a: any) => !onayliKatlanmis.has(aliasKey(a.alias)));
 
     if (kayitlar.length === 0) {
       await svc
@@ -317,6 +392,7 @@ KURALLAR:
         success: true,
         message: 'LLM onerilerinin tamami zaten mevcut — yeni alias yok',
         suggestions: [],
+        hizalanan_yazimlar: hizalananlar,
       });
     }
 
@@ -344,6 +420,8 @@ KURALLAR:
       message: `${kayitlar.length} yeni alias onerisi kaydedildi (onay bekliyor)`,
       suggestions: kayitlar,
       scanned_count: rawPosts.length,
+      // W5/D2 — LLM'in ürettiği yazım mevcut baskın yazıma çekildiyse burada görünür.
+      hizalanan_yazimlar: hizalananlar,
     });
   }
 
@@ -382,9 +460,25 @@ export async function PATCH(req: NextRequest) {
       approved_at: new Date().toISOString(),
     };
     // Düzeltme alanları varsa güncelle (düzenle + onayla akışı)
-    if (updates.alias !== undefined) payload.alias = String(updates.alias).trim().toLowerCase();
-    if (updates.normalized !== undefined) payload.normalized = String(updates.normalized).trim();
-    if ('district' in updates) payload.district = updates.district?.trim() || null;
+    // 🚨 W5/D2 — Onay anı bozulmanın son kapısı: burada "Istanbul" yazıp onaylamak
+    // tabloya ikinci bir İstanbul yazımı sokuyordu. Artık katlanmış forma göre
+    // çakışma varsa 409.
+    const alanlar = normalizeAliasFields(updates);
+    if (alanlar.alias !== undefined) payload.alias = alanlar.alias;
+    if (alanlar.normalized !== undefined) payload.normalized = alanlar.normalized;
+    if (alanlar.district !== undefined) payload.district = alanlar.district;
+
+    if (alanlar.alias !== undefined || alanlar.normalized !== undefined || alanlar.district) {
+      // Tip gönderilmiyorsa mevcut satırdan oku — çakışma kontrolü tip bazlı.
+      const { data: mevcutSatir } = await svc.from('aliases').select('type').eq('id', id).single();
+      const cakisma = await aliasCakismaBul(svc, {
+        type: mevcutSatir?.type ?? 'city',
+        ...alanlar,
+        excludeId: id,
+      });
+      if (cakisma) return NextResponse.json({ error: cakisma.mesaj, conflict: cakisma }, { status: 409 });
+    }
+
     const { error } = await svc.from('aliases').update(payload).eq('id', id);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json({ success: true });
@@ -397,14 +491,27 @@ export async function PATCH(req: NextRequest) {
   }
 
   // Alan güncelle
+  // 🚨 W5/D2 — Dördüncü yazma noktası. Aynı normalizasyon + çakışma kapısı.
+  const alanlar = normalizeAliasFields(updates);
   const izinli: Record<string, any> = {};
-  if (updates.alias !== undefined) izinli.alias = String(updates.alias).trim().toLowerCase();
-  if (updates.normalized !== undefined) izinli.normalized = String(updates.normalized).trim();
+  if (alanlar.alias !== undefined) izinli.alias = alanlar.alias;
+  if (alanlar.normalized !== undefined) izinli.normalized = alanlar.normalized;
   if (updates.type !== undefined) izinli.type = updates.type;
-  if ('district' in updates) izinli.district = updates.district?.trim() || null;
+  if (alanlar.district !== undefined) izinli.district = alanlar.district;
 
   if (Object.keys(izinli).length === 0) {
     return NextResponse.json({ error: 'Guncellenecek alan yok' }, { status: 400 });
+  }
+
+  if (alanlar.alias !== undefined || alanlar.normalized !== undefined || alanlar.district) {
+    // Tip değişiyorsa YENİ tipe göre kontrol et — çakışma hedef tipte olur.
+    let tip = updates.type as string | undefined;
+    if (!tip) {
+      const { data: mevcutSatir } = await svc.from('aliases').select('type').eq('id', id).single();
+      tip = mevcutSatir?.type ?? 'city';
+    }
+    const cakisma = await aliasCakismaBul(svc, { type: tip, ...alanlar, excludeId: id });
+    if (cakisma) return NextResponse.json({ error: cakisma.mesaj, conflict: cakisma }, { status: 409 });
   }
 
   const { error } = await svc.from('aliases').update(izinli).eq('id', id);

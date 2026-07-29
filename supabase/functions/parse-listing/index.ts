@@ -272,10 +272,45 @@ interface PlaceHit {
   district: string | null
 }
 
+// 🚨 W5/D4 — Şehir/ilçe KARŞILAŞTIRMALARI daima katlanmış anahtar üzerinden.
+//
+// Sorun: `aliases.normalized` kolonunda aynı şehir iki yazımla duruyor —
+// `Istanbul` (13 satır) ve `İstanbul` (154 satır); aynısı Izmir/İzmir,
+// Mugla/Muğla, Bingol/Bingöl. Ham string eşitliği bunları İKİ AYRI ŞEHİR sayıyor:
+//   • `avcilar` (→`Istanbul`) + `kadıköy` (→`İstanbul`) geçen tek satır
+//     "iki şehir bulmuş" oluyor,
+//   • `sameCity` koruması `'Istanbul' !== 'İstanbul'` dediği için devreye girmiyor,
+//   • sonuç: sahte **İstanbul→İstanbul** ilanı kaydediliyor.
+//
+// ⚠️ Katlama YALNIZ karşılaştırma ve dedup anahtarlarında kullanılır. `hits` ve
+// `lanes` içindeki değer HAM kalır — ilana yazılan, veritabanındaki yazımdır.
+// (Yazma tarafı W5/D1+D2 ile düzeltildi, D5 mevcut veriyi temizliyor; bu katman
+// veri temizlendikten sonra da doğru kalır ve bir daha bu bug'ı mümkün kılmaz.)
+function yerKey(s: string | null | undefined): string {
+  return trNorm(s ?? '')
+}
+
+/** Aynı şehir mi? Türkçe/ASCII yazım farkını yok sayar. */
+function ayniSehir(a: string, b: string): boolean {
+  return yerKey(a) === yerKey(b)
+}
+
+/** Aynı ilçe mi? `null`/boş ilçeler eşit sayılır (ikisi de "bilinmiyor"). */
+function ayniIlce(a: string | null | undefined, b: string | null | undefined): boolean {
+  return yerKey(a) === yerKey(b)
+}
+
+/** Lane / blok dedup anahtarı — yazım farkı ayrı lane üretmesin. */
+function laneKey(from: string, fromDist: string | null | undefined, to: string, toDist: string | null | undefined): string {
+  return `${yerKey(from)}|${yerKey(fromDist)}|${yerKey(to)}|${yerKey(toDist)}`
+}
+
 function findPlaces(text: string, aliases: Alias[]): PlaceHit[] {
   const norm = trNorm(text)
   const tokens = norm.split(' ').filter(t => t.length >= 3)
   const hits: PlaceHit[] = []
+  // 🚨 W5/D4 — Eskiden `seen.add(match.normalized)` HAM değerle anahtarlanıyordu;
+  // "Istanbul" ve "İstanbul" iki ayrı giriş oluyordu. Artık katlanmış anahtar.
   const seen = new Set<string>()
 
   const cityAliases = aliases.filter(a => a.type === 'city')
@@ -286,9 +321,9 @@ function findPlaces(text: string, aliases: Alias[]): PlaceHit[] {
     const bigram2 = stripSuffix(tokens[i]) + ' ' + stripSuffix(tokens[i + 1])
     for (const bg of [bigram, bigram2]) {
       const match = cityAliases.find(a => trNorm(a.alias) === bg)
-      if (match && !seen.has(match.normalized)) {
+      if (match && !seen.has(yerKey(match.normalized))) {
         hits.push({ normalized: match.normalized, priority: match.priority || 50, matched: bg, district: match.district || null })
-        seen.add(match.normalized)
+        seen.add(yerKey(match.normalized))
       }
     }
   }
@@ -300,9 +335,9 @@ function findPlaces(text: string, aliases: Alias[]): PlaceHit[] {
     const candidates = [...new Set([token, stripped1, strippedFull])]
     for (const cand of candidates) {
       const match = cityAliases.find(a => trNorm(a.alias) === cand)
-      if (match && !seen.has(match.normalized)) {
+      if (match && !seen.has(yerKey(match.normalized))) {
         hits.push({ normalized: match.normalized, priority: match.priority || 50, matched: cand, district: match.district || null })
-        seen.add(match.normalized)
+        seen.add(yerKey(match.normalized))
       }
     }
   }
@@ -423,7 +458,8 @@ function parseMessage(message: string, aliases: Alias[]): {
             for (const part of parts) {
               const partHits = findPlaces(part, aliases)
               const to = bestPlace(partHits)
-              if (to && to.normalized !== fromCity.normalized) {
+              // W5/D4 — yazım farkı yüzünden "Istanbul→İstanbul" lane'i doğmasın.
+              if (to && !ayniSehir(to.normalized, fromCity.normalized)) {
                 lanes.push({
                   from: fromCity.normalized,
                   fromDistrict: fromCity.district || null,
@@ -518,11 +554,12 @@ function parseMessage(message: string, aliases: Alias[]): {
         blockBody = findBodyType(line, aliases)
         // Aynı satırda hem kaynak hem hedef varsa (ör: "İKİTELLİ YÜKLEME HADIMKÖY")
         if (blockOrigin && yuklemePlaces.length >= 2) {
+          // W5/D4 — şehir VE ilçe karşılaştırması katlanmış anahtarla.
           const dest = yuklemePlaces.find(p =>
-            p.normalized !== blockOrigin!.normalized || (p.district ?? '') !== (blockOrigin!.district ?? '')
+            !ayniSehir(p.normalized, blockOrigin!.normalized) || !ayniIlce(p.district, blockOrigin!.district)
           )
           if (dest) {
-            const key = `${blockOrigin.normalized}|${blockOrigin.district ?? ''}|${dest.normalized}|${dest.district ?? ''}`
+            const key = laneKey(blockOrigin.normalized, blockOrigin.district, dest.normalized, dest.district)
             if (!blockSeen.has(key)) {
               lanes.push({
                 from: blockOrigin.normalized,
@@ -555,10 +592,11 @@ function parseMessage(message: string, aliases: Alias[]): {
         if (hits.length > 0) {
           const h = hits[0]
           // Aynı şehir farklı ilçe (şehiriçi güzergah) de lane sayılır
-          const isDiff = h.normalized !== blockOrigin.normalized ||
-            (h.district && blockOrigin.district && h.district !== blockOrigin.district)
+          // ⚠️ Bu mantık BİLİNÇLİ — silme. W5/D4 yalnız karşılaştırmayı katladı.
+          const isDiff = !ayniSehir(h.normalized, blockOrigin.normalized) ||
+            (h.district && blockOrigin.district && !ayniIlce(h.district, blockOrigin.district))
           if (isDiff) {
-            const key = `${blockOrigin.normalized}|${blockOrigin.district ?? ''}|${h.normalized}|${h.district ?? ''}`
+            const key = laneKey(blockOrigin.normalized, blockOrigin.district, h.normalized, h.district)
             if (!blockSeen.has(key)) {
               lanes.push({
                 from: blockOrigin.normalized,
@@ -591,8 +629,9 @@ function parseMessage(message: string, aliases: Alias[]): {
         hitsA[0].priority >= 40 && hitsB[0].priority >= 40
       ) {
         const a = hitsA[0], b = hitsB[0]
-        const isDiff = a.normalized !== b.normalized ||
-          (a.district && b.district && a.district !== b.district)
+        // ⚠️ Aynı şehir + farklı ilçe kabulü BİLİNÇLİ (şehiriçi güzergâh) — silme.
+        const isDiff = !ayniSehir(a.normalized, b.normalized) ||
+          (a.district && b.district && !ayniIlce(a.district, b.district))
         if (isDiff) {
           // Araç/yük bilgisi için çevre satırları da tara
           const ctx = lines.slice(i, i + 4).join(' ')
@@ -616,8 +655,20 @@ function parseMessage(message: string, aliases: Alias[]): {
       const hits = findPlaces(line, aliases)
       if (hits.length >= 2 && hits[0].priority >= 50 && hits[1].priority >= 50) {
         // Aynı şehir: sadece ilçeler farklıysa kabul et
-          const sameCity = hits[0].normalized === hits[1].normalized
-          const diffDist = hits[0].district !== hits[1].district
+        // 🚨 W5/D4 — SAHTE "İstanbul→İstanbul" İLANLARININ ÇIKTIĞI YER BURASI.
+        // `sameCity` ham string eşitliğiydi: `'Istanbul' !== 'İstanbul'` olduğu için
+        // koruma hiç devreye girmiyor, ilçesiz iki İstanbul eşleşmesi lane oluyordu.
+        // ⚠️ `diffDist` mantığı BİLİNÇLİ: ilçeler gerçekten farklıysa (şehiriçi
+        // güzergâh) lane korunmalı — silme, yalnız karşılaştırma katlandı.
+        // ⚠️ BULGU (W5/D4, testle doğrulandı): bu dalın `sameCity===true` kolu TEK
+        // SATIR için ULAŞILAMAZ, çünkü `findPlaces` şehir bazında tekilleştiriyor —
+        // aynı şehrin ikinci ilçesi `hits`e hiç girmiyor. Eskiden buraya düşen tek
+        // senaryo `Istanbul`/`İstanbul` bozulmasıydı, yani sahte lane üreten yoldu.
+        // Şehiriçi güzergâh AYRI SATIRLARDA hâlâ yakalanıyor (Pass 2 ~558, Pass 3
+        // ~594 iki farklı `findPlaces` çağrısını karşılaştırıyor). Silinmedi:
+        // `findPlaces` ileride ilçe bazında tekilleştirilirse tekrar canlanır.
+          const sameCity = ayniSehir(hits[0].normalized, hits[1].normalized)
+          const diffDist = !ayniIlce(hits[0].district, hits[1].district)
           if (!sameCity || (sameCity && hits[0].district && hits[1].district && diffDist)) {
           lanes.push({
             from: hits[0].normalized,
@@ -637,9 +688,10 @@ function parseMessage(message: string, aliases: Alias[]): {
   }
 
   // Duplicate lane temizle (from+fromDistrict+to+toDistrict kombinasyonu)
+  // W5/D4 — anahtar katlanmış: "Istanbul→Ankara" ile "İstanbul→Ankara" tek lane.
   const seen = new Set<string>()
   const uniqueLanes = lanes.filter(l => {
-    const key = `${l.from}|${l.fromDistrict ?? ''}|${l.to}|${l.toDistrict ?? ''}`
+    const key = laneKey(l.from, l.fromDistrict, l.to, l.toDistrict)
     if (seen.has(key)) return false
     seen.add(key)
     return true
