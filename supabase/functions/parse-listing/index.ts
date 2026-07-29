@@ -797,43 +797,67 @@ Deno.serve(async (req) => {
       if (spData) shadowProfileId = spData as string
     }
 
+    // ── İlan üretimi ──────────────────────────────────────────────────────────
+    //
+    // 🚨 ILAN_VER_ANALIZ W1+. Burada eskiden `listings` INSERT'i ve ardından
+    // `listing_stops` için ayrı bir döngü vardı. İkisi ayrı PostgREST isteği =
+    // ayrı transaction: durak insert'i patlarsa geriye DURAKSIZ ilan kalıyordu
+    // (V5). Uygulamadaki yollar `lib/ilan-yaz.ts`'e alındı ama bu fonksiyon
+    // Deno'da koştuğu için o modülü IMPORT EDEMEZ — ortak zemin `ilan_olustur()`
+    // RPC'si. Artık ilan + durakları tek transaction'da doğuyor.
+    //
+    // ⚠️ Migration: `docs/20260729_ilan_olustur_v2.sql` — `raw_post_id`,
+    // `shadow_profile_id`, `is_repost` alanlarını YAZAN sürüm. v1 ile deploy
+    // edilirse bu üç alan sessizce boş kalır.
     let created = 0
     for (const [, lanes] of lineGroups) {
       const firstLane = lanes[0]
-      const { data: listing } = await supabase.from('listings').insert({
-        listing_type: result.ad_type,
-        origin_city: firstLane.from,
-        origin_district: firstLane.fromDistrict || null,
-        contact_phone: contactPhone,
-        source: rawPost.source || 'whatsapp',
-        moderation_status: 'pending',
-        trust_level: 'social',
-        raw_post_id: raw_post_id,
-        raw_text: rawPost.raw_text,
-        notes: firstLane.raw_line,
-        vehicle_type: firstLane.vehicle ? [firstLane.vehicle] : null,
-        body_type: firstLane.body_type ? [firstLane.body_type] : null,
-        shadow_profile_id: shadowProfileId,
-        // Repost bayrağı raw_posts'tan taşınır. ÖNCEDEN whatsapp-parse route'u
-        // orijinal ilanı ayrıca kopyalıyordu; trigger de bu fonksiyonu çağırdığı
-        // için aynı mesaj İKİ ilan üretiyordu. Artık tek üretici burasıdır.
-        is_repost: rawPost.is_repost === true,
-      }).select().single()
+      const { data: rpcSonuc, error: rpcHata } = await supabase.rpc('ilan_olustur', {
+        p_listing: {
+          listing_type: result.ad_type,
+          origin_city: firstLane.from,
+          origin_district: firstLane.fromDistrict || null,
+          contact_phone: contactPhone,
+          source: rawPost.source || 'whatsapp',
+          // Sosyal medyadan gelen her ilan insan gözü görmeden yayına çıkmaz.
+          moderation_status: 'pending',
+          status: 'passive',
+          trust_level: 'social',
+          raw_post_id: raw_post_id,
+          raw_text: rawPost.raw_text,
+          notes: firstLane.raw_line,
+          vehicle_type: firstLane.vehicle ? [firstLane.vehicle] : null,
+          body_type: firstLane.body_type ? [firstLane.body_type] : null,
+          shadow_profile_id: shadowProfileId,
+          // Repost bayrağı raw_posts'tan taşınır. ÖNCEDEN whatsapp-parse route'u
+          // orijinal ilanı ayrıca kopyalıyordu; trigger de bu fonksiyonu çağırdığı
+          // için aynı mesaj İKİ ilan üretiyordu. Artık tek üretici burasıdır.
+          is_repost: rawPost.is_repost === true,
+        },
+        p_stops: lanes.map(l => ({
+          city: l.to,
+          district: l.toDistrict || null,
+          cargo_type: null,
+          weight_ton: l.weight_ton,
+          // ⚠️ RPC içinde `::int`; ondalık gelirse 22P02 atar ve TÜM transaction
+          // geri sarılır. Parser "1,5 palet" yazabilir — burada yuvarlıyoruz.
+          pallet_count: typeof l.pallet === 'number' && isFinite(l.pallet)
+            ? Math.round(l.pallet)
+            : null,
+        })),
+      })
 
-      if (listing) {
-        for (let i = 0; i < lanes.length; i++) {
-          await supabase.from('listing_stops').insert({
-            listing_id: listing.id,
-            stop_order: i + 1,
-            city: lanes[i].to,
-            district: lanes[i].toDistrict || null,
-            cargo_type: null,
-            weight_ton: lanes[i].weight_ton,
-            pallet_count: lanes[i].pallet,
-          })
-        }
-        created++
+      if (rpcHata || !rpcSonuc) {
+        edgeLog('ERROR', 'İlan oluşturulamadı (ilan_olustur)', {
+          raw_post_id,
+          output_status: 'error',
+          error_message: rpcHata?.message ?? 'rpc null döndü',
+          error_code: rpcHata?.code ?? null,
+          stop_count: lanes.length,
+        })
+        continue
       }
+      created++
     }
 
     await supabase.from('raw_posts').update({ processing_status: 'processed' }).eq('id', raw_post_id)
