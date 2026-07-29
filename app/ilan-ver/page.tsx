@@ -1,27 +1,14 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { ilanKaydet, kullanicitelefon } from './actions';
+import { ilanKaydet, kullanicitelefon, type IlanDurumu } from './actions';
 import { createClient } from '../../lib/supabase';
 import { olayGonder } from '../../lib/analiz';
 import TopluYukle from './TopluYukle';
 import MetindenIlan, { ParsedListingResult } from './MetindenIlan';
+// ILAN_VER_ANALIZ M2 — bu üç liste artık tek kaynaktan geliyor. Sunucu tarafı beyaz
+// liste (`./actions.ts`) da AYNI dosyayı okuyor; ayrışamazlar.
+import { ILLER, UTSYAPI, ARAC_TIPLERI, ilNormalize } from '../../lib/ilan-sabitler';
 const supabase = createClient();
-
-const ILLER = [
-  'Adana','Adıyaman','Afyonkarahisar','Ağrı','Amasya','Ankara','Antalya','Artvin',
-  'Aydın','Balıkesir','Bilecik','Bingöl','Bitlis','Bolu','Burdur','Bursa','Çanakkale',
-  'Çankırı','Çorum','Denizli','Diyarbakır','Edirne','Elazığ','Erzincan','Erzurum',
-  'Eskişehir','Gaziantep','Giresun','Gümüşhane','Hakkari','Hatay','Isparta','Mersin',
-  'İstanbul','İzmir','Kars','Kastamonu','Kayseri','Kırklareli','Kırşehir','Kocaeli',
-  'Konya','Kütahya','Malatya','Manisa','Kahramanmaraş','Mardin','Muğla','Muş',
-  'Nevşehir','Niğde','Ordu','Rize','Sakarya','Samsun','Siirt','Sinop','Sivas',
-  'Tekirdağ','Tokat','Trabzon','Tunceli','Şanlıurfa','Uşak','Van','Yozgat',
-  'Zonguldak','Aksaray','Bayburt','Karaman','Kırıkkale','Batman','Şırnak','Bartın',
-  'Ardahan','Iğdır','Yalova','Karabük','Kilis','Osmaniye','Düzce'
-];
-
-const UTSYAPI = ['Tenteli', 'Açık Kasa', 'Kapalı Kasa', 'Frigorifik', 'Damperli', 'Lowbed', 'Liftli', 'Silo'];
-const ARAC_TIPLERI = ['TIR', 'Kırkayak', 'Kamyon', 'Kamyonet', 'Panelvan'];
 
 interface Durak { sehir: string; ilce: string; ton: string; palet: string; notlar: string; }
 interface Vehicle { id: string; plate: string; vehicle_type: string; body_types: string[]; brand: string | null; model: string | null; capacity_ton: number | null; }
