@@ -97,6 +97,9 @@ export default function IlanVer() {
   const [fiyat, setFiyat] = useState('');
   const [fiyat_pazarlik, setFiyatPazarlik] = useState(false);
   const [tel, setTel] = useState('');
+  // Telefonun "henüz gelmedi" ile "gelemedi" hâlini ayır — ikisi de boş string
+  // olduğu için eskiden ikisi de sonsuz "Yükleniyor..." gösteriyordu.
+  const [telDurum, setTelDurum] = useState<'yukleniyor' | 'var' | 'numara-yok' | 'hata'>('yukleniyor');
   const [duraklar, setDuraklar] = useState<Durak[]>([{ sehir: '', ilce: '', ton: '', palet: '', yuk_cinsi: '', notlar: '' }]);
   const [gonderildi, setGonderildi] = useState(false);
   // ILAN_VER_ANALIZ V4 — sonuç ekranı artık VARSAYMIYOR, sunucunun döndürdüğü
