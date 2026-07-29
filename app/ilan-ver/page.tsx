@@ -177,13 +177,25 @@ export default function IlanVer() {
     if (bariyer) { setHata(bariyer); return; }
     setYukleniyor(true); setHata('');
     try {
-      await ilanKaydet({ tip, kalkis, kalkis_ilce, tel, fiyat, fiyat_pazarlik, tarih, tarih_esnek, genel_not, arac_tipi, utsyapi, arac_adet, yuk_cinsi, duraklar, raw_text: aiHamMetin || undefined });
+      const sonuc = await ilanKaydet({
+        tip, kalkis, kalkis_ilce, tel, fiyat, fiyat_pazarlik, tarih, tarih_esnek,
+        genel_not, arac_tipi, utsyapi, arac_adet, yuk_cinsi, duraklar,
+        raw_text: aiHamMetin || undefined,
+        ai_parsed: Boolean(aiHamMetin),
+      });
+
+      // ILAN_VER_ANALIZ V1/V4 — action artık fırlatmıyor, SONUÇ döndürüyor.
+      // Doğrulama hataları kullanıcıya olduğu gibi gösteriliyor.
+      if (!sonuc.ok) { setHata(sonuc.hata); return; }
+
       // SPRINT_01 L2 — huninin DİBİ. `ilan_ver_giris` ile birlikte persona başına
       // dönüşüm oranı hesaplanabiliyor. Kişisel veri gönderilmez (bkz. lib/analiz.ts).
-      olayGonder('ilan_olustur', { tip, yontem: yontem ?? 'tekil' });
+      olayGonder('ilan_olustur', { tip, yontem: yontem ?? 'tekil', durum: sonuc.durum });
+      setSonucDurum(sonuc.durum);
+      setSonucMesaj(sonuc.mesaj);
       setGonderildi(true);
     } catch (err: any) {
-      setHata(err.message || 'Bir hata oluştu.');
+      setHata(err?.message || 'Bir hata oluştu.');
     } finally {
       setYukleniyor(false);
     }
