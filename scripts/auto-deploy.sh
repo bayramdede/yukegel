@@ -25,6 +25,10 @@ STATE_DIR="$HOME/.local/state/yukegel-autodeploy"
 ENV_FILE="$HOME/.config/yukegel/auto-deploy.env"
 PROJECT_REF="gobepcswwsoswodhaufy"
 LOG_MAX_BYTES=$((5 * 1024 * 1024))
+# Daemon'ın push ettiği dal. `main` DEĞİL — sebebi `git_push()` içinde uzun uzun
+# yazılı: her push bir Vercel deployment'ı demek, Hobby'de 24 saatte 100 tane var.
+# `vercel.json → git.deploymentEnabled` bu dalı Vercel'e kapatır.
+YEDEK_DAL="yedek"
 
 mkdir -p "$STATE_DIR"
 
