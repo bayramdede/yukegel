@@ -30,8 +30,9 @@
 > Uygulamayı düzeltmek yetmiyordu: `anon`/`authenticated` rollerinin `listings.contact_phone` üzerindeki PostgREST yetkisi durduğu sürece anon key'i olan herkes `GET /rest/v1/listings?select=id,contact_phone&limit=1000` çekebiliyordu.
 > **Kural (bunu unutma):** **RLS SATIR bazlıdır, KOLON bazlı değildir.** Satır zaten herkese açıksa (ilan listesi çalışsın diye) o satırın *yetkili* her kolonu da okunur. Arayüzde göstermemek koruma değildir.
 > Revoke'un önündeki engel istemciden yazma yollarıydı; ikisi de kapatıldı: `app/panel/actions.ts` ve `app/moderator/actions.ts` (yeni). Numara artık yalnız service-role kullanan sunucu yollarından okunur/yazılır.
-> ⏳ **Bayram:** `docs/20260728_contact_phone_revoke.sql` — **deploy'dan SONRA** çalıştır.
+> ✅ **`docs/20260728_contact_phone_revoke.sql` çalıştırıldı** (Bayram, 29 Tem 2026 — doğrulama select'i 0 satır döndü). ⚠️ Bu SQL deploy'dan **sonra** çalışmalıydı; L1e kodu canlıda değilse panel/moderatör numarayı yazamaz (duman testi + geri alma bloğu dosyanın sonunda).
 > **Tuzak:** Tablo geneline verilmiş `GRANT`, kolon bazlı `REVOKE`'u **ezer**. Düz `revoke select (contact_phone) …` no-op olur. Migration önce tablo geneli yetkiyi alıp `contact_phone` hariç tüm kolonları programatik geri veriyor.
+> 🚨 **Bunun kalıcı yan etkisi:** grant'lar migration'ın çalıştığı ANDAKİ kolon listesine göre verildi. `public.listings`'e **bundan sonra eklenecek her yeni kolon `anon`/`authenticated` için yetkisiz doğar** ve `42501 permission denied for column …` ile sessizce patlar. Yeni kolon eklerken grant'ı da elle ver (bkz. §9 KURALLAR).
 
 > **✅ İSTEMCİ UPDATE'İ = KOLON BEYAZ LİSTESİ ŞART (28 Tem 2026, `SPRINT_01` K2 + L1e):**
 > Aynı sınıf hata iki yerde vardı: `profil-tamamla` `users` upsert'i ve `panel` `listings` update'i gövdeyi hiç filtrelemeden istemciden alıyordu. RLS "kendi satırın" der ama gövdeye `role: 'admin'`, `trust_level: 'verified'`, `moderation_status: 'approved'`, `is_shadow_banned: false` eklemeyi engellemez — devtools açmak kadar kolay.
