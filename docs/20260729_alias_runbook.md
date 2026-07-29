@@ -393,6 +393,6 @@ anahtar değeri ile yukarıdaki ölçüm sorgusuna bak.
 | 5 | `payas` → Hatay | K · BÖLÜM 4.1 | ✅ |
 | 6 | Elle kararlar | K · BÖLÜM 4.2-4.6 | seçmeli |
 | 7 | Doğrulama (boş dönmeli) | K · BÖLÜM 5 | ✅ |
-| 8 | Geçmiş `listings` onarımı + tekrar ölç | K · BÖLÜM 6 | ✅ |
+| 8 | Geçmiş konum onarımı — **4 kolon** (`origin_city`, `origin_district`, `listing_stops.city`, `listing_stops.district`) + tekrar ölç | bu dosya (K · BÖLÜM 6 **eksik**) | ✅ |
 | 9 | Katlanmış alias kopyalarını pasifleştir | bu dosya | ✅ (D3 önkoşulu) |
 | 10 | Trigger + kısmi UNIQUE indeks | `20260729_alias_normalize_trigger.sql` | ✅ |
