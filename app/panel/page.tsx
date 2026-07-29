@@ -15,7 +15,10 @@ export default async function Panel() {
   );
 
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect('/giris');
+  // 29 Tem 2026 — çıplak `/giris` DEĞİL. Normalde proxy bu rotayı zaten yakalar
+  // (`KORUNMALI` listesinde), ama oturum tam burada — proxy geçtikten sonra —
+  // düşerse tek yönlendiren burasıdır ve kullanıcıyı ana sayfaya bırakırdı.
+  if (!user) redirect(girisAdresi('/panel'));
 
   const svc = createSupabase(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
