@@ -109,9 +109,10 @@ function GirisIci() {
     return () => clearInterval(sayac);
   }, [bekleme]);
 
-  function beklemeBaslat() {
-    otpBeklemeYaz();
-    setBekleme(OTP_BEKLEME_SN);
+  // SPRINT_01 G2 — sunucu 429 ile daha uzun bir süre dayatabilir (IP kotası).
+  function beklemeBaslat(saniye: number = OTP_BEKLEME_SN) {
+    otpBeklemeYaz(saniye);
+    setBekleme(saniye);
   }
 
   const [bilgi, setBilgi] = useState('');
