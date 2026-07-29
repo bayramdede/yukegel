@@ -91,9 +91,10 @@
 - **Efor:** 4 puan · **Bağımlılık:** K1b migration ⚠️ **HENÜZ ÇALIŞTIRILMADI**
 - **DB:** `alter table users add column kvkk_onay_at timestamptz;`
 
-### K1b · Migration: `users.kvkk_onay_at` 🔴 — ⏳ Bayram çalıştıracak
-- Dosya hazır: **`docs/20260728_kvkk_onay.sql`** → Supabase SQL Editor.
-- Bu kolon açılmadan K1 kodu upsert'te hata verir. **Deploy'dan önce çalıştır.**
+### K1b · Migration: `users.kvkk_onay_at` 🔴 — ✅ çalıştırıldı (Bayram, 29 Tem 2026)
+- Dosya: **`docs/20260728_kvkk_onay.sql`** → Supabase SQL Editor. Idempotent
+  (`add column if not exists`), tekrar çalıştırmak zararsız.
+- Bu kolon açılmadan K1 kodu upsert'te hata verirdi. **Deploy'dan önce** çalışması gerekiyordu.
 - **Efor:** 1 puan · K1'i blokluyor
 
 ### L1b · `/api/ilan/[id]/telefon` endpoint'i 🔴 — ✅
