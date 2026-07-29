@@ -171,10 +171,7 @@
 > 1. ~~`docs/20260728_kvkk_onay.sql`~~ ✅ çalıştırıldı (29 Tem 2026)
 > 2. ~~`docs/20260728_auth_events.sql`~~ ✅ çalıştırıldı (29 Tem 2026)
 > 3. ~~`docs/20260728_contact_phone_revoke.sql`~~ ✅ çalıştırıldı (29 Tem 2026,
->    doğrulama select'i 0 satır döndü). ⚠️ Bu SQL deploy'dan **SONRA** çalışmalıydı:
->    L1e kodu (`app/panel/actions.ts`, `app/moderator/actions.ts`) canlıda değilse
->    panel ve moderatör numarayı **yazamaz** → duman testi ve geri alma bloğu
->    SQL dosyasının sonunda.
+>    doğrulama select'i 0 satır döndü) — **duman testi geçti**, kırık yol yok.
 >
 > **Bu dalgada keşfedilen ek açık:** panel'in istemci tarafı `listings` update'i gövdeyi
 > hiç filtrelemiyordu — kullanıcı kendi ilanına `trust_level: 'verified'`,
