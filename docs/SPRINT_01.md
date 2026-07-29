@@ -233,10 +233,11 @@
   telefon/şifre yazılmıyor. İstemcideki `.catch(() => {})` `console.warn`'a çevrildi
   (sessiz yutma tam da bu bug'ı 404 olarak gizlemişti).
 
-### A1b · Migration + RLS: `auth_events` tablosu — ✅ *(SQL hazır, ⏳ Bayram çalıştıracak)*
+### A1b · Migration + RLS: `auth_events` tablosu — ✅ *(çalıştırıldı, Bayram, 29 Tem 2026)*
 - Insert yalnız service-role; select yalnız admin/moderator.
 - **Efor:** 2 puan
-- **Yapıldı:** `docs/20260728_auth_events.sql`. **Deploy'dan ÖNCE çalıştırılmalı.**
+- **Yapıldı:** `docs/20260728_auth_events.sql`. **Deploy'dan ÖNCE** çalışması gerekiyordu;
+  idempotent (`create table if not exists`), tekrar çalıştırmak zararsız.
 
 ### A3 · `?hesap=tasindi` / `?hesap=eslesme` mesajları hiç gösterilmiyor 🟠 — ✅
 - **Dosya:** `proxy.ts:94` ve `:128` bu paramlarla yönlendiriyor; `app/giris/page.tsx:42` yalnızca `redirect` param'ını okuyor
