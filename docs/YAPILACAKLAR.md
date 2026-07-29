@@ -335,9 +335,40 @@ Daemon her kaydetmede push atıyor, Vercel her push'ta build ediyordu → günde
       (`_ignoreCommand_neden`) reddedildi, gerekçe `scripts/deploy.sh` başlığında.
 - [x] `scripts/deploy.sh` + `npm run deploy` — tek deploy kapısı. `.git/index.lock` bekler,
       `tsc --noEmit` çalıştırır (tip hatası varsa DURDURUR), `deploy:` commit'i atıp push'lar.
-- [ ] **Bayram:** Vercel günlük kotası açılınca `npm run deploy` — bekleyen telefon
-      düzeltmeleri + RPC v2 geçişleri tek deploy'da çıkar. Kota kayan 24 saatlik pencere,
-      sabit saatte sıfırlanmıyor.
+
+### 🔴 …ama `ignoreCommand` YETMEDİ — kota yine bitti (aynı gün 19:00)
+
+**Belirti:** `npm run deploy` çalışıyor, push başarılı, **Vercel'de hiçbir kayıt yok** —
+"Canceled" bile değil. Hata yok, e-posta yok, site güncellenmiyor.
+
+**Kök:** Hobby kotası **kayan 24 saatte 100 DEPLOYMENT** ve **`ignoreCommand` ile iptal
+edilen "Canceled" deployment'lar da sayılıyor.** `ignoreCommand` build DAKİKASINI
+kurtarır, KOTAYI kurtarmaz — deployment zaten oluşturulmuştur. Daemon 24 saatte **266
+commit** push'ladı → kota 19:00'da bitti → Vercel `deploy:` commit'leri dahil hiçbir
+deployment oluşturmaz oldu.
+
+> 🔍 **Tanı hilesi:** Deployments → Status filtresi varsayılan **6/7**; gizlenen statü
+> "Canceled". Onu açmadan tabloya bakarsan `auto:` push'larının iptal edildiğini
+> göremezsin ve yanlış yere bakarsın.
+
+**Çözüm — deployment'ın hiç OLUŞTURULMAMASI gerekiyor:**
+
+- [x] `scripts/auto-deploy.sh` → daemon artık `main`'e değil **`HEAD:yedek`**'e push
+      ediyor. Yedekleme kaybolmadı, sadece dal değişti; retry `--force-with-lease`.
+- [x] `vercel.json` → `git.deploymentEnabled.yedek = false`. ⚠️ Bu şart: Vercel
+      varsayılan olarak **her** dala Preview deployment'ı üretir ve **Preview de
+      kotadan düşer**.
+- [x] `ignoreCommand` ikinci katman olarak duruyor (`deploy.sh` `main`'e push ederken
+      yanındaki `auto:` commit'leri de taşır; HEAD `deploy:` olduğu için build 1 kez olur).
+- [ ] **Bayram — SIRAYLA:**
+      1. Daemon'ı yeniden başlat (çalışan süreç eski scripti tutuyor):
+         `launchctl kickstart -k gui/$(id -u)/com.yukegel.autodeploy`
+      2. Kota açılınca `npm run deploy` — bekleyen tonaj + telefon düzeltmeleri
+         + RPC v2 geçişleri tek deploy'da çıkar. Kota kayan pencere: slotlar
+         saat başı azar azar boşalıyor, sabit saatte sıfırlanmıyor.
+      3. Deploy sonrası Vercel → Deployments'ta **Status 7/7** ile bak: `yedek`
+         dalı için **hiçbir satır** (Canceled dahil) çıkmamalı. Çıkıyorsa
+         `deploymentEnabled` uygulanmamıştır.
 
 ## ✅ Tonaj: sadece 1. durak gösteriliyordu — TOPLAM'a çevrildi (29 Tem 2026)
 
