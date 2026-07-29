@@ -547,6 +547,17 @@ Açık rotalar: /giris, /auth/, /profil-tamamla, /nasil-calisir, /hakkimizda,
 
 ## 9. KURALLAR & TUZAKLAR
 
+- 🚨 **VIEW, ALTINDAKİ RLS'İ DELİP GEÇER** (29 Tem 2026, Supabase linter "Security Definer View").
+  PostgreSQL'de view **varsayılan olarak SAHİBİNİN** yetkileriyle çalışır. `shadow_profiles`
+  tablosu doğru şekilde admin-only RLS ile korunuyordu, ama üstündeki
+  `shadow_profile_summary` view'ına `GRANT SELECT ... TO authenticated` verilmişti →
+  siteye üye olan **herkes** PostgREST'ten tüm kayıtsız nakliyeci telefonlarını
+  (`phone`, `name`, `company_name`, `notes`) çekebiliyordu. KVKK ihlali.
+  **Kural:** RLS'li bir tablonun üstüne view açarken İKİSİ birden zorunlu —
+  `create view ... with (security_invoker = on)` **ve** `grant select ... to service_role`
+  (`authenticated`'a **değil**). Düzeltme: `docs/20260729_shadow_profile_summary_invoker.sql`.
+  Bu, `SPRINT_01 L1e`'nin ("RLS satır bazlıdır, kolon bazlı değildir") tamamlayıcısı:
+  tabloyu kilitlemek, üstüne yetkisiz bir view koyduğun anda anlamsızlaşır.
 - 🚨 **Güzergâh sorgusu yazarken `listings`'i tek başına sorgulama** (29 Tem 2026, W5).
   Kalkış `listings.origin_city`'de, varışlar `listing_stops` satırlarında. `listings`
   içindeki `destination_city` **ölü kolondur** — dolu görünse bile kimse okumaz.
