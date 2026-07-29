@@ -405,17 +405,28 @@ function GirisIci() {
     e.preventDefault();
     etkilesimRef.current = true; // A9 — açılış kontrolü artık araya girmesin
     setYukleniyor(true); temizle();
-    const { error } = await supabase.auth.signInWithPassword({ email: eposta, password: sifre });
-    if (error) {
-      if (error.message.includes('Invalid login')) setHata('E-posta veya şifre hatalı.');
-      else if (error.message.includes('Email not confirmed')) setHata('E-posta adresinizi doğrulamadınız. Gelen kutunuzu kontrol edin.');
-      else setHata(error.message);
-      authLog('login_failed', 'eposta', error.message);
-    } else {
-      authLog('login_success', 'eposta');
-      await yonlendir();
+    // SPRINT_01 G1 — şifre denemesi ARTIK SUNUCUDA (`/api/auth/giris`).
+    // İstemciden `signInWithPassword` çağırmak, şifre denemesini hiçbir hız sınırı
+    // olmadan herkese açık anon key'in arkasına koymak demekti: bir sözlük saldırısı
+    // saniyede onlarca deneme yapabilirdi. Kota sunucuda (e-posta başına 5 / 15 dk).
+    const res = await fetch('/api/auth/giris', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ eposta, sifre }),
+    }).catch(() => null);
+    const json = await res?.json().catch(() => null);
+
+    if (!res?.ok) {
+      setHata(json?.error || 'Giriş yapılamadı. Lütfen tekrar deneyin.');
+      authLog('login_failed', 'eposta', json?.error);
+      setYukleniyor(false);
+      return;
     }
-    setYukleniyor(false);
+
+    authLog('login_success', 'eposta');
+    // `setYukleniyor(false)` YOK: tam sayfa yüklemesi başlıyor, butonun bir an
+    // "Giriş Yap" haline dönüp tekrar tıklanabilir olmasına gerek yok.
+    yonlendirRol(json?.rol ?? 'user');
   }
 
   // ── E-posta kayıt ───────────────────────────────────────────────
