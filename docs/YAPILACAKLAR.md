@@ -162,11 +162,19 @@ Tam analiz, kabul kriterleri ve dalgalar: `docs/ILAN_VER_ANALIZ.md`
 INSERT) ama `SPRINT_01`'in üç kazanımı — sunucu tarafı kolon beyaz listesi, sunucu tarafı kota,
 sunucu tarafı sahiplik/doğrulama — bu yola **hiç uygulanmamış**.
 
-### W0 — Kanama durdur (19p)
-- [ ] **V1** — `ilanKaydet` için kolon beyaz listesi + sınır kontrolleri (`app/panel/actions.ts` kalıbı) · 6p
-- [ ] **V2** — `contact_phone` istemciden geliyor; oturumun profil telefonundan yazılmalı · 5p
-- [ ] **V3** — `moderation_status: 'auto_published'` sabiti 31–70 moderasyon bandını öldürüyor · 5p
-- [ ] **V4** — Başarı ekranı INSERT sonucunu okumuyor; shadow-ban'lı ilana "yayında" diyor · 3p
+### W0 — Kanama durdur (19p) ✅ **TAMAM** (29 Tem 2026)
+- [x] **V1** — `ilanKaydet` için kolon beyaz listesi + sınır kontrolleri (`app/panel/actions.ts` kalıbı) · 6p
+- [x] **V2** — `contact_phone` istemciden geliyor; oturumun profil telefonundan yazılmalı · 5p
+- [x] **V3** — `moderation_status: 'auto_published'` sabiti 31–70 moderasyon bandını öldürüyor · 5p
+- [x] **V4** — Başarı ekranı INSERT sonucunu okumuyor; shadow-ban'lı ilana "yayında" diyor · 3p
+
+Yan kazanımlar (migration'sız, aynı yamada): **V9/V10** (action'ın kendi auth kapısı),
+**V8/B9** (tanınmayan il/araç değeri artık ham hâliyle forma yazılmıyor), **V5 kısmî**
+(durak INSERT'i patlarsa ilan telafi edici `DELETE` ile geri alınıyor — yetim kayıt yok),
+**M2 kısmî** (`lib/ilan-sabitler.ts` tek kaynak; istemci ve sunucu beyaz listesi
+fiziksel olarak ayrışamıyor), **A2** (istemci `bugun()` de sabit +03:00 kullanıyor).
+
+Kalan: **V5 tam** (tek RPC ile atomik yazma) hâlâ W1'de.
 
 ### W1 — Kırıkları onar (15p)
 - [ ] **B1** — 🔴 **Toplu yükleme fiilen çalışmıyor** — istemci JSON `{action,rows,userId}`, route `formData().get('file')`; ayrıca şablon `'Kalkış İli'` ↔ route `'Kalkış Şehri'` · 5p
