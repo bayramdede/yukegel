@@ -301,6 +301,16 @@ function GirisIci() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // 29 Tem 2026 — bkz. `redirectCookieYaz` başlığındaki not.
+  // Query param'daki hedefi cookie'ye kopyala ki Google OAuth ve e-posta doğrulama
+  // zincirlerinde (ikisi de `/auth/callback`e döner ve YALNIZ cookie okur) kaybolmasın.
+  // Bağımlılık `redirect`: kullanıcı sayfada dururken URL değişirse cookie de değişsin.
+  // setState YOK — `react-hooks/set-state-in-effect` tetiklenmiyor.
+  useEffect(() => {
+    const hedef = guvenliRedirect(redirect);
+    if (hedef) redirectCookieYaz(hedef);
+  }, [redirect]);
+
   function temizle() { setHata(''); }
 
   // Başarılı giriş sonrası yönlendirme
