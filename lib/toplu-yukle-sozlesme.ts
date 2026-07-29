@@ -72,6 +72,39 @@ export const MAX_SATIR = 300;
 /** Tek istekte oluşturulabilecek en fazla ilan (grup). */
 export const MAX_ILAN = 50;
 
+/**
+ * Excel hücresindeki TÜRKÇE yazılmış sayıyı `Number()`'ın anladığı biçime çevirir.
+ * Çözemezse `''` döner (çağıran tarafta `null`'a düşer).
+ *
+ * 🚨 Bunun neden gerektiği: `Number("5.000")` JavaScript'te **5**'tir. Türkiye'de
+ * "5.000" beş bindir. Yani fiyat sütununa `5.000` yazan kullanıcının ilanı sessizce
+ * **5 TL**'ye kaydolurdu — hata yok, uyarı yok, sadece yanlış veri. `"2,5"` ise
+ * `NaN` verip tonajı büsbütün düşürüyordu.
+ *
+ * Kural: virgül varsa ondalık ayırıcıdır, noktalar binliktir. Virgül yoksa ve
+ * noktalar `1.234.567` kalıbına uyuyorsa binliktir; uymuyorsa ondalıktır
+ * (`2.5` gibi İngilizce yazımı da kabul ediyoruz — reddetmek kullanıcıyı cezalandırır).
+ */
+export function sayiMetniCoz(ham: unknown): string {
+  if (typeof ham === 'number') return Number.isFinite(ham) ? String(ham) : '';
+  if (typeof ham !== 'string') return '';
+
+  const temiz = ham.replace(/[^\d.,-]/g, '').trim();
+  if (!temiz) return '';
+
+  let normal: string;
+  if (temiz.includes(',')) {
+    normal = temiz.replace(/\./g, '').replace(',', '.');
+  } else if (/^-?\d{1,3}(\.\d{3})+$/.test(temiz)) {
+    normal = temiz.replace(/\./g, '');
+  } else {
+    normal = temiz;
+  }
+
+  const n = Number(normal);
+  return Number.isFinite(n) ? String(n) : '';
+}
+
 export const SABLON_HEADERS = [
   'Sefer No', 'Kalkış İli', 'Kalkış İlçesi', 'Varış İli', 'Varış İlçesi',
   'Durak Tipi', 'Araç Tipi', 'Üst Yapı', 'Tonaj (ton)', 'Palet',
