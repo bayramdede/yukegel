@@ -485,7 +485,9 @@ Analizde doğru kurgulanmış bulunan ve regresyon riski taşıyan noktalar:
    akışta ASLA kullanma; döngüyü o geri getirir.
 3. `giris/page.tsx:114-216` — 4 formatlı telefon eşleştirme (`+90…`, `90…`, `0…`, `5…`)
 4. `api/auth/tekil-kontrol` — service-role ile yalnız `{ mevcut: boolean }` dönmesi (enumeration'a kapalı)
-5. `profil-tamamla` — TCKN/VKN algoritmik doğrulama (K2b bunu **kaldırmıyor**, sunucuya *kopyalıyor*)
+5. `profil-tamamla` — TCKN/VKN algoritmik doğrulama. K2b bunu **kaldırmadı**, `lib/kimlik.ts`
+   ortak modülüne taşıdı; istemci ve sunucu aynı fonksiyonu import ediyor. İstemcideki kontrol
+   yalnız UX — sunucudakini ASLA kaldırma.
 6. Her yerde `maybeSingle()` kullanımı — `single()`'ın 0 satırda patlamasını eler
 7. **(W0 sonrası eklendi)** `app/page.tsx`'in ISR'li (`revalidate = 30`) olması — bu sayfada
    oturuma göre koşullu render **yapılamaz**. Hassas veriyi "misafirse gizle" ile değil,
