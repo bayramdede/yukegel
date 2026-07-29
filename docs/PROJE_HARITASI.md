@@ -644,7 +644,7 @@ Açık rotalar: /giris, /auth/, /profil-tamamla, /nasil-calisir, /hakkimizda,
 | İlan detay | `/ilan/[id]` | ✅ kısmi |
 | Tekil ilan formu | `/ilan-ver` | ✅ |
 | Metinden ilan (LLM) | `/ilan-ver` (yöntem=metin) | ✅ |
-| Toplu yükleme | `/ilan-ver` | ❌ **kırık** (istemci↔route sözleşmesi uyuşmuyor — `ILAN_VER_ANALIZ` B1) |
+| Toplu yükleme | `/ilan-ver` | ✅ çalışıyor (29 Tem 2026, `ILAN_VER_ANALIZ` B1 — ortak sözleşme `lib/toplu-yukle-sozlesme.ts`, kayıt `ilanYaz()` üzerinden) |
 | Atanan işlerim | `/panel/is/[id]` | 🔮 Faz 2 |
 | Puanlama | modal | 🔮 Faz 2 |
 | Profil / Araçlarım | `/panel` tab | ✅ kısmi |
