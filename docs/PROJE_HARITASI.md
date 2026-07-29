@@ -354,6 +354,18 @@ Açık rotalar: /giris, /auth/, /profil-tamamla, /nasil-calisir, /hakkimizda,
   `app/giris/page.tsx`.
 - Abone olunduğu anda `INITIAL_SESSION` bir kez tetiklenir → ayrıca `getSession()` çağırmaya
   gerek yok (ve o çağrı da kilide takılabilir).
+- 🚨 **Sunucuda oturum devrederken `action_link` DEĞİL `hashed_token` kullan** (A10, 29 Tem 2026).
+  `admin.generateLink()` iki şey döner: `properties.action_link` **implicit flow**tur
+  (`#access_token=…`) — token yalnız tarayıcıda işlenir, **SSR cookie'si eski oturumda kalır**;
+  proxy bir sonraki istekte kullanıcıyı yine eski kimlikte görür → sonsuz döngü.
+  Doğrusu: `properties.hashed_token` alınıp cookie yazan `createServerClient` üzerinden
+  `supabase.auth.verifyOtp({ type: 'magiclink', token_hash })` çağrılır; oturum doğrudan
+  sb- cookie'lerine yazılır. Uygulandığı yer: `app/auth/devir/route.ts`.
+  (`app/api/auth/switch-account/route.ts` hâlâ `action_link` döndürüyor — istemci tarafı
+  akış olduğu için orada sorun çıkarmıyor, ama sunucu tarafında ASLA o yolu kullanma.)
+- Emekli oturumu `/auth/devir`'e gönderirken **sb- cookie'lerini silme**: devir, devri
+  yetkilendirmek için emekli oturumun `merged_into` zincirini okumak zorunda. Temizliği
+  (kurtarılamayan hâllerde) devir route'u kendisi yapar.
 - `maybeSingle()` — callback, proxy, actions her yerde
 - `is_shadow_banned = false` — page.tsx + u/[username]/page.tsx zorunlu
 - Audit trigger sadece INSERT; re-scan → `/api/ilan/duzelt`
