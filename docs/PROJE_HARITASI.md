@@ -223,7 +223,9 @@ contact_phone — 🔒 anon/authenticated için REVOKE edildi (SPRINT_01 L1e). Y
 > bu kolonu içeremez → `42501 permission denied`. Okuma/yazma yolları:
 > `app/api/ilan/[id]/telefon`, `app/api/ilan/[id]/sahiplen`, `app/ilan/[id]/page.tsx`,
 > `app/panel/actions.ts`, `app/moderator/actions.ts`. Migration:
-> `docs/20260728_contact_phone_revoke.sql` — **deploy'dan SONRA** çalıştırılmalı.
+> `docs/20260728_contact_phone_revoke.sql` ✅ çalıştırıldı (29 Tem 2026).
+> 🚨 Migration `contact_phone` hariç **o anki** kolonlara grant verdi → `listings`'e sonradan
+> eklenen kolonlar `anon`/`authenticated` için yetkisiz doğar. Yeni kolon = elle grant.
 
 ### `shadow_profiles` — Gölge Profil / CRM
 ```
