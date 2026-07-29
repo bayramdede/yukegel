@@ -341,6 +341,17 @@ Açık rotalar: /giris, /auth/, /profil-tamamla, /nasil-calisir, /hakkimizda,
 
 ## 9. KURALLAR & TUZAKLAR
 
+- 🚨 **`onAuthStateChange` callback'i İÇİNDE `await supabase.*` ÇAĞIRMA** (A8, 29 Tem 2026).
+  Callback, Supabase'in auth kilidi (`navigator.locks`) tutulurken çalışır; içeriden yapılan
+  her `supabase.from(...)` / `getSession()` aynı kilidi bekler → **deadlock**. Belirti:
+  konsolda `Lock "lock:sb-...-auth-token" was not released within 5000ms`; oturum çerezi
+  geçerli olmasına rağmen istemci kendini çıkış yapmış sanır (navbar "Giriş Yap" gösterir,
+  ama `/admin` gibi sunucu tarafı rotalar çalışır — onlar cookie'yi sunucuda okuyor).
+  Doğrusu: callback yalnız senkron state yazar, DB işi `setTimeout(() => { ... }, 0)` ile
+  kilidin dışına atılır. Uygulandığı yerler: `app/_components/HomeClient.tsx`,
+  `app/giris/page.tsx`.
+- Abone olunduğu anda `INITIAL_SESSION` bir kez tetiklenir → ayrıca `getSession()` çağırmaya
+  gerek yok (ve o çağrı da kilide takılabilir).
 - `maybeSingle()` — callback, proxy, actions her yerde
 - `is_shadow_banned = false` — page.tsx + u/[username]/page.tsx zorunlu
 - Audit trigger sadece INSERT; re-scan → `/api/ilan/duzelt`
