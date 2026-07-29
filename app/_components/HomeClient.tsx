@@ -780,8 +780,9 @@ export default function HomeClient({ initialIlanlar = [], totalCount = 0 }: { in
             </div>
           ) : (
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <a href="/giris" style={{ color: '#8b949e', fontSize: '0.85rem', textDecoration: 'none' }}>Giriş Yap</a>
-              <a href="/giris" style={{ background: '#22c55e', color: '#000', fontWeight: 700, fontSize: '0.85rem', padding: '6px 16px', borderRadius: 6, textDecoration: 'none' }}>Üye Ol</a>
+              {/* 29 Tem 2026 — hedefli giriş; bkz. app/_components/GirisLink.tsx */}
+              <GirisLink style={{ color: '#8b949e', fontSize: '0.85rem', textDecoration: 'none' }}>Giriş Yap</GirisLink>
+              <GirisLink mod="kayit" style={{ background: '#22c55e', color: '#000', fontWeight: 700, fontSize: '0.85rem', padding: '6px 16px', borderRadius: 6, textDecoration: 'none' }}>Üye Ol</GirisLink>
             </div>
           )}
         </div>
