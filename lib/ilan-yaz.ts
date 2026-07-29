@@ -374,6 +374,7 @@ export async function ilanYaz(
     listing_type: tip,
     origin_city: kalkis,
     stop_count: duraklar.length,
+    vehicle_id: aracId,
     audit_score: skor,
     durum,
     ai_parsed: aiIle,
