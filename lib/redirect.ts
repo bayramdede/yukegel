@@ -46,3 +46,34 @@ export function guvenliRedirect(ham: string | null | undefined): string | null {
 
   return deger;
 }
+
+/**
+ * `/giris` adresini HEDEFİYLE BİRLİKTE üret (29 Tem 2026).
+ *
+ * 🚨 NEDEN VAR: `guvenliRedirect` + `yk_redirect` cookie zinciri (A7) doğru çalışıyordu
+ * ama YALNIZCA proxy'nin koruduğu 5 rota için (`/panel`, `/ilan-ver`, `/araclarim`,
+ * `/profil`, `/moderator`). Diğer her yerde giriş bağlantısı ÇIPLAK `/giris` idi:
+ * header, footer, "Üye Ol" butonu, `/hakkimizda`, `/nasil-calisir`…
+ *
+ * Somut şikâyet: bir kullanıcı ilanlarını `/u/<id>` adresiyle paylaşıyor. Gelen kişi
+ * header'daki "Giriş Yap"a basıyor, giriş yapıyor ve ANA SAYFAYA düşüyor — paylaşılan
+ * sayfa gitti, o kişinin ilanlarını bir daha bulamıyor. Bağlantı boşa gitmiş oluyor.
+ *
+ * Bu fonksiyon hedefi TEK yerden kurar ki her çağrı yeri `encodeURIComponent` ve
+ * `guvenliRedirect` çağırmayı hatırlamak zorunda kalmasın (biri unutulunca sessizce
+ * ana sayfaya düşüyoruz — hata vermiyor, sadece yanlış çalışıyor).
+ *
+ * ⚠️ `yol` GEÇERSİZSE (`/giris`in kendisi, mutlak URL, boş) `redirect` HİÇ eklenmez;
+ *    `/giris`e `redirect=/giris` yazmak sonsuz döngü olurdu.
+ *
+ * @param yol  Dönülecek yer: `pathname` (+ istenirse `?query`).
+ * @param mod  `'kayit'` verilirse doğrudan kayıt formu açılır (F1).
+ */
+export function girisAdresi(yol: string | null | undefined, mod?: 'kayit'): string {
+  const params = new URLSearchParams();
+  if (mod) params.set('mod', mod);
+  const hedef = guvenliRedirect(yol);
+  if (hedef) params.set('redirect', hedef);
+  const qs = params.toString();
+  return qs ? `/giris?${qs}` : '/giris';
+}
