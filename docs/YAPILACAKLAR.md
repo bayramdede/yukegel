@@ -312,6 +312,33 @@ dönmüş/yanlış ortama işaretlenmiş olabilir. Kontrol: Settings → Environ
 anahtarın **Production** kutusu işaretli mi + Supabase panelindeki güncel `service_role`
 anahtarıyla aynı mı. Deploy sonrası logda `phone-privacy` ara.
 
+### 🔴 `shadow_profile_summary` view'ı RLS bypass ediyor (29 Tem 2026) — SQL BEKLİYOR
+
+Supabase linter: **Security Definer View**. `shadow_profiles` admin-only RLS ile korunuyor
+ama üstündeki view'a `GRANT SELECT ... TO authenticated` verilmiş ve view sahibinin
+yetkisiyle çalışıyor → **siteye üye olan herkes** PostgREST'ten tüm kayıtsız nakliyeci
+telefonlarını (`phone`, `name`, `company_name`, `notes`, `ai_analiz`) çekebiliyor. KVKK.
+
+- [ ] **Bayram:** `docs/20260729_shadow_profile_summary_invoker.sql` çalıştır
+      (`security_invoker = on` + yetkiyi yalnız `service_role`a bırak). Kod deploy'u gerekmez.
+- [ ] Doğrula: `reloptions` içinde `security_invoker=true` görünüyor mu, `anon`/`authenticated`
+      için `has_table_privilege` false mu (SQL dosyasındaki §1–§2 sorguları).
+- [ ] `/admin/crm` hâlâ çalışıyor mu? (service-role kullandığı için etkilenmemeli)
+
+### 🚀 Otomatik deploy kapatıldı (29 Tem 2026)
+
+Daemon her kaydetmede push atıyor, Vercel her push'ta build ediyordu → günde ~79 deploy
+(Hobby limiti 100/gün, bugün doldu) ve yarım kod canlıda.
+
+- [x] `vercel.json` → `ignoreCommand`: commit mesajı `auto:` ile başlıyorsa build atlanır.
+      ⚠️ Vercel şeması bilinmeyen üst düzey anahtar kabul etmiyor — açıklama satırı
+      (`_ignoreCommand_neden`) reddedildi, gerekçe `scripts/deploy.sh` başlığında.
+- [x] `scripts/deploy.sh` + `npm run deploy` — tek deploy kapısı. `.git/index.lock` bekler,
+      `tsc --noEmit` çalıştırır (tip hatası varsa DURDURUR), `deploy:` commit'i atıp push'lar.
+- [ ] **Bayram:** Vercel günlük kotası açılınca `npm run deploy` — bekleyen telefon
+      düzeltmeleri + RPC v2 geçişleri tek deploy'da çıkar. Kota kayan 24 saatlik pencere,
+      sabit saatte sıfırlanmıyor.
+
 ## ⚠️ BUGLAR
 - [x] **A10 — "Hesabınız birleştirildi" sonsuz giriş döngüsü** ✅ (29 Tem 2026)
   Belirti: giriş yapılıyor → "Hesabınız başka bir hesabınızla birleştirildi… tekrar giriş
