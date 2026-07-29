@@ -1,6 +1,9 @@
 'use server'
 
 import { getServerSupabase, getServiceSupabase } from '../../lib/auth'
+// SPRINT_01 K2b — doğrulayıcılar ortak modülde. İstemci kopyasıyla ayrışmasın diye
+// buraya yeniden yazma; `lib/kimlik.ts`'i düzelt.
+import { tcknGecerli, vknGecerli } from '../../lib/kimlik'
 
 /**
  * SPRINT_01 K2 — profil tamamlama kaydı ARTIK SUNUCUDA.
