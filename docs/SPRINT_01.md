@@ -167,11 +167,10 @@
 > sabitlendi ve Bayram "4 hane, çalışıyor" diye teyit etti → kapandı).
 >
 > **Bayram'ın çalıştırması gereken SQL'ler ve SIRASI:**
-> 1. `docs/20260728_kvkk_onay.sql` — deploy'dan **ÖNCE** (W0)
-> 2. `docs/20260728_auth_events.sql` — deploy'dan **ÖNCE** (A1b; olmazsa `/api/auth/log`
->    her insert'te ERROR loglar)
+> 1. ~~`docs/20260728_kvkk_onay.sql`~~ ✅ çalıştırıldı (29 Tem 2026)
+> 2. ~~`docs/20260728_auth_events.sql`~~ ✅ çalıştırıldı (29 Tem 2026)
 > 3. `docs/20260728_contact_phone_revoke.sql` — deploy'dan **SONRA** (L1e; ters sırada
->    panel ve moderatör numarayı yazamaz)
+>    panel ve moderatör numarayı yazamaz) ← **tek kalan**
 >
 > **Bu dalgada keşfedilen ek açık:** panel'in istemci tarafı `listings` update'i gövdeyi
 > hiç filtrelemiyordu — kullanıcı kendi ilanına `trust_level: 'verified'`,
