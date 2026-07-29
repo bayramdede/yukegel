@@ -63,7 +63,8 @@ export default function Hakkimizda() {
           </a>
           <div style={{ display: 'flex', gap: 12 }}>
             <a href="/" style={{ color: '#8b949e', fontSize: '0.85rem', textDecoration: 'none' }}>← İlanlar</a>
-            <a href="/giris" style={{ background: '#22c55e', color: '#000', fontWeight: 700, fontSize: '0.85rem', padding: '6px 16px', borderRadius: 6, textDecoration: 'none' }}>Başla</a>
+            {/* 29 Tem 2026 — hedefli giriş; bkz. app/_components/GirisLink.tsx */}
+            <GirisLink mod="kayit" style={{ background: '#22c55e', color: '#000', fontWeight: 700, fontSize: '0.85rem', padding: '6px 16px', borderRadius: 6, textDecoration: 'none' }}>Başla</GirisLink>
           </div>
         </div>
       </nav>
