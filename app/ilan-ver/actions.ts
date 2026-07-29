@@ -36,13 +36,38 @@ async function oturumKullanicisi() {
 }
 
 export async function ilanKaydet(formData: IlanKaydetGirdi): Promise<IlanKaydetSonuc> {
-  // ── V10: auth kapısı BURADA. `proxy.ts`'e güvenip atlamıyoruz — tek katmanlı
-  // savunma `SPRINT_01 M1`'de bir kez kırıldı.
-  const user = await oturumKullanicisi();
-  if (!user) {
-    return { ok: false, hata: 'Oturum bulunamadı. Lütfen tekrar giriş yapın.' };
+  // 🚨 SERVER ACTION'DAN İSTİSNA KAÇIRMA (29 Tem 2026).
+  //
+  // Bir server action `throw` ederse Next istemciye yalnızca şunu gösterir:
+  // "An error occurred in the Server Components render. The specific message is
+  // omitted in production builds…". Kullanıcı ne olduğunu anlamaz, biz de log'da
+  // `digest`ten başka bir şey görmeyiz — ilan verme sessizce ölür. `ilanYaz()`
+  // kendi hatalarını `{ok:false}` ile dönüyor ama ALTINDAKİ katmanlar (env eksik
+  // service-role anahtarı, `cookies()`, ağ hatası, JSON serileştirme) hâlâ
+  // fırlatabilir. Bu blok onları kullanıcıya anlaşılır bir cevaba, bize de
+  // aranabilir bir log satırına çevirir.
+  try {
+    // ── V10: auth kapısı BURADA. `proxy.ts`'e güvenip atlamıyoruz — tek katmanlı
+    // savunma `SPRINT_01 M1`'de bir kez kırıldı.
+    const user = await oturumKullanicisi();
+    if (!user) {
+      return { ok: false, hata: 'Oturum bulunamadı. Lütfen tekrar giriş yapın.' };
+    }
+    return await ilanYaz(user.id, formData, 'form');
+  } catch (e) {
+    const hata = e as { message?: string; name?: string; stack?: string };
+    structuredLog('ERROR', 'db-transaction', 'ilanKaydet beklenmeyen istisna', {
+      error_name: hata?.name ?? null,
+      error_message: hata?.message ?? String(e),
+      // Vercel'de tek satırda görünsün diye kısaltılmış stack.
+      stack: typeof hata?.stack === 'string' ? hata.stack.slice(0, 1200) : null,
+      // ⚠️ `formData` LOGLANMAZ: içinde `tel` var (KVKK). Yalnız şekli.
+      tip: formData?.tip ?? null,
+      kalkis: formData?.kalkis ?? null,
+      durak_sayisi: Array.isArray(formData?.duraklar) ? formData.duraklar.length : null,
+    });
+    return { ok: false, hata: 'İlan kaydedilemedi. Teknik bir hata oluştu, kayıt altına alındı. Lütfen tekrar deneyin.' };
   }
-  return ilanYaz(user.id, formData, 'form');
 }
 
 export async function kullanicitelefon(): Promise<string | null> {
