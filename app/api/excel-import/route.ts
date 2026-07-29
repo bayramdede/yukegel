@@ -154,6 +154,13 @@ export async function POST(request: NextRequest) {
   if (!tarih) return yanit({ ok: false, hata: 'Geçerli bir yükleme tarihi seçin.' }, 400);
   if (tarih < bugunISO()) return yanit({ ok: false, hata: 'Geçmiş bir tarih seçilemez.' }, 400);
 
+  // Telefonu DÖNGÜDEN ÖNCE bir kez kontrol et. `ilanYaz()` zaten bakıyor ama orada
+  // hata her grup için ayrı ayrı düşer: profilinde numarası olmayan kullanıcı 50
+  // ilanın 50'sinin de "başarısız" olduğu bir ekranla karşılaşır ve neyi
+  // düzelteceğini anlamaz. Tek ve anlaşılır bir hata daha dürüst.
+  const telKontrol = await ilanTelefonu(user.id);
+  if (!telKontrol.ok) return yanit({ ok: false, hata: telKontrol.hata }, 400);
+
   // Sefer No ile grupla; boşsa her satır ayrı ilan (istemcideki mantığın AYNISI).
   const gruplar = new Map<string, OnaySatiri[]>();
   (rows as OnaySatiri[]).forEach((row, i) => {
