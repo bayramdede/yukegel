@@ -454,6 +454,17 @@ Açık rotalar: /giris, /auth/, /profil-tamamla, /nasil-calisir, /hakkimizda,
 
 ## 9. KURALLAR & TUZAKLAR
 
+- 🚨 **Güzergâh sorgusu yazarken `listings`'i tek başına sorgulama** (29 Tem 2026, W5).
+  Kalkış `listings.origin_city`'de, varışlar `listing_stops` satırlarında. `listings`
+  içindeki `destination_city` **ölü kolondur** — dolu görünse bile kimse okumaz.
+  Bir güzergâh sorgusu `JOIN public.listing_stops s ON s.listing_id = l.id` içermiyorsa
+  yanlıştır. Bu tuzak bir kez gerçek zarar verdi: eski temizlik script'i (BÖLÜM 6) ölü
+  kolonu onarıp kullanıcıya görünen `listing_stops.city`'yi atlamıştı.
+- ⚖️ **"Aynı şehir" bozukluk sinyali değildir** (29 Tem 2026, W5). Şehir içi taşıma meşru
+  bir hizmet; `origin_city = stops.city` olan ilanların çoğu gerçektir. Sahte güzergâhın
+  parmak izi **yazım farkıdır**: katlanmış anahtar eşit ama ham string farklı
+  (`Istanbul` vs `İstanbul`). Veri kalitesi ölçerken bu ikisini karıştırma — biri
+  düzeltilecek hasar, öteki korunacak iş.
 - 🚨 **`onAuthStateChange` callback'i İÇİNDE `await supabase.*` ÇAĞIRMA** (A8, 29 Tem 2026).
   Callback, Supabase'in auth kilidi (`navigator.locks`) tutulurken çalışır; içeriden yapılan
   her `supabase.from(...)` / `getSession()` aynı kilidi bekler → **deadlock**. Belirti:
