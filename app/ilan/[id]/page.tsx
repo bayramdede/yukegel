@@ -4,6 +4,7 @@ import { Metadata } from 'next';
 import Aksiyonlar from './Aksiyonlar';
 import { cookies } from 'next/headers';
 import { createServerClient } from '@supabase/ssr';
+import { durakToplami } from '../../../lib/ilan-liste';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
