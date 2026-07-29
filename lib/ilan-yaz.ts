@@ -230,6 +230,33 @@ export async function ilanYaz(
     ? girdi.utsyapi.filter(u => UTSYAPI_SETI.has(u)).slice(0, UTSYAPI_SETI.size)
     : [];
 
+  // ── B3: araç bağlantısı ───────────────────────────────────────────────────
+  // Kullanıcı `/ilan-ver`'de kendi araçlarından birini seçiyor; o seçim şimdiye
+  // kadar hiçbir yere yazılmıyordu. Yazıyoruz — ama id'ye GÜVENMİYORUZ:
+  // istemci başkasının plakasını gönderebilir. `user_id` + `is_active` ile
+  // doğrulanmayan id sessizce düşer (ilanı reddetmek kullanıcıyı cezalandırır;
+  // burada kaybedilen tek şey bir ilişki kaydı).
+  let aracId: string | null = null;
+  const aracIdHam = typeof girdi.arac_id === 'string' ? girdi.arac_id.trim() : '';
+  if (tip === 'arac' && /^[0-9a-f-]{36}$/i.test(aracIdHam)) {
+    const { data: arac } = await svc
+      .from('vehicles')
+      .select('id')
+      .eq('id', aracIdHam)
+      .eq('user_id', userId)
+      .eq('is_active', true)
+      .maybeSingle();
+    if (arac?.id) {
+      aracId = arac.id as string;
+    } else {
+      structuredLog('WARN', 'db-transaction', 'İlana bağlanmak istenen araç doğrulanamadı', {
+        user_id: userId,
+        vehicle_id: aracIdHam,
+        source: kaynak,
+      });
+    }
+  }
+
   // ── V2: telefon
   const telSonuc = await ilanTelefonu(userId, girdi.tel);
   if (!telSonuc.ok) return { ok: false, hata: telSonuc.hata };
