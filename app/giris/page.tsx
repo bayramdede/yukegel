@@ -159,6 +159,8 @@ function GirisIci() {
     // `await supabase.*` çağırmak deadlock yaratır. Gerçek iş setTimeout(0) ile
     // kilidin dışına taşınıyor.
     async function oturumDegerlendir(userId: string) {
+      // Kullanıcı bu arada kendi giriş denemesini başlattıysa karışma.
+      if (etkilesimRef.current) return;
       const { data: profil } = await supabase
         .from('users')
         .select('merged_into, user_type')
