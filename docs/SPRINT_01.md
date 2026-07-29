@@ -467,7 +467,8 @@ where table_name='users' and grantee in ('authenticated','anon') order by grante
 5. ~~**A4 — Twilio Console:** Code Length kaç hane?~~ ✅ **4 hane, çalışıyor** (28 Tem 2026).
    Bu bilgi `sahiplen` sayfasındaki 6-hane bug'ını (A4b-hane) ortaya çıkardı.
 6. **S1 — Görsel:** 1200×630 OG görseli (logo + "Türkiye'nin Nakliye İlan Platformu")
-7. **G2 — Karar:** Turnstile mi kota mı? Turnstile ücretsiz ama Cloudflare hesabı gerektiriyor
+7. ~~**G2 — Karar:** Turnstile mi kota mı?~~ ✅ **Sunucu tarafı kota seçildi** (Bayram, 29 Tem 2026).
+   Uygulandı: `lib/kota.ts` + `/api/auth/otp`. Turnstile ileride ek katman olarak eklenebilir.
 
 ---
 
