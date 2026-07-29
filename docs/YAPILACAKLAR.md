@@ -299,7 +299,6 @@ değişikliği içermiyor — yalnızca statik okuma. Canlı DB/RLS doğrulamas�
       (`auth/reset/page.tsx:30` vs `:74`; `giris/page.tsx:258` vs `:497`).
 - [ ] **F1** — `Footer.tsx:29` "Kayıt Ol" linki `/giris` (mod param yok, `:28` ile birebir aynı).
 - [ ] **F2** — `Footer.tsx:20-37` 7 link `<a>` ile → her tıklamada tam sayfa yenilemesi.
-- [ ] **K2b** — TCKN/VKN doğrulaması yalnız client'ta; sunucuda tekrarlanmıyor (K2 ile birlikte).
 
 > ⚠️ Aşağıdaki "Kritik / Yüksek / Orta / Düşük" blokları **28 Tem 2026'daki ilk analizin
 > bulgu envanteridir** — açıklamaları o günkü kodu tarif eder, W0/W1 sonrası kod değişti.
