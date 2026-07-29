@@ -397,6 +397,40 @@ ondalık artığı 2 haneye yuvarlıyor; hiç değer yoksa `0` değil `null`).
 > **Doğru olan ve DEĞİŞMEYEN:** `/ilan/[id]` durak kartları ve `/u/[username]` durakları
 > tek tek listeliyor — orada her satır kendi tonajını gösterir, toplam yanlış olurdu.
 
+## ✅ Giriş sonrası ana sayfaya düşme — gelinen sayfaya dönülüyor (29 Tem 2026)
+
+**Belirti:** Hangi sayfadan giriş yapılırsa yapılsın giriş sonrası **ana sayfa** açılıyordu.
+En can yakan hâli: kullanıcı ilanlarını `/u/<id>` bağlantısıyla paylaşıyor, gelen kişi
+"Giriş Yap"a basıyor ve o listeyi bir daha bulamıyor — paylaşılan bağlantı boşa gidiyor.
+
+**Kök 1 — kapsam:** `guvenliRedirect` + `yk_redirect` cookie zinciri (A7) doğru çalışıyordu
+ama hedefi YALNIZCA `proxy.girisYonlendir()` kuruyordu, o da sadece 5 `KORUNMALI` rota için
+(`/panel`, `/ilan-ver`, `/araclarim`, `/profil`, `/moderator`). Diğer ~10 giriş bağlantısı
+(header, footer, "Üye Ol", `/hakkimizda`, `/nasil-calisir`, `panel/page.tsx`, `araclarim`,
+`profil-tamamla`) ÇIPLAK `/giris` idi. Hata üretmiyor, sadece yanlış yere gidiyordu.
+
+**Kök 2 — sinsi olan:** `/auth/callback` hedefi **yalnız cookie'den** okur, query param'a
+hiç bakmaz. Bağlantılara `?redirect=` eklense bile proxy'ye uğramadan gelen kullanıcıda
+cookie boş kalıyordu → **telefon/e-posta ile girenler doğru yere, Google ile girenler ana
+sayfaya** düşüyordu. Aynı sayfa, iki farklı davranış, sıfır hata sinyali.
+
+**Düzeltme** — hedef tek yerden kuruluyor: `lib/redirect.ts → girisAdresi(yol, mod?)`
+(`encodeURIComponent` + `guvenliRedirect` içeride; `/giris`in kendisi hedefse hiç eklenmez).
+
+- [x] `lib/redirect.ts` — yeni `girisAdresi()`
+- [x] `app/_components/GirisLink.tsx` — yeni; bulunduğu sayfayı `usePathname()` ile kendisi
+      ekler (`useSearchParams()` DEĞİL: Suspense sınırı zorlar, statik render'ı bozar)
+- [x] `app/giris/page.tsx` — `?redirect=`'i cookie'ye de yazıyor → Google/e-posta zinciri
+- [x] `Footer.tsx` (her sayfada), `HomeClient.tsx` (banner + nav), `hakkimizda`,
+      `nasil-calisir`, `u/[username]`, `panel`, `araclarim`, `profil-tamamla`
+- [x] 🚨 **Yan bulgu — açık yönlendirme kapatıldı:** `profil-tamamla` "profil zaten tam"
+      dalı `redirect`'i HAM kullanıyordu (`?redirect=https://kotu.site` çalışıyordu).
+      Aynı dosyanın başka bir dalı zaten `guvenliRedirect`'ten geçiriyordu — bu dal atlanmış.
+- [x] `girisAdresi` testi 17/17 (mutlak URL, `//`, `/\`, CR/LF, null, `/giris` döngüsü)
+- [x] `tsc --noEmit` temiz
+- [ ] **Bayram:** deploy sonrası `/u/<id>` sayfasından "Ara" → giriş → **aynı sayfaya**
+      döndüğünü doğrula; ayrıca **Google ile girişte de** döndüğünü ayrıca dene
+
 ## ⚠️ BUGLAR
 - [x] **A10 — "Hesabınız birleştirildi" sonsuz giriş döngüsü** ✅ (29 Tem 2026)
   Belirti: giriş yapılıyor → "Hesabınız başka bir hesabınızla birleştirildi… tekrar giriş
