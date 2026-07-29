@@ -144,7 +144,9 @@ export default function Araclarim() {
   useEffect(() => {
     async function init() {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { window.location.href = '/giris'; return; }
+      // 29 Tem 2026 — çıplak `/giris` DEĞİL: giriş yapan kullanıcı araç listesine
+      // geri dönmeli, ana sayfaya değil.
+      if (!user) { window.location.href = girisAdresi('/araclarim'); return; }
       await araclariYukle(user.id);
     }
     init();
