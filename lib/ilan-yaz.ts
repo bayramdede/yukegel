@@ -290,6 +290,7 @@ export async function ilanYaz(
       status: 'active',
       trust_level: 'verified',
       user_id: userId,
+      vehicle_id: aracId,
       vehicle_type: aracTipi,
       body_type: utsyapi.length > 0 ? utsyapi : null,
       // `stop_order` fonksiyon içinde `with ordinality` ile üretiliyor;
