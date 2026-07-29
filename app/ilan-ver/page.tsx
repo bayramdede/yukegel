@@ -540,7 +540,12 @@ export default function IlanVer() {
                   </div>
                 </div>
                 <div style={{ marginBottom: 16 }}>
-                  <label style={s.label}>Yük Cinsi</label>
+                  <label style={s.label}>
+                    Yük Cinsi{' '}
+                    <span style={{ color: '#4b5563', fontWeight: 400, fontSize: '0.72rem' }}>
+                      (duraklarda boş bırakılanlar buradan doldurulur)
+                    </span>
+                  </label>
                   <input value={yuk_cinsi} onChange={e => setYukCinsi(e.target.value)} placeholder="Seramik, tekstil, elektronik..." style={s.input} />
                 </div>
               </>
