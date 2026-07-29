@@ -672,7 +672,7 @@ export default function IlanVer() {
                 {tel || telDurum === 'yukleniyor'
                   ? 'Profilinizdeki numara kullanılacak'
                   : telDurum === 'numara-yok'
-                    ? <a href="/profil" style={{ color: '#3b82f6' }}>Profilden ekleyin →</a>
+                    ? <a href="/profil-tamamla" style={{ color: '#3b82f6' }}>Profilden ekleyin →</a>
                     : 'Sayfayı yenileyin; sürerse bize bildirin'}
               </span>
             </div>
