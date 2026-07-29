@@ -3,6 +3,7 @@ import { createHmac } from 'crypto';
 import { getServiceSupabase } from '../../../lib/auth';
 import { getAiQuotaForUser, countAiListingsLast24h } from '../../../lib/auditLimits';
 import { structuredLog } from '../../../lib/logger';
+import { ilanYaz, bugunISO, type DurakGirdi } from '../../../lib/ilan-yaz';
 
 export const runtime = 'nodejs';
 
