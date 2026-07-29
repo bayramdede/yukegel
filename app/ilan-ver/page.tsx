@@ -259,12 +259,17 @@ export default function IlanVer() {
             ilce: s.district ? String(s.district) : '',
             ton: typeof s.weight_ton === 'number' && s.weight_ton > 0 ? String(s.weight_ton) : '',
             palet: typeof s.pallet_count === 'number' && s.pallet_count > 0 ? String(s.pallet_count) : '',
-            notlar: s.cargo_type ? String(s.cargo_type) : '',
+            // B4 — cargo_type ARTIK kendi alanına gidiyor. Eskiden `notlar`a
+            // gömülüyordu: veri hem yanlış kolona yazılıyor hem de kullanıcının
+            // yazdığı gerçek durak notunun yerini kapıyordu.
+            yuk_cinsi: s.cargo_type ? String(s.cargo_type) : '',
+            notlar: '',
           };
         });
-      // Yuk cinsi: ilk durak cargo_type çözümü
-      const ilkCargo = r.stops.find(s => s?.cargo_type)?.cargo_type;
-      if (ilkCargo) setYukCinsi(String(ilkCargo));
+      // Genel yük cinsi = duraklar arasında ORTAK olan cins. Duraklar farklıysa
+      // genel alan boş kalır; her durak kendi cinsini gösterir (B4).
+      const cinsler = new Set(r.stops.map(s => (s?.cargo_type ? String(s.cargo_type) : '')).filter(Boolean));
+      if (cinsler.size === 1) setYukCinsi([...cinsler][0]);
       if (yeni.length > 0) setDuraklar(yeni);
     }
 
