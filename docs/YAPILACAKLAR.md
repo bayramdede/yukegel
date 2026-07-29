@@ -198,6 +198,14 @@ U1–U10 ve V8–V10, B5–B9, M1–M5 için `docs/ILAN_VER_ANALIZ.md` §3–§5
 `safety_rules` tablosunun dolu olup olmadığı (boşsa her ilan 0 puan alır, V3 pratikte
 zaten hiçbir şeyi kuyruğa sokmuyordur).
 
+W0 sonrası eklenen doğrulamalar:
+- [ ] `safety_rules` **dolu mu?** Boşsa V3 kodu doğru ama etkisiz — her ilan 0 puanla `yayinda` döner.
+- [ ] Bir ilanı 31–70 bandına düşürüp `moderation_status='pending'` + `status='passive'`
+      olduğunu ve **listelerde görünmediğini** doğrula.
+- [ ] Google ile kaydolmuş, profilinde telefonu OLMAYAN bir kullanıcıyla ilan ver:
+      numara `users.phone`'a geri yazılıyor mu (V2 kendini onaran dal)?
+- [ ] Gece 00:00–03:00 arası tarih alanının bugünü gösterdiğini doğrula (A2).
+
 ## ⚠️ BUGLAR
 - [x] **A10 — "Hesabınız birleştirildi" sonsuz giriş döngüsü** ✅ (29 Tem 2026)
   Belirti: giriş yapılıyor → "Hesabınız başka bir hesabınızla birleştirildi… tekrar giriş
