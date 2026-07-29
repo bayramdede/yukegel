@@ -221,6 +221,17 @@ function GirisIci() {
     else router.push('/');
   }
 
+  // SPRINT_01 G1 — sunucuda giriş yapıldığında kullanılan yönlendirme.
+  // Farkı: rolü DB'den tekrar sormaz (sunucu zaten döndü) ve `router.push` yerine TAM
+  // SAYFA yüklemesi yapar. Oturum cookie'si sunucudan geldiği için tarayıcıdaki Supabase
+  // istemcisinin bellek içi durumu bayat kalabilir; tam yükleme herkesi aynı oturuma
+  // oturtur (header, proxy, server component'ler).
+  function yonlendirRol(rol: string) {
+    const hedef = guvenliRedirect(redirect) ?? guvenliRedirect(redirectCookieOku());
+    if (hedef) { redirectCookieSil(); window.location.assign(hedef); return; }
+    window.location.assign(rol === 'admin' ? '/admin' : rol === 'moderator' ? '/moderator' : '/');
+  }
+
   // ── Telefon akışı ───────────────────────────────────────────────
   async function otpGonder(e: React.FormEvent) {
     e.preventDefault();
