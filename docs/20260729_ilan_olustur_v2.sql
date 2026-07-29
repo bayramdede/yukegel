@@ -89,9 +89,13 @@ begin
     p_listing->>'notes',
     p_listing->>'raw_text',
     p_listing->>'source',
-    p_listing->>'moderation_status',
-    p_listing->>'status',
-    p_listing->>'trust_level',
+    -- ⚠️ `coalesce`: RPC her koşulda kolona YAZAR, yani alan gönderilmezse kolon
+    -- DEFAULT'unu değil NULL'ı alır. Eski INSERT'lerde bu alanları hiç yazmayan
+    -- çağıranlar (Edge Function) vardı; onlar RPC'ye geçerken sessizce NULL
+    -- `status` doğurmasın diye en muhafazakâr değere düşüyoruz.
+    coalesce(p_listing->>'moderation_status', 'pending'),
+    coalesce(p_listing->>'status', 'passive'),
+    coalesce(p_listing->>'trust_level', 'social'),
     (p_listing->>'user_id')::uuid,
     (p_listing->>'vehicle_id')::uuid,
     case
