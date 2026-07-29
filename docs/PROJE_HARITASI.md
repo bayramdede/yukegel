@@ -137,6 +137,11 @@ yukegel/
 ├── lib/auth.ts + supabase.ts             # auth.ts: requireStaff() → API route'lar için (redirect atmaz)
 ├── lib/redirect.ts                       # 🔒 SPRINT_01 A7 — guvenliRedirect(): yalnız `/` ile başlayan,
 │                                         #    `//` ve `\` içermeyen yollar (açık yönlendirme koruması) ✅
+├── lib/kota.ts                           # 🔒 SPRINT_01 G1/G2 — kotaDene()/kotaSifirla()/istekIp():
+│                                         #    bellek içi kayan pencere sayacı. `deger` verilirse FARKLI
+│                                         #    değer sayar, `sayma:true` sadece bakar. ⚠️ process-local ✅
+├── lib/kimlik.ts                         # 🔒 SPRINT_01 K2b — tcknGecerli()/vknGecerli() TEK KAYNAK
+│                                         #    (istemci + sunucu aynı modülü import eder) ✅
 ├── lib/whatsapp/chatParser.ts            # 📱 TEK KAYNAK sohbet parser (server + client ortak) ✅
 ├── lib/whatsapp/__tests__/chatParser.test.ts  # 29 assertion — `npm run test:parser` ✅
 ├── lib/whatsapp/telefon.ts               # 📱 TEK KAYNAK telefon regex (05XXXXXXXXX) ✅
