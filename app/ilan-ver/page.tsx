@@ -14,7 +14,13 @@ interface Durak { sehir: string; ilce: string; ton: string; palet: string; notla
 interface Vehicle { id: string; plate: string; vehicle_type: string; body_types: string[]; brand: string | null; model: string | null; capacity_ton: number | null; }
 type Yontem = null | 'tekil' | 'toplu' | 'metin';
 
-function bugun(): string { return new Date().toISOString().split('T')[0]; }
+// ⚠️ `PROJE_HARITASI §9` (A2): offset'siz `new Date().toISOString()` UTC verir.
+// Türkiye'de gece 00:00–03:00 arasında DÜNÜ döndürüyordu — sunucu (`actions.ts`
+// `bugunISO()`) aynı anda BUGÜNÜ hesapladığı için form "Geçmiş tarih seçilemez"
+// ile reddedilirdi. İki taraf da sabit +03:00 kullanmak zorunda.
+function bugun(): string {
+  return new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString().split('T')[0];
+}
 
 function SecimEkrani({ onSecim }: { onSecim: (y: Yontem) => void }) {
   return (
