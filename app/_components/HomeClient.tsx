@@ -158,7 +158,8 @@ function HeroMusteri({ ad }: { ad: string }) {
             <div style={{ color: '#e2e8f0', fontWeight: 800, fontSize: '1.15rem' }}>{ad} 👋</div>
           </div>
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-            <a href="/ilan-ver" style={{ background: '#22c55e', color: '#000', fontWeight: 800, fontSize: '0.85rem', padding: '9px 18px', borderRadius: 7, textDecoration: 'none' }}>+ Yeni İlan Oluştur</a>
+            {/* SPRINT_01 L2 — bu blok yük veren kullanıcıya gösteriliyor, tip belli. */}
+            <a href="/ilan-ver?tip=yuk" style={{ background: '#22c55e', color: '#000', fontWeight: 800, fontSize: '0.85rem', padding: '9px 18px', borderRadius: 7, textDecoration: 'none' }}>+ Yeni İlan Oluştur</a>
             <a href="/panel" style={{ background: '#161b22', color: '#e2e8f0', fontWeight: 600, fontSize: '0.85rem', padding: '9px 18px', borderRadius: 7, textDecoration: 'none', border: '1px solid #30363d' }}>📋 İlanlarım</a>
             <a href="/panel?tab=profil" style={{ background: '#161b22', color: '#8b949e', fontWeight: 600, fontSize: '0.85rem', padding: '9px 18px', borderRadius: 7, textDecoration: 'none', border: '1px solid #30363d' }}>👤 Profil</a>
           </div>
