@@ -4,9 +4,11 @@
 >
 > ✅ **BAYRAM — 3 SQL'in ÜÇÜ DE ÇALIŞTIRILDI** (29 Tem 2026): `20260728_kvkk_onay.sql`,
 > `20260728_auth_events.sql`, `20260728_contact_phone_revoke.sql`.
-> ⚠️ Sonuncusu kod deploy'undan SONRA çalışmalıydı — L1e kodu (`app/panel/actions.ts`,
-> `app/moderator/actions.ts`) canlıda değilse panel/moderatör telefon yazamaz.
-> Duman testi ve geri alma bloğu dosyanın sonunda.
+> ✅ Sonuncusunun **duman testi de geçti**: misafir ana sayfa + `/ilan/[id]` açılıyor,
+> `/moderator` listesi telefon kolonuyla yükleniyor, moderatör telefon düzenleme çalışıyor.
+> `contact_phone`'a dokunan her yol service-role kullanıyor → kırık yazma yolu yok.
+> 🚨 Yeni tuzak: `listings` artık **kolon bazlı** yetkili — sonradan eklenen kolonlar
+> `anon`/`authenticated` için yetkisiz doğar (bkz. PROJE_HARITASI §9).
 >
 > ~~Ayrıca kontrol: `public.users.is_active` DB default'u~~ ✅ doğrulandı: default `true`, NULL satır yok (29 Tem 2026). Opsiyonel sertleştirme: `alter table public.users alter column is_active set not null;`
 >
