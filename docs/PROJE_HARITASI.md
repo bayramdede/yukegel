@@ -280,6 +280,35 @@ contact_phone — 🔒 anon/authenticated için REVOKE edildi (SPRINT_01 L1e). Y
 > 🚨 Migration `contact_phone` hariç **o anki** kolonlara grant verdi → `listings`'e sonradan
 > eklenen kolonlar `anon`/`authenticated` için yetkisiz doğar. Yeni kolon = elle grant.
 
+### `listing_stops` — 🚨 GÜZERGÂH ŞEMASI (varışlar burada)
+```
+listing_id (FK → listings.id), stop_order (1..n)
+city, district (district nullable)
+cargo_type, weight_ton, pallet_count, vehicle_count, notes
+```
+> 🚨 **Çıkış tek, varış çok.** Kalkış `listings.origin_city` / `origin_district`'te tek satır
+> olarak durur; **uğrama/varış noktalarının hepsi `listing_stops` satırlarıdır.** Bir güzergâhı
+> tek tabloda aramak yanlış sonuç verir.
+> - Yazan: `supabase/functions/parse-listing/index.ts:825` (her lane için bir satır),
+>   `app/panel/actions.ts:96-157` (önce `delete .eq('listing_id')` sonra toplu insert — yani
+>   duraklar **replace** ediliyor, patch değil).
+> - Okuyan: `app/_components/HomeClient.tsx:696` varış filtresi
+>   (`i.duraklar.some(d => d.sehir?.includes(varis))`) — bozuk yazım burada **doğrudan
+>   kullanıcıya** "ilan bulunamadı" olarak yansır.
+> - `get_nearby_listings_by_city` RPC varışı `listing_stops`'un **son durağından**
+>   `DISTINCT ON` ile alıyor.
+>
+> ⚰️ **`listings.destination_city` ÖLÜ KOLON** (29 Tem 2026, W5). Uygulama kodunda tek bir
+> yazma veya okuma yok. `app/panel/actions.ts` patch whitelist'inde bile yer almıyor.
+> `docs/20260728_alias_kopya_temizligi.sql` BÖLÜM 6 bu ölü kolonu onarmaya çalışıp asıl canlı
+> kolonu (`listing_stops.city`) atlıyor → **o bölümü olduğu gibi çalıştırma**, yerine
+> `docs/20260729_alias_runbook.md` Adım 8'i kullan (dört kolonu birlikte onarıyor).
+> Kolonun düşürülmesi `YAPILACAKLAR.md`'de bilet.
+>
+> ⚖️ **Aynı şehir içi taşıma meşrudur.** `origin_city = stops.city` bir bozukluk sinyali
+> **değildir**. Sahte güzergâh parmak izi şudur: *katlanmış anahtar eşit, ham yazım farklı*
+> (`Istanbul` → `İstanbul`). Ölçüm sorguları runbook Adım 0.1 / 0.2'de.
+
 ### `shadow_profiles` — Gölge Profil / CRM
 ```
 phone (unique, +90 normalize), name, company_name, notes, status: 'active'|'blocked'|'converted'
