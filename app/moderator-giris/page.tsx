@@ -9,7 +9,6 @@ export default function ModeratorGiris() {
   const [sifre, setSifre] = useState('');
   const [hata, setHata] = useState('');
   const [yukleniyor, setYukleniyor] = useState(false);
-  const router = useRouter();
 
   const handleGiris = async (e: React.FormEvent) => {
     e.preventDefault();
