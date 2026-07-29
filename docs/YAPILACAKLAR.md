@@ -136,6 +136,21 @@
 
 
 ## ⚠️ BUGLAR
+- [x] **A10 — "Hesabınız birleştirildi" sonsuz giriş döngüsü** ✅ (29 Tem 2026)
+  Belirti: giriş yapılıyor → "Hesabınız başka bir hesabınızla birleştirildi… tekrar giriş
+  yapın" → tekrar giriş → aynı mesaj. **Hiç giriş yapılamıyor.**
+  Sebep: emekli (`merged_into` dolu) auth kimliğiyle girildiğinde `proxy.ts` sb- cookie'lerini
+  silip `/giris?hesap=tasindi`'ye atıyordu. Kullanıcı aynı kimlikle geri geldiği için yine
+  aynı satıra düşüyordu — kodda döngüden çıkış yolu yoktu. `/api/auth/switch-account`
+  magic-link'in `action_link`'ini (implicit flow) döndürdüğü için SSR cookie'si hiç
+  güncellenmiyor, döngü kapanmıyordu.
+  Çözüm: yeni `app/auth/devir/route.ts` — oturumu **sunucuda** canlı hesaba devreder:
+  `merged_into` zinciri (maks 5 adım, döngü koruması) → `admin.generateLink` →
+  **`hashed_token`** → cookie yazan `createServerClient` üzerinde `verifyOtp` → canlı
+  hesabın cookie'leri yazılır → hedefe (`?redirect` / `yk_redirect` / `/panel`) yönlendirir.
+  Kurtarılamayan hâllerde (hedef silinmiş, e-posta yok, zincir döngüsü) cookie'leri temizleyip
+  `/giris?hesap=tasindi`'ye düşer. `proxy.ts`'teki `merged_into` dalı artık cookie SİLMEZ.
+  Yetki: hedef hesap istekten ALINMAZ, yalnız oturumun kendi `merged_into` zincirinden okunur.
 - [x] **A9 — SMS girişinde kod girilmeden /admin'e düşme** ✅ (29 Tem 2026) — **güvenlik açığı DEĞİL**
   Belirti: `/giris`'te telefon yazıp SMS iste → kod girilmeden `/admin` açılıyor.
   Sebep: kullanıcının ZATEN geçerli bir oturumu vardı. Sayfa açılışındaki "oturum sağlık
