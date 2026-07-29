@@ -343,7 +343,7 @@ cargo_type, weight_ton, pallet_count, vehicle_count, notes
 > 🚨 **Çıkış tek, varış çok.** Kalkış `listings.origin_city` / `origin_district`'te tek satır
 > olarak durur; **uğrama/varış noktalarının hepsi `listing_stops` satırlarıdır.** Bir güzergâhı
 > tek tabloda aramak yanlış sonuç verir.
-> - Yazan: `supabase/functions/parse-listing/index.ts:825` (her lane için bir satır),
+> - Yazan: `supabase/functions/parse-listing/index.ts` (`ilan_olustur` RPC'si, lane grubu → `p_stops`),
 >   `app/panel/actions.ts:96-157` (önce `delete .eq('listing_id')` sonra toplu insert — yani
 >   duraklar **replace** ediliyor, patch değil).
 > - Okuyan: `app/_components/HomeClient.tsx:696` varış filtresi
