@@ -87,6 +87,10 @@ export default function IlanVer() {
   const [tel, setTel] = useState('');
   const [duraklar, setDuraklar] = useState<Durak[]>([{ sehir: '', ilce: '', ton: '', palet: '', notlar: '' }]);
   const [gonderildi, setGonderildi] = useState(false);
+  // ILAN_VER_ANALIZ V4 — sonuç ekranı artık VARSAYMIYOR, sunucunun döndürdüğü
+  // gerçek durumu gösteriyor. Trigger ilanı kuyruğa alsa da shadow-ban'lasa da.
+  const [sonucDurum, setSonucDurum] = useState<IlanDurumu>('yayinda');
+  const [sonucMesaj, setSonucMesaj] = useState('');
   const [yukleniyor, setYukleniyor] = useState(false);
   const [hata, setHata] = useState('');
 
