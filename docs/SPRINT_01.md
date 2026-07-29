@@ -15,8 +15,14 @@
 | **W0** ✅ | Yasal + tam kilitleyen buglar | L1, A2, M1, K1 (+L1b, L1c, L1d, L1f, A2b, K1b, A4b-hane) | 17 (+7 keşif) | Ürün şu an yasal risk taşıyor ve iki akış tamamen kırık |
 | **W1** ✅ | Auth akış bütünlüğü | A1, A3, A4, A7, K2, R1, C1 (+A1b, A4b, L1e) | 21 | Kullanıcı doğru ekrana gitmiyor / sessiz hata |
 | **W2** ✅ | Güvenlik & gözlemlenebilirlik | G1, G2, M2, C2, K2b (+A8, A10, `lib/kota.ts`) | 15 | Kötüye kullanım yüzeyi + kör nokta |
-| **W3** | SEO & huni | S1, S2, S3, S4, L2, L3 | 14 | Trafik ve dönüşüm |
-| **W4** | UX cila | K3, L4, L5, A5, A6, R2, F1, F2 | 11 | Küçük ama görünür |
+| **W3** ✅ | SEO & huni | S1, S2, S3, S4, L2, L3 (+`lib/analiz.ts`, `opengraph-image.tsx`) | 14 | Trafik ve dönüşüm |
+| **W4** ✅ | UX cila | K3, L4, L5, A5, A6, R2, F1, F2 (+`lib/sifre.ts`, `lib/ilan-liste.ts`, `api/auth/dogrulama-tekrar`) | 11 | Küçük ama görünür |
+| **W5** 📋 | Veri bütünlüğü (alias) | D1, D2, D3, D4, D5 | 13 | **Şu an aktif hasar veriyor** — ilan verisi bozuk kaydediliyor |
+
+> **W5 kapsam notu:** SPRINT_01'in özgün kapsamı landing/kayıt/giriş idi ve o kısım W0–W4
+> ile **bitti**. W5 bilinçli bir kapsam genişletmesi: `aliases` tablosundaki bozulma
+> auth'a değil, ürünün ana verisine (`listings`) dokunuyor ve her yeni ilanda büyüyor.
+> Ayrı bir sprint açmak yerine buraya eklendi çünkü bulgular W0–W4 sırasında çıktı.
 
 ---
 
@@ -370,84 +376,293 @@ where table_name='users' and grantee in ('authenticated','anon') order by grante
 
 ---
 
-## W3 — SEO & huni (14 puan)
+## W3 — SEO & huni (14 puan) — ✅ TAMAMLANDI (29 Tem 2026)
 
-### S1 · `layout.tsx` metadata eksik: metadataBase, OG, Twitter, canonical 🟠 *(yeni)*
+> **Doğrulama:** `npx tsc --noEmit` temiz. Eslint: yeni dosyaların (`lib/analiz.ts`,
+> `app/opengraph-image.tsx`, 4 adet `layout.tsx`, `app/sitemap.ts`) **hiç bulgusu yok**.
+> `app/ilan-ver/page.tsx`'te tek yeni bulgu `react-hooks/set-state-in-effect` (satır 123) —
+> depoda bu kuraldan zaten 18 ihlal var ve alternatifi (lazy `useState` içinde `window`
+> okumak) SSR hidrasyon uyuşmazlığı üretirdi; bilinçli bırakıldı.
+> `next build` bu ortamda çalışmıyor; OG kartı ve robots çıktısı canlıda göz kontrolü ister.
+
+### S1 · `layout.tsx` metadata eksik: metadataBase, OG, Twitter, canonical 🟠 ✅
 - **Dosya:** `app/layout.tsx:22-26` — yalnız `title`, `description`, `icons`
 - **Etki:** WhatsApp/Twitter/LinkedIn paylaşımlarında önizleme kartı yok. Nakliye sektöründe paylaşım WhatsApp üzerinden yürüdüğü için bu doğrudan trafik kaybı.
 - **Yapılacak:** `metadataBase: new URL(SITE_URL)`, `openGraph` (title/description/images/locale `tr_TR`/type `website`), `twitter: { card: 'summary_large_image' }`, `alternates.canonical`. `/ilan/[id]` için dinamik OG (ayrı ticket).
-- **Kabul kriteri:** [ ] WhatsApp'a link atınca kart görünüyor · [ ] `opengraph-image` 1200×630 mevcut
+- **Kabul kriteri:** [x] `opengraph-image` 1200×630 mevcut · [ ] WhatsApp'a link atınca kart görünüyor *(canlıda göz kontrolü — deploy sonrası)*
 - **Efor:** 3 puan
+- **Yapıldı:** `app/layout.tsx`'e `metadataBase`, `alternates.canonical: '/'`, `openGraph` (`type: 'website'`, `locale: 'tr_TR'`, `siteName`, `url`), `twitter: { card: 'summary_large_image' }` eklendi.
+- **Kart görseli (29 Tem 2026, güncellendi):** Bayram gerçek tasarımı verdi → `app/opengraph-image.jpg` + `app/opengraph-image.alt.txt`. Geçici `next/og` üreteci (`opengraph-image.tsx`) **silindi** — aynı segmentte iki og dosyası bulunamaz. Kaynak 2848×1504 PNG (4,5 MB); merkezden kırpılıp 1200×630'a indirildi, JPEG q95 → **134 KB**.
+- ⚠️ **Neden PNG değil JPEG:** aynı kadraj PNG olarak 650 KB ediyordu; WhatsApp büyük görsellerde kartı **sessizce göstermiyor**. Metin keskinliği q95'te kontrol edildi, bozulma yok.
+- ⚠️ Karttaki "519 aktif ilan" ve "BETA" **donmuş** metin. Sayı gerçek zamanlı değil; rakam anlamsızlaşınca ya da beta bitince görsel elle yenilenmeli.
+- 🚨 **`metadataBase` OLMADAN** Next göreli OG/canonical URL'lerini SESSİZCE üretmez — paylaşım kartının hiç görünmemesinin en sık sebebi budur.
+- 🚨 **`openGraph.images` BİLEREK yazılmadı:** `opengraph-image.tsx` dosya konvansiyonu `og:image`'ı kendisi ekliyor; iki kaynak olursa hangisinin kazandığı sürüme bağlı.
+- ⚠️ `SITE_URL` fallback'i `sitemap.ts` ile **birebir aynı** olmalı; ayrışırlarsa sitemap bir alan adını, canonical başkasını gösterir ve Google ikisini ayrı site sanar.
+- ⏭️ `/ilan/[id]` için dinamik OG + kendi `alternates.canonical`'ı hâlâ AÇIK (ayrı ticket) — Next alt sayfalara canonical'ı **miras bırakmaz**.
 
-### S2 · Auth sayfaları indekslenebilir — `noindex` yok 🟡 *(yeni)*
+### S2 · Auth sayfaları indekslenebilir — `noindex` yok 🟡 ✅
 - `/giris`, `/profil-tamamla`, `/moderator-giris`, `/auth/reset` için `robots: { index: false }` metadata yok (client component oldukları için `layout.tsx` veya route segment metadata'sı gerekiyor).
-- **Kabul kriteri:** [ ] Bu 4 sayfada `<meta name="robots" content="noindex">`
+- **Kabul kriteri:** [x] Bu 4 sayfada `<meta name="robots" content="noindex">`
 - **Efor:** 2 puan
+- **Yapıldı:** `app/giris/layout.tsx`, `app/moderator-giris/layout.tsx`, `app/profil-tamamla/layout.tsx`, `app/auth/layout.tsx` eklendi.
+- 🚨 **`'use client'` sayfası `metadata` EXPORT EDEMEZ** — Next bunu hata vermeden yok sayar. Tek çözüm aynı segmentte sunucu tarafı `layout.tsx`.
+- **Neden `/auth/reset` yerine segment seviyesi (`app/auth/layout.tsx`):** `callback`, `devir`, `reset` ve gelecekteki tüm `/auth/*` rotaları otomatik miras alsın diye. Sayfa başına yazsaydık S4'te robots.txt'te yaşadığımız "listeler zamanla ayrışır" sorununu yeniden üretirdik.
+- `follow` farkı bilinçli: `/giris` → `follow: true` (sayfadaki genel linkler taransın), diğer üçü → `follow: false` (URL'ler tek kullanımlık token taşıyor).
+- ⏭️ Açık kalan (isteğe bağlı): `/panel` ve `/araclarim`'da da `noindex` yok. robots.txt disallow'u var ve içerik zaten auth arkasında, o yüzden düşük öncelik.
 
-### S3 · Sitemap eksik: `/yol-rehberi` ve `/u/[username]` 🟡 *(yeni)*
-- **Dosya:** `app/sitemap.ts:29-35`
+### S3 · Sitemap eksik: `/yol-rehberi` ve `/u/[username]` 🟡 ✅
+- **Dosya:** `app/sitemap.ts`
 - Profil sayfaları (`/u/`) robots.txt'te AI crawler'lara açıkça izinli ama sitemap'te yok.
-- **Kabul kriteri:** [ ] `/yol-rehberi` statik listede · [ ] Aktif kullanıcı profilleri dinamik listede
+- **Kabul kriteri:** [x] `/yol-rehberi` statik listede · [x] Aktif kullanıcı profilleri dinamik listede
 - **Efor:** 2 puan
+- 🚨 **`/u/[username]` KLASÖR ADI YANILTICI: param `username` DEĞİL, kullanıcı `id`'si.** Sayfa `.eq('id', userId)` yapıyor, panel linki `/u/${userId}` üretiyor, `users.username` routing'de hiç kullanılmıyor. Sitemap'e `username` yazsaydık toptan 404 basardık.
+- **Neden `users` taranmadı:** ilanı olmayan yüzlerce boş profil "thin content" sayılır ve sitemap'in tamamına olan güveni düşürür. Profil URL'leri zaten çekilmiş aktif ilan listesinden türetiliyor → dolu sayfa garantisi, ek sorgu maliyeti sıfır.
+- `user_id` NULL olabilir (WhatsApp/Excel içe aktarımı) — bu satırlar profil listesine girmiyor. `lastModified` = kullanıcının en yeni ilanının tarihi.
 
-### S4 · robots.txt tutarsız 🟢 *(yeni)*
+### S4 · robots.txt tutarsız 🟢 ✅
 - **Dosya:** `public/robots.txt`
 - ClaudeBot bloğunda `/moderator-giris/` disallow yok (GPTBot'ta var). `User-agent: *` bloğu `Allow: /` diyor — `/panel/`, `/admin/`, `/api/`, `/moderator/` genel crawler'lara açık.
-- **Kabul kriteri:** [ ] `*` bloğunda özel alanlar disallow · [ ] Bot blokları birbiriyle tutarlı
+- **Kabul kriteri:** [x] `*` bloğunda özel alanlar disallow · [x] Bot blokları birbiriyle tutarlı
 - **Efor:** 1 puan
+- 🚨 **İsimli blok, `*` bloğunun YERİNE GEÇER — birleşmez.** GoogleBot/GPTBot/ClaudeBot kendi adını görünce `User-agent: *` bloğunu TAMAMEN yok sayar. Bu yüzden disallow listesi dört blokta da **birebir tekrar edilmek zorunda**; ayrışırlarsa bu bir hatadır.
+- ⚠️ robots.txt bir güvenlik sınırı değil; asıl sınır `proxy.ts` + `requireStaff()` + RLS. Amaç indekslenmeme + crawler bütçesi.
+- GPTBot/ClaudeBot'a `/ilan/`, `/u/`, `/yol-rehberi` bilinçli AÇIK: L1/L1c/L1f'ten sonra bu sayfalarda telefon yok, LLM'lerin Yükegel'i bilmesi işimize geliyor.
 
-### L2 · İki CTA aynı yere gidiyor, huni ayrışmıyor 🟠
-- **Dosya:** `HomeClient.tsx:92` ve `:248` — ikisi de `/ilan-ver`
+### L2 · İki CTA aynı yere gidiyor, huni ayrışmıyor 🟠 ✅
+- **Dosya:** `HomeClient.tsx` + `app/ilan-ver/page.tsx`
 - Yük veren ve nakliyeci için ayrı değer önerisi var ama tek hedef. Hangi persona'nın dönüştüğü ölçülemiyor.
-- **Yapılacak:** `/ilan-ver?tip=yuk` ve `?tip=arac` ile ön-seçim + GA event ayrımı.
 - **Efor:** 3 puan
+- **Yapıldı:** `lib/analiz.ts` (`olayGonder`) eklendi; `/ilan-ver` artık `?tip=` param'ını okuyup formu ön-seçiyor ve `ilan_ver_giris` / `ilan_olustur` olaylarını gönderiyor. HomeClient'taki üç "ilan ver" CTA'sı `?tip=yuk`'a bağlandı.
+- 🚨 **Bulunan sessiz hata:** `HomeClient.tsx` zaten bir yerde `/ilan-ver?tip=arac` linki veriyordu ama sayfa param'ı **hiç okumuyordu** — link aylardır etkisizdi.
+- 🚨 **İkinci bulunan hata:** `/ilan-ver` misafiri sabit `/giris?redirect=/ilan-ver`'e atıyordu; `?tip=` giriş turunda **kayboluyordu**. Artık `window.location.search` ekleniyor (`lib/redirect.ts`'teki `guvenliRedirect` query string'i zaten koruyor).
+- ⚠️ `useSearchParams` yerine `useEffect` içinde `window.location.search` bilinçli: bu sayfa Suspense sınırında değil, `useSearchParams` tüm ağacı CSR bailout'a sokardı.
+- ⚠️ Header'daki "+ İlan Ver" bilerek düz `/ilan-ver` bırakıldı — oradaki kullanıcının persona'sı bilinmiyor, uydurmak ölçümü kirletirdi.
+- ⚠️ `lib/analiz.ts`: **GA'ya asla kişisel veri gitmez** (telefon, e-posta, TCKN/VKN, ad). KVKK gereği — GA verisi yurt dışına çıkar.
 
-### L3 · "Ara" butonu misafirde auth kapısına çarpıyor 🟡
-- **Dosya:** `HomeClient.tsx:318/323`
-- Kullanıcı henüz değer görmeden duvara çarpıyor. Öneri: arama sonuçlarını göster, yalnız telefon açılışında giriş iste (L1 zaten bu mimariyi getiriyor).
+### L3 · "Ara" butonu misafirde auth kapısına çarpıyor 🟡 ✅
+- **Dosya:** `HomeClient.tsx`
 - **Efor:** 3 puan · **Bağımlılık:** L1
+- 🚨 **Ticket'ın öncülü kısmen yanlıştı:** arama sonuçları misafire ZATEN açıktı — filtreleme, sunucudan gelen listenin üzerinde istemci tarafında çalışıyor. Duvar yalnız NUMARADA ve bu bilinçli (L1).
+- **Gerçek kusur:** misafirin `🔐 Ara` butonu düz `/giris`'e atıyordu. Kullanıcı giriş yapıp ANA SAYFAYA düşüyor, baktığı ilanı akan listede yeniden bulmak zorunda kalıyor — çoğu zaman bulamıyordu.
+- **Yapıldı:** buton artık `/giris?redirect=/ilan/{id}`'e gidiyor (aynı dosyadaki `araTikla` 401 dalının hedefiyle birebir aynı) ve `telefon_giris_duvari` olayını gönderiyor.
 
 ---
 
-## W4 — UX cila (11 puan)
+## W4 — UX cila (11 puan) — ✅ TAMAMLANDI (29 Tem 2026)
 
-### K3 · `userType` değişince tüm form sıfırlanıyor 🟠
-- **Dosya:** `app/profil-tamamla/page.tsx:133-138`
+> **Doğrulama:** `npx tsc --noEmit -p tsconfig.json` **temiz**. Eslint: yeni dosyaların
+> (`lib/sifre.ts`, `lib/ilan-liste.ts`, `app/api/auth/dogrulama-tekrar/route.ts`) **hiç
+> bulgusu yok**; `Footer.tsx` de artık tamamen temiz. Değiştirilen üç büyük dosyada bulgu
+> sayısı HEAD ile birebir karşılaştırıldı: `HomeClient.tsx` 21→21, `giris/page.tsx` 7→7,
+> `profil-tamamla/page.tsx` 9→8. Yani **yeni ihlal yok**.
+> Tek bilinçli susturma: L5'in mount effect'indeki `react-hooks/set-state-in-effect`
+> (gerekçe kodda yazılı — alternatifi hidrasyon uyuşmazlığı).
+> `next build` bu ortamda çalışmıyor; sekme/URL davranışı ve doğrulama e-postası canlıda
+> göz kontrolü ister.
+>
+> Uygulama sonrası bağımsız bir inceleme ajanı çalıştırıldı; **3 gerçek hata + 3 yorum-kod
+> uyuşmazlığı** buldu ve **hepsi bu dalgada kapatıldı** (aşağıda ilgili ticket'ların altında
+> "İnceleme bulgusu" olarak işaretli).
+
+### K3 · `userType` değişince tüm form sıfırlanıyor 🟠 ✅
+- **Dosya:** `app/profil-tamamla/page.tsx`
 - Kullanıcı "şirket" seçip alanları doldurduktan sonra "broker"a geçerse her şey siliniyor — ortak alanlar (TCKN dahil) dahil. Yanlış tıklama = baştan.
-- **Yapılacak:** Yalnız o tipe özgü alanları sıfırla; TCKN/telefon/ad gibi ortak alanları koru.
 - **Efor:** 2 puan
+- **Yapıldı:** `ALAN_GORUNUR` haritası + `tipDegistir()` fonksiyonu. Yalnız YENİ tipte GÖRÜNMEYEN alanlar temizlenir; ad, telefon ve KVKK onayı asla sıfırlanmaz.
+- 🚨 **Neden effect değil fonksiyon:** "tip değişti" bir kullanıcı olayı, türetilmiş state değil. Effect'e bağlamak mount'ta da tetikleniyordu.
+- 🚨 **Görünmeyen alan MUTLAKA temizlenmeli:** `handleSubmit` `sirketAdi: sirketAdi || undefined` gönderiyor ve `actions.ts:135` `company_name`'i **tipten bağımsız** yazıyor. Yani ekranda olmayan veri sessizce kaydediliyordu. `ALAN_GORUNUR` ile JSX koşulları **eşleşmek zorunda** — biri değişirse diğeri de değişmeli.
+- 🚨 **İnceleme bulgusu — asenkron blur yarışı (düzeltildi).** Tip butonuna tıklamak açık TCKN/VKN alanını ÖNCE blur ediyor (mousedown → blur → click). Sıra: blur fetch'i başlar → `tipDegistir` `tcknMevcut`'u false yapar → fetch döner ve `setTcknMevcut(true)` yazar. Sonuç: `kimlikGecerli()` kalıcı false, "Kaydet" pasif, **uyarı metni de görünmüyor** (TCKN bloğu `sirket` tipinde gizli) — sebebi görünmeyen sessiz çıkmaz. Çözüm: `tipEpoch` ref sayacı; uçuştaki istek dönüşte epoch'u doğrulamazsa sonucunu yazmadan düşer. Spinner yine de kapatılır, yoksa sonsuz "Kontrol ediliyor" kalırdı.
 
-### R2 · Şifre güç göstergesi 3 kriter gösteriyor, doğrulama 1 kriter uyguluyor 🟡 *(yeni)*
-- **Dosya:** `app/auth/reset/page.tsx:30` (`length >= 8`) vs `:74` (uzunluk + rakam + büyük harf çubukları); `app/giris/page.tsx:258` + `:497` aynı tutarsızlık
-- Kullanıcıya 3 çubuk gösterip 1 tanesini zorunlu kılmak kafa karıştırıcı. Ya hepsini zorunlu yap ya da göstergeyi "öneri" olarak etiketle.
+### R2 · Şifre güç göstergesi 3 kriter gösteriyor, doğrulama 1 kriter uyguluyor 🟡 ✅
+- **Dosya:** `app/auth/reset/page.tsx` + `app/giris/page.tsx`
+- Kullanıcıya 3 çubuk gösterip 1 tanesini zorunlu kılmak kafa karıştırıcı.
 - **Efor:** 2 puan
+- **Yapıldı:** Kural **tek kaynağa** taşındı → `lib/sifre.ts` (`SIFRE_MIN`, `sifreKriterleri`, `sifreHatasi`, `SIFRE_KURAL_METNI`). Hem gösterge hem kapı aynı fonksiyondan besleniyor; bir daha ayrışamazlar.
+- 🚨 **TÜRKÇE TUZAĞI: `/[A-Z]/` YANLIŞ.** "Şifre123" ve "Ölçü1234" geçerli parolalar ama `[A-Z]` bunları "büyük harf yok" diye reddeder. `\p{Lu}` + `/u` bayrağı Ç, Ğ, İ, Ö, Ş, Ü dahil hepsini kapsar. Ticket'ı düz uygulasaydık bu hatayı "düzeltme" olarak kalıcılaştırırdık.
+- ⚠️ **`epostaGiris` BİLEREK kapıya bağlanmadı.** Yeni kural yalnız kayıt ve şifre sıfırlamada geçerli; mevcut zayıf parolalı kullanıcılar kilitlenmesin.
+- ⚠️ İstemci doğrulaması **güvenlik değil UX**. Asıl zorunluluk Supabase Dashboard → Authentication → Policies → Password Requirements'ta ayarlanmalı (Bayram listesinde).
 
-### F1 · Footer "Kayıt Ol" doğrudan giriş moduna düşüyor 🟢 *(yeni)*
-- **Dosya:** `app/_components/Footer.tsx:29` — `/giris` (mod param yok, `:28` ile birebir aynı link)
-- **Yapılacak:** `/giris?mod=kayit` + `giris/page.tsx`'te param okuma.
+### F1 · Footer "Kayıt Ol" doğrudan giriş moduna düşüyor 🟢 ✅
+- **Dosya:** `app/_components/Footer.tsx` + `app/giris/page.tsx`
 - **Efor:** 1 puan
+- **Yapıldı:** Link `/giris?mod=kayit`; `giris/page.tsx` param'ı okuyup **hem `mod` hem `sekme`**'yi kuruyor.
+- 🚨 **Yalnız `mod`'u kurmak ETKİSİZ olurdu:** kayıt formunun render koşulu `sekme === 'eposta' && mod === 'kayit'`. Tek başına `setMod('kayit')` sessiz bir no-op olarak ship edilirdi.
+- ⚠️ `mergeUserId` **önceliklidir** — hesap birleştirme akışındaki kullanıcı `?mod=kayit` ile kayıt formuna düşürülmemeli.
+- 🚨 **İnceleme bulgusu (düzeltildi):** sekme butonları koşulsuz `setMod('giris')` çağırıyordu; `?mod=kayit` ile gelen kullanıcı zaten aktif olan "E-posta" sekmesine bir kez daha tıklayınca sessizce giriş formuna düşüyordu. Artık aktif sekmeye tıklamak erken dönüyor.
 
-### F2 · Footer ve landing linkleri `<a>` — tam sayfa yenilemesi 🟢 *(yeni)*
-- **Dosya:** `Footer.tsx:20-37` (7 link)
-- `next/link` kullanılmadığı için her tıklamada tam navigasyon; ISR avantajı ve client state kayboluyor.
+### F2 · Footer ve landing linkleri `<a>` — tam sayfa yenilemesi 🟢 ✅
+- **Dosya:** `Footer.tsx` (8 link)
 - **Efor:** 1 puan
+- **Yapıldı:** Hepsi `next/link`'e çevrildi, ortak `bag` stil nesnesiyle. `@next/next/no-html-link-for-pages` bulgusu kalktı; ayrıca mevcut `react/no-unescaped-entities` (`Türkiye'nin`) fırsattan istifade düzeltildi. Dosya artık **sıfır bulgu**.
 
-### L4 · Landing sayaç ve `.limit()` değerleri tutarsız 🟢
-- `page.tsx` 200, `HomeClient.tsx:453` 30, sayaç (`:625`) toplam aktif ilan. Kullanıcı "1.240 ilan" görüp 30 tane listeleniyor.
+### L4 · Landing sayaç ve `.limit()` değerleri tutarsız 🟢 ✅
+- **Dosya:** `app/page.tsx`, `app/_components/HomeClient.tsx`, yeni `lib/ilan-liste.ts`
 - **Efor:** 2 puan
+- **Yapıldı (iki ayrı kusur):** (1) SSR `.limit(200)` ile istemci yenileme sorgusunun `.limit(30)`'u ayrışmıştı — "yenile"ye basan kullanıcının listesi **kısalıyordu**. Tek sabit `ILAN_LIMITI` (`lib/ilan-liste.ts`) ile ikisi birleştirildi. (2) Sayaç `totalCount` (platform geneli, iki sekme dahil, kırpma öncesi) yazıyordu; artık **ekrandakini** sayıyor.
+- ⚠️ `lib/ilan-liste.ts` istemci paketine giriyor — içine sunucuya özel hiçbir şey konulamaz.
+- 🚨 **İnceleme bulgusu (düzeltildi):** ilk sayaç metni filtre açıkken "en yeni" ön ekini **düşürüyordu**. Oysa filtre bu 200'lük pencerenin İÇİNDE, istemcide çalışıyor — sunucuya gitmiyor. "12 yük ilanı" demek aramanın tüm platformu taradığı izlenimi verirdi; L4'ün kapatmak istediği yanlış beyanın ta kendisi. Artık ön ek filtreden bağımsız.
+- ⚠️ **Kırpma ölçüsü `ilanlar.length`, `filtered.length` değil** ve **bilerek sekmeden bağımsız**: 200'lük pencere `created_at`e göre kesiliyor, tipe göre değil. Araç sekmesinde 3 kart görünse bile pencerenin dışında kalmış araç ilanları olabilir; per-tip saymak yanlış güven verirdi.
+- ⚠️ Platform toplamı hâlâ hero rozetinde — orası pazarlama bağlamı, liste iddiası değil.
 
-### L5 · Sekme state'i URL'e yansımıyor 🟢
-- **Dosya:** `HomeClient.tsx:374` `useState<'yuk'|'arac'>('yuk')`
-- Paylaşılan link her zaman "yük" sekmesinde açılıyor; geri tuşu sekme değişimini bilmiyor.
+### L5 · Sekme state'i URL'e yansımıyor 🟢 ✅
+- **Dosya:** `HomeClient.tsx`
 - **Efor:** 2 puan
+- **Yapıldı:** `urldenTip()` + mount effect + `popstate` dinleyicisi + `tipDegistir()`.
+- 🚨 **`pushState` TEK BAŞINA BOZUK:** geri tuşu URL'i değiştirir ama React state'ini değiştirmez. `popstate` dinleyicisi **zorunlu**, opsiyonel değil.
+- 🚨 **`useSearchParams` KULLANILAMAZ:** Suspense sınırı olmadan tüm ağacı CSR bailout'a sokar ve bu sayfa ISR'li (`revalidate = 30`) — ISR'ı öldürürdü.
+- ⚠️ **`router.push` değil `history.pushState`:** `router.push` sunucudan RSC payload'ı çeker, ISR sayfasını yeniden ister. Sekme tamamen istemci tarafı bir filtre.
+- ⚠️ Varsayılan (`yuk`) için parametre **silinir** — aynı liste için iki URL olmasın (yinelenen içerik).
+- ⚠️ Mount effect'teki `setTip` bilinçli: SSR HTML'i varsayılan sekmeyle üretilmek zorunda, lazy initializer içinde `window` okumak hidrasyon uyuşmazlığı üretirdi. Eslint kuralı gerekçesiyle susturuldu.
+- 🚨 **İnceleme bulgusu (düzeltildi):** `?tip=abc` sessizce varsayılana düşüyor ama **adres çubuğunda kalıyordu** — kullanıcı geçerli bir filtre uyguladığını sanıp o linki paylaşıyordu. Artık mount'ta `replaceState` ile temizleniyor (`?tip=yuk` de dahil; normalizasyon geçmişe kayıt bırakmamalı).
 
-### A5 · Hata mesajları jenerik 🟢
-- Supabase hataları tek bir "E-posta veya şifre hatalı" metnine indirgeniyor; "e-posta doğrulanmamış" ayrı ele alınmalı.
+### A5 · Hata mesajları jenerik 🟢 ✅
+- **Dosya:** `app/api/auth/giris/route.ts` + `app/giris/page.tsx`
 - **Efor:** 1 puan
+- **Yapıldı:** Route 401 gövdesine makine okunur `kod` eklendi (`eposta_dogrulanmamis` | `kimlik_hatali`); istemci bu koda bakıp kullanıcıyı kırmızı hata satırı yerine `dogrulama_bekle` ekranına geçiriyor.
+- 🚨 **Türkçe METNE göre dallanmak kırılgan** — metin değişince dal sessizce ölür. Bu yüzden kod.
+- ⚠️ **Hesap sayımı zayıflamadı:** GoTrue password grant'ta şifre, `Email not confirmed` kontrolünden ÖNCE doğrulanıyor. Yani bu ayrımı görmek için zaten doğru şifreyi bilmek gerekiyor.
+- ⚠️ Bu dalda cooldown sayacı 0'a kurulur: e-posta az önce GÖNDERİLMEDİ ve kullanıcıların çoğu buraya kayıttan saatler sonra düşer. Kayıttan hemen sonra gelen azınlık sunucudaki 60 sn'lik adres kotasından 429 alır; istemci yanıttaki `bekle` ile sayacı kurar. Bir fazladan istek karşılığında çoğunluk gereksiz beklemez.
 
-### A6 · `dogrulama_bekle` modunda tekrar gönderme yok 🟢
-- E-posta gelmezse kullanıcı sıkışıyor.
+### A6 · `dogrulama_bekle` modunda tekrar gönderme yok 🟢 ✅
+- **Dosya:** yeni `app/api/auth/dogrulama-tekrar/route.ts` + `app/giris/page.tsx`
 - **Efor:** 2 puan
+- **Yapıldı:** Origin (CSRF) kontrolü + e-posta normalizasyonu + üç kota kovası + `supabase.auth.resend()`. İstemcide geri sayımlı "tekrar gönder" butonu; ekran metni `dogrulamaSebep`'e göre (kayıt / giriş) değişiyor.
+- 🚨 **Neden sunucuda:** `resend()` istemciden de çağrılabilir, ama o zaman anon key ile döngü yazan biri istediği adrese sınırsız e-posta attırabilir (mail bombing). Kotalar: adres başına 60 sn, IP başına saatte 5 **farklı** adres, IP başına saatte 10 toplam.
+- 🚨 **`emailRedirectTo` VERİLMEZSE** Supabase kendi "Site URL"ine düşer, kullanıcı `/auth/callback` yerine ana sayfaya çıkar ve oturum takası **hiç yapılmaz** — "linke tıkladım ama giremiyorum". `request.url` kullanılmıyor: Vercel'de proxy arkasındaki iç adres olabilir.
+- ⚠️ **Yanıt daima aynı**, adres kayıtlı olsa da olmasa da. Aksi halde endpoint "bu e-posta sistemde var mı?" sorusuna ücretsiz cevap makinesi olur.
+- 🚨 **İnceleme bulgusu (düzeltildi — yorum yalanı):** yorum "sayaçlar yalnız başarılı gönderimden sonra işlenir" diyordu ama kod **her durumda** işliyor. Kod doğru, yorum yanlıştı → yorum düzeltildi. Bu, `otp/route.ts`'ten **bilinçli bir ayrılık**: oradaki "hata"lar sağlayıcı arızası, buradakilerin çoğu "böyle adres yok / zaten doğrulanmış" — yani saldırganın aradığı bilginin ta kendisi. Saymazsak o yol bedava olurdu. Bedeli: geçici sağlayıcı arızasında kullanıcı 60 sn bekler.
+- ⚠️ İki fazlı kota muhasebesi (`sayma: true` ile bak, sonra işle) burada da geçerli: kilitliyken gelen istekler kilidi **uzatmamalı**, yoksa saldırgan kurbanı süresiz kilitli tutabilir.
+
+---
+
+## W5 — Veri bütünlüğü / alias (13 puan) — 📋 PLANLANDI (29 Tem 2026)
+
+> **Neden bu dalga:** W0–W4 auth ve landing'i düzeltti. Bu dalga ürünün **ana verisini**
+> düzeltiyor. Fark şu: auth bug'ları kullanıcıyı engelliyordu, bu bug **sessizce yanlış
+> veri üretiyor** — hiç kimse hata görmüyor, ilanlar yanlış şehirle kaydediliyor ve her
+> yeni ilanda hasar büyüyor.
+
+### Zincirin tamamı — önce bunu anla
+
+Tek bir kök sorun var, üç yerde birden zarar veriyor:
+
+1. **`aliases.normalized` kolonunda aynı şehir iki farklı yazımla duruyor:**
+   `Istanbul` (13 satır) ve `İstanbul` (154 satır). Aynısı `Izmir`/`İzmir`,
+   `Mugla`/`Muğla`, `Bingol`/`Bingöl`.
+2. **`findPlaces` bunları iki ayrı şehir sayıyor** (`index.ts:279` — `seen` kümesi ham
+   `normalized` değeriyle anahtarlanıyor). İçinde hem `avcilar` (→`Istanbul`) hem
+   `kadıköy` (→`İstanbul`) geçen bir mesaj **iki şehir bulmuş** oluyor.
+3. **Sahte güzergâh üretiliyor:** `index.ts:619`'daki `sameCity` koruması string
+   eşitliğine bakıyor; `'Istanbul' !== 'İstanbul'` olduğu için koruma devreye girmiyor
+   ve **İstanbul→İstanbul** diye bir ilan kaydediliyor.
+
+Buna ek olarak şehir filtresi `Istanbul` ve `İstanbul`'u iki ayrı şehir sayar — yani
+kullanıcı İstanbul filtresi uyguladığında ilanların bir kısmını **hiç göremiyor**.
+
+🚨 **Yeni bulgu (29 Tem 2026) — bozulmanın kaynağı bulundu.** Dokümanlar bunu "AI aynı
+yeri farklı yazımla tekrar ekledi" diye açıklıyordu. Doğru değil: `learn-aliases`
+prompt'unun **kendi örnekleri** ASCII'ye indirgenmiş. Yani bozuk yazımı AI uydurmuyor,
+**biz öğretiyoruz** (bkz. D1). Bu bulgu olmadan SQL temizliği yapılsaydı bozulma
+birkaç hafta içinde aynen geri gelirdi.
+
+**Sıra önemli:** D1 + D2 (kaynağı kes) → D5 (mevcut veriyi temizle) → D3 (tekrarını DB'de
+imkânsızlaştır). D4 bağımsız, her an yapılabilir.
+
+---
+
+### D1 · Alias öğrenme prompt'u bozuk yazımı ÖĞRETİYOR 🔴
+- **Dosya:** `app/api/admin/learn-aliases/route.ts` (satır 181-219)
+- **Efor:** 2 puan
+- **Sorun:** Prompt kuralda "district: ilcenin **dogru Turkce adi**" diyor ama verdiği
+  sekiz örneğin **hepsi** ASCII: `"Gaziantep"`, `"Eskisehir"`, `"Kocaeli"`+`"Izmit"`,
+  `"Istanbul"`+`"Tuzla"`, `"Tekirdag"`+`"Corlu"`, `"Hatay"`+`"Antakya"`. LLM kuralı
+  değil örneği taklit eder. `normalized` kolonuna yazılan değer doğrudan `listings`'e
+  geçtiği için bozulma zincirin en başında doğuyor.
+- **Yapılacak:** Örnekleri Türkçe doğru yazımla değiştir (`"Eskişehir"`, `"İzmit"`,
+  `"İstanbul"`, `"Tekirdağ"`, `"Çorlu"`), prompt'un başına açık kural ekle:
+  Türkçe karakterler (`ı ğ ü ş ö ç İ`) **korunacak**, ASCII'ye indirgenmeyecek.
+  Prompt gövdesindeki diğer ASCII metinler (`GOREV`, `KURALLAR`) dokunulmadan kalabilir —
+  onlar veri değil, talimat.
+- **Kabul kriteri:** Prompt içindeki her il/ilçe örneği Türkçe doğru yazımda; keşif bir
+  kez çalıştırıldığında öneri listesinde ASCII'ye indirgenmiş `normalized` yok.
+
+### D2 · Alias yazma yolunda normalizasyon yok 🔴
+- **Dosya:** `app/api/admin/learn-aliases/route.ts` (satır 123-135, 279-289, 385-387, 400-404)
+- **Efor:** 3 puan
+- **Sorun:** Dört yazma noktası **birbirinden farklı** davranıyor.
+  - AI yolu (280) ve PATCH yolları (385, 401) `alias`'ı `.toLowerCase()` yapıyor.
+  - **Manuel `create` (127) yapmıyor.** Admin panelden "Gebze" yazınca `gebze` zaten
+    varken **yeni satır doğuyor**. `onConflict: 'alias'` upsert'i (325) tam string
+    eşleşmesine dayandığı için bunu görmüyor.
+  - `normalized` ve `district` **hiçbir yolda** normalize edilmiyor, sadece `.trim()`.
+    Yani D1 düzeltilse bile elle "istanbul" yazan bir admin yeni bir varyant üretebilir.
+- **Yapılacak:** Ortak yardımcı (örn. `lib/alias-normalize.ts`): `alias` → küçük harf +
+  boşluk sadeleştirme; `normalized`/`district` → baş harf büyük, Türkçe karakter korunur.
+  Dört yazma noktasında da kullan. Ayrıca yazmadan önce **ASCII-katlanmış** forma göre
+  çakışma kontrolü: yeni değer mevcut farklı bir değerle katlandığında 409 dön ve mevcut
+  değeri öner (sessizce ezme — admin hangi yazımın kazandığını görmeli).
+- **Kabul kriteri:** Manuel formdan "Gebze"/"GEBZE"/"gebze" girilince üç deneme de aynı
+  satıra düşüyor, yeni satır oluşmuyor. `normalized: "istanbul"` girişimi `İstanbul`
+  mevcutken reddediliyor.
+- ⚠️ **`is_active`/`is_approved` filtresi:** hem `parse-listing` hem `whatsapp-parse`
+  yalnız `is_active = true` filtreliyor, `is_approved`'a **bakmıyor**. Şu an güvenli
+  çünkü AI önerileri `is_active: false` doğuyor — ama bu iki bayrağın senkron kalmasına
+  bağlı, kırılgan bir varsayım. D2'de not düşülecek, davranış değiştirilmeyecek.
+
+### D3 · `aliases` tablosuna trigger + UNIQUE indeks 🟡
+- **Dosya:** yeni `docs/20260729_alias_normalize_trigger.sql`
+- **Efor:** 2 puan
+- **Sorun:** D2 kodu korur, ama SQL Editor'den ya da ileride başka bir servisten gelen
+  yazımı korumaz. 538 kopya grubu tam olarak böyle oluştu.
+- **Yapılacak:** `BEFORE INSERT OR UPDATE` trigger — `alias` normalize edilerek yazılsın;
+  + normalize forma UNIQUE indeks:
+  `(type, translate(lower(replace(alias,'İ','i')),'ıçğöşü','icgosu'))`
+- 🚨 **SIRA ŞART:** Bu **en son** çalışır. D5'teki temizlik yapılmadan indeks kurulmaya
+  çalışılırsa mevcut kopyalar yüzünden **hata verir ve kurulmaz**.
+- **Kabul kriteri:** Temizlik sonrası indeks kuruluyor; SQL Editor'den `'GEBZE'` insert
+  denemesi unique ihlali veriyor.
+
+### D4 · `findPlaces` `seen` kümesi ham `normalized` ile anahtarlanıyor 🔴
+- **Dosya:** `supabase/functions/parse-listing/index.ts` (279, 289-291, 303-305, 617-621)
+- **Efor:** 3 puan
+- **Sorun:** Yukarıdaki zincirin 2. ve 3. adımı. Veri temizlense bile **kod bu hata
+  sınıfına açık kalır** — yarın yeni bir varyant doğduğunda sahte güzergâh yine üretilir.
+- **Yapılacak:** `seen` kümesini ve `sameCity` karşılaştırmasını **katlanmış** anahtar
+  üzerinden yürüt (`trNorm(match.normalized)`), `hits` içindeki değer ham kalsın.
+  Aynı katlamayı `bestPlace` sonrası lane `from`/`to` karşılaştırmalarına da uygula
+  (satır 426, 619, 642 civarı `l.from`/`l.to` anahtarı).
+- **Kabul kriteri:** Hem `avcilar` hem `kadıköy` geçen tek satırlık bir metin **hiç lane
+  üretmiyor** (iki hit tek şehre katlanıyor, ilçeler ayırt edici değilse reddediliyor);
+  gerçek İstanbul→Ankara metni etkilenmiyor.
+- ⚠️ İlçeler **gerçekten** farklıysa (şehiriçi güzergâh) lane korunmalı — satır 621'deki
+  mevcut `diffDist` mantığı bilinçli, silinmemeli.
+
+### D5 · SQL çalıştırma sırası + geçmiş veri onarımı 🟡
+- **Dosya:** yeni `docs/20260729_alias_runbook.md` (mevcut iki `.sql`'i sırayla yönetir)
+- **Efor:** 3 puan · **Bayram çalıştıracak**
+- **Sorun:** İki hazır script var (`20260728_alias_homonim_temizligi.sql`,
+  `20260728_alias_kopya_temizligi.sql`) ama aralarındaki **sıra hiçbir yerde yazılı
+  değil** ve ikisi de yalnız kısmen çalıştırılmış durumda. Yanlış sırada çalıştırmak
+  BÖLÜM 3'ü bozar (kaynak değerleri BÖLÜM 2 düzeltiyor).
+- **Yapılacak — tek dosyada, numaralı sıra:**
+  1. Homonim ADIM 3 — `araç`/`arac`/`olur` pasifleştir.
+     (`araç` 3000 mesajın **580'inde** geçiyor, %19 — Bursa'nın bile üstünde.
+     `olur` yerel testte doğrulandı: "…KAMYONDA OLUR" → sahte Erzurum eşleşmesi.)
+  2. Kopya BÖLÜM 1 → 2 → 3 (ASCII bozulması → district yazımı → NULL district doldur).
+  3. Kopya BÖLÜM 4.1 **`payas`** — 🚨 gerçek hata: Payas 2008'den beri **Hatay** ilçesi,
+     `id=1003` "Adana" diyor ve küçük id kazandığı için **bugün her payas ilanı Adana'ya
+     yazılıyor**. Doğru satır (`id=1844`) tabloda zaten var.
+  4. Kopya BÖLÜM 4.2-4.6 (`kazan`→Kahramankazan, `ömerli`, `kıraç`, `gölbaşı`, `kemalpaşa`).
+  5. Kopya BÖLÜM 5 doğrulama — **iki sorgu da boş dönmeli**, dönmüyorsa durup bana getir.
+  6. Geçmiş `listings` onarımı (kopya BÖLÜM 6) — **önce ölç, sonra UPDATE**.
+  7. Sahte güzergâh ölçümü: `SELECT count(*) FROM listings WHERE origin_city = destination_city;`
+     — D4 öncesi ve sonrası karşılaştırılabilsin diye **düzeltmeden önce de** al.
+  8. D3 indeksini **en son** kur.
+- **Kabul kriteri:** BÖLÜM 5'in iki doğrulama sorgusu boş dönüyor; D3 indeksi hatasız
+  kuruluyor.
+- ⚠️ Hiçbir adım satır **silmiyor** — hepsi `UPDATE` ya da `is_active = false`. Geri
+  alınabilir. `araç`/`olur` pasifleştirmesinin bedeli: Kastamonu/Araç ve Erzurum/Olur
+  gerçekten geçtiğinde artık yakalanmaz. Bilinçli takas.
 
 ---
 
@@ -476,7 +691,13 @@ where table_name='users' and grantee in ('authenticated','anon') order by grante
    (Nullable kaldığı sürece `.eq('is_active', true)` NULL satırları sessizce atlar.)
 5. ~~**A4 — Twilio Console:** Code Length kaç hane?~~ ✅ **4 hane, çalışıyor** (28 Tem 2026).
    Bu bilgi `sahiplen` sayfasındaki 6-hane bug'ını (A4b-hane) ortaya çıkardı.
-6. **S1 — Görsel:** 1200×630 OG görseli (logo + "Türkiye'nin Nakliye İlan Platformu")
+6. ~~**S1 — Görsel:** 1200×630 OG görseli~~ ✅ **TESLİM EDİLDİ** (Bayram, 29 Tem 2026).
+   `app/opengraph-image.jpg` (1200×630, 134 KB) + `app/opengraph-image.alt.txt`.
+   Geçici `next/og` üreteci silindi.
+   ⏳ **Deploy sonrası göz kontrolü:** siteye bir link WhatsApp'a atıp kart görünüyor mu bak.
+8. **`NEXT_PUBLIC_SITE_URL` ortam değişkeni** Vercel'de tanımlı mı teyit et. Tanımsızsa
+   `https://yukegel.com` fallback'i devreye girer; alan adı farklıysa canonical + sitemap +
+   OG URL'leri **hep birden** yanlış alan adını gösterir.
 7. ~~**G2 — Karar:** Turnstile mi kota mı?~~ ✅ **Sunucu tarafı kota seçildi** (Bayram, 29 Tem 2026).
    Uygulandı: `lib/kota.ts` + `/api/auth/otp`. Turnstile ileride ek katman olarak eklenebilir.
 

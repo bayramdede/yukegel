@@ -138,6 +138,8 @@ export default function WhatsappYukle() {
     // tekrar göndermek güvenlidir — daha önce yazılanlar `skipped` olarak döner.
     // Böylece parti büyüklüğü sihirli sabitlerle değil, ölçülen davranışla ayarlanır.
     const MAX_BOLUNME = 8; // sonsuz döngü emniyeti
+    const MAX_BEKLEYIS = 6; // 429 sonrası toplam bekleme denemesi (6 × 20sn = 2dk)
+    let bekleyisSayaci = 0;
     let tamamlanan = 0;
 
     while (kuyruk.length > 0) {
@@ -186,6 +188,21 @@ export default function WhatsappYukle() {
             ? 'Sunucu zaman aşımı — parça daha fazla bölünemedi.'
             : `Sunucu hatası (HTTP ${res.status}) — JSON dönmedi. Parça daha fazla bölünemedi.`;
           break;
+        }
+        // 429 → BÖLME, BEKLE. Parçayı küçültmek isteği azaltmaz, ARTIRIR;
+        // rate limit penceresi 60sn olduğu için tek yapılacak şey beklemek.
+        // Aynı parça kuyruğun başına geri konur.
+        if (res.status === 429) {
+          if (bekleyisSayaci >= MAX_BEKLEYIS) {
+            toplamSonuc.success = false;
+            toplamSonuc.error = 'Sunucu istek sınırı aşıldı ve bekleme denemeleri tükendi — biraz sonra tekrar dene.';
+            break;
+          }
+          bekleyisSayaci++;
+          kuyruk.unshift(grup);
+          setProgress({ current: tamamlanan, total: tamamlanan + kuyruk.length });
+          await new Promise(r => setTimeout(r, 20_000));
+          continue;
         }
         if (!res.ok || !data.success) {
           toplamSonuc.success = false;

@@ -1,8 +1,23 @@
+import Link from 'next/link';
 import { getConfig } from '../../lib/config';
 
+/**
+ * SPRINT_01 F2 — buradaki bağlantılar `<a href>` idi, artık `next/link`.
+ *
+ * ESKİ HALİNİN SORUNU: `<a href="/kvkk">` tarayıcıya TAM SAYFA YENİLEMESİ yaptırır.
+ * Next router devre dışı kalır: React ağacı, oturum istemcisi ve tüm önbellek
+ * sıfırdan kurulur. 3G'deki bir şoför için bu her footer tıklamasında saniyeler.
+ * `next/link` ise sadece o rotanın RSC payload'ını çeker ve görünür olduğunda
+ * önden yükler (prefetch). `@next/next/no-html-link-for-pages` kuralı da tam
+ * bunu yakalıyordu.
+ *
+ * ⚠️ KURAL: `/` ile başlayan her hedef `<Link>` olmalı. `<a>` yalnız DIŞ
+ *    adresler, `mailto:` ve `tel:` için.
+ */
 export default async function Footer() {
   const sirketUnvani = await getConfig('sirket_unvani', 'Yükegel');
   const yil = new Date().getFullYear();
+  const bag = { color: '#8b949e', fontSize: '0.82rem', textDecoration: 'none' };
 
   return (
     <footer style={{ borderTop: '1px solid #30363d', marginTop: 0, padding: '32px 16px', background: '#0d1117', fontFamily: "'IBM Plex Sans', system-ui, sans-serif" }}>
@@ -11,30 +26,34 @@ export default async function Footer() {
           <div style={{ fontWeight: 800, fontSize: '1rem', marginBottom: 8 }}>
             <span style={{ color: '#22c55e' }}>YÜKE</span><span style={{ color: '#e2e8f0' }}>GEL</span>
           </div>
-          <div style={{ color: '#4b5563', fontSize: '0.78rem' }}>Türkiye'nin nakliye ilan platformu</div>
+          {/* `&apos;` — düz `'` JSX metninde `react/no-unescaped-entities` hatası veriyor. */}
+          <div style={{ color: '#4b5563', fontSize: '0.78rem' }}>Türkiye&apos;nin nakliye ilan platformu</div>
         </div>
         <div style={{ display: 'flex', gap: 32, flexWrap: 'wrap' }}>
           <div>
             <div style={{ color: '#6b7280', fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 10 }}>Platform</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <a href="/nasil-calisir" style={{ color: '#8b949e', fontSize: '0.82rem', textDecoration: 'none' }}>Nasıl Çalışır?</a>
-              <a href="/hakkimizda"    style={{ color: '#8b949e', fontSize: '0.82rem', textDecoration: 'none' }}>Hakkımızda</a>
-              <a href="/ilan-ver"      style={{ color: '#8b949e', fontSize: '0.82rem', textDecoration: 'none' }}>İlan Ver</a>
+              <Link href="/nasil-calisir" style={bag}>Nasıl Çalışır?</Link>
+              <Link href="/hakkimizda"    style={bag}>Hakkımızda</Link>
+              <Link href="/ilan-ver"      style={bag}>İlan Ver</Link>
             </div>
           </div>
           <div>
             <div style={{ color: '#6b7280', fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 10 }}>Hesap</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <a href="/giris" style={{ color: '#8b949e', fontSize: '0.82rem', textDecoration: 'none' }}>Giriş Yap</a>
-              <a href="/giris" style={{ color: '#8b949e', fontSize: '0.82rem', textDecoration: 'none' }}>Kayıt Ol</a>
-              <a href="/panel" style={{ color: '#8b949e', fontSize: '0.82rem', textDecoration: 'none' }}>Panelim</a>
+              <Link href="/giris" style={bag}>Giriş Yap</Link>
+              {/* SPRINT_01 F1 — eskiden bu da düz `/giris`e gidiyordu, yani "Kayıt Ol"
+                  ile "Giriş Yap" AYNI ekranı açıyordu. `?mod=kayit` doğrudan e-posta
+                  sekmesindeki kayıt formunu açar (bkz. app/giris/page.tsx). */}
+              <Link href="/giris?mod=kayit" style={bag}>Kayıt Ol</Link>
+              <Link href="/panel" style={bag}>Panelim</Link>
             </div>
           </div>
           <div>
             <div style={{ color: '#6b7280', fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 10 }}>Yasal</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <a href="/kvkk"               style={{ color: '#8b949e', fontSize: '0.82rem', textDecoration: 'none' }}>KVKK</a>
-              <a href="/kullanim-kosullari"  style={{ color: '#8b949e', fontSize: '0.82rem', textDecoration: 'none' }}>Kullanım Koşulları</a>
+              <Link href="/kvkk"               style={bag}>KVKK</Link>
+              <Link href="/kullanim-kosullari" style={bag}>Kullanım Koşulları</Link>
             </div>
           </div>
         </div>

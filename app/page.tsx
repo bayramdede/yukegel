@@ -3,6 +3,8 @@ import HomeClient from './_components/HomeClient';
 import Footer from './_components/Footer';
 import { createPublicServerClient } from '../lib/supabase-server';
 import { createClient } from '@supabase/supabase-js';
+// SPRINT_01 L4 — limit tek yerden; HomeClient'taki yenileme sorgusu da bunu kullanır.
+import { ILAN_LIMITI } from '../lib/ilan-liste';
 
 // Service role client — RLS'i bypass eder; listings + listing_stops birlikte çekilir
 function createServiceClient() {
@@ -59,7 +61,7 @@ async function fetchInitialIlanlar() {
       .eq('is_shadow_banned', false)
       .eq('status', 'active')
       .order('created_at', { ascending: false })
-      .limit(200);
+      .limit(ILAN_LIMITI);
 
     if (error || !data || data.length === 0) return [];
 

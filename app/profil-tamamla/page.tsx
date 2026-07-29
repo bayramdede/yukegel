@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useCallback, Suspense } from 'react';
+import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import { createClient } from '../../lib/supabase';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { REDIRECT_COOKIE, guvenliRedirect } from '../../lib/redirect';
@@ -137,13 +137,63 @@ function ProfilTamamlaIci() {
     init();
   }, []);
 
-  // userType değişince kimlik alanlarını temizle
-  useEffect(() => {
-    setTckn(''); setVkn(''); setTcknHata(''); setVknHata('');
-    setTcknMevcut(false); setVknMevcut(false);
-    setAracPlaka(''); setAracTipi(''); setAracUtsyapi([]);
-    setSirketAdi('');
-  }, [userType]);
+  /**
+   * SPRINT_01 K3 — tip değişiminde SADECE artık görünmeyen alanlar temizlenir.
+   *
+   * ESKİ HALİ (`useEffect(… , [userType])`) İKİ AYRI ŞEKİLDE ZARARLIYDI:
+   *   1. Her tip değişiminde TCKN, VKN, şirket adı ve araç bilgilerinin HEPSİNİ siliyordu.
+   *      Kullanıcı "Şirket"i doldurup "Komisyoncu"ya geçince — ki ikisi de aynı alanları
+   *      gösteriyor — her şeyi baştan yazmak zorunda kalıyordu. Yanlış tıklama = form baştan.
+   *   2. Effect MOUNT'ta da çalışıyordu. `init()` async olduğu için prefill şimdilik
+   *      hayatta kalıyordu, ama bu tesadüf; `init()` senkronlaşsa sessizce bozulurdu.
+   *
+   * NEDEN EFFECT DEĞİL DE FONKSİYON: "tip değişti" bir KULLANICI OLAYI, türetilmiş bir
+   * state değil. Effect'e bağlamak mount'ta da tetiklenmesine yol açıyordu. Olayı olduğu
+   * yerde ele almak hem doğru hem de `react-hooks/set-state-in-effect` uyarısını kaldırıyor.
+   *
+   * ⚠️ GÖRÜNÜRLÜK KURALLARI AŞAĞIDAKİ JSX İLE EŞLEŞMELİ — biri değişirse diğeri de değişmeli.
+   *    Görünmeyen bir alanı temizlemezsek `handleSubmit` onu YİNE DE gönderir
+   *    (`sirketAdi: sirketAdi || undefined`), yani ekranda olmayan veri kaydedilir.
+   */
+  const ALAN_GORUNUR = {
+    // JSX: `{(userType === 'sirket' || userType === 'broker') && …}`
+    sirket: (t: string) => t === 'sirket' || t === 'broker',
+    // JSX: `{(userType === 'sirket' || userType === 'broker') && …}`
+    vkn: (t: string) => t === 'sirket' || t === 'broker',
+    // JSX: `{userType && userType !== 'sirket' && …}`
+    tckn: (t: string) => t !== '' && t !== 'sirket',
+    // JSX: `{userType === 'arac_sahibi' && …}`
+    arac: (t: string) => t === 'arac_sahibi',
+  };
+
+  /**
+   * ⚠️ YARIŞ (race) KORUMASI — bunu silmeyin.
+   *
+   * Tip butonuna tıklamak, açık olan TCKN/VKN alanını ÖNCE blur eder
+   * (mousedown → blur → click). Sıralama şu oluyordu:
+   *   1. `handleTcknBlur` tekillik fetch'ini başlatır (henüz dönmedi),
+   *   2. `tipDegistir` alanı temizler → `setTcknMevcut(false)`,
+   *   3. fetch döner ve `setTcknMevcut(true)` yazar.
+   * Sonuç: `kimlikGecerli()` kalıcı olarak false döner, `formGecerli` false kalır
+   * ve uyarı metni EKRANDA GÖRÜNMEZ (TCKN bloğu 'sirket' tipinde gizli) —
+   * kullanıcı için sessiz bir çıkmaz: "Kaydet" pasif ama sebebi yazmıyor.
+   *
+   * Çözüm: her tip değişiminde sayaç artar. Uçuştaki blur isteği, döndüğünde
+   * sayacın değişmediğini doğrulamazsa sonucunu yazmadan sessizce düşer.
+   */
+  const tipEpoch = useRef(0);
+
+  function tipDegistir(yeniTip: string) {
+    if (yeniTip === userType) return;
+    tipEpoch.current += 1;
+    setUserType(yeniTip);
+
+    if (!ALAN_GORUNUR.tckn(yeniTip)) { setTckn(''); setTcknHata(''); setTcknMevcut(false); }
+    if (!ALAN_GORUNUR.vkn(yeniTip)) { setVkn(''); setVknHata(''); setVknMevcut(false); }
+    if (!ALAN_GORUNUR.sirket(yeniTip)) setSirketAdi('');
+    if (!ALAN_GORUNUR.arac(yeniTip)) { setAracPlaka(''); setAracTipi(''); setAracUtsyapi([]); }
+    // Ad, telefon ve KVKK onayı ORTAK alanlar — tipe bağlı değiller, asla sıfırlanmazlar.
+  }
 
   // ── Tekillik kontrol: Telefon (onBlur) ──────────────────────────
   const handleTelefonBlur = useCallback(async () => {
@@ -158,19 +208,25 @@ function ProfilTamamlaIci() {
   // ── Tekillik kontrol: TCKN (onBlur) ─────────────────────────────
   const handleTcknBlur = useCallback(async () => {
     if (!mevcutId || tckn.length !== 11 || tcknHata) return;
+    const epoch = tipEpoch.current;
     setTcknKontrolYukleniyor(true);
     const mevcut = await tekilKontrol('tckn', tckn, mevcutId);
-    setTcknMevcut(mevcut);
     setTcknKontrolYukleniyor(false);
+    // Biz beklerken kullanıcı tipi değiştirdiyse bu sonuç artık geçersiz — YAZMA.
+    // (Spinner'ı yine de kapatıyoruz, yoksa sonsuz "kontrol ediliyor" kalır.)
+    if (epoch !== tipEpoch.current) return;
+    setTcknMevcut(mevcut);
   }, [tckn, tcknHata, mevcutId]);
 
   // ── Tekillik kontrol: VKN (onBlur) ──────────────────────────────
   const handleVknBlur = useCallback(async () => {
     if (!mevcutId || vkn.length !== 10 || vknHata) return;
+    const epoch = tipEpoch.current; // bkz. handleTcknBlur'daki yarış notu
     setVknKontrolYukleniyor(true);
     const mevcut = await tekilKontrol('vkn', vkn, mevcutId);
-    setVknMevcut(mevcut);
     setVknKontrolYukleniyor(false);
+    if (epoch !== tipEpoch.current) return;
+    setVknMevcut(mevcut);
   }, [vkn, vknHata, mevcutId]);
 
   function handleTckn(val: string) {
@@ -353,7 +409,10 @@ function ProfilTamamlaIci() {
               <label style={lbl}>Ben bir... *</label>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                 {KULLANICI_TIPLERI.map(t => (
-                  <button key={t.value} type="button" onClick={() => setUserType(t.value)}
+                  /* SPRINT_01 K3 — doğrudan setUserType DEĞİL. tipDegistir, artık görünmeyen
+                     alanları da temizler. setUserType'a geri dönülürse eski veri ekranda
+                     görünmez ama state'te kalır; handleSubmit onu yine de gönderir. */
+                  <button key={t.value} type="button" onClick={() => tipDegistir(t.value)}
                     style={{ padding: '12px', borderRadius: 8, border: '2px solid', borderColor: userType === t.value ? '#22c55e' : '#30363d', background: userType === t.value ? '#14532d' : '#0d1117', cursor: 'pointer', textAlign: 'left' }}>
                     <div style={{ color: userType === t.value ? '#22c55e' : '#e2e8f0', fontWeight: 700, fontSize: '0.85rem', marginBottom: 2 }}>{t.label}</div>
                     <div style={{ color: '#6b7280', fontSize: '0.72rem' }}>{t.desc}</div>

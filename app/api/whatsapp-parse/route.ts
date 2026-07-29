@@ -20,7 +20,12 @@ const supabase = createClient(
 // Vercel'de her instance kendi sayacını tutar; amaç mutlak sınır değil, kazara/kötü
 // niyetli seri isteklerde tek bir instance'ın DB'yi yormasını engellemek.
 const RATE_LIMIT_PENCERE_MS = 60_000;
-const RATE_LIMIT_MAX = 10;
+// 29 Tem 2026: 10 idi ve MEŞRU içe aktarmayı kesiyordu. Tek bir yükleme başarısız
+// parçaları ikiye bölerek yeniden deniyor (MAX_BOLUNME=8) ve sunucu `tamamlanmadi`
+// dönünce de bölüyor — tek dosya rahatlıkla 10 isteği geçiyor. Endpoint zaten
+// `requireStaff()` arkasında; amaç kötü niyetli seli durdurmak, moderatörün işini
+// yarıda kesmek değil.
+const RATE_LIMIT_MAX = 40;
 const istekGecmisi = new Map<string, number[]>();
 
 function rateLimitAsildi(userId: string): boolean {
@@ -367,6 +372,31 @@ export async function POST(request: NextRequest) {
       else debugAtlanan++;
     };
 
+    // ── Süre bütçesi kapısı ───────────────────────────────────────────────
+    // 29 Tem 2026: "Vercel Runtime Timeout Error: Task timed out after 60
+    // seconds". Bütçe kontrolü SADECE 8. adımdaki insert döngüsünde vardı;
+    // ondan ÖNCEKİ aşamalar (dosya okuma, alias çekme, hash hesaplama, 5a/5b
+    // toplu sorguları) sınırsızdı. Büyük dosyada bu aşamalar tek başına 60sn'i
+    // yiyor, fonksiyon öldürülüyor ve platform JSON değil HTML döndürüyordu —
+    // yani hangi aşamada takıldığımıza dair hiçbir iz kalmıyordu. Artık her
+    // aşama sınırının başında kontrol var; bütçe dolduysa DÜZGÜN JSON dönüyoruz.
+    const butceKalanMs = () => SURE_BUTCESI_MS - (Date.now() - baslangic);
+    const butceCikisi = (asama: string, passedGate: number) => {
+      structuredLog('WARN', 'whatsapp-import', 'Süre bütçesi doldu — aşama yarıda', {
+        output_status: 'partial', asama, duration_ms: Date.now() - baslangic,
+      });
+      return NextResponse.json({
+        success: true, total_messages: totalMessages,
+        unparsed_timestamps: cozulemeyenZaman, passed_gate: passedGate,
+        saved_to_db: 0, skipped: 0, spam_blocked: 0, reposted: 0,
+        insert_failed: 0, errors: [`Süre bütçesi "${asama}" aşamasında doldu — hiçbir kayıt yazılmadı.`],
+        tamamlanmadi: true, islenmeyen: passedGate,
+        cutoff: cutoff.toISOString(), saat_filtre: saatFiltre,
+        aliases_count: aliases.length, debug: debugLog,
+        debug_atlanan: debugAtlanan, cutoff_atlanan: cutoffAtlanan,
+      });
+    };
+
     // Alias normalizasyonu istek başına BİR KEZ (bkz. aliasDiziniKur yorumu).
     const dizin = aliasDiziniKur(aliases);
 
@@ -410,6 +440,8 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    if (butceKalanMs() <= 0) return butceCikisi('gatekeeper', rawCandidates.length);
+
     // ── 4. Hash'leri PARALEL hesapla ─────────────────────────────────────────
     const candidates: Candidate[] = await Promise.all(
       rawCandidates.map(async c => ({ ...c, hash: await cleanHash(c.msg.message) }))
@@ -443,6 +475,8 @@ export async function POST(request: NextRequest) {
           return data || [];
         }).then(r => r.flat()),
     ]);
+
+    if (butceKalanMs() <= 0) return butceCikisi('toplu-sorgu', candidates.length);
 
     // Lookup map'leri oluştur (O(1) erişim)
     const existingMap = new Map<string, { id: string; contact_phone: string | null }>();

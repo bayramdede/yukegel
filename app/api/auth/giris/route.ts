@@ -110,6 +110,12 @@ export async function POST(request: Request) {
           error: dogrulanmamis
             ? 'E-posta adresinizi doğrulamadınız. Gelen kutunuzu kontrol edin.'
             : 'E-posta veya şifre hatalı.',
+          // SPRINT_01 A5 — makine okunur kod. İstemci eskiden bu iki durumu
+          // ayırt edemiyor, ikisini de aynı kırmızı satırda gösteriyordu:
+          // doğrulama linkini kaçıran kullanıcı "şifrem yanlış" sanıp şifre
+          // sıfırlama döngüsüne giriyordu. Türkçe METNE göre dallanmak kırılgan
+          // olurdu (metin değişince sessizce bozulur) — kod ile ayırıyoruz.
+          kod: dogrulanmamis ? 'eposta_dogrulanmamis' : 'kimlik_hatali',
           kalanDeneme: Math.max(0, epostaKota.kalan - 1),
         },
         { status: 401 }

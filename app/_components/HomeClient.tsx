@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { createClient } from '../../lib/supabase';
 import { olayGonder } from '../../lib/analiz';
+import { ILAN_LIMITI } from '../../lib/ilan-liste';
 import type { AuthChangeEvent, Session } from '@supabase/supabase-js';
 
 const supabase = createClient();
@@ -32,6 +33,40 @@ const KAYNAK_ETIKET: Record<string, { label: string; bg: string; color: string }
 function yeniUye(createdAt: string | null): boolean {
   if (!createdAt) return false;
   return new Date(createdAt) > new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+}
+
+/**
+ * SPRINT_01 L5 — "Yük / Araç" sekmesi artık URL'de yaşıyor (`/?tip=arac`).
+ *
+ * ESKİ HALİNİN SORUNU: sekme sadece `useState`'teydi. Sonuçları:
+ *   • Araç sekmesindeki bir şoför linki WhatsApp'a yapıştırınca karşı taraf
+ *     YÜK sekmesini görüyordu — "bende öyle bir şey yok" muhabbeti.
+ *   • Bir ilana girip GERİ tuşuna basınca yük sekmesine düşülüyordu; kullanıcı
+ *     baktığı listeyi kaybediyordu.
+ *   • Sayfa yenilenince (mobilde çok sık) seçim uçuyordu.
+ *
+ * ⚠️ NEDEN `useSearchParams` DEĞİL: bu bileşen ISR'li bir server component'in
+ *    (app/page.tsx, revalidate=30) çocuğu. `useSearchParams` Suspense sınırı
+ *    olmadan kullanılınca Next TÜM ağacı client-side render'a düşürür ve ISR
+ *    faydası gider. `window.location.search` mount'ta okunur — SSR HTML'i her
+ *    zaman varsayılan sekmeyle üretilir, hydration uyuşmazlığı olmaz.
+ *
+ * ⚠️ NEDEN `pushState` + `popstate` BİRLİKTE: yalnız pushState yazarsak geri
+ *    tuşu URL'i değiştirir ama React state'i olduğu yerde kalır — adres çubuğu
+ *    ile ekran birbirini tutmaz. Dinleyici bu ikisini eşler.
+ *
+ * Varsayılan sekmede param SİLİNİR (`/`), böylece aynı liste için iki ayrı
+ * URL oluşmaz (arama motoru için tekrar eden içerik).
+ */
+const ILAN_TIPLERI = ['yuk', 'arac'] as const;
+type IlanTipi = (typeof ILAN_TIPLERI)[number];
+const VARSAYILAN_TIP: IlanTipi = 'yuk';
+
+function urldenTip(): IlanTipi {
+  if (typeof window === 'undefined') return VARSAYILAN_TIP;
+  const t = new URLSearchParams(window.location.search).get('tip');
+  // Bilinmeyen değer (elle yazılmış `?tip=abc`) sessizce varsayılana düşer.
+  return (ILAN_TIPLERI as readonly string[]).includes(t ?? '') ? (t as IlanTipi) : VARSAYILAN_TIP;
 }
 
 function Chip({ label, bg = '#1f2937', color = '#94a3b8' }: { label: string; bg?: string; color?: string }) {
@@ -426,7 +461,8 @@ export default function HomeClient({ initialIlanlar = [], totalCount = 0 }: { in
   const [ilanlar, setIlanlar] = useState<any[]>(initialIlanlar);
   const [yukleniyor, setYukleniyor] = useState(initialIlanlar.length === 0);
   const [hata, setHata] = useState<'timeout' | 'error' | null>(null);
-  const [tip, setTip] = useState<'yuk' | 'arac'>('yuk');
+  // SPRINT_01 L5 — SSR'da her zaman varsayılanla başla; URL mount'ta okunur (bkz. urldenTip notu).
+  const [tip, setTip] = useState<IlanTipi>(VARSAYILAN_TIP);
   const [kalkis, setKalkis] = useState('');
   const [varis, setVaris] = useState('');
   const [aracTipi, setAracTipi] = useState('');
@@ -434,6 +470,58 @@ export default function HomeClient({ initialIlanlar = [], totalCount = 0 }: { in
   const [kullanici, setKullanici] = useState<{ display_name: string | null; email: string | null; user_type: string | null } | null>(null);
   const [authHazir, setAuthHazir] = useState(false);
   const [yenilemeKey, setYenilemeKey] = useState(0);
+
+  /**
+   * SPRINT_01 L5 — sekmeyi URL ile eşle.
+   *
+   * Mount'ta bir kez okur (paylaşılan link / yenileme / dışarıdan gelen ziyaretçi),
+   * sonra `popstate`i dinler (geri–ileri tuşları).
+   *
+   * `setTip`in effect içinde çağrılması bilinçli: SSR HTML'i varsayılan sekmeyle
+   * üretilmek ZORUNDA (bkz. urldenTip notu), dolayısıyla URL yalnız hydration
+   * sonrası uygulanabilir. Lazy initializer kullanmak hydration uyuşmazlığı olurdu.
+   */
+  useEffect(() => {
+    const urldeki = urldenTip();
+    // Kural bilinçli olarak susturuldu: alternatifi (lazy initializer) SSR/CSR
+    // hydration uyuşmazlığı üretiyor ki o daha kötü bir hata sınıfı.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (urldeki !== VARSAYILAN_TIP) setTip(urldeki);
+
+    /* Çöp/gereksiz parametreyi URL'den at: `?tip=abc` sessizce varsayılana düşüyor
+       ama adres çubuğunda kalıyordu — kullanıcı geçerli bir filtre uyguladığını
+       sanıyor, o linki paylaşıyor ve karşı taraf da aynı yanılgıyı yaşıyordu.
+       `?tip=yuk` de atılır: varsayılan için parametresiz biçim tek kanonik URL.
+       `replaceState` — bu bir kullanıcı eylemi değil, sadece normalizasyon;
+       geçmişe kayıt bırakırsa geri tuşu aynı sayfaya döner gibi görünür. */
+    const ham = new URLSearchParams(window.location.search).get('tip');
+    if (ham !== null && urldeki === VARSAYILAN_TIP) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('tip');
+      window.history.replaceState(null, '', url);
+    }
+
+    const geriIleri = () => setTip(urldenTip());
+    window.addEventListener('popstate', geriIleri);
+    return () => window.removeEventListener('popstate', geriIleri);
+  }, []);
+
+  /**
+   * Sekme değişimi = yeni bir geçmiş kaydı. `pushState` kullanıyoruz ki geri tuşu
+   * önceki sekmeye dönsün. `replaceState` olsaydı geri tuşu kullanıcıyı doğrudan
+   * siteden atardı ve sekme geçmişi hiç oluşmazdı.
+   *
+   * Not: `router.push` DEĞİL — o sunucudan RSC payload'ı çeker ve ISR sayfasını
+   * yeniden ister. Sekme tamamen istemci tarafı bir filtre; ağ turu gereksiz.
+   */
+  function tipDegistir(yeni: IlanTipi) {
+    if (yeni === tip) return;
+    setTip(yeni);
+    const url = new URL(window.location.href);
+    if (yeni === VARSAYILAN_TIP) url.searchParams.delete('tip');
+    else url.searchParams.set('tip', yeni);
+    window.history.pushState(null, '', url);
+  }
 
   async function profilCek(userId: string) {
     const { data: profil } = await supabase
@@ -532,7 +620,9 @@ export default function HomeClient({ initialIlanlar = [], totalCount = 0 }: { in
           .eq('is_shadow_banned', false)
           .eq('status', 'active')
           .order('created_at', { ascending: false })
-          .limit(30);
+          // SPRINT_01 L4 — eskiden burada elle yazılmış `30` vardı; SSR ise 200 çekiyordu.
+          // "Tekrar dene"ye basan kullanıcının listesi sessizce 170 ilan eksiliyordu.
+          .limit(ILAN_LIMITI);
 
         const timeout = new Promise<{ data: null; error: Error }>(resolve =>
           setTimeout(() => resolve({ data: null, error: new Error('timeout') }), 8000)
@@ -609,6 +699,35 @@ export default function HomeClient({ initialIlanlar = [], totalCount = 0 }: { in
     return true;
   });
 
+  /**
+   * SPRINT_01 L4 — sayaç artık EKRANDAKİNİ sayıyor.
+   *
+   * ESKİ HALİ: filtre yokken `totalCount` yazılıyordu. `totalCount` platformdaki
+   * TÜM aktif ilanların sayısı — her iki sekme dahil, kırpma öncesi. Altındaki
+   * liste ise yalnızca seçili sekmenin ilk `ILAN_LIMITI` ilanı. Yani ekranda
+   * "519 aktif ilan" yazarken 40 kart görünüyordu; kullanıcı ya sayfayı bozuk
+   * sanıyor ya da geri kalanı nasıl göreceğini arıyordu (sayfalama yok).
+   *
+   * Liste kırpıldıysa "en yeni" ön eki bunu dürüstçe söyler. Platform toplamı
+   * hâlâ hero rozetinde duruyor — orası pazarlama bağlamı, liste iddiası değil.
+   *
+   * ⚠️ KIRPMA ÖLÇÜSÜ `ilanlar.length`, `filtered.length` DEĞİL. `ilanlar` sorgudan
+   *    dönen HAM liste; `ILAN_LIMITI`ne dayandıysa sunucu kesmiş demektir. Kırpma
+   *    her iki sekmeyi birlikte etkiler: 200'lük pencere tipe göre değil,
+   *    `created_at`e göre kesiliyor — yani araç sekmesinde 3 kart görünse bile
+   *    pencerenin DIŞINDA kalmış araç ilanları olabilir. Bu yüzden "en yeni"
+   *    ön eki sekmeden bağımsız uygulanır; per-tip saymak yanlış güven verirdi.
+   *
+   * ⚠️ FİLTRE VARKEN DE "en yeni" DEMELİ. Filtre bu 200'lük pencerenin İÇİNDE
+   *    çalışıyor; sunucuya gitmiyor. Kırpılmış veride "12 yük ilanı" demek,
+   *    aramanın tüm platformu taradığı izlenimi verir — L4'ün kapatmak istediği
+   *    yanlış beyanın ta kendisi.
+   */
+  const listeKirpildi = ilanlar.length >= ILAN_LIMITI;
+  const tipAdi = tip === 'yuk' ? 'yük' : 'araç';
+  const sayacMetni =
+    `${listeKirpildi ? 'en yeni ' : ''}${filtered.length.toLocaleString('tr-TR')} ${tipAdi} ilanı`;
+
 
   const ad = kullanici?.display_name || kullanici?.email?.split('@')[0] || 'Kullanıcı';
   const isNakliyeci = kullanici?.user_type === 'arac_sahibi';
@@ -673,8 +792,9 @@ export default function HomeClient({ initialIlanlar = [], totalCount = 0 }: { in
       <div style={{ background: '#161b22', borderBottom: '1px solid #30363d', position: 'sticky', top: 56, zIndex: 40, marginTop: 12 }}>
         <div style={{ maxWidth: 1280, margin: '0 auto', padding: '10px 16px', display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
           <div style={{ background: '#0d1117', borderRadius: 6, padding: 2, border: '1px solid #30363d', display: 'flex' }}>
+            {/* SPRINT_01 L5 — `setTip` DEĞİL `tipDegistir`: URL de güncellenmeli. */}
             {(['arac', 'yuk'] as const).map(t => (
-              <button key={t} onClick={() => setTip(t)}
+              <button key={t} onClick={() => tipDegistir(t)}
                 style={{ padding: '5px 12px', borderRadius: 4, border: 'none', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600, background: tip === t ? '#22c55e' : 'transparent', color: tip === t ? '#000' : '#8b949e' }}>
                 {t === 'yuk' ? '🔴 Yük' : '🟢 Araç'}
               </button>
@@ -707,9 +827,7 @@ export default function HomeClient({ initialIlanlar = [], totalCount = 0 }: { in
             </button>
           )}
           <span style={{ color: '#8b949e', fontSize: '0.78rem', marginLeft: 'auto' }}>
-            {yukleniyor ? 'Yükleniyor...' : hata ? '–' : filterAktif
-              ? `${filtered.length} ${tip === 'yuk' ? 'yük' : 'araç'} ilanı`
-              : `${totalCount.toLocaleString('tr-TR')} aktif ilan`}
+            {yukleniyor ? 'Yükleniyor...' : hata ? '–' : sayacMetni}
           </span>
         </div>
       </div>

@@ -2,6 +2,8 @@
 import { useState, useEffect } from 'react';
 import { createClient } from '../../../lib/supabase';
 import { useRouter } from 'next/navigation';
+// SPRINT_01 R2 — kural tek yerden: gösterge ile dayatma ayrışmasın.
+import { sifreKriterleri, sifreHatasi, SIFRE_KURAL_METNI } from '../../../lib/sifre';
 
 const supabase = createClient();
 
@@ -79,7 +81,11 @@ export default function SifreSifirla() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (sifre.length < 8) { setHata('Şifre en az 8 karakter olmalı.'); return; }
+    // SPRINT_01 R2 — eskiden yalnız `sifre.length < 8` bakılıyordu; ekrandaki üç
+    // çubuktan ikisi kırmızıyken bile şifre kabul ediliyordu. Artık gösterge ne
+    // vaat ediyorsa dayatılan da o.
+    const sifreSorunu = sifreHatasi(sifre);
+    if (sifreSorunu) { setHata(sifreSorunu); return; }
     if (sifre !== sifreTekrar) { setHata('Şifreler eşleşmiyor.'); return; }
     setYukleniyor(true); setHata('');
 
@@ -147,18 +153,29 @@ export default function SifreSifirla() {
 
         <div style={{ background: '#161b22', border: '1px solid #30363d', borderRadius: 12, padding: 24 }}>
           <div style={{ color: '#e2e8f0', fontWeight: 700, marginBottom: 4 }}>Yeni Şifre Belirle</div>
-          <div style={{ color: '#8b949e', fontSize: '0.82rem', marginBottom: 20 }}>En az 8 karakter kullanın.</div>
+          {/* SPRINT_01 R2 — eskiden "En az 8 karakter kullanın." yazıyordu ama altta
+              üç çubuk vardı; kullanıcı diğer iki çubuğun neyi ölçtüğünü bilmiyordu. */}
+          <div style={{ color: '#8b949e', fontSize: '0.82rem', marginBottom: 20 }}>{SIFRE_KURAL_METNI}</div>
 
           <form onSubmit={handleSubmit}>
             <div style={{ marginBottom: 14 }}>
               <label style={lbl}>Yeni Şifre</label>
               <input type="password" value={sifre} onChange={e => setSifre(e.target.value)} placeholder="••••••••" required style={inp} autoFocus />
               {sifre.length > 0 && (
-                <div style={{ marginTop: 6, display: 'flex', gap: 4 }}>
-                  {[sifre.length >= 8, /[0-9]/.test(sifre), /[A-Z]/.test(sifre)].map((ok, i) => (
-                    <div key={i} style={{ flex: 1, height: 3, borderRadius: 2, background: ok ? '#22c55e' : '#374151', transition: 'background 0.2s' }} />
-                  ))}
-                </div>
+                <>
+                  <div style={{ marginTop: 6, display: 'flex', gap: 4 }}>
+                    {sifreKriterleri(sifre).map(k => (
+                      // `title`: çubuğun neyi ölçtüğü artık üzerine gelince görünüyor.
+                      <div key={k.etiket} title={k.etiket}
+                        style={{ flex: 1, height: 3, borderRadius: 2, background: k.saglandi ? '#22c55e' : '#374151', transition: 'background 0.2s' }} />
+                    ))}
+                  </div>
+                  {/* Eksik kriteri ADIYLA söyle — kullanıcı hangi çubuğun kırmızı
+                      olduğunu tahmin etmek zorunda kalmasın. */}
+                  {sifreHatasi(sifre) && (
+                    <div style={{ color: '#f59e0b', fontSize: '0.72rem', marginTop: 4 }}>{sifreHatasi(sifre)}</div>
+                  )}
+                </>
               )}
             </div>
             <div style={{ marginBottom: 16 }}>

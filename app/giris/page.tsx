@@ -4,6 +4,8 @@ import { createClient } from '../../lib/supabase';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
 import { REDIRECT_COOKIE, guvenliRedirect } from '../../lib/redirect';
+// SPRINT_01 R2 — kural tek yerden: gösterge ile dayatma ayrışmasın.
+import { sifreKriterleri, sifreHatasi, SIFRE_KURAL_METNI } from '../../lib/sifre';
 
 const supabase = createClient();
 
@@ -78,8 +80,29 @@ function GirisIci() {
   const mergeName   = searchParams.get('merge_name');
   const mergeEmail  = searchParams.get('merge_email');
 
-  const [sekme, setSekme] = useState<Sekme>('telefon');
-  const [mod, setMod] = useState<Mod>(() => (mergeUserId ? 'merge_onay' : 'giris'));
+  /**
+   * SPRINT_01 F1 — `?mod=kayit` ile doğrudan kayıt formunda açılabiliyor.
+   *
+   * ESKİ HALİNİN SORUNU: Footer'daki "Kayıt Ol" da "Giriş Yap" da düz `/giris`e
+   * gidiyordu. Yeni kullanıcı "Kayıt Ol"a basıyor, telefon sekmesinde bir giriş
+   * ekranı buluyor ve kaydın nerede olduğunu anlayamıyordu — e-posta sekmesine
+   * geçip oradaki küçük "Hesap oluştur" bağlantısını bulması gerekiyordu.
+   *
+   * ⚠️ İKİ state birden kurulmalı: kayıt formu `sekme === 'eposta' && mod === 'kayit'`
+   *    koşuluyla render ediliyor. Sadece `mod`u ayarlamak sessizce hiçbir şey yapmaz,
+   *    çünkü varsayılan sekme 'telefon'.
+   * ⚠️ Merge akışı ÖNCELİKLİ: `?merge_user_id` varsa kullanıcı hesap birleştirme
+   *    kararının ortasındadır, oradan kayıt formuna düşürülmemeli.
+   *
+   * Effect değil lazy initializer: URL'den TÜRETİLMİŞ bir değer, ilk render'da
+   * doğru olmalı — yoksa ekran bir kare yanlış modda yanıp sıçrar (A2 notu).
+   */
+  const kayitModu = searchParams.get('mod') === 'kayit';
+
+  const [sekme, setSekme] = useState<Sekme>(() => (kayitModu && !mergeUserId ? 'eposta' : 'telefon'));
+  const [mod, setMod] = useState<Mod>(() =>
+    mergeUserId ? 'merge_onay' : kayitModu ? 'kayit' : 'giris'
+  );
 
   // Telefon
   const [telefon, setTelefon] = useState('');
@@ -116,6 +139,62 @@ function GirisIci() {
   }
 
   const [bilgi, setBilgi] = useState('');
+
+  /**
+   * SPRINT_01 A5 + A6 — `dogrulama_bekle` ekranına İKİ ayrı yoldan gelinir ve
+   * ekranın metni buna göre değişmeli:
+   *   • 'kayit'  → kullanıcı az önce kayıt oldu, e-posta AZ ÖNCE gönderildi.
+   *   • 'giris'  → kullanıcı giriş denedi, hesabı var ama doğrulanmamış.
+   *                Burada "gönderildi" demek YALAN olur; e-posta günler önce
+   *                gönderilmişti ve muhtemelen kayboldu.
+   *
+   * Eskiden ikinci yol hiç yoktu: sunucu "E-posta adresinizi doğrulamadınız"
+   * diyordu ama istemci bunu diğer tüm hatalarla aynı kırmızı satıra basıyordu.
+   * Kullanıcı bunu "şifrem yanlış" sanıp şifre sıfırlama döngüsüne giriyor,
+   * yeni şifreyle de giremiyordu — çünkü sorun şifre değildi.
+   */
+  const [dogrulamaSebep, setDogrulamaSebep] = useState<'kayit' | 'giris'>('kayit');
+  const [dogrulamaBekleme, setDogrulamaBekleme] = useState(0);
+  const [dogrulamaGonderiliyor, setDogrulamaGonderiliyor] = useState(false);
+
+  // Geri sayım. `setTimeout` içinde setState → effect'te SENKRON setState değil,
+  // bu yüzden `react-hooks/set-state-in-effect` tetiklenmiyor.
+  useEffect(() => {
+    if (dogrulamaBekleme <= 0) return;
+    const s = setTimeout(() => setDogrulamaBekleme(v => v - 1), 1000);
+    return () => clearTimeout(s);
+  }, [dogrulamaBekleme]);
+
+  /**
+   * SPRINT_01 A6 — doğrulama e-postasını tekrar iste.
+   *
+   * ⚠️ Kota SUNUCUDA (`/api/auth/dogrulama-tekrar`). Buradaki geri sayım yalnız UX;
+   *    butonu gizlemek kimseyi engellemez, adres başına 60 sn kuralı sunucuda.
+   * ⚠️ Sunucu hesabın var olup olmadığını ELE VERMEZ; bu yüzden burada da her
+   *    zaman aynı olumlu mesajı gösteriyoruz.
+   */
+  async function dogrulamaTekrarGonder() {
+    if (dogrulamaBekleme > 0 || dogrulamaGonderiliyor) return;
+    setDogrulamaGonderiliyor(true);
+    setHata(''); setBilgi('');
+
+    const res = await fetch('/api/auth/dogrulama-tekrar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ eposta }),
+    }).catch(() => null);
+    const json = await res?.json().catch(() => null);
+
+    if (!res?.ok) {
+      setHata(json?.error || 'E-posta gönderilemedi. Biraz sonra tekrar deneyin.');
+      // Sunucu daha uzun bir bekleme dayattıysa sayacı ona göre kur.
+      if (res?.status === 429 && typeof json?.bekle === 'number') setDogrulamaBekleme(json.bekle);
+    } else {
+      setBilgi('Doğrulama e-postasını tekrar gönderdik. Gelen kutunuzu ve spam klasörünü kontrol edin.');
+      setDogrulamaBekleme(typeof json?.bekleme === 'number' ? json.bekleme : 60);
+    }
+    setDogrulamaGonderiliyor(false);
+  }
 
   // SPRINT_01 A3 — proxy kullanıcıyı buraya `?hesap=tasindi` veya `?hesap=eslesme` ile
   // gönderiyordu ama BU SAYFA O PARAMI HİÇ OKUMUYORDU. Kullanıcı sebepsiz yere boş bir
@@ -417,9 +496,30 @@ function GirisIci() {
     const json = await res?.json().catch(() => null);
 
     if (!res?.ok) {
-      setHata(json?.error || 'Giriş yapılamadı. Lütfen tekrar deneyin.');
       authLog('login_failed', 'eposta', json?.error);
       setYukleniyor(false);
+
+      // SPRINT_01 A5 — "doğrulanmamış e-posta" bir ŞİFRE hatası değil, bir ADIM eksiği.
+      // Kırmızı hata satırı yerine ne yapması gerektiğini anlatan (ve tekrar gönderme
+      // butonu olan) ekrana geçir. Türkçe metne değil `kod`a bakıyoruz — metin
+      // değişirse bu dal sessizce ölmesin.
+      if (json?.kod === 'eposta_dogrulanmamis') {
+        setDogrulamaSebep('giris');
+        // Sayaç 0: bu akışta az önce e-posta GÖNDERİLMEDİ, dolayısıyla istemci
+        // tarafında beklemek için sebep yok. Kullanıcıların çoğu buraya kayıttan
+        // saatler sonra düşer; onlara peşinen 60 sn saydırmak anlamsız olurdu.
+        //
+        // Kayıttan hemen sonra gelen azınlık, sunucudaki adres kotasına (60 sn)
+        // takılıp 429 alır — `dogrulamaTekrarGonder` o yanıttaki `bekle` ile
+        // sayacı kurar ve kalan süreyi yazar. Yani kötü durumda bir fazladan
+        // istek atılır; buna karşılık çoğunluk gereksiz beklemez.
+        setDogrulamaBekleme(0)
+        setBilgi(''); setHata('');
+        setMod('dogrulama_bekle');
+        return;
+      }
+
+      setHata(json?.error || 'Giriş yapılamadı. Lütfen tekrar deneyin.');
       return;
     }
 
@@ -432,7 +532,10 @@ function GirisIci() {
   // ── E-posta kayıt ───────────────────────────────────────────────
   async function epostaKayit(e: React.FormEvent) {
     e.preventDefault(); temizle();
-    if (sifre.length < 8) { setHata('Şifre en az 8 karakter olmalı.'); return; }
+    // SPRINT_01 R2 — eskiden yalnız uzunluk kontrol ediliyordu; forma "sayı ve büyük
+    // harf içermeli" yazıp hiçbirini dayatmıyorduk. "aaaaaaaa" kabul ediliyordu.
+    const sifreSorunu = sifreHatasi(sifre);
+    if (sifreSorunu) { setHata(sifreSorunu); return; }
     if (sifre !== sifreTekrar) { setHata('Şifreler eşleşmiyor.'); return; }
     setYukleniyor(true);
     const { error } = await supabase.auth.signUp({
@@ -444,6 +547,11 @@ function GirisIci() {
       if (error.message.includes('already registered')) setHata('Bu e-posta zaten kayıtlı. Giriş yapmayı deneyin.');
       else setHata(error.message);
     } else {
+      setDogrulamaSebep('kayit');
+      // Supabase AZ ÖNCE bir e-posta gönderdi. Sunucudaki adres kotası 60 sn;
+      // sayacı burada da başlatmazsak kullanıcı butona basıp 429 yer.
+      setDogrulamaBekleme(60);
+      setBilgi('');
       setMod('dogrulama_bekle');
     }
     setYukleniyor(false);
@@ -506,17 +614,44 @@ function GirisIci() {
     </Wrap>
   );
 
-  // Doğrulama bekleniyor
+  // Doğrulama bekleniyor — SPRINT_01 A5 + A6
   if (mod === 'dogrulama_bekle') return (
     <Wrap><Logo />
       <div style={{ background: '#161b22', border: '1px solid #30363d', borderRadius: 12, padding: 24, textAlign: 'center' }}>
         <div style={{ fontSize: '2.5rem', marginBottom: 12 }}>📧</div>
-        <div style={{ color: '#e2e8f0', fontWeight: 700, fontSize: '1rem', marginBottom: 8 }}>Doğrulama e-postası gönderildi</div>
-        <div style={{ color: '#8b949e', fontSize: '0.85rem', marginBottom: 20 }}>
-          <strong style={{ color: '#e2e8f0' }}>{eposta}</strong> adresine doğrulama linki gönderdik. Linke tıkladıktan sonra giriş yapabilirsiniz.
+
+        {/* Başlık ve açıklama, ekrana NEREDEN gelindiğine göre değişir (A5). */}
+        <div style={{ color: '#e2e8f0', fontWeight: 700, fontSize: '1rem', marginBottom: 8 }}>
+          {dogrulamaSebep === 'kayit' ? 'Doğrulama e-postası gönderildi' : 'E-postanız henüz doğrulanmamış'}
         </div>
-        <div style={{ color: '#4b5563', fontSize: '0.78rem', marginBottom: 20 }}>Spam klasörünüzü de kontrol edin.</div>
-        <button onClick={() => { setMod('giris'); setSifre(''); setSifreTekrar(''); }}
+        <div style={{ color: '#8b949e', fontSize: '0.85rem', marginBottom: 20, lineHeight: 1.6 }}>
+          {dogrulamaSebep === 'kayit' ? (
+            <><strong style={{ color: '#e2e8f0' }}>{eposta}</strong> adresine doğrulama linki gönderdik. Linke tıkladıktan sonra giriş yapabilirsiniz.</>
+          ) : (
+            <>Hesabınız var, şifreniz de doğru — ama <strong style={{ color: '#e2e8f0' }}>{eposta}</strong> adresine gönderdiğimiz doğrulama linkine henüz tıklamadınız. Link kaybolduysa aşağıdan yenisini isteyebilirsiniz.</>
+          )}
+        </div>
+        <div style={{ color: '#4b5563', fontSize: '0.78rem', marginBottom: 16 }}>Spam klasörünüzü de kontrol edin.</div>
+
+        {bilgi && <div style={{ color: '#22c55e', fontSize: '0.82rem', marginBottom: 12 }}>✓ {bilgi}</div>}
+        {hata && <div style={{ color: '#ef4444', fontSize: '0.82rem', marginBottom: 12 }}>⚠️ {hata}</div>}
+
+        {/* A6 — eskiden bu ekranda HİÇBİR çıkış yolu yoktu. E-posta gelmediyse
+            kullanıcının yapabileceği tek şey aynı adresle tekrar kayıt denemekti,
+            o da "Bu e-posta zaten kayıtlı" ile duvara toslar. */}
+        <button onClick={dogrulamaTekrarGonder} disabled={dogrulamaBekleme > 0 || dogrulamaGonderiliyor}
+          style={{
+            width: '100%', background: dogrulamaBekleme > 0 || dogrulamaGonderiliyor ? '#166534' : '#22c55e',
+            color: '#000', fontWeight: 700, borderRadius: 8, border: 'none', padding: '11px 20px',
+            cursor: dogrulamaBekleme > 0 || dogrulamaGonderiliyor ? 'default' : 'pointer',
+            fontSize: '0.9rem', marginBottom: 12,
+          }}>
+          {dogrulamaGonderiliyor ? 'Gönderiliyor...'
+            : dogrulamaBekleme > 0 ? `Tekrar gönder (${dogrulamaBekleme} sn)`
+            : '📨 Doğrulama e-postasını tekrar gönder'}
+        </button>
+
+        <button onClick={() => { setMod('giris'); setSifre(''); setSifreTekrar(''); setBilgi(''); setHata(''); }}
           style={{ background: 'none', border: '1px solid #30363d', color: '#8b949e', borderRadius: 8, padding: '9px 20px', cursor: 'pointer', fontSize: '0.85rem' }}>
           ← Giriş sayfasına dön
         </button>
@@ -581,7 +716,12 @@ function GirisIci() {
       {/* Sekmeler */}
       <div style={{ display: 'flex', background: '#161b22', border: '1px solid #30363d', borderRadius: 10, padding: 4, marginBottom: 16 }}>
         {(['telefon', 'eposta'] as Sekme[]).map(s => (
-          <button key={s} onClick={() => { setSekme(s); setMod('giris'); setOtpAdim(false); temizle(); }}
+          /* ⚠️ AKTİF SEKMEYE TIKLAMAK BİR ŞEYİ SIFIRLAMAMALI. Eskiden koşulsuz
+             `setMod('giris')` vardı: `/giris?mod=kayit` ile gelen kullanıcı zaten
+             "E-posta" sekmesindeyken ona bir kez daha tıklayınca sessizce kayıt
+             formundan giriş formuna düşüyordu — footer'daki "Kayıt Ol" linkini
+             boşa çıkaran, sebebi görünmeyen bir davranış. */
+          <button key={s} onClick={() => { if (s === sekme) return; setSekme(s); setMod('giris'); setOtpAdim(false); temizle(); }}
             style={{ flex: 1, padding: '8px', borderRadius: 7, border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem', background: sekme === s ? '#22c55e' : 'none', color: sekme === s ? '#000' : '#8b949e', transition: 'all 0.15s' }}>
             {s === 'telefon' ? '📱 Telefon' : '✉️ E-posta'}
           </button>
@@ -679,15 +819,23 @@ function GirisIci() {
             </div>
             <div style={{ marginBottom: 14 }}>
               <label style={lbl}>Şifre</label>
-              <input type="password" value={sifre} onChange={e => setSifre(e.target.value)} placeholder="En az 8 karakter" required style={inp} />
+              <input type="password" value={sifre} onChange={e => setSifre(e.target.value)} placeholder="••••••••" required style={inp} />
               {sifre.length > 0 && (
                 <div style={{ marginTop: 6, display: 'flex', gap: 4 }}>
-                  {[sifre.length >= 8, /[0-9]/.test(sifre), /[A-Z]/.test(sifre)].map((ok, i) => (
-                    <div key={i} style={{ flex: 1, height: 3, borderRadius: 2, background: ok ? '#22c55e' : '#374151', transition: 'background 0.2s' }} />
+                  {sifreKriterleri(sifre).map(k => (
+                    // `title`: çubuğun neyi ölçtüğü artık üzerine gelince görünüyor.
+                    <div key={k.etiket} title={k.etiket}
+                      style={{ flex: 1, height: 3, borderRadius: 2, background: k.saglandi ? '#22c55e' : '#374151', transition: 'background 0.2s' }} />
                   ))}
                 </div>
               )}
-              <div style={{ color: '#4b5563', fontSize: '0.72rem', marginTop: 4 }}>En az 8 karakter, sayı ve büyük harf içermeli.</div>
+              {/* Şifre yazılmaya başlandıysa EKSİK OLANI adıyla söyle; boşken sadece kuralı hatırlat.
+                  Eskiden bu satır "…içermeli" diye söz veriyordu ama hiçbiri dayatılmıyordu (R2). */}
+              {sifre.length > 0 && sifreHatasi(sifre) ? (
+                <div style={{ color: '#f59e0b', fontSize: '0.72rem', marginTop: 4 }}>{sifreHatasi(sifre)}</div>
+              ) : (
+                <div style={{ color: '#4b5563', fontSize: '0.72rem', marginTop: 4 }}>{SIFRE_KURAL_METNI}</div>
+              )}
             </div>
             <div style={{ marginBottom: 16 }}>
               <label style={lbl}>Şifre Tekrar</label>

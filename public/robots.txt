@@ -15,7 +15,8 @@
 #    (b) crawler bütçesinin herkese açık sayfalara harcanması.
 #    Bu yüzden disallow listesi "gizlensin" diye değil, "indekslenmesin" diye var.
 #
-# KURAL: yeni bir özel alan (panel benzeri) eklerken ÜÇ bloğu da güncelle.
+# KURAL: yeni bir özel alan (panel benzeri) eklerken DÖRT bloğu da güncelle
+#        (*, GoogleBot, GPTBot, ClaudeBot).
 #        Listeler bilinçli olarak birebir aynı; farklılaşırlarsa bu bir hatadır.
 
 # --- Genel crawler'lar (isimli blokla eşleşmeyen HERKES buraya düşer) ---
