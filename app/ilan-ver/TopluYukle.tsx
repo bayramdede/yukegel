@@ -37,14 +37,15 @@ export default function TopluYukle({ onGeri }: { onGeri: () => void }) {
   const [previewRows, setPreviewRows] = useState<PreviewRow[]>([]);
   const [overrides, setOverrides] = useState<Overrides>({});
   const [yukleniyor, setYukleniyor] = useState(false);
-  const [sonuc, setSonuc] = useState<{ created: number; errors: string[] } | null>(null);
+  const [tarih, setTarih] = useState(bugun());
+  const [sonuc, setSonuc] = useState<{ olusturulan: number; sonuclar: KayitSonucu[] } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   // ── Şablon indir ──
   async function sablonIndir() {
     const XLSX = await import('xlsx');
     const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.aoa_to_sheet([SABLON_HEADERS, ...SABLON_ORNEK]);
+    const ws = XLSX.utils.aoa_to_sheet([[...SABLON_HEADERS], ...SABLON_ORNEK]);
     ws['!cols'] = [10, 14, 14, 12, 12, 12, 12, 12, 10, 8, 10, 12, 22].map(wch => ({ wch }));
     XLSX.utils.book_append_sheet(wb, ws, 'İlanlar');
     XLSX.writeFile(wb, 'yukegel-ilan-sablonu.xlsx');
