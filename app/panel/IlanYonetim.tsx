@@ -145,8 +145,8 @@ function IlanKart({ ilan, onGuncelle }: { ilan: any; onGuncelle: (id: string, pa
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
               {(ilan.vehicle_type || []).map((t: string) => <Chip key={t} label={'🚛 ' + t} bg='#1a2535' color='#60a5fa' />)}
               {(ilan.body_type || []).map((u: string) => <Chip key={u} label={u} bg='#1f2937' color='#94a3b8' />)}
-              {ilkStop?.weight_ton && <Chip label={'⚖ ' + ilkStop.weight_ton + ' ton'} bg='#1a2a1a' color='#86efac' />}
-              {ilkStop?.pallet_count && <Chip label={'📦 ' + ilkStop.pallet_count + ' palet'} bg='#1a2a1a' color='#86efac' />}
+              {toplamTon !== null && <Chip label={'⚖ ' + toplamTon.toLocaleString('tr-TR') + ' ton' + (stops.length > 1 ? ` (${stops.length} durak)` : '')} bg='#1a2a1a' color='#86efac' />}
+              {toplamPalet !== null && <Chip label={'📦 ' + toplamPalet.toLocaleString('tr-TR') + ' palet'} bg='#1a2a1a' color='#86efac' />}
               {ilan.available_date && <Chip label={'📅 ' + new Date(ilan.available_date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' }) + (ilan.date_flexible ? ' ±' : '')} bg='#1f2937' color='#94a3b8' />}
             </div>
           </div>
