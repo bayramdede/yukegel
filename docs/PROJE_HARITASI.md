@@ -293,8 +293,26 @@ status: 'active'|'passive'|'completed'|'expired'
 is_shadow_banned, audit_score, internal_audit_logs (JSONB)
 user_id (nullable), source: 'form'|'whatsapp'|'excel'
 shadow_profile_id (nullable FK → shadow_profiles.id) — kayıtsız kullanıcı ilanları için
+vehicle_id (nullable FK → vehicles.id, on delete set null) — ILAN_VER_ANALIZ B3 (29 Tem 2026)
 contact_phone — 🔒 anon/authenticated için REVOKE edildi (SPRINT_01 L1e). Yalnız service-role.
 ```
+> 🚨 **YAZMA YOLU TEK: `lib/ilan-yaz.ts`** (29 Tem 2026, `ILAN_VER_ANALIZ` W0/W1). Uygulamada
+> `listings` INSERT'i **kopyalanmaz**; `ilanYaz()` çağrılır. Kanallar: `/ilan-ver` tekil form
+> (`app/ilan-ver/actions.ts` → yalnız auth kapısı) ve `/api/excel-import` toplu yükleme.
+> Kendi INSERT'ini yazan ikinci bir yol, W0'da kapatılan V1/V3 deliklerini yeniden açar —
+> excel-import'ta tam olarak bu oldu. (İstisna: `app/moderator/page.tsx:974` `raw_posts`'tan
+> ilan üretiyor — personel yolu, farklı semantik; V5 atomikliği oraya HENÜZ uygulanmadı,
+> `YAPILACAKLAR.md`'de bilet.)
+>
+> ⚡ **`public.ilan_olustur(p_listing jsonb, p_stops jsonb) → jsonb`** (29 Tem 2026, V5).
+> İlan + duraklarını TEK transaction'da yazar, trigger'ın hesapladığı
+> `id, audit_score, moderation_status, is_shadow_banned` ile döner. `security invoker`
+> (bilerek — `definer` olsaydı ayrıcalık yükseltme yüzeyi olurdu), EXECUTE yalnız
+> `service_role`da. Migration: `docs/20260729_ilan_olustur_rpc.sql`, sonra
+> `docs/20260729_listings_vehicle_id.sql` (kolon + `create or replace` ile RPC'yi tazeler).
+> 🚨 **RPC'ye kolon eklerken iki yeri birlikte güncelle:** fonksiyon gövdesi ve
+> `lib/ilan-yaz.ts`'teki `p_listing` nesnesi. Fonksiyon jsonb aldığı için ayrışma
+> **derleme zamanında görünmez** — alan sessizce NULL yazılır.
 > ⚠️ `contact_phone` (28 Tem 2026, `SPRINT_01` L1e): PostgREST kolon yetkisi `anon` ve
 > `authenticated` rollerinden alındı. İstemci tarafı hiçbir `select`/`update`/`insert`
 > bu kolonu içeremez → `42501 permission denied`. Okuma/yazma yolları:
