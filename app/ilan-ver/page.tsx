@@ -285,27 +285,36 @@ export default function IlanVer() {
     </nav>
   );
 
-  if (gonderildi) return (
-    <div style={{ background: '#0d1117', minHeight: '100vh' }}>
-      <Navbar />
-      <div style={{ maxWidth: 480, margin: '80px auto', padding: '0 16px', textAlign: 'center' }}>
-        <div style={{ fontSize: '3rem', marginBottom: 16 }}>✅</div>
-        <div style={{ color: '#e2e8f0', fontSize: '1.25rem', fontWeight: 700, marginBottom: 8 }}>İlanınız yayınlandı!</div>
-        <div style={{ color: '#8b949e', fontSize: '0.85rem', marginBottom: 24 }}>
-          {tip === 'yuk' ? 'Nakliyeciler artık ilanınızı görebilir.' : 'Yük sahipleri artık ilanınızı görebilir.'}
-        </div>
-        {fiyat && (
-          <div style={{ background: '#14532d', border: '1px solid #166534', borderRadius: 8, padding: '10px 20px', marginBottom: 24, display: 'inline-block' }}>
-            <span style={{ color: '#22c55e', fontWeight: 700, fontSize: '0.85rem' }}>✓ Fiyat Belli rozeti kazandınız!</span>
+  if (gonderildi) {
+    const gorunum = {
+      yayinda:    { ikon: '✅', baslik: 'İlanınız yayında!',        renk: '#22c55e' },
+      incelemede: { ikon: '🕓', baslik: 'İlanınız incelemede',      renk: '#f59e0b' },
+      reddedildi: { ikon: '⚠️', baslik: 'İlanınız yayına alınmadı', renk: '#ef4444' },
+    }[sonucDurum];
+
+    return (
+      <div style={{ background: '#0d1117', minHeight: '100vh' }}>
+        <Navbar />
+        <div style={{ maxWidth: 480, margin: '80px auto', padding: '0 16px', textAlign: 'center' }}>
+          <div style={{ fontSize: '3rem', marginBottom: 16 }}>{gorunum.ikon}</div>
+          <div style={{ color: gorunum.renk, fontSize: '1.25rem', fontWeight: 700, marginBottom: 8 }}>{gorunum.baslik}</div>
+          <div style={{ color: '#8b949e', fontSize: '0.85rem', marginBottom: 24, lineHeight: 1.6 }}>
+            {sonucMesaj}
           </div>
-        )}
-        <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
-          <a href="/" style={{ color: '#8b949e', fontSize: '0.85rem', textDecoration: 'none' }}>← Ana Sayfa</a>
-          <a href="/panel" style={{ color: '#22c55e', fontWeight: 700, fontSize: '0.85rem', textDecoration: 'none' }}>İlanlarım →</a>
+          {/* Rozet yalnızca ilan GERÇEKTEN yayındaysa anlamlı. */}
+          {fiyat && sonucDurum === 'yayinda' && (
+            <div style={{ background: '#14532d', border: '1px solid #166534', borderRadius: 8, padding: '10px 20px', marginBottom: 24, display: 'inline-block' }}>
+              <span style={{ color: '#22c55e', fontWeight: 700, fontSize: '0.85rem' }}>✓ Fiyat Belli rozeti kazandınız!</span>
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+            <a href="/" style={{ color: '#8b949e', fontSize: '0.85rem', textDecoration: 'none' }}>← Ana Sayfa</a>
+            <a href="/panel" style={{ color: '#22c55e', fontWeight: 700, fontSize: '0.85rem', textDecoration: 'none' }}>İlanlarım →</a>
+          </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  }
 
   if (!yontem) return (
     <div style={{ background: '#0d1117', minHeight: '100vh' }}>
