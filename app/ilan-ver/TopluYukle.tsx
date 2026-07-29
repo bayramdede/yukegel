@@ -3,7 +3,7 @@ import { useState, useRef } from 'react';
 // 🚨 `ILAN_VER_ANALIZ` B1 — istemci↔route sözleşmesi TEK dosyadan. Bu import
 // olmadan iki taraf yine sessizce ayrışabilir; `satisfies` mühürleri aşağıda.
 import {
-  SABLON_HEADERS, MAX_SATIR,
+  SABLON_HEADERS, MAX_SATIR, MAX_ILAN,
   type HamSatir, type OnizlemeSatiri, type TopluYukleIstek, type TopluYukleYanit,
   type KayitSonucu,
 } from '../../lib/toplu-yukle-sozlesme';
