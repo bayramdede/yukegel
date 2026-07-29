@@ -215,7 +215,8 @@ sessizce düşüyor. **Yan kazanım: B2 kısmî** — `maxDuration=60`, `MAX_SAT
 ### W2 — Maliyet & kötüye kullanım (11p)
 - [ ] **V7** — AI kotasının kapısı `parse`, sayacı `kayıt` — Anthropic sınırsız çağrılabiliyor · 4p
 - [ ] **V6** — İlan oluşturmada hız limiti / tekrar tespiti yok · 4p
-- [ ] **B2** — `excel-import`'ta `maxDuration`, süre bütçesi ve satır tavanı yok · 3p
+- [ ] **B2 kısmî** — ~~`maxDuration`~~ ✅ (60sn), ~~satır tavanı~~ ✅ (`MAX_SATIR=300`, `MAX_ILAN=50`); kalan: **satır bazlı süre bütçesi** (bütçe dolunca kalanları "işlenmedi" diye dönmek) · 1p
+- [ ] **Yeni (W1'de keşfedildi)** — `app/moderator/page.tsx:974` `raw_posts`'tan ilan üretirken hâlâ kendi `listings` INSERT'ini + ayrı `listing_stops` INSERT'ini yazıyor: V5 atomikliği personel yoluna uygulanmadı, duraksız ilan hâlâ üretilebilir. `ilan_olustur()` RPC'sine geçirilmeli (personel semantiği farklı: `trust_level:'social'`, `moderation_status:'approved'`, `raw_post_id`) · 3p
 
 ### W3 — Dönüşüm (14p) · W4 — Sağlamlaştırma (28p)
 U1–U10 ve V8–V10, B5–B9, M1–M5 için `docs/ILAN_VER_ANALIZ.md` §3–§5.
