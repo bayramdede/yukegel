@@ -179,11 +179,38 @@ fiziksel olarak ayrışamıyor), **A2** (istemci `bugun()` de sabit +03:00 kulla
 
 Kalan: **V5 tam** (tek RPC ile atomik yazma) hâlâ W1'de.
 
-### W1 — Kırıkları onar (15p)
-- [ ] **B1** — 🔴 **Toplu yükleme fiilen çalışmıyor** — istemci JSON `{action,rows,userId}`, route `formData().get('file')`; ayrıca şablon `'Kalkış İli'` ↔ route `'Kalkış Şehri'` · 5p
-- [ ] **B3** — Seçilen araç ilana bağlanmıyor (`listings.vehicle_id` yok) · 3p ⚠️ migration'a **grant satırı** şart
-- [ ] **B4** — AI durak eşlemesi `cargo_type`'ı not alanına yazıyor; kayıtta tek global yük cinsi tüm duraklara kopyalanıyor · 3p
-- [ ] **V5** — İlan + duraklar atomik değil; durak INSERT'i patlarsa duraksız yetim ilan kalıyor · 4p
+### W1 — Kırıkları onar (15p) ✅ **TAMAM** (29 Tem 2026)
+- [x] **B1** — 🔴 **Toplu yükleme fiilen çalışmıyor** — istemci JSON `{action,rows,userId}`, route `formData().get('file')`; ayrıca şablon `'Kalkış İli'` ↔ route `'Kalkış Şehri'` · 5p
+- [x] **B3** — Seçilen araç ilana bağlanmıyor (`listings.vehicle_id` yok) · 3p ⚠️ migration'a **grant satırı** şart
+- [x] **B4** — AI durak eşlemesi `cargo_type`'ı not alanına yazıyor; kayıtta tek global yük cinsi tüm duraklara kopyalanıyor · 3p
+- [x] **V5** — İlan + duraklar atomik değil; durak INSERT'i patlarsa duraksız yetim ilan kalıyor · 4p
+
+**Ne yapıldı.** İki yeni dosya: `lib/ilan-yaz.ts` (`listings` yazan tek yol) ve
+`lib/toplu-yukle-sozlesme.ts` (toplu yükleme sözleşmesi). `/api/excel-import` ve
+`app/ilan-ver/actions.ts` baştan yazıldı; ikincisi artık yalnızca bir auth kapısı.
+B1'in asıl bulgusu protokol uyuşmazlığı değildi: excel-import **ikinci ve
+sertleştirilmemiş bir ayrıcalıklı yazma yoluydu** — W0'da kapatılan V1/V3 delikleri
+orada açık duruyordu. Sözleşme `satisfies` ile mühürlendi, `userId` sözleşmeden
+tamamen çıkarıldı, önizleme `aliases` sözlüğünü kullanıyor (şablonun vaat ettiği
+kısaltmalar artık gerçekten çözülüyor). B4'te durak bazlı yük cinsi hem tekil forma
+hem AI eşlemesine hem Excel'e geldi. B3'te istemciden gelen `arac_id` sahiplik
+(`user_id` + `is_active`) doğrulamasından geçiyor, doğrulanmayan id `WARN` loglanıp
+sessizce düşüyor. **Yan kazanım: B2 kısmî** — `maxDuration=60`, `MAX_SATIR=300`,
+`MAX_ILAN=50` (kalan: satır bazlı süre bütçesi).
+
+> ⚠️ **BAYRAM — İKİ MIGRATION, SIRAYLA, KODU DEPLOY ETMEDEN ÖNCE:**
+> 1. `docs/20260729_ilan_olustur_rpc.sql` — `public.ilan_olustur(jsonb,jsonb)`
+> 2. `docs/20260729_listings_vehicle_id.sql` — `listings.vehicle_id` + **grant** + RPC tazeleme
+>
+> Sıra tersine olursa ilan verme `PGRST202 function not found` ile **tamamen durur**
+> (kod artık RPC'siz yazmıyor). Doğrulama ve duman testleri dosyaların sonunda.
+
+**Canlı DB'de doğrulanacak (W1):**
+- [ ] Migration'lar çalıştı mı? → `select routine_name from information_schema.routines where routine_name='ilan_olustur';`
+- [ ] Yetkisiz kolon kaldı mı? → `20260729_listings_vehicle_id.sql` DOĞRULAMA §1 (sıfır satır dönmeli)
+- [ ] Yetim ilan var mı? → duraksız `listings` sorgusu (aynı dosya, duman testi §4). Eski kayıtlardan kalma varsa temizlenmeli.
+- [ ] Araç ilanı verildiğinde `vehicle_id` gerçekten doluyor mu?
+- [ ] Toplu yükleme uçtan uca: şablon indir → 2 satır → önizleme → tarih seç → onayla.
 
 ### W2 — Maliyet & kötüye kullanım (11p)
 - [ ] **V7** — AI kotasının kapısı `parse`, sayacı `kayıt` — Anthropic sınırsız çağrılabiliyor · 4p
