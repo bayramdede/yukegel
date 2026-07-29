@@ -1,5 +1,7 @@
 {
   "regions": ["fra1"],
+  "_ignoreCommand_neden": "29 Tem 2026 — otomatik deploy kapatıldı. scripts/auto-deploy.sh her dosya kaydetmesinde 'auto: <tarih>' commit'i atıp push ediyor; Vercel de main'e giden HER push'ta build ettiği için günde ~79 deploy oluyordu (Hobby limiti 100/gün) ve yarım kaydedilmiş kod canlıya çıkıyordu. 17:47'deki 'TelefonDurumu is not assignable' hatası tam olarak buydu: daemon actions.ts'i push etmiş, page.tsx'i henüz commit'lememişti. Artık GitHub'a push devam ediyor (yedek durur) ama Vercel yalnız commit mesajı 'auto:' ile BAŞLAMAYAN commit'lerde build ediyor. Deploy için: npm run deploy",
+  "ignoreCommand": "git log -1 --pretty=%s | grep -q '^auto:' && exit 0 || exit 1",
   "functions": {
     "app/api/admin/learn-aliases/route.ts": {
       "maxDuration": 60
