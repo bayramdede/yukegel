@@ -304,8 +304,9 @@ function UyeBanner() {
         🔐 <strong style={{ color: '#e2e8f0' }}>Telefon numaralarını görmek</strong> ve ilan sahiplerine ulaşmak için üye olun. Ücretsiz.
       </div>
       <div style={{ display: 'flex', gap: 8 }}>
-        <a href="/giris" style={{ background: '#1e3a5f', color: '#60a5fa', borderRadius: 6, padding: '7px 14px', fontSize: '0.82rem', fontWeight: 600, textDecoration: 'none' }}>Giriş Yap</a>
-        <a href="/giris" style={{ background: '#22c55e', color: '#000', borderRadius: 6, padding: '7px 14px', fontSize: '0.82rem', fontWeight: 700, textDecoration: 'none' }}>Üye Ol →</a>
+        {/* 29 Tem 2026 — hedefli giriş; bkz. app/_components/GirisLink.tsx */}
+        <GirisLink style={{ background: '#1e3a5f', color: '#60a5fa', borderRadius: 6, padding: '7px 14px', fontSize: '0.82rem', fontWeight: 600, textDecoration: 'none' }}>Giriş Yap</GirisLink>
+        <GirisLink mod="kayit" style={{ background: '#22c55e', color: '#000', borderRadius: 6, padding: '7px 14px', fontSize: '0.82rem', fontWeight: 700, textDecoration: 'none' }}>Üye Ol →</GirisLink>
       </div>
     </div>
   );
