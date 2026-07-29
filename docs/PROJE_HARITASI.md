@@ -496,7 +496,7 @@ Açık rotalar: /giris, /auth/, /profil-tamamla, /nasil-calisir, /hakkimizda,
 
 ### ✅ Tamamlanan
 - **SPRINT_01 W1 — Auth akış bütünlüğü** (28 Temmuz 2026). Ayrıntı ve kabul kriterleri: `docs/SPRINT_01.md`.
-  - **A1 + A1b — auth denetim izi açıldı.** `app/api/auth/log/route.ts` (yeni) service-role ile `auth_events`'e yazıyor. Endpoint aylardır **yoktu**; `authLog()` çağrıları `.catch(()=>{})` içinde olduğu için 404 sessizce yutuluyordu. Artık `console.warn` bırakılıyor. ⏳ `docs/20260728_auth_events.sql`.
+  - **A1 + A1b — auth denetim izi açıldı.** `app/api/auth/log/route.ts` (yeni) service-role ile `auth_events`'e yazıyor. Endpoint aylardır **yoktu**; `authLog()` çağrıları `.catch(()=>{})` içinde olduğu için 404 sessizce yutuluyordu. Artık `console.warn` bırakılıyor. ✅ `docs/20260728_auth_events.sql` çalıştırıldı (29 Tem 2026).
   - **A3 — `?hesap=tasindi` / `?hesap=eslesme` mesajları görünür oldu.** Mesaj `onAuthStateChange`'ten bağımsız basılıyor; proxy cookie'yi sildiği için `!user` dalında da çalışması gerekiyordu.
   - **A7 — `redirect` param'ı korunuyor.** `lib/redirect.ts` (yeni) `guvenliRedirect()`: yalnız `/` ile başlayan, `//` ve `\` içermeyen yollar → açık yönlendirme kapalı.
   - **K2 — `users` upsert'i server action'a taşındı.** `app/profil-tamamla/actions.ts` (yeni) + kolon beyaz listesi. `role`, `is_active`, `phone_verified`, `merged_into`, `trust_level` istemciden yazılamıyor.
