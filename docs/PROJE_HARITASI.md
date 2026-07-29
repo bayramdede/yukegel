@@ -185,6 +185,12 @@ yukegel/
 │                                         #    ⚠️ Büyük harf: `\p{Lu}` + /u — `[A-Z]` Türkçe'de YANLIŞ ✅
 ├── lib/ilan-liste.ts                     # 📋 SPRINT_01 L4 — ILAN_LIMITI: SSR ve istemci sorgusu AYNI
 │                                         #    limiti kullanır. ⚠️ İstemci paketine girer, server-only YOK ✅
+├── lib/ilan-sabitler.ts                  # 🚨 ILAN_VER_ANALIZ M2 (29 Tem 2026) — ilan alanlarının TEK KAYNAĞI.
+│                                         #    ILLER (81) · ARAC_TIPLERI · UTSYAPI · ARAC_TIPI_SETI ·
+│                                         #    UTSYAPI_SETI · ilKey() · ilNormalize() → resmî il adı | null
+│                                         #    ⚠️ Yalnız gösterim değil, SUNUCU BEYAZ LİSTESİ de bu dosya
+│                                         #    (`app/ilan-ver/actions.ts`). İstemci ve sunucu ayrışamaz.
+│                                         #    ⚠️ ilKey(): İ (U+0130) → düz `i` ÖNCE, sonra toLowerCase (§9)
 ├── lib/alias-normalize.ts                # 🚨 SPRINT_01 W5/D2 — alias yazma yolu TEK KAYNAK.
 │                                         #    aliasKey() (İ→i, lower, ıçğöşü→icgosu) · trTemizle() ·
 │                                         #    normalizeAliasFields() · aliasSatirlariniYukle() (sayfalı,
