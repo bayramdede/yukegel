@@ -185,6 +185,9 @@ yukegel/
 │   ├── kullanim-kosullari/page.tsx     # ✅ — sirket_unvani config'den
 │   ├── _components/
 │   │   ├── Footer.tsx                  # Server component — sirket_unvani config'den
+│   │   ├── GirisLink.tsx               # 🔗 Giriş/Üye Ol bağlantısı — bulunduğu sayfayı
+│   │   │                               #    `?redirect=` olarak KENDİSİ ekler (usePathname).
+│   │   │                               #    Çıplak `<Link href="/giris">` YAZMA (29 Tem 2026) ✅
 │   │   └── HomeClient.tsx              # Client component — eski page.tsx içeriği
 │   ├── layout.tsx                        # 🔍 SPRINT_01 S1 — metadataBase + OG + Twitter + canonical ✅
 │   ├── opengraph-image.jpg               # 🔍 SPRINT_01 S1 — 1200×630 paylaşım kartı (Bayram'ın
