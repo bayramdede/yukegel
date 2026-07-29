@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { createClient } from '../../lib/supabase';
 import { olayGonder } from '../../lib/analiz';
 import { ILAN_LIMITI, durakToplami } from '../../lib/ilan-liste';
+import GirisLink from './GirisLink';
 import type { AuthChangeEvent, Session } from '@supabase/supabase-js';
 
 const supabase = createClient();
