@@ -20,6 +20,11 @@ export interface HamSatir {
   kalkisIlce: string;
   varisIli: string;
   varisIlce: string;
+  /**
+   * ⚠️ Şablonda kolon var, sözleşmede alan var, route satırı taşıyor — ama HİÇBİR YERDE
+   * OKUNMUYOR. Kullanıcı doldurup gönderiyor ve değeri sessizce yok oluyor.
+   * Ya bir anlam kazandırılmalı (yükleme/boşaltma ayrımı) ya da şablondan çıkarılmalı.
+   */
   durakTipi: string;
   aracTipi: string;
   ustYapi: string;
