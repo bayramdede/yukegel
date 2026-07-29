@@ -2,6 +2,7 @@
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { getServiceSupabase } from '../../lib/auth';
+import { structuredLog } from '../../lib/logger';
 import { ilanYaz, type IlanYazGirdi, type IlanYazSonuc, type IlanDurumu } from '../../lib/ilan-yaz';
 
 /**
