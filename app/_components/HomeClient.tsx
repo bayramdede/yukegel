@@ -441,13 +441,17 @@ export default function HomeClient({ initialIlanlar = [], totalCount = 0 }: { in
         setAuthHazir(true);
         return;
       }
-      // Önce oturumdan bildiğimizle doldur: profil sorgusu gecikse/başarısız olsa bile
-      // navbar doğru durumu gösterir.
+      // Navbar'ı HEMEN doğru duruma getir: profil sorgusu gecikse/başarısız olsa bile
+      // kullanıcı "Giriş Yap" görmesin.
       setKullanici({ display_name: null, email: session.user.email ?? null, user_type: null });
-      setAuthHazir(true);
-      const profil = await profilCek(session.user.id);
-      if (cancelled || !profil) return;
-      setKullanici(profil);
+      try {
+        const profil = await profilCek(session.user.id);
+        if (cancelled) return;
+        if (profil) setKullanici(profil);
+      } catch { /* profil okunamadı — oturum yine de geçerli */ }
+      // `authHazir` hero'ları açar; user_type belli olmadan açarsak nakliyeciye
+      // bir an müşteri hero'su görünür. Bu yüzden profil çözüldükten SONRA.
+      if (!cancelled) setAuthHazir(true);
     }
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
