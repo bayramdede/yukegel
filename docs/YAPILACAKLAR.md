@@ -2,10 +2,11 @@
 
 > Son güncelleme: 29 Temmuz 2026 (SPRINT_01 **W0 + W1 + W2 tamamlandı** — telefon sızıntısı hem uygulama hem DB katmanında kapatıldı, auth denetim izi açıldı, iki ayrı yetki yükseltme açığı kolon beyaz listesiyle giderildi, `/auth/reset` ve `/cikis` sertleştirildi, `merged_into` giriş döngüsü `/auth/devir` ile kapandı, SMS ve şifre tetikleyicileri istemciden alınıp kotalı sunucu route'larına taşındı.)
 >
-> ⏳ **BAYRAM — SQL durumu:**
-> 1. ~~`docs/20260728_kvkk_onay.sql`~~ ✅ **çalıştırıldı** (Bayram, 29 Tem 2026)
-> 2. ~~`docs/20260728_auth_events.sql`~~ ✅ **çalıştırıldı** (Bayram, 29 Tem 2026)
-> 3. `docs/20260728_contact_phone_revoke.sql` — deploy'dan **SONRA** (ters sırada panel ve moderatör telefonu yazamaz) ← **tek kalan**
+> ✅ **BAYRAM — 3 SQL'in ÜÇÜ DE ÇALIŞTIRILDI** (29 Tem 2026): `20260728_kvkk_onay.sql`,
+> `20260728_auth_events.sql`, `20260728_contact_phone_revoke.sql`.
+> ⚠️ Sonuncusu kod deploy'undan SONRA çalışmalıydı — L1e kodu (`app/panel/actions.ts`,
+> `app/moderator/actions.ts`) canlıda değilse panel/moderatör telefon yazamaz.
+> Duman testi ve geri alma bloğu dosyanın sonunda.
 >
 > ~~Ayrıca kontrol: `public.users.is_active` DB default'u~~ ✅ doğrulandı: default `true`, NULL satır yok (29 Tem 2026). Opsiyonel sertleştirme: `alter table public.users alter column is_active set not null;`
 >
