@@ -196,6 +196,8 @@ export default function IlanVer() {
       const sonuc = await ilanKaydet({
         tip, kalkis, kalkis_ilce, tel, fiyat, fiyat_pazarlik, tarih, tarih_esnek,
         genel_not, arac_tipi, utsyapi, arac_adet, yuk_cinsi, duraklar,
+        // B3 — seçilen araç ARTIK ilana bağlanıyor. Sunucu sahipliği doğruluyor.
+        arac_id: secilenArac?.id ?? null,
         raw_text: aiHamMetin || undefined,
         ai_parsed: Boolean(aiHamMetin),
       });
