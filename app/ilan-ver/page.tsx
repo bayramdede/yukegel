@@ -226,9 +226,8 @@ export default function IlanVer() {
       const yeni = r.stops
         .filter(s => s && s.city)
         .map(s => {
-          const eslen = ILLER.find(il => il.toLocaleLowerCase('tr') === String(s.city).toLocaleLowerCase('tr'));
           return {
-            sehir: eslen || String(s.city),
+            sehir: ilNormalize(s.city) ?? '',
             ilce: s.district ? String(s.district) : '',
             ton: typeof s.weight_ton === 'number' && s.weight_ton > 0 ? String(s.weight_ton) : '',
             palet: typeof s.pallet_count === 'number' && s.pallet_count > 0 ? String(s.pallet_count) : '',
