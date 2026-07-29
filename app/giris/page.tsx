@@ -225,6 +225,7 @@ function GirisIci() {
     e.preventDefault();
     // SPRINT_01 A4b — bekleme süresi dolmadan tekrar gönderme.
     if (bekleme > 0) { setHata(`${bekleme} saniye sonra tekrar deneyebilirsiniz.`); return; }
+    etkilesimRef.current = true; // A9 — açılış kontrolü artık araya girmesin
     setYukleniyor(true); temizle();
     const temiz = telefon.replace(/\D/g, '');
     const fmt = temiz.startsWith('90') ? `+${temiz}` : temiz.startsWith('0') ? `+9${temiz}` : `+90${temiz}`;
