@@ -83,14 +83,19 @@ export default function TopluYukle({ onGeri }: { onGeri: () => void }) {
         }));
 
       if (!rows.length) throw new Error('Dolu satır bulunamadı');
+      if (rows.length > MAX_SATIR) {
+        throw new Error(`Tek seferde en fazla ${MAX_SATIR} satır yüklenebilir. Dosyanızda ${rows.length} dolu satır var.`);
+      }
 
+      const istek = { action: 'preview', rows } satisfies TopluYukleIstek;
       const res = await fetch('/api/excel-import', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'preview', rows }),
+        body: JSON.stringify(istek),
       });
-      const json = await res.json();
-      if (!json.success) throw new Error(json.error);
+      const json: TopluYukleYanit = await res.json();
+      if (!json.ok) throw new Error(json.hata);
+      if (json.action !== 'preview') throw new Error('Beklenmeyen sunucu yanıtı.');
 
       setPreviewRows(json.preview);
       setOverrides({});
