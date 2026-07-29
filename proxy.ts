@@ -125,17 +125,20 @@ export async function proxy(request: NextRequest) {
     // aşağıdaki user_type kontrolüne bırakılırsa kullanıcı SONSUZ profil-tamamla döngüsüne girer.
     // Bunun yerine giriş sayfasına gönder; orada oturum otomatik canlı hesaba geçirilir (switch-account).
     if (profil?.merged_into) {
-      // Bu oturum emekli (merge edilmiş) bir kayda ait. Magic-link ile canlı hesaba
-      // geçirmek SSR cookie'lerini güncellemediği için SONSUZ DÖNGÜ yaratıyordu
-      // (localStorage yeni hesaba geçiyor, cookie eski oturumda kalıyor → proxy tekrar
-      // buraya atıyor). Çözüm: ölü oturumun sb- cookie'lerini TEMİZLE ve temiz giriş
-      // ekranına gönder. Kullanıcı Google ile yeniden girer (PKCE → /auth/callback →
-      // cookie doğru set edilir → /panel).
-      const clearResponse = girisYonlendir(request, 'tasindi');
-      request.cookies.getAll().forEach(({ name }) => {
-        if (name.startsWith('sb-')) clearResponse.cookies.delete(name);
-      });
-      return clearResponse;
+      // SPRINT_01 A10 — burası eskiden sb- cookie'lerini silip `/giris?hesap=tasindi`'ye
+      // atıyordu. Ama kullanıcı hep aynı kimlikle (ör. telefon OTP) geri geldiği için
+      // yine bu satıra düşüyordu: SONSUZ DÖNGÜ, çıkışı olmayan bir giriş ekranı.
+      //
+      // Yeni davranış: `/auth/devir` oturumu SUNUCUDA canlı hesaba geçirir
+      // (service-role + magic-link `hashed_token` + `verifyOtp` → cookie'ler yazılır).
+      //
+      // ⚠️ COOKIE'LERİ BURADA SİLME. Devir route'u, devri yetkilendirmek için emekli
+      // oturumu okumak zorunda; cookie'ler silinirse `getUser()` null döner ve kullanıcı
+      // yine girişte kalır. Devir başarısız olursa temizliği o route yapar.
+      const devirUrl = new URL('/auth/devir', request.url);
+      const devirHedef = guvenliRedirect(pathname + request.nextUrl.search);
+      if (devirHedef) devirUrl.searchParams.set('redirect', devirHedef);
+      return NextResponse.redirect(devirUrl);
     }
 
     if (profil?.role === 'admin' || profil?.role === 'moderator') {
