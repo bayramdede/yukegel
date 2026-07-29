@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 import { createClient } from '../../lib/supabase';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
-import { REDIRECT_COOKIE, guvenliRedirect } from '../../lib/redirect';
+import { REDIRECT_COOKIE, REDIRECT_COOKIE_MAX_AGE, guvenliRedirect } from '../../lib/redirect';
 // SPRINT_01 R2 — kural tek yerden: gösterge ile dayatma ayrışmasın.
 import { sifreKriterleri, sifreHatasi, SIFRE_KURAL_METNI } from '../../lib/sifre';
 
