@@ -67,6 +67,13 @@
 > Aynı sınıf hata iki yerde vardı: `profil-tamamla` `users` upsert'i ve `panel` `listings` update'i gövdeyi hiç filtrelemeden istemciden alıyordu. RLS "kendi satırın" der ama gövdeye `role: 'admin'`, `trust_level: 'verified'`, `moderation_status: 'approved'`, `is_shadow_banned: false` eklemeyi engellemez — devtools açmak kadar kolay.
 > **Kural:** İstemciden gelen her `update`/`upsert` gövdesi `'use server'` action içinde **beyaz listeden** geçmeli. Sahiplik kontrolü de sunucuda olmalı — `getServiceSupabase()` RLS'i bypass ettiği için "RLS nasılsa engeller" varsayımı geçersiz.
 
+> **✅ `useEffect` İÇİNDEKİ ASYNC = SESSİZ ARIZA (29 Tem 2026, `/ilan-ver` telefon alanı — ÇÖZÜLDÜ):**
+> `useEffect(() => { init() }, [])` kalıbı bu projede birden çok yerde var. `init()` bir promise döner; **reddedilirse hiçbir yerde yakalanmaz** — error boundary tetiklenmez, konsolda kullanıcıya bir şey görünmez, ilgili `setState` sadece hiç çalışmaz. Ekranda kalan tek iz, sonsuza kadar duran bir yükleme yazısıdır.
+> Somut vaka: `kullanicitelefon()` üç ayrı sonucu (oturum yok / profilde numara yok / **fırlattı**) tek bir `null`'a çöküyor, `📞 {tel || 'Yükleniyor...'}` de üçünü aynı gösteriyordu. Aynı fırlatma `ilanKaydet()` içinde olunca ise "An error occurred in the Server Components render…" çıkıyordu — **iki farklı belirti, tek kök.**
+> **Kural 1:** `useEffect` içinden çağrılan async fonksiyona **daima** `.catch(...)` bağla ve bir hata durumu state'i yaz.
+> **Kural 2:** Veri çeken server action'lar `null` dönmesin; `{ durum: 'var' | 'yok' | 'hata' }` gibi **ayrık birleşim** dönsün. "Yok" ile "alınamadı" kullanıcıya aynı gösterilemez.
+> **Kural 3:** `process.env.X!` sadece TypeScript'i susturur. Env okuyan her helper eksik değişkenin **adını** söyleyerek patlasın (`lib/auth.ts` → `getServiceSupabase()` örnek).
+
 ---
 
 ## 0. SİSTEM CONFIG PARAMETRELERİ (system_config)
