@@ -210,6 +210,13 @@ sessizce düşüyor. **Yan kazanım: B2 kısmî** — `maxDuration=60`, `MAX_SAT
 > Sıra tersine olursa ilan verme `PGRST202 function not found` ile **tamamen durur**
 > (kod artık RPC'siz yazmıyor). Doğrulama ve duman testleri dosyaların sonunda.
 
+**W1 sonrası bağımsız denetimde bulunup düzeltilenler (29 Tem 2026):**
+- Türkçe sayı ayrıştırma — `Number("5.000")===5` yüzünden `5.000 TL` **5 TL**'ye kaydoluyordu, `"2,5"` tonaj `NaN` olup düşüyordu → `sayiMetniCoz()` (`lib/toplu-yukle-sozlesme.ts`), önizlemede uygulanıyor ki kullanıcı gerçek değeri görsün.
+- Ondalık palet RPC'de `(…)::int` ile `22P02` atıp **tüm ilanı** geri alıyordu → `tamSayiAralik()` (`lib/ilan-yaz.ts`), `palet` ve `arac_adet`e uygulandı.
+- Profilinde telefonu olmayan kullanıcı 50 ilanın 50'sinin de tek tek "başarısız" olduğu bir ekran görüyordu → `ilanTelefonu()` kontrolü döngüden ÖNCE, tek ve anlaşılır 400.
+- `durumEtiketi()`'nin 3. parametresi iki çağrı yerinde de `false`'tı, `'error'` dalı ulaşılamazdı → parametre kaldırıldı.
+- `TopluYukle.tsx` `MAX_ILAN`'a bakmıyordu: 60 gruplu dosyada buton "60 ilan" diyor, sunucu 400 dönüyor, **hiçbir** ilan oluşmuyordu → istemci tarafı uyarı + buton kilidi.
+
 **Canlı DB'de doğrulanacak (W1):**
 - [ ] Migration'lar çalıştı mı? → `select routine_name from information_schema.routines where routine_name='ilan_olustur';`
 - [ ] Yetkisiz kolon kaldı mı? → `20260729_listings_vehicle_id.sql` DOĞRULAMA §1 (sıfır satır dönmeli)
