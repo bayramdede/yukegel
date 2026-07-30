@@ -675,12 +675,13 @@ değişikliği içermiyor — yalnızca statik okuma. Canlı DB/RLS doğrulamas�
 - [ ] **`profil-tamamla`'daki diğer `onBlur` alanları** (telefon) aynı epoch guard'ına sahip
       değil — telefon alanı tipe bağlı gizlenmediği için şu an zararsız, ama alan görünürlüğü
       değişirse aynı yarış geri gelir. *(K3'ten çıkan yeni iş)*
-- [ ] **Geçmişte üretilmiş sahte güzergâhlı `listings` satırlarının kaderi** — runbook Adım 8
-      dört konum kolonunun **yazımını** onarıyor (`listings.origin_city`/`origin_district`,
-      `listing_stops.city`/`district`). Onarım sonrası "aynı şehir" kalan satırlar
-      **otomatikman sahte değil**: şehir içi taşıma meşru bir iş. Sahte olan alt küme
-      "aynı şehir + aynı ilçe + tek durak + AI üretimi" — ayrıca sorgulanıp silme mi,
-      moderasyona düşürme mi karar verilmeli. Runbook'un kapsamı dışında. *(W5/D5)*
+- [x] ~~**Geçmişte üretilmiş sahte güzergâhlı `listings` satırlarının kaderi**~~ —
+      **ÖLÇÜMLE KAPANDI** (29 Tem 2026). Runbook Adım 0.1 çalıştırıldı: **0 satır / 0 ilan**.
+      Yani katlanmış anahtarı eşit ama ham yazımı farklı (= sahte güzergâh parmak izi) hiç
+      satır yok; silinecek/moderasyona düşürülecek bir küme yok. D4'ün değeri **önleme**,
+      geriye dönük onarım değil. Kalan 6.173 "aynı şehir" satırı meşru şehir içi taşıma —
+      dokunulmayacak. Asıl hasar başka yerde çıktı: **~88 satırda yazım çeşitliliği**
+      (~12 ASCII bozulması + ~76 tamamı büyük harf), onarımı runbook Adım 8. *(W5/D5)*
 - [ ] **`listings.destination_city` ölü kolon — düşürülmeli** (29 Tem 2026, W5). Uygulama
       kodunda tek bir yazma/okuma yok; varış verisi `listing_stops` satırlarında
       (`supabase/functions/parse-listing/index.ts:825` yazıyor, `HomeClient.tsx:696` okuyor).
