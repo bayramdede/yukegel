@@ -689,6 +689,15 @@ değişikliği içermiyor — yalnızca statik okuma. Canlı DB/RLS doğrulamas�
       canlı kolonu (`listing_stops.city`) atlıyor — runbook Adım 8 bunu düzeltti. Önce
       `SELECT count(*) WHERE destination_city IS NOT NULL` ile boş olduğu teyit edilsin,
       sonra `ALTER TABLE public.listings DROP COLUMN destination_city;`
+      ⏳ Sayım hâlâ alınmadı — 29 Tem'de yanlış tablo sorgulandı (`listing_stops`, 244.379 =
+      toplam durak satırı). Doğrusu: `SELECT count(*) FROM public.listings WHERE destination_city IS NOT NULL;`
+- [ ] 🆕 **Varış filtresi büyük/küçük harfe duyarlı — katlanmalı** (29 Tem 2026, W5 Adım 0).
+      `app/_components/HomeClient.tsx:696` `d.sehir?.includes(varis)` iki tarafı da katlamıyor;
+      DB'de tamamı büyük harf yazılmış **~76 durak satırı** ("ÇORLU" 42, "KEMALPAŞA" 17,
+      "ÇERKEZKÖY" 6 …) aramada **hiç görünmüyor**. Adım 8 mevcut satırları onaracak ama kod
+      tarafı korumasız kalıyor: yeni bir yazım varyantı girdiği an aynı bug geri gelir.
+      Çözüm: karşılaştırmayı `lib/alias-normalize.ts` katlama fonksiyonundan geçir
+      (kalkış filtresi ve `get_nearby_listings_by_city` de gözden geçirilsin).
 - [ ] **`is_active` / `is_approved` desenkronu** — `learn-aliases` `is_approved=false` öneri
       üretiyor ama eşleşme tarafı (`findPlaces`, `whatsapp-parse` gatekeeper) yalnız
       `is_active`'e bakıyor; onaylanmamış alias parse'a giriyor. W0-W4'ten devreden bilinen
