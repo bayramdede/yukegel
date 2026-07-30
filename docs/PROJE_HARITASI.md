@@ -1,6 +1,17 @@
 # Yükegel — Proje Haritası
 > **Kullanım:** Her sohbet başında sadece bu dosyayı oku. Kaynak dosyaları sadece o dosyada değişiklik yapacaksan oku.  
-> Son güncelleme: 29 Temmuz 2026 — **SPRINT_01 W5 (alias veri bütünlüğü) kod tarafı tamamlandı.**
+> Son güncelleme: 30 Temmuz 2026 — **COĞRAFİ STANDARDİZASYON Dalga 1 (şema) hazır.**
+> İl artık **metin değil `province_id` (plaka kodu, 1-81)**. Üç yeni dosya: `lib/constants/locations.json`
+> (81 il + **973 resmî ilçe**), `lib/lokasyon.ts` (`ilId`/`ilAdi`/`ilceler`/`ilceNormalize`/`ilCiftYazim`),
+> `scripts/test-lokasyon.mts` (`npm run test:lokasyon`). Geçiş **çift yazım**: metin kolonları
+> YERİNDE KALIR ve yazılmaya devam eder, `province_id` yanlarında birikir; Dalga 5'te drop edilir.
+> ⚠️ **`docs/20260730_province_id.sql` ÇALIŞTIRILMADI.** Koddan önce çalıştırılabilir (hiçbir mevcut
+> kolonu düşürmez). Dalgalar ve dokunulacak 20+ dosya: **`docs/COGRAFI_GECIS.md`**.
+> 🔁 **W5 alias runbook'unun il yazımı adımları (3 ve 8) GEREKSİZLEŞTİ** — `il_key()` `Istanbul`
+> ile `İstanbul`'u aynı id'ye katlıyor. **İlçe adımları (4, 6) + trigger dosyası KORUNUYOR.**
+> ⚠️ Dalga 2 ertelenirse `findPlaces` sahte güzergâh üretmeye devam eder → o zaman runbook şart.
+>
+> Önceki: 29 Temmuz 2026 — **SPRINT_01 W5 (alias veri bütünlüğü) kod tarafı tamamlandı.**
 > **W5:** Bozuk `aliases.normalized` yazımı (`Istanbul` 13 satır / `İstanbul` 154 satır) sahte
 > **İstanbul→İstanbul** güzergâhları üretiyordu. Kaynak iki katmanlıydı: `learn-aliases` prompt'unun
 > örnekleri ASCII'ye indirgenmişti (**D1** düzeltti) ve dört alias yazma noktasının hiçbiri
