@@ -227,7 +227,9 @@ export async function moderatorIlanOlustur(
       p_listing: {
         listing_type: tip,
         origin_city: kalkis,
-        origin_district: kisaMetin(girdi?.origin_district),
+        origin_province_id: kalkisIl.id,
+        origin_district: kalkisIlce?.ad ?? kisaMetin(girdi?.origin_district),
+        origin_district_official: kalkisIlce?.resmi ?? null,
         // Telefon burada YAZILMAZ; aşağıda `ilanTelefonGuncelle` ile, kendi
         // doğrulaması ve KVKK izi ile yazılıyor. Tek kapı kalsın.
         contact_phone: null,
