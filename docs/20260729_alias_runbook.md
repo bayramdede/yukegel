@@ -111,6 +111,60 @@ SELECT count(*) AS dolu_destination_city FROM public.listings WHERE destination_
 
 ---
 
+## ✅ ÖLÇÜM SONUÇLARI — 29 Temmuz 2026 (Adım 0 çalıştırıldı)
+
+| Sorgu | Sonuç |
+|---|---|
+| **0.1 sahte güzergâh adayı** | **0 satır / 0 ilan** |
+| **0.2 meşru şehir içi taşıma** | 6.173 satır / 6.122 ilan; 1.465'i farklı ilçe |
+| **0.3 katlanmış anahtar çakışması** | **16 grup / ~88 satır** (4 kolonun tamamında) |
+| **0.4 ölü `destination_city`** | ⚠️ **HÂLÂ ÖLÇÜLMEDİ** — yanlışlıkla `listing_stops.city` sorgulandı (244.379 = toplam durak satırı) |
+
+**0.1 = 0 → geçmişte sahte güzergâh HASARI YOK.** Yazım farkından doğmuş tek bir
+bozuk güzergâh bile bulunamadı. D4'ün değeri geriye dönük onarım değil,
+**bundan sonrasını önlemek**; ölçülebilir "önce/sonra" farkı olmayacak.
+`YAPILACAKLAR.md`'deki "sahte güzergâhlı satırların kaderi" bileti bu ölçümle
+kapandı.
+
+**0.2 → 6.122 ilan şehir içi ve bunlar meşru.** 244.379 durak satırının %2,5'i.
+Ayrıca 6.173 − 1.465 = **4.708 satırda ilçe de aynı** (ya gerçekten aynı ilçe ya
+da iki tarafta da `NULL` — `IS DISTINCT FROM` ikisini ayırmıyor). Bu küme "sahte"
+diye elenmemeli; büyük kısmı ilçesi hiç girilmemiş kaba veri.
+
+**0.3 → hasar ilçelerde ve iki AYRI türde.** Beklenen tek türü değil, ikisini
+buldu:
+
+| Tür | Örnek | Satır |
+|---|---|---|
+| ASCII bozulması (W5'in beklediği) | `Istanbul` 3 · `Bingol` 5 · `Cekmekoy` 2 · `Avcilar` 1 · `Eyyubiye` 1 | **~12** |
+| 🆕 **TAMAMI BÜYÜK HARF** | `ÇORLU` 42 · `KEMALPAŞA` 17 · `ÇERKEZKÖY` 6 · `NİLÜFER` 3 · `MUDANYA` 2 · `LÜLEBURGAZ` 2 · `KEŞAN`/`MİLAS`/`GELİBOLU`/`OSMANGAZİ` 1'er | **~76** |
+
+> 🆕 **BÜYÜK HARF kategorisi devir notunda yoktu ve zararı gerçek.** Yazım
+> Türkçe olarak DOĞRU, yalnız kasası bozuk — ama `HomeClient.tsx:696` filtresi
+> `d.sehir?.includes(varis)` ile **büyük/küçük harf duyarlı** çalışıyor, yani
+> `ÇORLU` kayıtlı bir durak "Çorlu" aramasında **hiç çıkmıyor**. Adım 8'in
+> sözlük yaklaşımı bunu kendiliğinden onarır (ham değer sözlükteki doğru
+> yazımdan farklıysa güncellenir); elle `CASE` listesi onaramazdı.
+>
+> ⚠️ `KEMALPAŞA` (17) doğru yazımdan (11) **daha kalabalık**. Bu yüzden Adım 8
+> **çoğunluk yazımını değil `aliases` sözlüğünü** kullanıyor — çoğunluk mantığı
+> burada yanlış değeri seçerdi.
+
+**Eski BÖLÜM 6 bu veride ne yapardı:** sabit `('Istanbul','Izmir','Mugla','Bingol')`
+listesi 16 grubun **13'ünü ıskalardı** (`Avcilar`, `Cekmekoy`, `Eyyubiye` ve
+büyük-harf grubunun tamamı), üstelik `Izmir`/`Mugla` bu veride hiç yok. Sözlük
+yaklaşımının somut gerekçesi bu.
+
+**Dağılım kolon bazında:** hasar ağırlıkla **ilçelerde** —
+`listing_stops.district` 11 grup, `listings.origin_district` 3, `listing_stops.city`
+1, `listings.origin_city` 1 (22.471 `İstanbul`'a karşı 3 `Istanbul`). Çıkış şehri
+pratikte temiz.
+
+**Sırada:** 0.4'ü doğru sorguyla tekrarla (`FROM public.listings WHERE
+destination_city IS NOT NULL`) — ölü kolonu düşürme bileti buna bağlı.
+
+---
+
 ## Adım 1 — H / ADIM 3: homonim alias'ları pasifleştir
 
 `araç`, `arac`, `olur` → `is_active = false`.
