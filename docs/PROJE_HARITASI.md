@@ -5,8 +5,12 @@
 > (81 il + **973 resmî ilçe**), `lib/lokasyon.ts` (`ilId`/`ilAdi`/`ilceler`/`ilceNormalize`/`ilCiftYazim`),
 > `scripts/test-lokasyon.mts` (`npm run test:lokasyon`). Geçiş **çift yazım**: metin kolonları
 > YERİNDE KALIR ve yazılmaya devam eder, `province_id` yanlarında birikir; Dalga 5'te drop edilir.
-> ⚠️ **`docs/20260730_province_id.sql` ÇALIŞTIRILMADI.** Koddan önce çalıştırılabilir (hiçbir mevcut
-> kolonu düşürmez). Dalgalar ve dokunulacak 20+ dosya: **`docs/COGRAFI_GECIS.md`**.
+> ✅ **`docs/20260730_province_id.sql` ÇALIŞTIRILDI (30 Tem 2026).** Backfill %100/%100
+> (234.229 ilan + 244.379 durak), çelişki sıfır, GRANT'lar yerinde.
+> 🚨 **AMA KOD HENÜZ `province_id` YAZMIYOR** → bu andan sonra oluşan her ilanın
+> `origin_province_id`'si **NULL** doğuyor. Dalga 2 çıkana kadar boşluk büyür; migration'daki
+> 6.A güncellemesi idempotent, arada tekrar çalıştırılabilir.
+> Dalgalar ve dokunulacak 20+ dosya: **`docs/COGRAFI_GECIS.md`**.
 > 🔁 **W5 alias runbook'unun il yazımı adımları (3 ve 8) GEREKSİZLEŞTİ** — `il_key()` `Istanbul`
 > ile `İstanbul`'u aynı id'ye katlıyor. **İlçe adımları (4, 6) + trigger dosyası KORUNUYOR.**
 > ⚠️ Dalga 2 ertelenirse `findPlaces` sahte güzergâh üretmeye devam eder → o zaman runbook şart.
