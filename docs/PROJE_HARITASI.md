@@ -382,7 +382,28 @@ user_id (nullable), source: 'form'|'whatsapp'|'excel'
 shadow_profile_id (nullable FK → shadow_profiles.id) — kayıtsız kullanıcı ilanları için
 vehicle_id (nullable FK → vehicles.id, on delete set null) — ILAN_VER_ANALIZ B3 (29 Tem 2026)
 contact_phone — 🔒 anon/authenticated için REVOKE edildi (SPRINT_01 L1e). Yalnız service-role.
+origin_province_id (nullable FK → provinces.id) — 30 Tem 2026. origin_city'nin YERİNİ ALACAK.
+origin_district_official (nullable bool) — true=resmî ilçe, false=serbest giriş (İkitelli, İSTOÇ)
 ```
+> 🗺️ **İL ARTIK ID (30 Tem 2026, `docs/COGRAFI_GECIS.md`).** `origin_city` metin kolonu
+> **çift yazım** döneminde YERİNDE — hem id hem metin yazılıyor. Yalnız id yazan bir yol,
+> metne bakan okuma yollarında (HomeClient varış filtresi, radar RPC'leri) ilanı **görünmez**
+> yapar. Her yazma yolu `lib/lokasyon.ts::ilCiftYazim()` kullanmalı.
+> 🚨 Yeni iki kolona GRANT **elle verildi** (migration Adım 4) — L1e sonrası her yeni kolon
+> `anon`/`authenticated` için yetkisiz doğuyor.
+
+### `provinces` — 81 il (30 Tem 2026)
+```
+id smallint PK (1-81, plaka kodu) · plate char(2) · name text
+```
+> 🚨 **TÜRETİLMİŞ VERİ.** Kaynağı `lib/constants/locations.json`. Elle satır ekleme/düzenleme
+> YAPMA — JSON'u değiştir, migration bloğunu yeniden üret, `npm run test:lokasyon` çalıştır.
+> Sözleşme: `id = locations.json index + 1 = ILLER index + 1`. Biri yeniden sıralanırsa DB'deki
+> TÜM `province_id`'ler sessizce yanlış ile işaret eder — hiçbir yerde patlamaz. Test bunu yakalar.
+> **İlçe için tablo AÇILMADI** (bilerek): her okumaya JOIN ekler, karşılığında yalnızca yazım
+> garantisi verir — onu zaten form tarafındaki Searchable Select veriyor. İlçe metin kalıyor.
+> `public.il_key(text)` — `lib/ilan-sabitler.ts::ilKey()` ve `lib/alias-normalize.ts::aliasKey()`
+> ile **birebir aynı olmak zorunda**. `İ` (U+0130) ÖNCE düz `i`ye çevrilir.
 > 🚨 **YAZMA YOLU TEK** (29 Tem 2026, `ILAN_VER_ANALIZ` W0/W1). Uygulamada `listings` INSERT'i
 > **kopyalanmaz**. İki katmanlı bir kural:
 > - **Next tarafındaysan → `lib/ilan-yaz.ts` / `ilanYaz()`.** Kanallar: `/ilan-ver` tekil form
