@@ -1,5 +1,35 @@
 # Yükegel — Yapılacaklar Listesi
 
+> 🗺️ **COĞRAFİ STANDARDİZASYON — DALGA 1 KOD TARAFI BİTTİ, SQL BAYRAM'DA** (30 Tem 2026,
+> tam plan `docs/COGRAFI_GECIS.md`). İl metin olmaktan çıkıp `province_id` (plaka kodu 1-81)
+> oluyor; ilçe metin kalıyor ama **seçmeli** (81 il / 973 resmî ilçe `lib/constants/locations.json`).
+> Geçiş **çift yazım**: metin kolonları yerinde kalır, Dalga 5'te drop edilir.
+>
+> ⏳ **BAYRAM — çalıştırılacak:** `docs/20260730_province_id.sql`
+> - Koddan **önce** çalıştırılabilir; hiçbir mevcut kolonu düşürmez, davranış değiştirmez.
+> - ⚠️ **Adım 5'in ön raporunu çalıştırmadan ÖNCE oku ve çıktıyı sakla** — kaç satırın id
+>   alamayacağını orada görürsün. Beklenenden büyükse backfill'i çalıştırma.
+> - Kabul: Adım 8.1 kapsama %98+ · Adım 8.2 **sıfır satır** · Adım 8.4 iki satır (GRANT).
+> - Geri alma tek `drop column`; kaynak metin kolonları duruyor, veri kaybı yok.
+>
+> **Kalan dalgalar (kod):**
+> - [ ] **Dalga 2 — yazma yolları.** `ilan_olustur` RPC v3 + `lib/ilan-yaz.ts` + `moderator/actions.ts`
+>       + `parse-listing` (Deno, `tsc` görmez) + `excel-import` + `whatsapp` + `panel/actions.ts`.
+>       🔴 RPC jsonb aldığı için ayrışma **derleme zamanında görünmez**, alan sessizce NULL yazılır.
+> - [ ] **Dalga 3 — okuma/filtre/moderasyon.** `HomeClient` (🔴 filtre şu an tamamen istemcide,
+>       `includes` büyük/küçük harfe duyarlı — spec md.5'in SQL filtresi yeni sunucu yolu ister)
+>       + 5 radar/nearby RPC'sindeki `ILIKE '%…%'` → `= province_id` + moderatör paneli (md.6).
+> - [ ] **Dalga 4 — AI parser.** Prompt'lar. 🚨 AI'a **doğrudan plaka kodu ürettirme** — 81 satırlık
+>       tabloyu prompt'a koymak token yakar ve model uydurur ("Bursa 16 mı 61 mi"). Eşleştirmeyi
+>       `lib/lokasyon.ts::ilId()` yapar; spec md.4'ün istediği sonuç böyle de sağlanır.
+> - [ ] **Dalga 5 — drop.** `origin_city`, `listing_stops.city`, ölü `destination_city`, eski
+>       metin index'leri (trigram dahil). Ön koşul: Adım 8.2 **bir hafta** sıfır satır.
+>
+> 🔁 **W5 runbook'unun il yazımı adımları (3 ve 8) gereksizleşti** — `il_key()` `Istanbul` ile
+> `İstanbul`'u aynı id'ye katlıyor. **İlçe adımları (4, 6) + trigger dosyası KORUNUYOR.**
+> ⚠️ Bedava değil: bozuk alias satırları **silinmiyor, zararsızlaşıyor**. Dalga 2 ertelenirse
+> `findPlaces` sahte güzergâh üretmeye devam eder → o durumda runbook'u çalıştır.
+>
 > Son güncelleme: 29 Temmuz 2026 — **ILAN_VER_ANALIZ W0 + W1 tamamlandı** (34p/87). İlan
 > verme yolu sertleştirildi ve kırıkları onarıldı: `listings` yazan tek yol `lib/ilan-yaz.ts`,
 > ilan+durak yazımı `public.ilan_olustur()` RPC'siyle atomik, aylardır ölü olan toplu yükleme
