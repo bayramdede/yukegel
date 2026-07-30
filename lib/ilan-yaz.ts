@@ -324,7 +324,9 @@ export async function ilanYaz(
     p_listing: {
       listing_type: tip,
       origin_city: kalkis,
-      origin_district: kisaMetin(girdi.kalkis_ilce),
+      origin_province_id: kalkisIl.id,
+      origin_district: kalkisIlce?.ad ?? null,
+      origin_district_official: kalkisIlce?.resmi ?? null,
       contact_phone: telSonuc.tel,
       price_offer: fiyat,
       price_negotiable: Boolean(girdi.fiyat_pazarlik),
