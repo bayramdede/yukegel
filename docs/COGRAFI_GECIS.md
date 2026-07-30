@@ -198,7 +198,10 @@ değiştirmeli. `İ` (U+0130) **önce** düz `i`ye çevrilir — aksi hâlde Pos
 
 **`ilan_olustur` RPC'si jsonb alıyor.** Fonksiyon gövdesi ile çağıran arasındaki ayrışma
 **derleme zamanında görünmez**; eksik alan sessizce NULL yazılır. RPC'ye kolon eklerken dört
-çağıranı birlikte güncelle.
+çağıranı birlikte güncelle. — v3'te `province_id` için bu tuzak **kapatıldı**: RPC id'yi
+metinden kendisi türetiyor, çağıran unutsa bile alan doluyor. Ama bu yalnız `province_id` için
+geçerli; `district_official` gibi DB'den türetilemeyen alanlar hâlâ çağırana bağlı ve hâlâ
+sessizce NULL kalır.
 
 **Çift yazım döneminde yalnız id yazan bir yol tehlikeli.** Metin kolonu boş kalırsa, henüz metne
 bakan okuma yolları (HomeClient varış filtresi, radar RPC'leri) o ilanı **görünmez** yapar.
