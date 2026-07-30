@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "deploy": "bash scripts/deploy.sh",
+    "panel": "node scripts/panel/server.mjs",
     "test:parser": "npx tsx lib/whatsapp/__tests__/chatParser.test.ts",
     "test:lokasyon": "npx tsx scripts/test-lokasyon.mts"
   },
