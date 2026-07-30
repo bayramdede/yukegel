@@ -266,6 +266,15 @@ group by 1
 having count(distinct origin_city) > 1
 order by 4 desc;
 
+
+-- ╔══════════════════════════════════════════════════════════════════════════╗
+-- ║ BLOK C — backfill + indeksler. BLOK B'nin çıktısını OKUMADAN çalıştırma. ║
+-- ║ 5.1/5.2'deki eşleşmeyen sayısı beklediğinden büyükse dur, önce alias'a   ║
+-- ║ bak. Buradan itibaren satırlar değişiyor.                                ║
+-- ╚══════════════════════════════════════════════════════════════════════════╝
+
+begin;
+
 -- ────────────────────────────────────────────────────────────────────────────
 -- 6. BACKFILL
 --
