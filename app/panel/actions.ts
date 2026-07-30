@@ -130,8 +130,12 @@ export async function ilanGuncelle(girdi: IlanGuncelleGirdi): Promise<PanelSonuc
   // ASLA eklenmemesi gerekenler: user_id, trust_level, moderation_status,
   // is_shadow_banned, status, internal_audit_logs, claimed_at, source.
   const patch = {
-    origin_city: kalkis,
-    origin_district: (girdi.origin_district ?? '').trim() || null,
+    // Çift yazım: çözülebildiyse kanonik ad + id, çözülemediyse ham metin + NULL id.
+    // İkisi HER ZAMAN birlikte yazılıyor — biri güncellenip diğeri kalırsa satır çelişir.
+    origin_city: kalkisIl?.ad ?? kalkis,
+    origin_province_id: kalkisIl?.id ?? null,
+    origin_district: kalkisIlce?.ad ?? ((girdi.origin_district ?? '').trim() || null),
+    origin_district_official: kalkisIlce?.resmi ?? null,
     vehicle_type: (girdi.vehicle_type ?? []).filter(t => ARAC_TIPLERI.has(t)).slice(0, 10),
     body_type: (girdi.body_type ?? []).filter(u => UTSYAPI.has(u)).slice(0, 10),
     available_date: tarih,
