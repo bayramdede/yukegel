@@ -219,6 +219,7 @@
 | `system_config` action | Service role kullanır (RLS bypass) |
 | İlan süresi | Kullanıcı ilanları 30 gün, parse ilanları 2 saat (WhatsApp), 7 saat (Excel) |
 | Parse pipeline | `raw_posts` → Edge Function `parse-listing` → `listings` + `listing_stops` |
+| Yerel yönetim paneli | `npm run panel` → http://127.0.0.1:4711 — git durumu, kilit aç, yedekle, deploy (mesajlı), tsc, edge function, daemon. `scripts/panel/` altında; Next ağacında **değil** (bkz. PROJE_HARITASI §1) |
 
 ---
 
