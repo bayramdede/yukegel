@@ -623,6 +623,14 @@ Açık rotalar: /giris, /auth/, /profil-tamamla, /nasil-calisir, /hakkimizda,
   parmak izi **yazım farkıdır**: katlanmış anahtar eşit ama ham string farklı
   (`Istanbul` vs `İstanbul`). Veri kalitesi ölçerken bu ikisini karıştırma — biri
   düzeltilecek hasar, öteki korunacak iş.
+- 🚨 **KONUM ARAMASI BÜYÜK/KÜÇÜK HARFE DUYARLI — depolanan yazım kullanıcıya yansıyor**
+  (29 Tem 2026, W5 Adım 0 ölçümü). `HomeClient.tsx:696` varış filtresi düz
+  `d.sehir?.includes(varis)` kullanıyor; iki taraf da katlanmıyor. Ölçüm, DB'de **~76 satırın
+  tamamı büyük harf** yazıldığını gösterdi (`ÇORLU` 42 · `KEMALPAŞA` 17 · `ÇERKEZKÖY` 6 …).
+  Bu satırlar arama sonuçlarında **hiç görünmüyor** — sessiz, kullanıcıya dönük veri hasarı.
+  ⚠️ Çoğunluk oyu ile onarma: `KEMALPAŞA` (17) doğru `Kemalpaşa`'dan (11) **daha kalabalık**.
+  Onarım `aliases` sözlüğünden gelmeli (runbook Adım 8), elle `CASE` listesinden değil.
+  Yeni konum karşılaştırması yazarken iki tarafı da `lib/alias-normalize.ts` ile katla.
 - 🚨 **`onAuthStateChange` callback'i İÇİNDE `await supabase.*` ÇAĞIRMA** (A8, 29 Tem 2026).
   Callback, Supabase'in auth kilidi (`navigator.locks`) tutulurken çalışır; içeriden yapılan
   her `supabase.from(...)` / `getSession()` aynı kilidi bekler → **deadlock**. Belirti:
