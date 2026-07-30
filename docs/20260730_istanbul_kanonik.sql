@@ -48,6 +48,14 @@ order by a.normalized;
 
 -- 1.2 DÜZELT — `normalized`'ı provinces'ten kanonikleştir.
 --     `il_key` eşitliği zaten aynı ili garanti ediyor; yanlış ile kayma riski yok.
+--
+--     ✅ 23505 RİSKİ YOK: `aliases`'taki unique kısıt **`alias`** kolonunda ve HAM
+--        string üzerinde (runbook Adım 9: `Gebze`/`GEBZE`/`gebze` üç ayrı satır).
+--        Bu update `alias`'a DOKUNMUYOR, yalnızca `normalized`'ı değiştiriyor.
+--     ➕ YAN FAYDA: runbook Adım 9'un ölçümündeki `farkli_normalized` sayısını
+--        düşürür — yani D3'ün (`20260729_alias_normalize_trigger.sql`) UNIQUE
+--        indeks önkoşuluna doğru bir adım. Adım 9'un kopya pasifleştirmesi yine
+--        de ayrıca gerekli.
 begin;
 
 update public.aliases a
