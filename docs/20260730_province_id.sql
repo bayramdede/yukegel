@@ -351,6 +351,14 @@ create index if not exists listing_stops_province_listing_idx
   where province_id is not null;
 
 commit;
+-- ▲ BLOK C BİTTİ.
+
+
+-- ╔══════════════════════════════════════════════════════════════════════════╗
+-- ║ BLOK D — DOĞRULAMA. Transaction YOK. Dört sorguyu TEK TEK çalıştır.      ║
+-- ║ Kabul ölçütü: 8.1 ≥ %98, 8.2 SIFIR satır, 8.4 iki satır.                 ║
+-- ║ 8.2 satır döndürüyorsa geri alma (Adım 9) hâlâ ücretsiz — kullan.        ║
+-- ╚══════════════════════════════════════════════════════════════════════════╝
 
 -- ============================================================================
 -- 8. DOĞRULAMA (commit sonrası çalıştır, çıktıyı sakla)
