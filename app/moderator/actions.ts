@@ -176,8 +176,10 @@ export async function moderatorIlanOlustur(
   try {
     const tip = girdi?.listing_type === 'arac' ? 'arac' : 'yuk'
 
-    const kalkis = ilNormalize(girdi?.origin_city)
-    if (!kalkis) return { ok: false, hata: 'Kalkış ili tanınamadı. Listeden bir il seçin.' }
+    const kalkisIl = ilCiftYazim(girdi?.origin_city)
+    if (!kalkisIl) return { ok: false, hata: 'Kalkış ili tanınamadı. Listeden bir il seçin.' }
+    const kalkis = kalkisIl.ad
+    const kalkisIlce = ilceNormalize(kalkisIl.id, girdi?.origin_district)
 
     const rawPostId = typeof girdi?.raw_post_id === 'string' ? girdi.raw_post_id.trim() : ''
     if (!/^[0-9a-f-]{36}$/i.test(rawPostId))
