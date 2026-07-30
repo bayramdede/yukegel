@@ -32,10 +32,26 @@
 > - [ ] **Dalga 5 — drop.** `origin_city`, `listing_stops.city`, ölü `destination_city`, eski
 >       metin index'leri (trigram dahil). Ön koşul: Adım 8.2 **bir hafta** sıfır satır.
 >
-> 🔁 **W5 runbook'unun il yazımı adımları (3 ve 8) gereksizleşti** — `il_key()` `Istanbul` ile
-> `İstanbul`'u aynı id'ye katlıyor. **İlçe adımları (4, 6) + trigger dosyası KORUNUYOR.**
-> ⚠️ Bedava değil: bozuk alias satırları **silinmiyor, zararsızlaşıyor**. Dalga 2 ertelenirse
-> `findPlaces` sahte güzergâh üretmeye devam eder → o durumda runbook'u çalıştır.
+> ❌ **DÜZELTME (30 Tem 2026) — "W5'in il yazımı adımları gereksizleşti" TAVSİYESİ YANLIŞTI.**
+> Gerekçe (`il_key()` iki yazımı aynı id'ye katlar) yalnızca **id kolonu** için geçerliydi;
+> **metin kolonu Dalga 3'e kadar canlı arayüzü besliyor.** Runbook Adım 2 bunu zaten yazmıştı:
+> *"şehir filtresi hâlâ ham değere bakıyor."* Veri doğruladı:
+>
+> 🔴 **CANLI HATA — `origin_city='istanbul'` 22.474 satır** (tüm ilanların ~%9,6'sı).
+> Tamamı `source='whatsapp'`, ilk 12 May, **son 29 Tem** → akış hâlâ üretiyor.
+> `HomeClient:711` `i.kalkis?.includes(kalkis)` büyük/küçük harfe duyarlı, dropdown (satır 823)
+> `ILLER`'den kanonik `İstanbul` veriyor ⇒ **kullanıcı İstanbul filtrelediğinde bu ilanları
+> göremiyor.** Kaynak: `parse-listing/index.ts:818` `origin_city: firstLane.from` —
+> `aliases.normalized` ham değeri hiç kanonikleştirilmeden yazılıyor.
+> (Sahte İstanbul→İstanbul güzergâhı bunun alt kümesi: 1.565 satır. Aynı il içi 6.173 ilanın
+> kalan ~4.600'ü aynı yazımda, yani meşru şehir içi taşıma.)
+>
+> - [ ] ⏳ **`docs/20260730_istanbul_kanonik.sql` çalıştır.** Blok 1 = alias kaynağını kurut
+>       (runbook Adım 2 ile aynı iş), Blok 2 = metni `province_id`'den onar. **Sıra önemli** —
+>       ters çevirirsen whatsapp akışı deliği anında yeniden açar. Geri alma gerekmiyor,
+>       her iki blok da veriyi yalnızca kanonik yazıma taşıyor.
+> - [ ] Runbook'un **ilçe** adımları (3, 4, 6) + `20260729_alias_normalize_trigger.sql`
+>       hâlâ geçerli — trigger olmadan `learn-aliases` yeni bozuk satır üretebilir.
 >
 > Son güncelleme: 29 Temmuz 2026 — **ILAN_VER_ANALIZ W0 + W1 tamamlandı** (34p/87). İlan
 > verme yolu sertleştirildi ve kırıkları onarıldı: `listings` yazan tek yol `lib/ilan-yaz.ts`,
