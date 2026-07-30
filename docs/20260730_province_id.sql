@@ -356,7 +356,7 @@ commit;
 
 -- ╔══════════════════════════════════════════════════════════════════════════╗
 -- ║ BLOK D — DOĞRULAMA. Transaction YOK. Dört sorguyu TEK TEK çalıştır.      ║
--- ║ Kabul ölçütü: 8.1 ≥ %98, 8.2 SIFIR satır, 8.4 iki satır.                 ║
+-- ║ Kabul ölçütü: 8.1 ≥ %98 · 8.2 SIFIR satır · 8.4 anon+authenticated var.  ║
 -- ║ 8.2 satır döndürüyorsa geri alma (Adım 9) hâlâ ücretsiz — kullan.        ║
 -- ╚══════════════════════════════════════════════════════════════════════════╝
 
