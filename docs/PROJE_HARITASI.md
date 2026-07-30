@@ -422,7 +422,8 @@ cargo_type, weight_ton, pallet_count, vehicle_count, notes
 >   duraklar **replace** ediliyor, patch değil).
 > - Okuyan: `app/_components/HomeClient.tsx:696` varış filtresi
 >   (`i.duraklar.some(d => d.sehir?.includes(varis))`) — bozuk yazım burada **doğrudan
->   kullanıcıya** "ilan bulunamadı" olarak yansır.
+>   kullanıcıya** "ilan bulunamadı" olarak yansır. `includes` **büyük/küçük harfe duyarlı**:
+>   `ÇORLU` yazılmış bir durak "Çorlu" aramasında hiç çıkmaz (bkz. §9 tuzağı).
 > - `get_nearby_listings_by_city` RPC varışı `listing_stops`'un **son durağından**
 >   `DISTINCT ON` ile alıyor.
 >
