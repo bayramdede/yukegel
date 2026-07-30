@@ -1,5 +1,13 @@
-import { ILLER } from './lib/ilan-sabitler';
-import { ILLER_TAM, ilId, ilAdi, ilceler, ilceNormalize, ilAra, ilceAra, ilCiftYazim, ilceResmiMi } from './lib/lokasyon';
+// scripts/test-lokasyon.mts — `npm run test:lokasyon`
+//
+// 🚨 EN KRİTİK KONTROL: `locations.json` sırası ↔ `ILLER` sırası ↔ plaka kodu.
+// `province_id` = `locations.json` index + 1 sözleşmesine dayanıyor. Biri yeniden
+// sıralanırsa DB'deki TÜM province_id'ler sessizce yanlış ile işaret eder —
+// hiçbir yerde patlamaz, ilanlar sadece yanlış şehirde görünür. Bu test o yüzden
+// var; `locations.json` ya da `ILLER` her değiştiğinde çalıştır.
+
+import { ILLER } from '../lib/ilan-sabitler';
+import { ILLER_TAM, ilId, ilAdi, ilceler, ilceNormalize, ilAra, ilceAra, ilCiftYazim, ilceResmiMi } from '../lib/lokasyon';
 
 let hata = 0;
 const ok = (ad: string, kosul: boolean) => { if (!kosul) { console.log('❌', ad); hata++; } else console.log('✓', ad); };
