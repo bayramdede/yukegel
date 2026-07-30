@@ -9,7 +9,9 @@
 > - Koddan **önce** çalıştırılabilir; hiçbir mevcut kolonu düşürmez, davranış değiştirmez.
 > - ⚠️ **Adım 5'in ön raporunu çalıştırmadan ÖNCE oku ve çıktıyı sakla** — kaç satırın id
 >   alamayacağını orada görürsün. Beklenenden büyükse backfill'i çalıştırma.
-> - Kabul: Adım 8.1 kapsama %98+ · Adım 8.2 **sıfır satır** · Adım 8.4 iki satır (GRANT).
+> - Kabul: Adım 8.1 kapsama %98+ · Adım 8.2 **sıfır satır** · Adım 8.4'te `anon → SELECT`
+>   ve `authenticated → SELECT/INSERT/UPDATE` (satır sayısına bakma; REFERENCES ve
+>   postgres/service_role satırları normal). ✅ 8.4 doğrulandı — 30 Tem 2026.
 > - Geri alma tek `drop column`; kaynak metin kolonları duruyor, veri kaybı yok.
 >
 > **Kalan dalgalar (kod):**
