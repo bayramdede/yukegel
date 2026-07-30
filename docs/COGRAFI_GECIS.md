@@ -162,10 +162,11 @@ yazım döneminde metin kolonu **birinci sınıf veri olarak kalır** — Dalga 
 
 ### Şu an geçerli plan
 
-- ⏳ **`docs/20260730_istanbul_kanonik.sql`** — Blok 1 alias kaynağını kurutur (runbook Adım 2 ile
-  aynı iş), Blok 2 metni `province_id`'den onarır. Sıra ters olursa whatsapp akışı deliği yeniden
-  açar. Blok 2, migration'ın 8.2 çapraz kontrolü sıfır döndüğü için güvenli: id artık metni
-  onaracak **otorite**.
+- ✅ **`docs/20260730_istanbul_kanonik.sql` çalıştırıldı (30 Tem 2026).** Blok 1 alias kaynağını
+  kuruttu (runbook Adım 2 ile aynı iş), Blok 2 metni `province_id`'den onardı. Doğrulama
+  **2.4 = 0**. Blok 2'nin güvenliği migration'ın 8.2 çapraz kontrolüne dayanıyordu: id ile metin
+  hiçbir yerde çelişmediği için id, metni onaracak **otorite** olarak kullanılabildi. Bu,
+  `province_id` migration'ının ilk somut getirisi.
 - **İlçe adımları korunuyor.** `aliases.district` metin kalmaya devam ediyor; runbook'un Adım 3
   (ilçe yazımı), Adım 4 (NULL ilçe doldurma) ve Adım 6 (elle kararlar) ile
   `docs/20260729_alias_normalize_trigger.sql` **çalıştırılmalı**.
