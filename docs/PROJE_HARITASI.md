@@ -205,6 +205,33 @@ onu tetiklemez.
 çalışan bash süreci eski kodu tutar:
 `launchctl kickstart -k gui/$(id -u)/com.yukegel.autodeploy`
 
+### 🛠 Yerel yönetim paneli (30 Tem 2026 — YENİ)
+
+```bash
+npm run panel      # → http://127.0.0.1:4711
+```
+
+`scripts/panel/server.mjs` (bağımlılıksız Node sunucusu) + `scripts/panel/index.html`.
+Yukarıdaki her şeyi tarayıcıdan yapar: git durumu (dal, değişen dosyalar, son 10 commit,
+`↑ahead ↓behind`), **kilidi aç**, **Yedekle** (`yedek` dalına), **Deploy** (mesaj kutusu →
+`scripts/deploy.sh`), **tsc kontrol**, **pull --rebase**, edge function deploy, daemon
+başlat/durdur/log. Çıktı canlı akar (chunked stream).
+
+🚨 **Neden Next.js route DEĞİL:** panel `git push`, `rm .git/index.lock`, `launchctl`
+çalıştırıyor. Uygulama ağacına konsaydı Vercel'e deploy edilen koda girerdi; `NODE_ENV`
+guard'ı bugün doğru olsa bile yarın kopyalanır/kaldırılır ve **uzaktan komut çalıştırma**
+açığı olur. Bu yüzden `scripts/` altında, Next build'ine hiç girmiyor.
+
+**Panelin dört koruması** (biri kaldırılırsa panel savunmasız kalır):
+`127.0.0.1`'e bağlanır (`0.0.0.0` YAPMA — kimlik doğrulaması yok, tek koruma bu) ·
+`Host` başlığı `127.0.0.1`/`localhost` değilse 403 (DNS rebinding) ·
+`x-panel: 1` başlığı yoksa 403 (form tabanlı CSRF) ·
+iş adı ve edge function adı beyaz listeden geçer (`fn=../../etc` reddedilir).
+
+**Deploy mantığı kopyalanmadı** — panel `scripts/deploy.sh`'i çağırıyor. `main`'e giden
+tek kapı hâlâ o script; panel sadece düğme. Yedekle düğmesi `main`'e DEĞİL `yedek`'e
+push eder (kota).
+
 ---
 
 ## 2. PROJE DOSYA YAPISI
