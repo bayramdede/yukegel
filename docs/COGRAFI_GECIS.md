@@ -80,20 +80,30 @@ Kabul: Adım 8.1 kapsama oranı %98+, Adım 8.2 sıfır satır, Adım 8.4'te `an
 ve `authenticated → SELECT/INSERT/UPDATE` satırlarının bulunması (satır **sayısı** değil;
 çıktıda REFERENCES ve postgres/service_role satırları da normal olarak görünür).
 
-### Dalga 2 — yazma yolları
+### Dalga 2 — yazma yolları (✅ kod hazır, ⏳ RPC v3 çalıştırılmadı)
 
 `province_id` yazılmaya başlar, **metin kolonları da yazılmaya devam eder**
 (`lib/lokasyon.ts::ilCiftYazim()` tek çağrıda ikisini de verir).
 
-| Dosya | Değişiklik | Risk |
+**Tasarımın kilit kararı:** id'yi çağıranlardan istemek yerine **RPC'nin kendisi
+türetiyor.** `ilan_olustur` v3, `origin_city` metnini `il_key()` ile katlayıp
+`provinces`'tan çözüyor ve `origin_city`'yi **kanonik ada çevirerek** yazıyor.
+Bunun iki sonucu var: (1) jsonb ayrışma tuzağı — "üç çağıranı da güncellemeyi
+unutma" varsayımı — devre dışı kalıyor, çağıran unutsa bile id doluyor;
+(2) `origin_city='istanbul'` sınıfı bozulma **yapısal olarak** imkânsız oluyor,
+disiplinle değil. Çağıran yine de açıkça `province_id` gönderirse o kazanır.
+
+| Dosya | Durum | Not |
 |---|---|---|
-| `docs/20260729_ilan_olustur_v2.sql` → v3 | RPC'ye `origin_province_id`, `stops[].province_id`, `*_official` alanları | 🔴 **RPC jsonb alıyor — ayrışma derleme zamanında GÖRÜNMEZ, alan sessizce NULL yazılır.** Üç çağıranı birlikte güncelle. |
-| `lib/ilan-yaz.ts` | `:228` `ilNormalize(d.sehir)` → `ilCiftYazim()`; `:313`, `:357`, `:409` payload'a id ekle | 🟡 `listings` yazan TEK yol, üç kanalın hepsi buradan geçiyor |
-| `app/moderator/actions.ts` | `moderatorIlanOlustur()` RPC'yi doğrudan çağırıyor | 🟡 `ilanYaz()` kullanmıyor, ayrı güncellenmeli |
-| `supabase/functions/parse-listing/index.ts` | Deno — TS modülü **import edemez**, `il_key` eşlemesi kopyalanacak | 🔴 `tsconfig.json` `exclude`'unda → `tsc` bu dosyayı **hiç görmez** |
-| `app/api/excel-import/route.ts` | Kalkış İli sütunu → id | 🟢 |
-| `app/api/whatsapp/route.ts` | Webhook payload'ı | 🟢 |
-| `app/panel/actions.ts` | Durak replace bloğu (`:96-157`) + kolon beyaz listesi | 🟡 Beyaz listeye yeni kolonları eklemeyi unutma, yoksa sessizce düşer |
+| `docs/20260730_ilan_olustur_v3.sql` | ✅ yazıldı, ⏳ **çalıştırılmadı** | 🔴 Koddan **önce** çalıştır. v2 ile deploy edilirse `origin_province_id` sessizce NULL kalır — hata vermez, sadece boş. 5 rollback'li test + 24 saatlik kapsama sorgusu dosyanın içinde. |
+| `lib/ilan-yaz.ts` | ✅ | `ilNormalize` → `ilCiftYazim` + `ilceNormalize`. `p_listing`'e `origin_province_id`/`origin_district_official`, `p_stops`'a `province_id`/`district_official`. `listings` yazan tek TS yolu; whatsapp + excel-import buradan geçiyor. |
+| `app/moderator/actions.ts` | ✅ | `ilanYaz()` kullanmıyor, RPC'yi doğrudan çağırıyor — ayrı güncellendi. |
+| `app/panel/actions.ts` | ✅ | RPC'yi **atlayan tek yazma yolu** (`update` + durak replace). 🚨 Buradaki tehlike id'nin boş kalması değil, **eski değerde kalması**: metin Ankara'ya çevrilip id 34'te kalırsa satır kendi kendisiyle çelişir. Bu yüzden id ve metin aynı yerde birlikte hesaplanıyor. Beyaz listeye yeni kolonlar eklendi. |
+| `supabase/functions/parse-listing/index.ts` | ✅ (kod değişikliği gerekmedi) | Deno, `lib/lokasyon.ts`'i import **edemez**; `tsconfig.json` `exclude`'unda olduğu için `tsc` bu dosyayı **hiç görmez**. RPC v3 id'yi metinden türettiği için gerek kalmadı — dosyaya bunun *neden* böyle olduğunu anlatan blok eklendi. Tek boşluk: `district_official` bu yolda NULL kalıyor (tanımlı anlamı "bilinmiyor"). |
+| `app/api/excel-import/route.ts` | ✅ (değişiklik gerekmedi) | `sehirCoz()` alias'ı çözüp adı `ilanYaz()`'a veriyor; çift yazım orada oluyor. |
+| `app/api/whatsapp/route.ts` | ✅ (değişiklik gerekmedi) | `ilanYaz()` üzerinden geçiyor. |
+
+Doğrulama: `npx tsc --noEmit` temiz, `test:lokasyon` 21/21, `test:parser` 29/29.
 
 ### Dalga 3 — okuma / filtre / moderasyon
 
