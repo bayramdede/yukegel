@@ -350,9 +350,14 @@ export async function ilanYaz(
       // araç adedi tüm duraklara aynı yazılıyor (mevcut davranış korundu).
       arac_adet: aracAdet,
     },
+    // ⚠️ `province_id` ve `district_official` BURADAN gitmezse RPC v3 metinden
+    // türetir (id) veya NULL bırakır (official) — sessizce. Derleyici bu jsonb
+    // gövdesindeki eksik alanı GÖREMEZ; alan eklerken RPC gövdesiyle karşılaştır.
     p_stops: duraklar.map(d => ({
       city: d.city,
+      province_id: d.province_id,
       district: d.district,
+      district_official: d.district_official,
       cargo_type: d.yuk_cinsi,
       weight_ton: d.ton,
       pallet_count: d.palet,
