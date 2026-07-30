@@ -1,18 +1,23 @@
 # Yükegel — Yapılacaklar Listesi
 
-> 🗺️ **COĞRAFİ STANDARDİZASYON — DALGA 1 KOD TARAFI BİTTİ, SQL BAYRAM'DA** (30 Tem 2026,
+> 🗺️ **COĞRAFİ STANDARDİZASYON — DALGA 1 BİTTİ (ŞEMA CANLIDA), SIRA DALGA 2'DE** (30 Tem 2026,
 > tam plan `docs/COGRAFI_GECIS.md`). İl metin olmaktan çıkıp `province_id` (plaka kodu 1-81)
 > oluyor; ilçe metin kalıyor ama **seçmeli** (81 il / 973 resmî ilçe `lib/constants/locations.json`).
 > Geçiş **çift yazım**: metin kolonları yerinde kalır, Dalga 5'te drop edilir.
 >
-> ⏳ **BAYRAM — çalıştırılacak:** `docs/20260730_province_id.sql`
-> - Koddan **önce** çalıştırılabilir; hiçbir mevcut kolonu düşürmez, davranış değiştirmez.
-> - ⚠️ **Adım 5'in ön raporunu çalıştırmadan ÖNCE oku ve çıktıyı sakla** — kaç satırın id
->   alamayacağını orada görürsün. Beklenenden büyükse backfill'i çalıştırma.
-> - Kabul: Adım 8.1 kapsama %98+ · Adım 8.2 **sıfır satır** · Adım 8.4'te `anon → SELECT`
->   ve `authenticated → SELECT/INSERT/UPDATE` (satır sayısına bakma; REFERENCES ve
->   postgres/service_role satırları normal). ✅ 8.4 doğrulandı — 30 Tem 2026.
-> - Geri alma tek `drop column`; kaynak metin kolonları duruyor, veri kaybı yok.
+> ✅ **`docs/20260730_province_id.sql` ÇALIŞTIRILDI — 30 Tem 2026.** Doğrulama çıktısı:
+> - 8.1 `listings` 234.229/234.229 = **%100** · `listing_stops` 244.379/244.379 = **%100**.
+>   Tek satır bile eşleşmesiz kalmadı; alias köprüsüne (6.B) ihtiyaç olmadı denebilir.
+> - 8.2 **sıfır satır** — id ile metin hiçbir yerde çelişmiyor.
+> - 8.3 aynı il içi ilan **6.173** (~%2,6). Bunun ne kadarı meşru şehir içi taşıma, ne kadarı
+>   W5'in sahte İstanbul→İstanbul'u — **henüz ayrıştırılmadı**, Dalga 2 öncesi ölçülmeli.
+> - 8.4 `anon → SELECT`, `authenticated → SELECT/INSERT/UPDATE` yerinde (42501 tuzağı kapandı).
+>
+> 🚨 **Bu tablolar CANLI ve `province_id` kolonu şu an DONUYOR.** Kod hâlâ yalnızca metin
+> kolonlarını yazıyor; bu andan sonra girilen her yeni ilanın `origin_province_id`'si **NULL**.
+> Yani kapsama oranı Dalga 2 çıkana kadar %100'den aşağı kayar. Dalga 2 geciktikçe geri
+> doldurulacak satır birikir — 6.A güncellemesini tekrar çalıştırmak gerekir (idempotent,
+> `where origin_province_id is null` koşulu zaten var).
 >
 > **Kalan dalgalar (kod):**
 > - [ ] **Dalga 2 — yazma yolları.** `ilan_olustur` RPC v3 + `lib/ilan-yaz.ts` + `moderator/actions.ts`
