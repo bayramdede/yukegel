@@ -809,6 +809,27 @@ Deno.serve(async (req) => {
     // ⚠️ Migration: `docs/20260729_ilan_olustur_v2.sql` — `raw_post_id`,
     // `shadow_profile_id`, `is_repost` alanlarını YAZAN sürüm. v1 ile deploy
     // edilirse bu üç alan sessizce boş kalır.
+    //
+    // ── COĞRAFİ GEÇİŞ Dalga 2 — bu dosya NEDEN `province_id` GÖNDERMİYOR ──────
+    //
+    // Aşağıdaki `origin_city` (ve `p_stops[].city`) `aliases.normalized`'ın HAM
+    // değeri. 2026-07-29'a kadar bu değer doğrudan tabloya yazılıyordu ve W5
+    // alias öğrenmesi 'istanbul' (küçük i) ürettiği için 22.474 ilan
+    // `origin_city='istanbul'` ile doğdu — ana sayfa filtresi 'İstanbul' ile
+    // büyük/küçük harf duyarlı `.includes()` yaptığından bu ilanlar kullanıcıya
+    // GÖRÜNMÜYORDU. (Onarım: `docs/20260730_istanbul_kanonik.sql`.)
+    //
+    // `ilan_olustur` v3 bunu YAPISAL olarak imkânsız kılıyor: RPC metni
+    // `il_key()` ile katlayıp `provinces`'tan çözüyor, `province_id`'yi KENDİSİ
+    // türetiyor ve `origin_city`'yi kanonik ada çevirerek yazıyor. Bu yüzden
+    // burada bir şey göndermeye gerek yok — Deno bu dosyada `lib/lokasyon.ts`'i
+    // zaten import EDEMEZ.
+    //
+    // Tek boşluk: `district_official`. 973 ilçe `lib/constants/locations.json`'da
+    // ve DB'de ilçe tablosu YOK, yani RPC bunu türetemez. Bu yoldan gelen
+    // ilanlarda NULL kalıyor — tanımlı anlamı "bilinmiyor", bozuk veri değil.
+    // ⚠️ Migration: `docs/20260730_ilan_olustur_v3.sql` — v2 ile deploy edilirse
+    // `origin_province_id` sessizce NULL kalır (hata vermez, sadece boş).
     let created = 0
     for (const [, lanes] of lineGroups) {
       const firstLane = lanes[0]
