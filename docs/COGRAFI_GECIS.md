@@ -132,19 +132,45 @@ sıfır satır dönüyor.
 
 ## W5 alias runbook'u ne olacak
 
-**İl yazımıyla ilgili adımları gereksizleşti.** `docs/20260729_alias_runbook.md`'in Adım 3
-(yazım düzeltme) ve Adım 8 (geçmiş `listings` onarımı) `Istanbul` → `İstanbul` düzeltmesi
-yapıyordu; `province_id` backfill'i `il_key()` ile katladığı için iki yazım da 34'e gidiyor —
-düzeltmeye gerek kalmıyor.
+### ❌ İlk tavsiye yanlıştı — 30 Tem 2026 düzeltmesi
 
-**Hâlâ geçerli olan kısım: ilçe.** `aliases.district` metin olarak kalmaya devam ediyor ve orada
-aynı ikilik hâlâ mümkün. Runbook'un Adım 4 (NULL ilçe doldurma) ve Adım 6 (elle kararlar) ile
-`docs/20260729_alias_normalize_trigger.sql` **korunmalı**.
+Bu bölüm önce şunu söylüyordu: *"il yazımı adımları gereksizleşti, `province_id` backfill'i
+`il_key()` ile katladığı için iki yazım da 34'e gidiyor."* **Hatalı çıkarım.** Doğru olan kısmı:
+iki yazım gerçekten de aynı **id**'ye gidiyor. Atlanan kısım: **metin kolonu Dalga 3'e kadar
+canlı arayüzü beslemeye devam ediyor**, dolayısıyla id'nin doğru olması kullanıcının ilanı
+görmesini sağlamıyor. Runbook'un kendi Adım 2'si bunu zaten yazmıştı —
+*"şehir filtresi hâlâ ham değere bakıyor"*.
 
-> ⚠️ Bu bir kayıp değil ama bedava da değil: `aliases` tablosundaki bozuk il yazımı **silinmiyor**,
-> yalnızca zararsızlaşıyor. `learn-aliases` yolu hâlâ yeni bozuk satır üretebilir; `parse-listing`
-> `findPlaces` içindeki `sameCity` karşılaştırması id'ye geçene kadar (Dalga 2) sahte güzergâh
-> üretme ihtimali sürüyor. **Dalga 2 ertelenirse W5 runbook'unu çalıştırmak gerekir.**
+Migration sonrası ölçüm hatayı kanıtladı:
+
+| Ölçüm | Sonuç |
+|---|---|
+| `origin_city <> provinces.name` olan satırlar | **22.474** — hepsi `istanbul` → `İstanbul` |
+| Kaynak | **tamamı** `source='whatsapp'` |
+| İlk / son | 12 May 2026 / **29 Tem 2026** → akış **canlı** |
+| Tüm ilanlara oranı | **~%9,6** |
+| Bunun sahte güzergâh üreten alt kümesi | 1.565 |
+
+Zincir: `parse-listing/index.ts:818` `origin_city: firstLane.from` ← `aliases.normalized` ham
+değeri, hiç kanonikleştirilmeden. Sonuç: `HomeClient:711` `i.kalkis?.includes(kalkis)`
+büyük/küçük harfe duyarlı ve dropdown (`:823`) `ILLER`'den kanonik `İstanbul` verdiği için
+**kullanıcı İstanbul filtrelediğinde 22.474 ilan görünmüyor.** Sahte güzergâh bunun yanında
+ikincil bir zarar.
+
+**Alınacak ders:** yeni bir kolonun doğru olması, eski kolonu okuyan yolları düzeltmez. Çift
+yazım döneminde metin kolonu **birinci sınıf veri olarak kalır** — Dalga 5'te düşene kadar.
+
+### Şu an geçerli plan
+
+- ⏳ **`docs/20260730_istanbul_kanonik.sql`** — Blok 1 alias kaynağını kurutur (runbook Adım 2 ile
+  aynı iş), Blok 2 metni `province_id`'den onarır. Sıra ters olursa whatsapp akışı deliği yeniden
+  açar. Blok 2, migration'ın 8.2 çapraz kontrolü sıfır döndüğü için güvenli: id artık metni
+  onaracak **otorite**.
+- **İlçe adımları korunuyor.** `aliases.district` metin kalmaya devam ediyor; runbook'un Adım 3
+  (ilçe yazımı), Adım 4 (NULL ilçe doldurma) ve Adım 6 (elle kararlar) ile
+  `docs/20260729_alias_normalize_trigger.sql` **çalıştırılmalı**.
+- Trigger olmadan `learn-aliases` yeni bozuk satır üretmeye devam edebilir — kanonikleştirme
+  tek seferlik bir temizlik, kalıcı koruma değil.
 
 ## Bilinen tuzaklar
 
