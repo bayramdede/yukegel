@@ -402,7 +402,8 @@ user_id (nullable), source: 'form'|'whatsapp'|'excel'
 shadow_profile_id (nullable FK → shadow_profiles.id) — kayıtsız kullanıcı ilanları için
 vehicle_id (nullable FK → vehicles.id, on delete set null) — ILAN_VER_ANALIZ B3 (29 Tem 2026)
 contact_phone — 🔒 anon/authenticated için REVOKE edildi (SPRINT_01 L1e). Yalnız service-role.
-origin_province_id (nullable FK → provinces.id) — 30 Tem 2026. origin_city'nin YERİNİ ALACAK.
+origin_province_id (nullable FK → provinces.id) — 30 Tem 2026, backfill %100 (234.229 satır).
+                    origin_city'nin YERİNİ ALACAK. ⚠️ YENİ satırlarda NULL — kod henüz yazmıyor.
 origin_district_official (nullable bool) — true=resmî ilçe, false=serbest giriş (İkitelli, İSTOÇ)
 ```
 > 🗺️ **İL ARTIK ID (30 Tem 2026, `docs/COGRAFI_GECIS.md`).** `origin_city` metin kolonu
