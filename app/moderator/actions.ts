@@ -192,12 +192,17 @@ export async function moderatorIlanOlustur(
 
     const duraklar: Array<Record<string, unknown>> = []
     for (const d of gecerli) {
-      const city = ilNormalize(d.city)
-      if (!city)
+      const il = ilCiftYazim(d.city)
+      if (!il)
         return { ok: false, hata: `Varış ili tanınamadı: "${String(d.city).slice(0, 30)}". Listeden seçin.` }
+      // İlçe İL'E BAĞLI çözülüyor: "Kadıköy" İstanbul'un resmî ilçesi, Ankara'nın
+      // değil. Serbest giriş reddedilmiyor, `resmi:false` ile işaretleniyor.
+      const ilce = ilceNormalize(il.id, d.district)
       duraklar.push({
-        city,
-        district: kisaMetin(d.district),
+        city: il.ad,
+        province_id: il.id,
+        district: ilce?.ad ?? kisaMetin(d.district),
+        district_official: ilce?.resmi ?? null,
         cargo_type: kisaMetin(d.cargo_type),
         weight_ton: sayiAralik(d.weight_ton, 0, MAX_TON),
         // ⚠️ RPC içinde `::int`; ondalık değer 22P02 atıp TÜM transaction'ı geri sarar.
