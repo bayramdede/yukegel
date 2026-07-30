@@ -394,7 +394,13 @@ join public.listing_stops s on s.listing_id = l.id
 where l.origin_province_id is not null
   and l.origin_province_id = s.province_id;
 
--- 8.4 Kolon yetkisi gerçekten verildi mi? İki satır dönmeli (anon + authenticated).
+-- 8.4 Kolon yetkisi gerçekten verildi mi?
+--     ARANAN: anon → SELECT ; authenticated → SELECT + INSERT + UPDATE.
+--     Bunlar varsa geçti. Çıktıda ayrıca REFERENCES satırları ve postgres /
+--     service_role rolleri görünür — normal, tablo sahipliğinden geliyor,
+--     satır SAYISINA bakma. anon'un SELECT'i eksikse okuma tarafı
+--     `42501 permission denied for column origin_province_id` ile sessizce
+--     patlar; sayfa "ilan bulunamadı" der ve hata yalnızca konsolda kalır.
 select grantee, column_name, privilege_type
 from information_schema.column_privileges
 where table_schema = 'public' and table_name = 'listings'
