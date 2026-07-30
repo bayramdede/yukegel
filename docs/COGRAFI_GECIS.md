@@ -76,7 +76,9 @@ filtre tarafı "resmî ilçe" ile "serbest etiket"i karıştırmaz.
 kolonu düşürmez, hiçbir mevcut davranışı bozmaz. Adım 5'in ön raporunu **çalıştırmadan önce oku**
 ve çıktıyı sakla — kaç satırın id alamayacağını orada görürsün.
 
-Kabul: Adım 8.1 kapsama oranı %98+, Adım 8.2 sıfır satır, Adım 8.4 iki satır.
+Kabul: Adım 8.1 kapsama oranı %98+, Adım 8.2 sıfır satır, Adım 8.4'te `anon → SELECT`
+ve `authenticated → SELECT/INSERT/UPDATE` satırlarının bulunması (satır **sayısı** değil;
+çıktıda REFERENCES ve postgres/service_role satırları da normal olarak görünür).
 
 ### Dalga 2 — yazma yolları
 
