@@ -204,10 +204,16 @@ export async function ilanYaz(
   // ── V1: doğrulama. İstemcideki kontrollerin AYNISI — istemciye GÜVENME.
   const tip = girdi.tip === 'arac' ? 'arac' : 'yuk';
 
-  const kalkis = ilNormalize(girdi.kalkis);
-  if (!kalkis) {
+  // Çift yazım (`docs/COGRAFI_GECIS.md` Dalga 2): tek çağrıda hem kanonik metin
+  // hem plaka id'si. `ilCiftYazim` içeride `ilId`'yi çağırıyor ve o da aynı
+  // katlama (`ilKey`) ile eşleşiyor — yani `ilNormalize`'ın döndürdüğü adla
+  // birebir aynı sonucu üretir, üstüne id'yi de verir.
+  const kalkisIl = ilCiftYazim(girdi.kalkis);
+  if (!kalkisIl) {
     return { ok: false, hata: 'Kalkış ili tanınamadı. Listeden bir il seçin.' };
   }
+  const kalkis = kalkisIl.ad;
+  const kalkisIlce = ilceNormalize(kalkisIl.id, girdi.kalkis_ilce);
 
   const ham = Array.isArray(girdi.duraklar) ? girdi.duraklar : [];
   const durakGirdileri = ham.filter(d => d && typeof d.sehir === 'string' && d.sehir.trim());
