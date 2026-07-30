@@ -18,9 +18,11 @@
 > kanonik `İstanbul` veriyor ⇒ **kullanıcı İstanbul filtrelerken bu 22.474 ilanı GÖREMİYOR**
 > (tüm ilanların ~%9,6'sı). Kaynak: `parse-listing/index.ts:818` `origin_city: firstLane.from`
 > = `aliases.normalized` ham değeri.
-> ⏳ **ÇALIŞTIRILACAK: `docs/20260730_istanbul_kanonik.sql`** — Blok 1 alias kaynağını kurutur
-> (= runbook Adım 2), Blok 2 metni `province_id`'den onarır. Sıra ters olursa delik yeniden açılır.
-> Runbook'un ilçe adımları (3, 4, 6) + trigger dosyası zaten KORUNUYORDU.
+> ✅ **`docs/20260730_istanbul_kanonik.sql` ÇALIŞTIRILDI (30 Tem 2026).** Blok 1 alias kaynağını
+> kuruttu (= runbook Adım 2), Blok 2 metni `province_id`'den onardı. Doğrulama **2.4 = 0** →
+> farklı yazımlı aynı il satırı kalmadı; 22.474 ilan İstanbul filtresinde artık görünüyor.
+> ⚠️ Tek seferlik temizlik — kalıcı koruma `20260729_alias_normalize_trigger.sql` (önkoşul: runbook
+> Adım 9 kopya pasifleştirme). Runbook'un ilçe adımları (3, 4, 6) hâlâ bekliyor.
 >
 > Önceki: 29 Temmuz 2026 — **SPRINT_01 W5 (alias veri bütünlüğü) kod tarafı tamamlandı.**
 > **W5:** Bozuk `aliases.normalized` yazımı (`Istanbul` 13 satır / `İstanbul` 154 satır) sahte
