@@ -1,6 +1,7 @@
 'use server'
 
 import { getServerSupabase, getServiceSupabase } from '../../lib/auth'
+import { ilCiftYazim, ilceNormalize } from '../../lib/lokasyon'
 
 /**
  * SPRINT_01 L1e — panel ilan düzenleme ARTIK SUNUCUDA.
