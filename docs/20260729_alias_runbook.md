@@ -284,6 +284,43 @@ olarak kullan: Adım 2-7 bittiğinde `normalized` ve `district` kolonları doğr
 yazımı tutuyor. Katlanmış anahtarı eşleşen ama ham yazımı farklı olan her
 konum değeri, sözlükteki doğru yazıma çekilir.
 
+**8.0 — Sözlük kapsama ön-kontrolü (8.1'den ÖNCE çalıştır).**
+Adım 0.3'te bulunan her çakışma anahtarının sözlükte **tek bir doğru yazımla** karşılığı
+var mı? Olmayan anahtar sessizce onarılmadan kalır — 8.1/8.2 hata vermez, sadece o satırlara
+dokunmaz. Bu sorgu "onarılamayacak" anahtarları önden listeler:
+
+```sql
+WITH tum_degerler AS (
+  SELECT 'city'     AS tur, origin_city     AS deger FROM public.listings
+  UNION ALL SELECT 'district', origin_district FROM public.listings
+  UNION ALL SELECT 'city',     city            FROM public.listing_stops
+  UNION ALL SELECT 'district', district        FROM public.listing_stops
+), cakisan AS (
+  SELECT tur, translate(lower(replace(deger,'İ','i')),'ıçğöşü','icgosu') AS anahtar,
+         count(DISTINCT deger) AS farkli_yazim
+  FROM tum_degerler WHERE deger IS NOT NULL AND deger <> ''
+  GROUP BY 1,2 HAVING count(DISTINCT deger) > 1
+), sozluk AS (
+  SELECT type AS tur,
+         translate(lower(replace(coalesce(normalized,alias),'İ','i')),'ıçğöşü','icgosu') AS anahtar,
+         count(DISTINCT coalesce(normalized,alias)) AS sozluk_yazim
+  FROM public.aliases
+  WHERE is_active = true AND type IN ('city','district')
+  GROUP BY 1,2
+)
+SELECT c.tur, c.anahtar, c.farkli_yazim, s.sozluk_yazim,
+       CASE WHEN s.anahtar IS NULL       THEN '❌ sözlükte YOK — elle düzelt'
+            WHEN s.sozluk_yazim > 1      THEN '❌ sözlükte ÇOK yazım — Adım 6 eksik'
+            ELSE                              '✅ onarılabilir' END AS durum
+FROM cakisan c
+LEFT JOIN sozluk s ON s.tur = c.tur AND s.anahtar = c.anahtar
+ORDER BY 5 DESC, 1, 2;
+```
+
+**Beklenen: 16 satırın tamamı `✅ onarılabilir`.** `❌` gören anahtarları 8.1/8.2 atlar;
+onları ya `aliases`'a doğru yazımıyla ekle, ya da Adım 6'daki ilgili kararı tamamla
+(özellikle `kemalpasa` — bkz. Adım 6 uyarısı).
+
 **8.1 — Şehir kolonları (`listings.origin_city`, `listing_stops.city`).**
 Önce `SELECT` ile bak, sonra `UPDATE`'e çevir:
 
