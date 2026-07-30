@@ -46,10 +46,11 @@
 > (Sahte İstanbul→İstanbul güzergâhı bunun alt kümesi: 1.565 satır. Aynı il içi 6.173 ilanın
 > kalan ~4.600'ü aynı yazımda, yani meşru şehir içi taşıma.)
 >
-> - [ ] ⏳ **`docs/20260730_istanbul_kanonik.sql` çalıştır.** Blok 1 = alias kaynağını kurut
->       (runbook Adım 2 ile aynı iş), Blok 2 = metni `province_id`'den onar. **Sıra önemli** —
->       ters çevirirsen whatsapp akışı deliği anında yeniden açar. Geri alma gerekmiyor,
->       her iki blok da veriyi yalnızca kanonik yazıma taşıyor.
+> - [x] ✅ **`docs/20260730_istanbul_kanonik.sql` ÇALIŞTIRILDI — 30 Tem 2026.**
+>       Blok 1 alias kaynağını kuruttu, Blok 2 metni `province_id`'den onardı.
+>       **Doğrulama 2.4 = 0** → farklı yazımlı aynı il satırı kalmadı, sahte İstanbul→İstanbul
+>       güzergâhı (1.565 satır) temizlendi. 22.474 ilan artık İstanbul filtresinde görünüyor.
+>       ⚠️ Tek seferlik temizlik: `learn-aliases` yeni bozuk satır üretirse delik geri açılır.
 > - [ ] Runbook'un **ilçe** adımları (3, 4, 6) + `20260729_alias_normalize_trigger.sql`
 >       hâlâ geçerli — trigger olmadan `learn-aliases` yeni bozuk satır üretebilir.
 >
