@@ -14,7 +14,20 @@
 --
 -- 🔁 GERİ ALMA: en sondaki blok. Tek işlem `drop column` — veri kaybı yok,
 -- çünkü kaynak metin kolonları duruyor.
+--
+-- 🚨 TEK SEFERDE YAPIŞTIRMA — DÖRT BLOK, SIRAYLA ÇALIŞTIR.
+--    Supabase SQL Editor **yalnızca son ifadenin sonucunu** gösterir; hepsini bir
+--    kerede çalıştırırsan Adım 5'in ön raporunu ve Adım 8'in doğrulamasını HİÇ
+--    GÖRMEZSİN — backfill'in ne yaptığını da bilemezsin.
+--      BLOK A → Adım 1-4  (tablo + fonksiyon + kolonlar + GRANT)
+--      BLOK B → Adım 5    (ÖN RAPOR — 3 sorgu, TEK TEK çalıştır, çıktıları SAKLA)
+--      BLOK C → Adım 6-7  (backfill + indeksler)
+--      BLOK D → Adım 8    (doğrulama — 4 sorgu, tek tek)
 -- ============================================================================
+
+-- ╔══════════════════════════════════════════════════════════════════════════╗
+-- ║ BLOK A — şema. Tek başına güvenli, geri alınabilir.                      ║
+-- ╚══════════════════════════════════════════════════════════════════════════╝
 
 begin;
 
