@@ -234,6 +234,26 @@ Sırayla bak, istemediğini atla. Her birinin gerekçesi script içinde:
   Adıyaman pasifleştiriliyor — `araç` ile aynı mantık, aynı takas.
 - **4.6 `kemalpaşa`** → İzmir ilçesi vs Artvin beldesi; mevcut davranışı korur.
 
+### 📊 Ölçüme göre öncelik (Adım 0.3 çıktısı, 29 Tem 2026)
+
+Beşinin hepsi alias hijyeni açısından doğru, ama **gerçek `listings` verisine dokunanı
+ikisi**. Zaman kısıtlıysan sıra şu:
+
+| Karar | `listings`/`listing_stops` verisinde izi | Öncelik |
+|---|---|---|
+| **4.6 `kemalpaşa`** | ✅ **28 satır** — `KEMALPAŞA` 17 + `Kemalpaşa` 11 | 🔴 **Zorunlu** |
+| **4.3 `ömerli`** | ✅ `Cekmekoy` 2 satır (Ömerli'nin ilçesi) | 🟡 Yap |
+| 4.2 `kazan` | ❌ yok | 🟢 İstersen |
+| 4.4 `kıraç` | ❌ yok | 🟢 İstersen |
+| 4.5 `gölbaşı` | ❌ yok | 🟢 İstersen |
+
+> 🚨 **4.6 Adım 8'i bloke edebilir.** Adım 8'in sözlüğü `HAVING count(DISTINCT normalized) = 1`
+> ile korunuyor: `kemalpasa` anahtarında **iki farklı `normalized` yazımı** aktif kalırsa o
+> anahtar sözlüğe hiç girmez ve **28 satır onarılmaz**. İki alias'ın (İzmir ilçesi / Artvin
+> beldesi) `normalized` değeri **aynı** (`Kemalpaşa`) olduğu sürece sorun yok — ayrıştıkları
+> yer `district`. 4.6'yı uygularken `normalized` kolonunu değiştirmemeye dikkat et, ve
+> Adım 8'e geçmeden **8.0 ön-kontrolünü** çalıştır.
+
 ---
 
 ## Adım 7 — K / BÖLÜM 5: doğrulama
