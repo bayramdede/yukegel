@@ -1,6 +1,6 @@
 # Yükegel — Proje Haritası
 > **Kullanım:** Her sohbet başında sadece bu dosyayı oku. Kaynak dosyaları sadece o dosyada değişiklik yapacaksan oku.  
-> Son güncelleme: 30 Temmuz 2026 — **COĞRAFİ STANDARDİZASYON Dalga 1 (şema) hazır.**
+> Son güncelleme: 30 Temmuz 2026 — **COĞRAFİ STANDARDİZASYON Dalga 1 (şema) CANLIDA.**
 > İl artık **metin değil `province_id` (plaka kodu, 1-81)**. Üç yeni dosya: `lib/constants/locations.json`
 > (81 il + **973 resmî ilçe**), `lib/lokasyon.ts` (`ilId`/`ilAdi`/`ilceler`/`ilceNormalize`/`ilCiftYazim`),
 > `scripts/test-lokasyon.mts` (`npm run test:lokasyon`). Geçiş **çift yazım**: metin kolonları
