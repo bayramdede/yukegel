@@ -13,14 +13,19 @@
 >   W5'in sahte İstanbul→İstanbul'u — **henüz ayrıştırılmadı**, Dalga 2 öncesi ölçülmeli.
 > - 8.4 `anon → SELECT`, `authenticated → SELECT/INSERT/UPDATE` yerinde (42501 tuzağı kapandı).
 >
-> 🚨 **`province_id` KOLONU HÂLÂ DONUYOR — RPC v3 çalıştırılana kadar.** Migration'dan sonra
-> girilen her yeni ilanın `origin_province_id`'si **NULL**; kapsama oranı %100'den aşağı kayar.
-> Gecikme uzadıkça geri doldurulacak satır birikir — 6.A güncellemesi tekrar çalıştırılır
-> (idempotent, `where origin_province_id is null` koşulu zaten var).
+> ✅ **`docs/20260730_ilan_olustur_v3.sql` ÇALIŞTIRILDI (30 Tem 2026) — duman testi geçti.**
+> Bilerek bozuk yazımla (`origin_city='istanbul'`, durak `'ANKARA'`) çağrıldı; dönen
+> `İstanbul | 34` ve `Ankara | 6`. Yani metin kanonikleşiyor **ve** id doluyor, hem kalkışta
+> hem durakta. ⚠️ Testte `source` uydurma değer alamaz — `listings_source_check` var, geçerli
+> küme `whatsapp|facebook|telegram|manual` (ilk denemede 23514 aldık).
 >
-> ⏳ **BAYRAM — SIRADAKİ TEK SQL: `docs/20260730_ilan_olustur_v3.sql`.**
-> Koddan **önce** çalıştır. Dosyanın içinde 5 rollback'li test + deploy sonrası 24 saatlik
-> kapsama sorgusu var. v2 ile deploy edilirse hata **vermez**, id sessizce NULL kalır.
+> ⏳ **SIRADAKİ: `npm run deploy`.** SQL canlıda ama kod değil; deploy'a kadar RPC'ye eski
+> gövde gidiyor (id yine de doluyor — v3 metinden türetiyor, bu tasarımın asıl faydası).
+> Deploy'dan **24 saat sonra** v3 dosyasının sonundaki iki kapsama sorgusunu çalıştır:
+> `eksik` ≈ 0 ve ikinci sorgu **sıfır satır** olmalı; olmazsa RPC'yi atlayan bir yazma yolu var.
+>
+> Migration'daki 6.A geri doldurma güncellemesi idempotent — arada oluşmuş NULL'lar için
+> tekrar çalıştırılabilir (`where origin_province_id is null` koşulu zaten var).
 >
 > ✅ **Dalga 2 kodu tamam (30 Tem 2026).** `ilan_olustur` v3 + `lib/ilan-yaz.ts` +
 > `app/moderator/actions.ts` + `app/panel/actions.ts` güncellendi; `parse-listing`,

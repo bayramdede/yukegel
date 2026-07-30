@@ -10,9 +10,10 @@
 > ✅ **DALGA 2 KODU TAMAM (30 Tem 2026).** `lib/ilan-yaz.ts`, `app/moderator/actions.ts`,
 > `app/panel/actions.ts` çift yazıma geçti (`ilCiftYazim` + `ilceNormalize`); `parse-listing`,
 > `excel-import`, `whatsapp` **değişiklik gerektirmedi**. tsc temiz · 21/21 · 29/29.
-> ⏳ **AMA `docs/20260730_ilan_olustur_v3.sql` HENÜZ ÇALIŞTIRILMADI** → o çalışana kadar
-> `origin_province_id` NULL doğmaya devam ediyor (hata vermez, sessizce boş). Migration'daki
-> 6.A güncellemesi idempotent, arada tekrar çalıştırılabilir.
+> ✅ **`docs/20260730_ilan_olustur_v3.sql` ÇALIŞTIRILDI (30 Tem 2026).** Duman testi geçti:
+> `origin_city='istanbul'` + durak `'ANKARA'` gönderildi, dönen `İstanbul | 34` ve `Ankara | 6`
+> — hem metin kanonikleşti hem id doldu, hem kalkışta hem durakta. Kod deploy'u bekliyor;
+> migration'daki 6.A geri doldurma güncellemesi idempotent, arada tekrar çalıştırılabilir.
 > **v3'ün kilit kararı:** id çağırandan İSTENMİYOR, RPC `origin_city` metnini `il_key()` ile
 > katlayıp `provinces`'tan **kendisi türetiyor** ve metni kanonik ada çevirerek yazıyor. Böylece
 > jsonb ayrışma tuzağı `province_id` için kapandı ve `origin_city='istanbul'` sınıfı bozulma

@@ -190,12 +190,17 @@ commit;
 -- DOĞRULAMA — hepsi `rollback` ile biter, veri bırakmaz
 -- ============================================================================
 --
+-- ⚠️ `source` DEĞERİ SERBEST DEĞİL. `listings_source_check` kısıtı var; testte
+-- 'test' gibi uydurma bir değer verirsen 23514 alırsın ve fonksiyonu değil
+-- kısıtı test etmiş olursun. Geçerli küme (bkz. `app/moderator/actions.ts`
+-- KAYNAK_SETI): 'whatsapp', 'facebook', 'telegram', 'manual'.
+--
 -- 1) ESKİ ÇAĞIRAN (yalnız metin gönderiyor) id yazıyor mu? + bozuk yazım
 --    kanonikleşiyor mu? Bu, Dalga 2'nin tüm iddiasının testi.
 --
 --      begin;
 --      select public.ilan_olustur(
---        jsonb_build_object('listing_type','yuk','origin_city','istanbul','source','test'),
+--        jsonb_build_object('listing_type','yuk','origin_city','istanbul','source','whatsapp'),
 --        jsonb_build_array(jsonb_build_object('city','ANKARA'))
 --      );
 --      select origin_city, origin_province_id from public.listings
@@ -211,7 +216,7 @@ commit;
 --      begin;
 --      select public.ilan_olustur(
 --        jsonb_build_object('listing_type','yuk','origin_province_id',35,
---                           'origin_city','bilinmeyen yer','source','test'),
+--                           'origin_city','bilinmeyen yer','source','whatsapp'),
 --        jsonb_build_array(jsonb_build_object('city','Bursa','province_id',16))
 --      );
 --      select origin_city, origin_province_id from public.listings
@@ -223,7 +228,7 @@ commit;
 --
 --      begin;
 --      select public.ilan_olustur(
---        jsonb_build_object('listing_type','yuk','origin_city','Rotterdam','source','test'),
+--        jsonb_build_object('listing_type','yuk','origin_city','Rotterdam','source','whatsapp'),
 --        jsonb_build_array(jsonb_build_object('city','Hamburg'))
 --      );
 --      select origin_city, origin_province_id from public.listings
@@ -235,7 +240,7 @@ commit;
 --
 --      begin;
 --      select public.ilan_olustur(
---        jsonb_build_object('listing_type','yuk','origin_province_id',99,'source','test'),
+--        jsonb_build_object('listing_type','yuk','origin_province_id',99,'source','whatsapp'),
 --        jsonb_build_array(jsonb_build_object('city','Ankara'))
 --      );
 --      rollback;

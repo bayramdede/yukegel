@@ -80,7 +80,7 @@ Kabul: Adım 8.1 kapsama oranı %98+, Adım 8.2 sıfır satır, Adım 8.4'te `an
 ve `authenticated → SELECT/INSERT/UPDATE` satırlarının bulunması (satır **sayısı** değil;
 çıktıda REFERENCES ve postgres/service_role satırları da normal olarak görünür).
 
-### Dalga 2 — yazma yolları (✅ kod hazır, ⏳ RPC v3 çalıştırılmadı)
+### Dalga 2 — yazma yolları (✅ kod hazır, ✅ RPC v3 canlıda, ⏳ deploy bekliyor)
 
 `province_id` yazılmaya başlar, **metin kolonları da yazılmaya devam eder**
 (`lib/lokasyon.ts::ilCiftYazim()` tek çağrıda ikisini de verir).
@@ -95,7 +95,7 @@ disiplinle değil. Çağıran yine de açıkça `province_id` gönderirse o kaza
 
 | Dosya | Durum | Not |
 |---|---|---|
-| `docs/20260730_ilan_olustur_v3.sql` | ✅ yazıldı, ⏳ **çalıştırılmadı** | 🔴 Koddan **önce** çalıştır. v2 ile deploy edilirse `origin_province_id` sessizce NULL kalır — hata vermez, sadece boş. 5 rollback'li test + 24 saatlik kapsama sorgusu dosyanın içinde. |
+| `docs/20260730_ilan_olustur_v3.sql` | ✅ **çalıştırıldı 30 Tem 2026** | Duman testi: `'istanbul'` + `'ANKARA'` → `İstanbul \| 34`, `Ankara \| 6`. ⚠️ Testte `source` uydurulamaz (`listings_source_check`; geçerli: `whatsapp\|facebook\|telegram\|manual`). |
 | `lib/ilan-yaz.ts` | ✅ | `ilNormalize` → `ilCiftYazim` + `ilceNormalize`. `p_listing`'e `origin_province_id`/`origin_district_official`, `p_stops`'a `province_id`/`district_official`. `listings` yazan tek TS yolu; whatsapp + excel-import buradan geçiyor. |
 | `app/moderator/actions.ts` | ✅ | `ilanYaz()` kullanmıyor, RPC'yi doğrudan çağırıyor — ayrı güncellendi. |
 | `app/panel/actions.ts` | ✅ | RPC'yi **atlayan tek yazma yolu** (`update` + durak replace). 🚨 Buradaki tehlike id'nin boş kalması değil, **eski değerde kalması**: metin Ankara'ya çevrilip id 34'te kalırsa satır kendi kendisiyle çelişir. Bu yüzden id ve metin aynı yerde birlikte hesaplanıyor. Beyaz listeye yeni kolonlar eklendi. |
