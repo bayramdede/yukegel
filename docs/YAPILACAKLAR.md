@@ -1,6 +1,6 @@
 # Yükegel — Yapılacaklar Listesi
 
-> 🗺️ **COĞRAFİ STANDARDİZASYON — DALGA 1 BİTTİ (ŞEMA CANLIDA), SIRA DALGA 2'DE** (30 Tem 2026,
+> 🗺️ **COĞRAFİ STANDARDİZASYON — DALGA 1 CANLIDA, DALGA 2 KODU HAZIR** (30 Tem 2026,
 > tam plan `docs/COGRAFI_GECIS.md`). İl metin olmaktan çıkıp `province_id` (plaka kodu 1-81)
 > oluyor; ilçe metin kalıyor ama **seçmeli** (81 il / 973 resmî ilçe `lib/constants/locations.json`).
 > Geçiş **çift yazım**: metin kolonları yerinde kalır, Dalga 5'te drop edilir.
