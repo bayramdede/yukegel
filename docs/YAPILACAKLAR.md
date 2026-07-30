@@ -14,12 +14,15 @@
 > Beş bilet tamam: **D1** prompt örnekleri Türkçeleşti · **D2** dört yazma yolu
 > `lib/alias-normalize.ts` üzerinden geçiyor (409 çakışma) · **D4** `findPlaces` karşılaştırma
 > anahtarları katlandı (5/5 kabul testi; HEAD 3/5 başarısız) · **D5** runbook · **D3** trigger+indeks SQL'i.
-> ⏳ **BAYRAM — sırayla çalıştırılacak, HİÇBİRİ ÇALIŞTIRILMADI:**
-> 1. `docs/20260729_alias_runbook.md` → Adım 0-9 (Adım 0 ölçümü **atlanamaz**: sahte güzergâh
->    sayısı — `listings.origin_city` ile `listing_stops.city` katlanmış anahtarı eşit, ham yazımı
->    farklı — düzeltmeden önce alınmazsa D4'ün etkisi bir daha ölçülemez. ⚠️ Adım 8 **eski
+> ⏳ **BAYRAM — sırayla çalıştırılacak:**
+> 0. ✅ **Adım 0 ölçümü ALINDI** (29 Tem 2026, sonuçlar runbook'ta "ÖLÇÜM SONUÇLARI" bölümünde).
+>    Özet: sahte güzergâh **0 satır** (geçmiş hasar yok, D4 önleyici) · aynı şehir 6.173 satır
+>    (meşru, korunacak) · **16 yazım çakışması ~88 satır** (~12 ASCII + 🆕 ~76 TAMAMI BÜYÜK HARF)
+>    · 0.4 hâlâ ölçülmedi (yanlış tablo sorgulandı).
+> 1. `docs/20260729_alias_runbook.md` → Adım 1-9. ⚠️ Adım 8 **eski
 >    `20260728_alias_kopya_temizligi.sql` BÖLÜM 6'yı geçersiz kılıyor**: o bölüm ölü
->    `destination_city`'yi onarıp canlı `listing_stops`'u atlıyor)
+>    `destination_city`'yi onarıp canlı `listing_stops`'u atlıyor. Ölçüm bunu doğruladı:
+>    BÖLÜM 6'nın elle yazılmış 4 şehirlik listesi 16 grubun **13'ünü** kaçırırdı.
 > 2. `docs/20260729_alias_normalize_trigger.sql` → **en son**; runbook Adım 9 yapılmadan indeks
 >    23505 ile reddedilir.
 > Her adımın önizleme `SELECT`'i var, `UPDATE`'ler yorumda, hiçbir adım satır silmiyor.
