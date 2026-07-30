@@ -446,6 +446,8 @@ id smallint PK (1-81, plaka kodu) · plate char(2) · name text
 ```
 listing_id (FK → listings.id), stop_order (1..n)
 city, district (district nullable)
+province_id (nullable FK → provinces.id) — 30 Tem 2026, city'nin yerini alacak
+district_official (nullable bool) — true=resmî ilçe, false=serbest giriş
 cargo_type, weight_ton, pallet_count, vehicle_count, notes
 ```
 > 🚨 **Çıkış tek, varış çok.** Kalkış `listings.origin_city` / `origin_district`'te tek satır
