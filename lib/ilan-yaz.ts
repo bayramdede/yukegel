@@ -17,7 +17,11 @@
 import { getServiceSupabase } from './auth';
 import { getAuditThresholds } from './auditLimits';
 import { structuredLog } from './logger';
-import { ARAC_TIPI_SETI, UTSYAPI_SETI, ilNormalize } from './ilan-sabitler';
+import { ARAC_TIPI_SETI, UTSYAPI_SETI } from './ilan-sabitler';
+// Çift yazım kaynağı. `ilNormalize` (ilan-sabitler) ile AYNI katlamayı kullanır
+// ama id'yi de döndürür — bu yüzden burada onun yerine geçti.
+// `docs/COGRAFI_GECIS.md` Dalga 2.
+import { ilCiftYazim, ilceNormalize } from './lokasyon';
 
 export const MAX_DURAK = 10;
 export const MAX_ARAC_ADET = 50;
@@ -34,7 +38,7 @@ export type IlanYazSonuc =
   | { ok: true; id: string; durum: IlanDurumu; mesaj: string }
   | { ok: false; hata: string };
 
-/** Bir durağın ham hâli. Şehir serbest metin gelebilir; `ilNormalize` süzer. */
+/** Bir durağın ham hâli. Şehir serbest metin gelebilir; `ilCiftYazim` süzer. */
 export interface DurakGirdi {
   sehir: string;
   ilce?: string;
