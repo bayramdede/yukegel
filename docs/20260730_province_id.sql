@@ -214,6 +214,17 @@ create policy provinces_okuma on public.provinces for select using (true);
 -- listing_stops tablo geneli grant'a dokunulmamıştı; yine de garantiye al.
 grant select on public.listing_stops to anon, authenticated;
 
+commit;
+-- ▲ BLOK A BİTTİ. Buraya kadar hiçbir satır değişmedi — sadece şema büyüdü.
+--   Devam etmeden `provinces` tablosunda 81 satır olduğunu doğrula.
+
+
+-- ╔══════════════════════════════════════════════════════════════════════════╗
+-- ║ BLOK B — ÖN RAPOR. Transaction YOK. Üç sorguyu TEK TEK çalıştır ve       ║
+-- ║ çıktılarını sakla; hepsini birden çalıştırırsan Editor yalnızca          ║
+-- ║ sonuncusunu gösterir ve ilk ikisini kaybedersin.                         ║
+-- ╚══════════════════════════════════════════════════════════════════════════╝
+
 -- ────────────────────────────────────────────────────────────────────────────
 -- 5. ÖN RAPOR — backfill'den ÖNCE oku, çıktıyı SAKLA
 --
