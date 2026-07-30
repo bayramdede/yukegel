@@ -7,9 +7,16 @@
 > YERİNDE KALIR ve yazılmaya devam eder, `province_id` yanlarında birikir; Dalga 5'te drop edilir.
 > ✅ **`docs/20260730_province_id.sql` ÇALIŞTIRILDI (30 Tem 2026).** Backfill %100/%100
 > (234.229 ilan + 244.379 durak), çelişki sıfır, GRANT'lar yerinde.
-> 🚨 **AMA KOD HENÜZ `province_id` YAZMIYOR** → bu andan sonra oluşan her ilanın
-> `origin_province_id`'si **NULL** doğuyor. Dalga 2 çıkana kadar boşluk büyür; migration'daki
+> ✅ **DALGA 2 KODU TAMAM (30 Tem 2026).** `lib/ilan-yaz.ts`, `app/moderator/actions.ts`,
+> `app/panel/actions.ts` çift yazıma geçti (`ilCiftYazim` + `ilceNormalize`); `parse-listing`,
+> `excel-import`, `whatsapp` **değişiklik gerektirmedi**. tsc temiz · 21/21 · 29/29.
+> ⏳ **AMA `docs/20260730_ilan_olustur_v3.sql` HENÜZ ÇALIŞTIRILMADI** → o çalışana kadar
+> `origin_province_id` NULL doğmaya devam ediyor (hata vermez, sessizce boş). Migration'daki
 > 6.A güncellemesi idempotent, arada tekrar çalıştırılabilir.
+> **v3'ün kilit kararı:** id çağırandan İSTENMİYOR, RPC `origin_city` metnini `il_key()` ile
+> katlayıp `provinces`'tan **kendisi türetiyor** ve metni kanonik ada çevirerek yazıyor. Böylece
+> jsonb ayrışma tuzağı `province_id` için kapandı ve `origin_city='istanbul'` sınıfı bozulma
+> yapısal olarak imkânsız oldu. Deno'daki `parse-listing` bu yüzden hiç dokunulmadan doğru yazıyor.
 > Dalgalar ve dokunulacak 20+ dosya: **`docs/COGRAFI_GECIS.md`**.
 > ❌ **DÜZELTME — "W5'in il yazımı adımları gereksizleşti" TAVSİYESİ YANLIŞTI.** `il_key()` iki
 > yazımı aynı **id**'ye katlıyor, ama **metin kolonu Dalga 3'e kadar canlı arayüzü besliyor.**
