@@ -13,16 +13,25 @@
 >   W5'in sahte İstanbul→İstanbul'u — **henüz ayrıştırılmadı**, Dalga 2 öncesi ölçülmeli.
 > - 8.4 `anon → SELECT`, `authenticated → SELECT/INSERT/UPDATE` yerinde (42501 tuzağı kapandı).
 >
-> 🚨 **Bu tablolar CANLI ve `province_id` kolonu şu an DONUYOR.** Kod hâlâ yalnızca metin
-> kolonlarını yazıyor; bu andan sonra girilen her yeni ilanın `origin_province_id`'si **NULL**.
-> Yani kapsama oranı Dalga 2 çıkana kadar %100'den aşağı kayar. Dalga 2 geciktikçe geri
-> doldurulacak satır birikir — 6.A güncellemesini tekrar çalıştırmak gerekir (idempotent,
-> `where origin_province_id is null` koşulu zaten var).
+> 🚨 **`province_id` KOLONU HÂLÂ DONUYOR — RPC v3 çalıştırılana kadar.** Migration'dan sonra
+> girilen her yeni ilanın `origin_province_id`'si **NULL**; kapsama oranı %100'den aşağı kayar.
+> Gecikme uzadıkça geri doldurulacak satır birikir — 6.A güncellemesi tekrar çalıştırılır
+> (idempotent, `where origin_province_id is null` koşulu zaten var).
+>
+> ⏳ **BAYRAM — SIRADAKİ TEK SQL: `docs/20260730_ilan_olustur_v3.sql`.**
+> Koddan **önce** çalıştır. Dosyanın içinde 5 rollback'li test + deploy sonrası 24 saatlik
+> kapsama sorgusu var. v2 ile deploy edilirse hata **vermez**, id sessizce NULL kalır.
+>
+> ✅ **Dalga 2 kodu tamam (30 Tem 2026).** `ilan_olustur` v3 + `lib/ilan-yaz.ts` +
+> `app/moderator/actions.ts` + `app/panel/actions.ts` güncellendi; `parse-listing`,
+> `excel-import` ve `whatsapp` **kod değişikliği gerektirmedi**.
+> `npx tsc --noEmit` temiz · `test:lokasyon` 21/21 · `test:parser` 29/29.
+> **Kilit karar:** jsonb ayrışma tuzağını disiplinle değil **tasarımla** kapattık — RPC v3
+> `province_id`'yi `origin_city` metninden `il_key()` ile kendisi türetiyor ve metni kanonik ada
+> çevirerek yazıyor. Çağıran unutsa bile id doluyor, ve `origin_city='istanbul'` sınıfı bozulma
+> bir daha doğamıyor. (Tuzak `district_official` gibi DB'den türetilemeyen alanlar için sürüyor.)
 >
 > **Kalan dalgalar (kod):**
-> - [ ] **Dalga 2 — yazma yolları.** `ilan_olustur` RPC v3 + `lib/ilan-yaz.ts` + `moderator/actions.ts`
->       + `parse-listing` (Deno, `tsc` görmez) + `excel-import` + `whatsapp` + `panel/actions.ts`.
->       🔴 RPC jsonb aldığı için ayrışma **derleme zamanında görünmez**, alan sessizce NULL yazılır.
 > - [ ] **Dalga 3 — okuma/filtre/moderasyon.** `HomeClient` (🔴 filtre şu an tamamen istemcide,
 >       `includes` büyük/küçük harfe duyarlı — spec md.5'in SQL filtresi yeni sunucu yolu ister)
 >       + 5 radar/nearby RPC'sindeki `ILIKE '%…%'` → `= province_id` + moderatör paneli (md.6).
