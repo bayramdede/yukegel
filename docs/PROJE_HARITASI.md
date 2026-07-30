@@ -11,9 +11,16 @@
 > `origin_province_id`'si **NULL** doğuyor. Dalga 2 çıkana kadar boşluk büyür; migration'daki
 > 6.A güncellemesi idempotent, arada tekrar çalıştırılabilir.
 > Dalgalar ve dokunulacak 20+ dosya: **`docs/COGRAFI_GECIS.md`**.
-> 🔁 **W5 alias runbook'unun il yazımı adımları (3 ve 8) GEREKSİZLEŞTİ** — `il_key()` `Istanbul`
-> ile `İstanbul`'u aynı id'ye katlıyor. **İlçe adımları (4, 6) + trigger dosyası KORUNUYOR.**
-> ⚠️ Dalga 2 ertelenirse `findPlaces` sahte güzergâh üretmeye devam eder → o zaman runbook şart.
+> ❌ **DÜZELTME — "W5'in il yazımı adımları gereksizleşti" TAVSİYESİ YANLIŞTI.** `il_key()` iki
+> yazımı aynı **id**'ye katlıyor, ama **metin kolonu Dalga 3'e kadar canlı arayüzü besliyor.**
+> Ölçüm: `origin_city='istanbul'` **22.474 satır**, tamamı `source='whatsapp'`, sonuncusu 29 Tem —
+> yani CANLI. `HomeClient:711` `.includes()` büyük/küçük harfe duyarlı + dropdown `ILLER`'den
+> kanonik `İstanbul` veriyor ⇒ **kullanıcı İstanbul filtrelerken bu 22.474 ilanı GÖREMİYOR**
+> (tüm ilanların ~%9,6'sı). Kaynak: `parse-listing/index.ts:818` `origin_city: firstLane.from`
+> = `aliases.normalized` ham değeri.
+> ⏳ **ÇALIŞTIRILACAK: `docs/20260730_istanbul_kanonik.sql`** — Blok 1 alias kaynağını kurutur
+> (= runbook Adım 2), Blok 2 metni `province_id`'den onarır. Sıra ters olursa delik yeniden açılır.
+> Runbook'un ilçe adımları (3, 4, 6) + trigger dosyası zaten KORUNUYORDU.
 >
 > Önceki: 29 Temmuz 2026 — **SPRINT_01 W5 (alias veri bütünlüğü) kod tarafı tamamlandı.**
 > **W5:** Bozuk `aliases.normalized` yazımı (`Istanbul` 13 satır / `İstanbul` 154 satır) sahte
