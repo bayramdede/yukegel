@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "deploy": "bash scripts/deploy.sh",
-    "test:parser": "npx tsx lib/whatsapp/__tests__/chatParser.test.ts"
+    "test:parser": "npx tsx lib/whatsapp/__tests__/chatParser.test.ts",
+    "test:lokasyon": "npx tsx scripts/test-lokasyon.mts"
   },
   "dependencies": {
     "@next/third-parties": "^16.2.6",
