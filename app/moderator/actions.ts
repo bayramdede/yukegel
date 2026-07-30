@@ -6,7 +6,10 @@ import {
   kisaMetin, sayiAralik, tamSayiAralik,
   MAX_DURAK, MAX_TON, MAX_PALET, MAX_NOT, MAX_RAW_TEXT, MAX_ARAC_ADET,
 } from '../../lib/ilan-yaz'
-import { ARAC_TIPI_SETI, UTSYAPI_SETI, ilNormalize } from '../../lib/ilan-sabitler'
+import { ARAC_TIPI_SETI, UTSYAPI_SETI } from '../../lib/ilan-sabitler'
+// Çift yazım (`docs/COGRAFI_GECIS.md` Dalga 2). `ilCiftYazim`, `ilNormalize` ile
+// aynı katlamayı (`ilKey`) kullanır; farkı plaka id'sini de döndürmesi.
+import { ilCiftYazim, ilceNormalize } from '../../lib/lokasyon'
 
 /**
  * SPRINT_01 L1e — moderatör panelindeki `contact_phone` okuma/yazmaları sunucuya taşındı.
