@@ -286,6 +286,22 @@ yukegel/
 │                                         #    ⚠️ Yalnız gösterim değil, SUNUCU BEYAZ LİSTESİ de bu dosya
 │                                         #    (`lib/ilan-yaz.ts`). İstemci ve sunucu ayrışamaz.
 │                                         #    ⚠️ ilKey(): İ (U+0130) → düz `i` ÖNCE, sonra toLowerCase (§9)
+├── lib/constants/locations.json          # 🗺️ 30 Tem 2026 — 81 il + 973 RESMÎ İLÇE. {id, plate, name, districts[]}
+│                                         #    id = PLAKA KODU = `province_id`. Sıra `ILLER` ile BİREBİR.
+│                                         #    🚨 Türetilmiş veri; `public.provinces` tablosunun kaynağı.
+├── lib/lokasyon.ts                       # 🗺️ 30 Tem 2026 — COĞRAFİ VERİNİN TEK KAYNAĞI (bkz. COGRAFI_GECIS.md)
+│                                         #    ilId(v) → 1-81 | null — SUNUCU BEYAZ LİSTE KAPISI. İstemciden
+│                                         #      gelen province_id'yi DOĞRUDAN yazma, önce buradan geçir.
+│                                         #      "34" / 34 / "istanbul" / "İSTANBUL" / "Istanbul" → 34
+│                                         #    ilAdi(id) · ilPlaka · ilGetir · ilAra(q) (Searchable Select)
+│                                         #    ilceler(ilId) · ilceAra(ilId,q) · ilceResmiMi
+│                                         #    ilceNormalize(ilId,v) → {ad, resmi} | null — SERBEST GİRİŞE
+│                                         #      İZİN VAR (İkitelli, İSTOÇ) ama `resmi:false` İŞARETLENİR
+│                                         #    ilCiftYazim(v) → {id, ad} — ÇİFT YAZIM dönemi; Dalga 5'te silinecek
+│                                         #    ⚠️ ilKey()'i `ilan-sabitler`den import eder; 3. kopya yok
+├── scripts/test-lokasyon.mts             # `npm run test:lokasyon` — 21 kontrol. locations.json ↔ ILLER ↔
+│                                         #    plaka sözleşmesini doğrular. Sıra bozulursa DB'deki TÜM
+│                                         #    province_id'ler sessizce yanlış ile işaret eder; test o yüzden var.
 ├── lib/ilan-yaz.ts                       # 🚨 ILAN_VER_ANALIZ W0/W1 (29 Tem 2026) — `listings` yazan TEK YOL.
 │                                         #    `server-only`. ilanYaz(userId, girdi, kaynak) → ayrık birlik.
 │                                         #    Doğrulama + beyaz liste + sınırlar (MAX_DURAK=10, MAX_ARAC_ADET=50,
