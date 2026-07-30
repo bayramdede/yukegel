@@ -1,0 +1,406 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Yükegel — Yönetim Paneli</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --kart: #161b22;
+    --cizgi: #21262d;
+    --yesil: #22c55e;
+    --sari: #eab308;
+    --kirmizi: #ef4444;
+    --mavi: #58a6ff;
+    --metin: #e6edf3;
+    --soluk: #8b949e;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--metin);
+    font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: 14px;
+  }
+  a { color: var(--mavi); }
+  header {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--cizgi);
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+    background: var(--kart);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  header h1 { font-size: 16px; margin: 0; font-weight: 600; }
+  .rozet {
+    font-size: 12px;
+    padding: 3px 9px;
+    border-radius: 999px;
+    border: 1px solid var(--cizgi);
+    color: var(--soluk);
+    white-space: nowrap;
+  }
+  .rozet.iyi { color: var(--yesil); border-color: #14532d; background: #052e16; }
+  .rozet.uyari { color: var(--sari); border-color: #713f12; background: #1c1400; }
+  .rozet.kotu { color: var(--kirmizi); border-color: #7f1d1d; background: #1f0a0a; }
+  main {
+    display: grid;
+    grid-template-columns: 380px 1fr;
+    gap: 16px;
+    padding: 16px 20px 40px;
+    align-items: start;
+  }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+  .kart {
+    background: var(--kart);
+    border: 1px solid var(--cizgi);
+    border-radius: 10px;
+    padding: 14px;
+    margin-bottom: 14px;
+  }
+  .kart h2 {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    color: var(--soluk);
+    margin: 0 0 10px;
+    font-weight: 600;
+  }
+  button {
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 500;
+    padding: 8px 12px;
+    border-radius: 7px;
+    border: 1px solid var(--cizgi);
+    background: #21262d;
+    color: var(--metin);
+    cursor: pointer;
+    transition: filter .12s;
+  }
+  button:hover:not(:disabled) { filter: brightness(1.35); }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  button.birincil { background: var(--yesil); border-color: var(--yesil); color: #04140a; font-weight: 600; }
+  button.ikincil { background: #1f6feb; border-color: #1f6feb; color: #fff; }
+  button.tehlike { background: #2d1214; border-color: #7f1d1d; color: #fca5a5; }
+  button.tam { width: 100%; }
+  .sira { display: flex; gap: 8px; flex-wrap: wrap; }
+  input[type=text] {
+    width: 100%;
+    font-family: inherit;
+    font-size: 13px;
+    padding: 9px 11px;
+    border-radius: 7px;
+    border: 1px solid var(--cizgi);
+    background: #0d1117;
+    color: var(--metin);
+    margin-bottom: 8px;
+  }
+  input[type=text]:focus { outline: none; border-color: var(--yesil); }
+  .ipucu { font-size: 12px; color: var(--soluk); line-height: 1.5; margin: 8px 0 0; }
+  .ipucu strong { color: var(--metin); font-weight: 600; }
+  ul.liste { list-style: none; margin: 0; padding: 0; max-height: 240px; overflow-y: auto; }
+  ul.liste li {
+    display: flex;
+    gap: 8px;
+    align-items: baseline;
+    padding: 3px 0;
+    font-family: 'SF Mono', Menlo, monospace;
+    font-size: 12px;
+    border-bottom: 1px solid rgba(255,255,255,.03);
+  }
+  .kod { color: var(--sari); min-width: 22px; font-weight: 600; }
+  .kod.M { color: var(--sari); } .kod.A, .kod\?\? { color: var(--yesil); }
+  .kod.D { color: var(--kirmizi); }
+  .yol { color: var(--metin); word-break: break-all; }
+  .commit { display: block; padding: 5px 0; border-bottom: 1px solid rgba(255,255,255,.03); }
+  .commit .hash { color: var(--mavi); font-family: 'SF Mono', Menlo, monospace; font-size: 12px; }
+  .commit .konu { color: var(--metin); }
+  .commit .zaman { color: var(--soluk); font-size: 11px; }
+  .bos { color: var(--soluk); font-size: 13px; padding: 6px 0; }
+  #terminal {
+    background: #010409;
+    border: 1px solid var(--cizgi);
+    border-radius: 10px;
+    padding: 14px 16px;
+    font-family: 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 12.5px;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    word-break: break-word;
+    min-height: 420px;
+    max-height: calc(100vh - 160px);
+    overflow-y: auto;
+    color: #c9d1d9;
+  }
+  #terminal .cmd { color: var(--mavi); font-weight: 600; display: block; margin-top: 10px; }
+  #terminal .ok { color: var(--yesil); font-weight: 600; }
+  #terminal .err { color: var(--kirmizi); font-weight: 600; }
+  .terminal-bas {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+  .nokta { width: 8px; height: 8px; border-radius: 50%; background: #30363d; display: inline-block; margin-right: 6px; }
+  .nokta.calisiyor { background: var(--sari); animation: nabiz 1s infinite; }
+  .nokta.bitti { background: var(--yesil); }
+  .nokta.hata { background: var(--kirmizi); }
+  @keyframes nabiz { 0%,100% { opacity: 1 } 50% { opacity: .3 } }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🛠 Yükegel Yönetim</h1>
+  <span class="rozet" id="r-dal">dal: …</span>
+  <span class="rozet" id="r-degisen">… değişiklik</span>
+  <span class="rozet" id="r-uzak">…</span>
+  <span class="rozet" id="r-lock">kilit: …</span>
+  <span class="rozet" id="r-daemon">daemon: …</span>
+  <span style="flex:1"></span>
+  <button id="b-yenile">↻ Yenile</button>
+</header>
+
+<main>
+  <!-- ── SOL SÜTUN ────────────────────────────────────────────────────── -->
+  <div>
+    <div class="kart">
+      <h2>Yayına al</h2>
+      <input type="text" id="mesaj" placeholder="Ne değişti? (örn. telefon alanı düzeltildi)" autocomplete="off">
+      <div class="sira">
+        <button class="birincil" data-is="deploy" style="flex:2">🚀 Deploy (main)</button>
+        <button class="ikincil" data-is="yedekle" style="flex:1">💾 Yedekle</button>
+      </div>
+      <p class="ipucu">
+        <strong>Deploy</strong> önce <code>tsc</code> çalıştırır — tip hatası varsa durur, Vercel kotası
+        harcanmaz. Sonra <code>deploy: mesaj</code> commit'i atıp <strong>main</strong>'e push eder → 1 deployment.<br>
+        <strong>Yedekle</strong> aynı işi <strong>yedek</strong> dalına yapar; Vercel deployment
+        <em>oluşturmaz</em>, kota harcanmaz. Canlıyı değiştirmez.
+      </p>
+    </div>
+
+    <div class="kart">
+      <h2>Git</h2>
+      <div class="sira">
+        <button data-is="tsc">🔍 tsc kontrol</button>
+        <button data-is="cek">⬇ Pull (rebase)</button>
+        <button class="tehlike" data-is="lock-ac">🔓 Kilidi aç</button>
+      </div>
+      <p class="ipucu">
+        <strong>Kilidi aç</strong> takılı kalmış <code>.git/index.lock</code>'u siler. Dosya 5 saniyeden
+        yeniyse önce bekler — çalışan bir git komutunun index'ini yarıda kesmemek için.
+      </p>
+    </div>
+
+    <div class="kart">
+      <h2>Auto-deploy daemon</h2>
+      <div class="sira">
+        <button data-is="daemon-baslat">▶ Başlat</button>
+        <button data-is="daemon-durdur">⏸ Durdur</button>
+        <button data-is="daemon-log">📄 Log</button>
+      </div>
+      <p class="ipucu">
+        Her dosya kaydetmesinde <code>yedek</code> dalına commit + push atar ve değişmişse edge
+        function deploy eder. Kapatırsan otomatik yedekleme durur.
+      </p>
+    </div>
+
+    <div class="kart">
+      <h2>Supabase edge functions</h2>
+      <div class="sira" id="fn-liste"><span class="bos">yükleniyor…</span></div>
+      <p class="ipucu" id="fn-ipucu"></p>
+    </div>
+
+    <div class="kart">
+      <h2>Değişen dosyalar <span id="degisen-sayi" style="color:var(--soluk);font-weight:400"></span></h2>
+      <ul class="liste" id="degisenler"><li class="bos">yükleniyor…</li></ul>
+    </div>
+
+    <div class="kart">
+      <h2>Son commit'ler</h2>
+      <div id="commitler"><div class="bos">yükleniyor…</div></div>
+    </div>
+  </div>
+
+  <!-- ── SAĞ SÜTUN ────────────────────────────────────────────────────── -->
+  <div>
+    <div class="terminal-bas">
+      <span><span class="nokta" id="nokta"></span><span id="durum-metni" style="color:var(--soluk);font-size:13px">hazır</span></span>
+      <button id="b-temizle">Temizle</button>
+    </div>
+    <div id="terminal">Yükegel yönetim paneli hazır.
+Sol taraftan bir işlem seç — çıktı burada canlı akar.
+</div>
+  </div>
+</main>
+
+<script>
+const $ = s => document.querySelector(s);
+const terminal = $('#terminal');
+let mesgul = false;
+
+// ── Terminal ────────────────────────────────────────────────────────────────
+function ekle(metin, sinif) {
+  const yapisik = terminal.scrollHeight - terminal.scrollTop - terminal.clientHeight < 60;
+  if (sinif) {
+    const el = document.createElement('span');
+    el.className = sinif;
+    el.textContent = metin;
+    terminal.appendChild(el);
+  } else {
+    terminal.appendChild(document.createTextNode(metin));
+  }
+  // Kullanıcı yukarı kaydırdıysa okumasını bölme.
+  if (yapisik) terminal.scrollTop = terminal.scrollHeight;
+}
+
+function durumGoster(sinif, metin) {
+  $('#nokta').className = 'nokta ' + sinif;
+  $('#durum-metni').textContent = metin;
+}
+
+// Sunucu komut satırlarını \x01 ile işaretliyor; ham metinden ayrıştır.
+function parcaIsle(parca) {
+  for (const satir of parca.split(/(?<=\n)/)) {
+    if (satir.startsWith('\x01')) {
+      const govde = satir.slice(1);
+      if (govde.startsWith('[bitti:')) continue;
+      ekle(govde, 'cmd');
+    } else if (/^✓|^🟢/.test(satir)) {
+      ekle(satir, 'ok');
+    } else if (/^✗|^🔴|error TS|^error:/.test(satir)) {
+      ekle(satir, 'err');
+    } else {
+      ekle(satir);
+    }
+  }
+}
+
+// ── Komut çalıştır ──────────────────────────────────────────────────────────
+async function calistir(is, ekstra = {}) {
+  if (mesgul) return;
+  mesgul = true;
+  document.querySelectorAll('button[data-is], button[data-fn]').forEach(b => (b.disabled = true));
+  durumGoster('calisiyor', is + ' çalışıyor…');
+  ekle('\n' + '─'.repeat(60) + '\n');
+
+  let kod = 1;
+  try {
+    const yanit = await fetch('/api/calistir', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-panel': '1' },
+      body: JSON.stringify({ is, mesaj: $('#mesaj').value, ...ekstra }),
+    });
+    const okuyucu = yanit.body.getReader();
+    const cozucu = new TextDecoder();
+    let artik = '';
+    while (true) {
+      const { done, value } = await okuyucu.read();
+      if (done) break;
+      const metin = artik + cozucu.decode(value, { stream: true });
+      artik = '';
+      const bitti = metin.match(/\x01\[bitti:(-?\d+)\]/);
+      if (bitti) kod = Number(bitti[1]);
+      parcaIsle(metin);
+    }
+  } catch (e) {
+    ekle('\n✗ Bağlantı hatası: ' + e.message + '\n', 'err');
+    kod = 1;
+  }
+
+  durumGoster(kod === 0 ? 'bitti' : 'hata', kod === 0 ? 'tamamlandı' : 'hata (çıkış kodu ' + kod + ')');
+  ekle(kod === 0 ? '\n✓ Bitti.\n' : '\n✗ Başarısız (çıkış kodu ' + kod + ').\n', kod === 0 ? 'ok' : 'err');
+  mesgul = false;
+  document.querySelectorAll('button[data-is], button[data-fn]').forEach(b => (b.disabled = false));
+  if (kod === 0 && (is === 'deploy' || is === 'yedekle')) $('#mesaj').value = '';
+  durumYukle();
+}
+
+// ── Durum ───────────────────────────────────────────────────────────────────
+async function durumYukle() {
+  let d;
+  try {
+    d = await (await fetch('/api/durum', { cache: 'no-store' })).json();
+  } catch {
+    $('#r-dal').textContent = 'sunucuya ulaşılamıyor';
+    $('#r-dal').className = 'rozet kotu';
+    return;
+  }
+
+  $('#r-dal').textContent = 'dal: ' + d.dal;
+  $('#r-dal').className = 'rozet ' + (d.dal === 'main' ? 'iyi' : 'uyari');
+
+  const n = d.degisenler.length;
+  $('#r-degisen').textContent = n === 0 ? 'temiz' : n + ' değişiklik';
+  $('#r-degisen').className = 'rozet ' + (n === 0 ? 'iyi' : 'uyari');
+  $('#degisen-sayi').textContent = n ? '(' + n + ')' : '';
+
+  $('#r-uzak').textContent = '↑' + d.onde + ' ↓' + d.geride;
+  $('#r-uzak').className = 'rozet ' + (d.onde === 0 && d.geride === 0 ? 'iyi' : 'uyari');
+
+  $('#r-lock').textContent = d.lock.var ? '🔒 kilit var (' + d.lock.yas + ' sn)' : 'kilit yok';
+  $('#r-lock').className = 'rozet ' + (d.lock.var ? 'kotu' : 'iyi');
+
+  $('#r-daemon').textContent = 'daemon: ' + (d.daemon ? 'çalışıyor' : 'durdu');
+  $('#r-daemon').className = 'rozet ' + (d.daemon ? 'iyi' : 'uyari');
+
+  $('#degisenler').innerHTML = n
+    ? d.degisenler
+        .map(x => '<li><span class="kod">' + kacir(x.kod) + '</span><span class="yol">' + kacir(x.yol) + '</span></li>')
+        .join('')
+    : '<li class="bos">Çalışma alanı temiz.</li>';
+
+  $('#commitler').innerHTML = d.commitler.length
+    ? d.commitler
+        .map(c =>
+          '<div class="commit"><span class="hash">' + kacir(c.hash) + '</span> <span class="konu">' +
+          kacir(c.konu) + '</span><br><span class="zaman">' + kacir(c.ne_zaman) + ' · ' + kacir(c.yazar) + '</span></div>')
+        .join('')
+    : '<div class="bos">commit yok</div>';
+
+  $('#fn-liste').innerHTML = d.fonksiyonlar.length
+    ? d.fonksiyonlar.map(f => '<button data-fn="' + kacir(f) + '">⚡ ' + kacir(f) + '</button>').join('')
+    : '<span class="bos">fonksiyon bulunamadı</span>';
+  $('#fn-ipucu').innerHTML = d.tokenVar
+    ? 'Token bulundu (<code>~/.config/yukegel/auto-deploy.env</code>).'
+    : '⚠ <code>~/.config/yukegel/auto-deploy.env</code> yok — <code>SUPABASE_ACCESS_TOKEN=sbp_…</code> yazıp <code>chmod 600</code> yapmadan deploy düşer.';
+
+  if (mesgul) document.querySelectorAll('button[data-is], button[data-fn]').forEach(b => (b.disabled = true));
+}
+
+function kacir(s) {
+  return String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+}
+
+// ── Bağlama ─────────────────────────────────────────────────────────────────
+document.addEventListener('click', e => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  if (b.dataset.is) calistir(b.dataset.is);
+  else if (b.dataset.fn) calistir('fn-deploy', { fn: b.dataset.fn });
+});
+
+$('#b-yenile').addEventListener('click', durumYukle);
+$('#b-temizle').addEventListener('click', () => {
+  terminal.textContent = '';
+  durumGoster('', 'hazır');
+});
+
+// Cmd/Ctrl+Enter → deploy
+$('#mesaj').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) calistir('deploy');
+});
+
+durumYukle();
+setInterval(() => { if (!mesgul) durumYukle(); }, 6000);
+</script>
+</body>
+</html>
