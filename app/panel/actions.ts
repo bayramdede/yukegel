@@ -154,16 +154,23 @@ export async function ilanGuncelle(girdi: IlanGuncelleGirdi): Promise<PanelSonuc
 
   // ── Duraklar: sil + yeniden ekle ───────────────────────────────────
   await service.from('listing_stops').delete().eq('listing_id', girdi.id)
-  const yeniStoplar = duraklar.map((d, i) => ({
-    listing_id: girdi.id,
-    stop_order: i + 1,
-    city: d.city.trim(),
-    district: (d.district ?? '')?.toString().trim() || null,
-    cargo_type: (d.cargo_type ?? '')?.toString().trim() || null,
-    weight_ton: sayiYada(d.weight_ton),
-    pallet_count: sayiYada(d.pallet_count),
-    vehicle_count: sayiYada(d.vehicle_count),
-  }))
+  const yeniStoplar = duraklar.map((d, i) => {
+    const sehir = d.city.trim()
+    const il = ilCiftYazim(sehir)
+    const ilce = il ? ilceNormalize(il.id, d.district) : null
+    return {
+      listing_id: girdi.id,
+      stop_order: i + 1,
+      city: il?.ad ?? sehir,
+      province_id: il?.id ?? null,
+      district: ilce?.ad ?? ((d.district ?? '')?.toString().trim() || null),
+      district_official: ilce?.resmi ?? null,
+      cargo_type: (d.cargo_type ?? '')?.toString().trim() || null,
+      weight_ton: sayiYada(d.weight_ton),
+      pallet_count: sayiYada(d.pallet_count),
+      vehicle_count: sayiYada(d.vehicle_count),
+    }
+  })
   const { data: eklenen, error: durakHata } = await service
     .from('listing_stops').insert(yeniStoplar).select()
 
