@@ -460,7 +460,13 @@ id smallint PK (1-81, plaka kodu) · plate char(2) · name text
 > (bilerek — `definer` olsaydı ayrıcalık yükseltme yüzeyi olurdu), EXECUTE yalnız
 > `service_role`da. Migration SIRASI: `docs/20260729_ilan_olustur_rpc.sql` →
 > `docs/20260729_listings_vehicle_id.sql` (kolon + `create or replace` ile RPC'yi tazeler) →
-> `docs/20260729_ilan_olustur_v2.sql`.
+> `docs/20260729_ilan_olustur_v2.sql` → `docs/20260730_ilan_olustur_v3.sql` (⏳ **bekliyor**).
+> **v3 (30 Tem 2026, coğrafi Dalga 2)** `origin_province_id`, `stops[].province_id` ve
+> `*_district_official` yazıyor. 🔑 id'yi çağırandan İSTEMİYOR: `origin_city`/`stops[].city`
+> metnini `public.il_key()` ile katlayıp `provinces`'tan **kendisi çözüyor**, sonra metni de
+> kanonik ada çeviriyor. Çağıran açıkça `province_id` gönderirse o kazanır. Bu sayede jsonb
+> ayrışma tuzağı (aşağıdaki uyarı) `province_id` için devre dışı — çağıran unutsa bile alan
+> doluyor — ve Deno'daki `parse-listing` hiç değişmeden doğru yazıyor.
 > **v2 (29 Tem 2026, W1+)** dört OPSİYONEL alan ekledi — `raw_post_id`, `shadow_profile_id`,
 > `is_repost`, `reviewed_at` — böylece moderatör paneli ve Edge Function da bu RPC'yi
 > kullanabiliyor. Ayrıca `listing_stops.vehicle_count` artık ÖNCE durağın kendi değerine
