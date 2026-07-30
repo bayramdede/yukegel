@@ -227,17 +227,24 @@ export async function ilanYaz(
   const genelYukCinsi = kisaMetin(girdi.yuk_cinsi);
 
   const duraklar: Array<{
-    city: string; district: string | null; ton: number | null;
+    city: string; province_id: number; district: string | null;
+    district_official: boolean | null; ton: number | null;
     palet: number | null; notlar: string | null; yuk_cinsi: string | null;
   }> = [];
   for (const d of durakGirdileri) {
-    const city = ilNormalize(d.sehir);
-    if (!city) {
+    const il = ilCiftYazim(d.sehir);
+    if (!il) {
       return { ok: false, hata: `Varış ili tanınamadı: "${String(d.sehir).slice(0, 30)}". Listeden seçin.` };
     }
+    // İlçe ile BAĞLI çözülüyor: "Kadıköy" İstanbul'un resmî ilçesi, Ankara'nın
+    // değil. `ilceNormalize` serbest girişi reddetmiyor, `resmi:false` ile
+    // işaretliyor (spec md.7 — "İkitelli", "İSTOÇ" gibi adlar kullanımda).
+    const ilce = ilceNormalize(il.id, d.ilce);
     duraklar.push({
-      city,
-      district: kisaMetin(d.ilce),
+      city: il.ad,
+      province_id: il.id,
+      district: ilce?.ad ?? null,
+      district_official: ilce?.resmi ?? null,
       ton: sayiAralik(d.ton, 0, MAX_TON),
       palet: tamSayiAralik(d.palet, 0, MAX_PALET),
       notlar: kisaMetin(d.notlar, MAX_NOT),
