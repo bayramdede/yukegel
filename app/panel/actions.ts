@@ -100,6 +100,20 @@ export async function ilanGuncelle(girdi: IlanGuncelleGirdi): Promise<PanelSonuc
   if (duraklar.length === 0) return { ok: false, hata: 'En az bir varış durağı gerekli.' }
   if (duraklar.length > 10) return { ok: false, hata: 'En fazla 10 durak eklenebilir.' }
 
+  // ── İL ÇÖZÜMLEMESİ — bu dosya `ilan_olustur` RPC'sini ATLAYAN TEK yazma yolu.
+  //
+  // 🚨 Buradaki asıl tehlike `province_id`'nin boş kalması DEĞİL, ESKİ DEĞERDE
+  // KALMASI. Kullanıcı ilanı İstanbul'dan Ankara'ya çevirdiğinde metin 'Ankara'
+  // olur ama `origin_province_id` 34'te kalırsa satır artık kendi kendisiyle
+  // çelişir: `20260730_province_id.sql` Adım 8.2 çapraz kontrolü bunu yakalar,
+  // ama kullanıcı bunu göremez — ilan Ankara yazar, İstanbul filtresinde çıkar.
+  // Bu yüzden id ve metin BURADA BİRLİKTE hesaplanıyor.
+  //
+  // Çözülemeyen değer (yurt dışı, yazım hatası, serbest yer adı) reddedilmiyor:
+  // metin korunuyor, id NULL'a çekiliyor. Reddetmek düzenlemeyi kilitlerdi.
+  const kalkisIl = ilCiftYazim(kalkis)
+  const kalkisIlce = kalkisIl ? ilceNormalize(kalkisIl.id, girdi.origin_district) : null
+
   const telefon = (girdi.telefon ?? '').replace(/\D/g, '')
   if (telefon && !/^0\d{10}$/.test(telefon))
     return { ok: false, hata: 'Telefon numarası 11 haneli olmalı (05xx xxx xx xx).' }
