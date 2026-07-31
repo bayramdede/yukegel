@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin, getServiceSupabase } from '../../../../lib/auth';
+import { ilId, ilAdi } from '../../../../lib/lokasyon';
 
 export const dynamic = 'force-dynamic';
 
@@ -41,10 +42,28 @@ export async function GET(req: NextRequest) {
     );
   }
 
+  // Dalga 3: RPC artık il ADI değil `province_id` alıyor. Çeviri route
+  // sınırında yapılır — arayüz il adıyla çalışmaya devam eder.
+  //
+  // ⚠️ TANINMAYAN İL = 400, SESSİZ NULL DEĞİL. Eski gövde boş string'i
+  // NULLIF ile NULL'a çeviriyordu; NULL "tüm iller" demek. `ilId()` tanımadığı
+  // adı da null döndürür — o null'ı RPC'ye geçirseydik kullanıcı "Ankra" yazınca
+  // hata yerine TÜM İLLERİN sonucunu görürdü. Sessiz yanlış sonuç, açık
+  // hatadan kötüdür.
+  const fromId = fromCity ? ilId(fromCity) : null;
+  const toId   = toCity   ? ilId(toCity)   : null;
+
+  if (fromCity && fromId === null) {
+    return NextResponse.json({ error: `Tanınmayan kalkış ili: ${fromCity}` }, { status: 400 });
+  }
+  if (toCity && toId === null) {
+    return NextResponse.json({ error: `Tanınmayan varış ili: ${toCity}` }, { status: 400 });
+  }
+
   const { data, error } = await svc.rpc('get_radar_intelligence', {
-    p_from_city: fromCity || null,
-    p_to_city:   toCity   || null,
-    p_days:      days,
+    p_from_province_id: fromId,
+    p_to_province_id:   toId,
+    p_days:             days,
   });
 
   if (error) {
@@ -72,7 +91,16 @@ export async function GET(req: NextRequest) {
     success: true,
     route_stats: result.route_stats,
     leads,
-    filters: { from_city: fromCity, to_city: toCity, days, mode },
+    // Kanonik ad döndürülüyor ("istanbul" → "İstanbul"); arayüz bunu başlıkta
+    // gösteriyor, kullanıcının yazdığı hali değil.
+    filters: {
+      from_city:        fromId !== null ? ilAdi(fromId) : null,
+      to_city:          toId   !== null ? ilAdi(toId)   : null,
+      from_province_id: fromId,
+      to_province_id:   toId,
+      days,
+      mode,
+    },
   });
 }
 

@@ -29,8 +29,11 @@
 > ✅ **`docs/20260730_istanbul_kanonik.sql` ÇALIŞTIRILDI (30 Tem 2026).** Blok 1 alias kaynağını
 > kuruttu (= runbook Adım 2), Blok 2 metni `province_id`'den onardı. Doğrulama **2.4 = 0** →
 > farklı yazımlı aynı il satırı kalmadı; 22.474 ilan İstanbul filtresinde artık görünüyor.
-> ⚠️ Tek seferlik temizlik — kalıcı koruma `20260729_alias_normalize_trigger.sql` (önkoşul: runbook
-> Adım 9 kopya pasifleştirme). Runbook'un ilçe adımları (3, 4, 6) hâlâ bekliyor.
+> ✅ **KALICI KORUMA KURULDU (30 Tem 2026).** `20260730_alias_adim9_kopya_pasiflestir.sql`
+> (612 satır pasif, kayıpsız) → `20260729_alias_normalize_trigger.sql` BÖLÜM 1+2 → doğrulama.
+> `aliases_normalize_trg` ve **kısmi** `aliases_katlanmis_anahtar_uniq` canlıda; katlanmış alias
+> kopyası bundan sonra DB seviyesinde DOĞAMAZ. Ayrıntı: "`aliases` kolon özeti" bölümü.
+> ⏳ Runbook'un ilçe adımları (3, 4, 6) hâlâ bekliyor.
 >
 > Önceki: 29 Temmuz 2026 — **SPRINT_01 W5 (alias veri bütünlüğü) kod tarafı tamamlandı.**
 > **W5:** Bozuk `aliases.normalized` yazımı (`Istanbul` 13 satır / `İstanbul` 154 satır) sahte
@@ -482,6 +485,16 @@ id smallint PK (1-81, plaka kodu) · plate char(2) · name text
 > Kendi iki ayrı INSERT'ini yazan bir yol, W0/W1'de kapatılan V1/V3/V5 deliklerini yeniden
 > açar — excel-import'ta, WhatsApp webhook'unda ve moderatör panelinde tam olarak bu olmuştu.
 >
+> 🚨 **AMA `ilan_olustur()` YALNIZ INSERT YOLUNU KAPSIYOR — UPDATE YOLU KAPSAM DIŞI.**
+> `app/moderator/page.tsx::duzenleKaydet()` tarayıcıdan doğrudan UPDATE atıyor ve bu
+> yüzden RPC'nin "province_id'yi metinden kendim türetirim" garantisinden YARARLANMIYOR.
+> 30 Tem 2026'da bulundu: moderatör kalkış ilini düzeltince `origin_city` değişiyor,
+> `origin_province_id` **eski değerde kalıyordu**. Dalga 3 okuma yollarını id'ye çevirdiği
+> için bu düzeltmeler radar/nearby'ye hiç işlemeyecekti. Düzeltildi — `duzenleKaydet()`
+> artık `ilCiftYazim()` + `ilceNormalize()` ile hem metni kanonikleştiriyor hem id yazıyor,
+> duraklar dahil; ayrıca tanınmayan il varsa **hiçbir şey yazmadan** çıkıyor (yarım yazım yok).
+> **Ders: "yazma yolu" denince UPDATE'leri de say.**
+>
 > ⚡ **`public.ilan_olustur(p_listing jsonb, p_stops jsonb) → jsonb`** (29 Tem 2026, V5).
 > İlan + duraklarını TEK transaction'da yazar, trigger'ın hesapladığı
 > `id, audit_score, moderation_status, is_shadow_banned` ile döner. `security invoker`
@@ -597,16 +610,31 @@ district   — ilçe adı (city tipi için, normalize ile ilişkilendirir)
 created_by_ai / is_approved / llm_confidence / source_listing_ids  (SLH kolonları)
 ```
 🚨 **W5 (29 Tem 2026) — yazım bütünlüğü.** `normalized`/`district` uzun süre iki yazımla birikti
-(`Istanbul`/`İstanbul`, `Izmir`/`İzmir`, `Mugla`/`Muğla`, `Bingol`/`Bingöl`). Yazma yolu artık
-`lib/alias-normalize.ts` üzerinden geçiyor. Bekleyen DB tarafı (henüz çalıştırılmadı):
-- `docs/20260729_alias_runbook.md` → Adım 0-9 (ölçüm → homonim pasifleştirme → yazım düzeltme →
-  NULL ilçe doldurma → `payas` → elle kararlar → doğrulama → geçmiş `listings` onarımı →
-  katlanmış kopyaları pasifleştirme)
-- `docs/20260729_alias_normalize_trigger.sql` → `aliases_normalize_trg` (BEFORE INSERT/UPDATE:
-  `alias` lowercase+trim, `normalized`/`district` trim, boş `district` → NULL) +
-  `aliases_katlanmis_anahtar_uniq`: **KISMİ** UNIQUE indeks
+(`Istanbul`/`İstanbul`, `Izmir`/`İzmir`, `Mugla`/`Muğla`, `Bingol`/`Bingöl`). Yazma yolu
+`lib/alias-normalize.ts` üzerinden geçiyor.
+
+✅ **DB TARAFI KAPANDI (30 Tem 2026).** Artık tekillik uygulama disiplinine değil DB'ye bağlı:
+- `aliases_normalize_trg` **canlıda** — `BEFORE INSERT OR UPDATE OF alias, normalized, district`;
+  `alias` lowercase+boşluk sadeleştirme, `normalized`/`district` trim, boş `district` → NULL.
+  ⚠️ Yalnız bu üç kolon listelendiği için `is_active`-only UPDATE trigger'ı TETİKLEMEZ (Adım 9
+  toplu pasifleştirmesi bu sayede güvenliydi).
+- `aliases_katlanmis_anahtar_uniq` **canlıda** — **KISMİ** UNIQUE indeks
   `(type, translate(lower(replace(alias,'İ','i')),'ıçğöşü','icgosu')) WHERE is_active = true`
   ⚠️ İndeks ifadesi `lib/alias-normalize.ts::aliasKey()` ile birebir aynı olmak zorunda.
+- **Adım 9 uygulandı** → `docs/20260730_alias_adim9_kopya_pasiflestir.sql`. **612 satır**
+  `is_active=false` (silinmedi), **1270 aktif** kaldı. Ölçüm: 552 çatışan grup / 1164 satır,
+  `norm_ayrisan_grup=0` ve `ilce_ayrisan_grup=0` → hiçbir grupta `normalized`/`district`
+  ayrışmadığı için pasifleştirme kayıpsız. Geri alma yedeği: **`public.aliases_adim9_yedek`**
+  (612 id + kazanan_id). Yedek tablosu bilerek DURUYOR.
+  🔑 **Kazanan seçimi `ORDER BY id` (en küçük id).** Keyfi değil: `parse-listing/index.ts:44`
+  alias'ları `.order('id',{ascending:true})` ile çekiyor, `findPlaces` `.find()` ile İLK
+  eşleşmeyi alıyor (`:323`, `:337`) — yani en küçük id zaten kazanıyordu. `is_approved`/
+  `priority` ile başka bir kazanan seçmek ölçülmemiş bir davranış değişikliği olurdu.
+  🔑 **`corlu` pasifleşince ASCII girdi körleşmez**: karşılaştırma `trNorm()` ile katlanmış
+  anahtar üzerinden (W5/D4), kalan `çorlu` satırı ASCII yazımı da yakalıyor.
+- Doğrulama geçti: trigger yaz-oku-rollback ✅ · indeks 23505 üretiyor ✅ · anahtar paritesi ✅.
+- ℹ️ Tablo boyutu: **1882 satır** (trigger dosyasındaki "~200 satır mertebesi" tahmini YANLIŞTI).
+- ⏳ Kalan: runbook **Adım 3, 4, 6** (ilçe yazım düzeltmesi, NULL ilçe doldurma, elle kararlar).
 ### `system_config` — `parse.auto_publish_score_max`, `parse.reject_score_min`, `llm.ai_listing_quota_default` ve diğerleri
 ### `safety_rules`, `blacklist`
 
@@ -992,6 +1020,7 @@ sayfalara **miras bırakmaz**. Dinamik OG görseli de yok (kök karta düşüyor
 - **Yakınımdaki Yükler** (1 Temmuz 2026): `/yol-rehberi` haritasına 3. sekme ("📦 Yükler") eklendi — stealth büyüme stratejisine uygun, sürücü zaten haritayı açmışken arka planda yük keşfi.
   - `lib/il-koordinatlari.ts`: 81 il merkez koordinatı (`app/api/admin/poi-import/route.ts` içindeki tablonun kopyası) + `enYakinIl(lat,lng)` — GPS'ten offline haversine ile en yakın ili bulur (Geocoding API çağrısı YOK, ek maliyet yok).
   - `docs/20260701_nearby_listings_rpc.sql`: `get_nearby_listings_by_city(p_city, p_district, p_limit)` RPC — **gerçek şema** (`origin_city`/`origin_district`, varış `listing_stops`'un son durağından `DISTINCT ON` ile) ile yazıldı.
+    - ⏳ **Dalga 3 (30 Tem 2026) bu fonksiyonun ADINI DEĞİŞTİRİYOR:** `get_nearby_listings_by_province(p_province_id, p_district, p_limit)` — `docs/20260730_dalga3_radar_province_id.sql` BÖLÜM 4. Ad değişti çünkü `_by_city` artık yalan olurdu. İlçe karşılaştırması `ILIKE` yerine `public.il_key()` (katlanmış eşitlik); güvenli çünkü `eslesme` bir **sıralama ipucu**, filtre değil. SQL çalıştırılana kadar yeni kod `PGRST202` alır.
   - **Not:** `docs/20260610_poi_module.sql` içindeki eski `get_nearby_listings_for_parked_driver` fonksiyonu `listings.dest_city`/`title`/`load_type` gibi olmayan kolonları referans alıyor — çağrılırsa hata verir, kullanılmıyor, silinmedi (geriye dönük doküman amaçlı duruyor).
   - `/api/listings/yakin` (GET, `?lat=&lng=`): en yakın ili bulur, RPC'yi çağırır, ilan listesini döner.
   - UI: `YolRehberiClient.tsx` — Liste/Harita yanına "📦 Yükler" toggle, `YukListeKart` bileşeni (kalkış→varış, fiyat, araç tipi, "YAKININDA" rozeti ilçe eşleşmesinde), `/ilan/[id]`'e link.
@@ -1022,6 +1051,21 @@ sayfalara **miras bırakmaz**. Dinamik OG görseli de yok (kök karta düşüyor
   - **Lead Radar** (`/admin/radar`): Rota bazlı (kalkış+varış) lead arama. `get_radar_intelligence` RPC, phone normalize, frekans+NLP sınıflandırma, WA/davet/geçmiş aksiyonları. Migration: `docs/20260604_radar_intelligence_rpc.sql`.
   - **Analitik Dashboard** (`/admin/radar/analitik`): QlikView-tarzı drill-down. Şehir listesi sol panel, varış/kalkış bar chart, araç tipi dağılımı, sparkline. `get_radar_city_overview` + `get_radar_city_detail(direction)` RPC. Migration: `docs/20260604_radar_analitik_rpc.sql`.
   - API: `app/api/admin/radar/route.ts` + `app/api/admin/radar/analitik/route.ts`.
+  - 🚨 **DEPODAKİ RADAR MIGRATION'LARI CANLIYI TEMSİL ETMİYOR (30 Tem 2026 keşfi).**
+    `docs/` altında beş dosya bu üç fonksiyonu birbirinin üstüne yazıyor. Canlı
+    `pg_get_functiondef` çıktısı gösterdi ki en az iki sürüm **elle çalıştırılmış,
+    depoya yazılmamış**: `get_radar_city_detail` canlıda `ILIKE` değil `=` kullanıyor;
+    `get_radar_intelligence` canlıda `dest_ids AS MATERIALIZED` CTE'li (dosyadaki
+    correlated `EXISTS` sürümünden yeni). **Kural: bu fonksiyonlara dokunmadan önce
+    her zaman `pg_get_functiondef` ile canlı gövdeyi al** — `docs/20260730_dalga3_kesif.sql`.
+  - ⏳ **Dalga 3 imzaları değiştiriyor** (`docs/20260730_dalga3_radar_province_id.sql`,
+    SQL henüz çalıştırılmadı): `get_radar_city_detail(p_province_id int, p_direction, p_days, p_counterpart_id int)`,
+    `get_radar_intelligence(p_from_province_id int, p_to_province_id int, p_days)`.
+    `get_radar_city_overview(int)` imzası aynı, çıktıya `province_id` eklendi ve
+    **LIMIT 60 → 81** (tavan zaten 81 il; önceden 61-81. sıradaki iller listede hiç görünmüyordu).
+    Eski imzalar DROP ediliyor → PostgREST overload belirsizliği olmasın diye.
+    **API il ADI almaya devam ediyor**, çeviri route sınırında `ilId()` ile; `AnalitikClient.tsx`
+    değişmiyor çünkü RPC hem `province_id` hem kanonik `city` döndürüyor.
 - **Shadow Profile / CRM** (1 Haziran 2026): WhatsApp'tan ilan atan kayıtsız numaraların otomatik profillenmesi.
   - `shadow_profiles` tablosu: phone (unique), name, company_name, notes, status, converted_user_id. RLS: admin only.
   - `listings.shadow_profile_id` FK eklendi.

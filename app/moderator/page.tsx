@@ -4,6 +4,8 @@ import { createClient } from '../../lib/supabase';
 import { useRouter } from 'next/navigation';
 import WhatsappYukle from './WhatsappYukle';
 import { ilanTelefonlariGetir, ilanTelefonGuncelle, moderatorIlanOlustur } from './actions';
+import { ilCiftYazim, ilceNormalize } from '../../lib/lokasyon';
+import { ilKey } from '../../lib/ilan-sabitler';
 
 const supabase = createClient();
 
@@ -528,12 +530,57 @@ export default function Moderator() {
 
   async function duzenleKaydet(id: string, mod: 'onayla' | 'sadece_kaydet') {
     setIslem(id);
+
+    // 🚨 DALGA 3 — ÇİFT YAZIM BURADA DA ZORUNLU.
+    // Bu düzenleme yolu `moderatorIlanOlustur()` server action'ından GEÇMİYOR;
+    // doğrudan tarayıcıdan UPDATE atıyor. `province_id` yazılmazsa moderatörün
+    // düzeltmesi metne işler ama ID'de ESKİ DEĞERDE KALIR — ve Dalga 3'ten
+    // sonra radar/nearby ID'ye baktığı için düzeltme HİÇ ETKİ ETMEZ.
+    // Tehlike "boş kalması" değil, "eski değerde kalması": İstanbul→Ankara
+    // düzeltilen satır metinde Ankara, ID'de 34 olur; `20260730_province_id.sql`
+    // Adım 8.2 çapraz kontrolü bunu tutarsızlık olarak yakalar.
+    // (Aynı gerekçe: `app/panel/actions.ts:105-108`.)
+    const kalkisIl = ilCiftYazim(duzenleData.origin_city);
+    if (!kalkisIl) {
+      alert('Kalkış ili tanınamadı: ' + duzenleData.origin_city + '. Listeden bir il seçin.');
+      setIslem('');
+      return;
+    }
+    const kalkisIlce = ilceNormalize(kalkisIl.id, duzenleData.origin_district);
+
+    // Duraklar `listings` UPDATE'inden ÖNCE çözülüyor: tanınmayan bir durak ili
+    // varsa hiçbir şey yazılmadan çıkılsın. Aksi halde ilan güncellenir, duraklar
+    // yarıda kalır ve satır kendisiyle çelişir.
+    const cozulmusDuraklar: Array<{
+      id: string | null; ad: string; ilId: number;
+      ilceAd: string | null; ilceResmi: boolean | null; kaynak: any;
+    }> = [];
+    for (const stop of duzenleData.stops) {
+      const il = ilCiftYazim(stop.city);
+      if (!il) {
+        alert('Varış ili tanınamadı: ' + stop.city + '. Listeden bir il seçin.');
+        setIslem('');
+        return;
+      }
+      // İlçe İL'E BAĞLI çözülüyor — "Kadıköy" İstanbul'un ilçesi, Ankara'nın değil.
+      const ilce = ilceNormalize(il.id, stop.district);
+      cozulmusDuraklar.push({
+        id: stop.id ?? null, ad: il.ad, ilId: il.id,
+        ilceAd: ilce?.ad ?? null, ilceResmi: ilce?.resmi ?? null, kaynak: stop,
+      });
+    }
+
     // ⚠️ SPRINT_01 L1e — `contact_phone` bu update'te YOK.
     // Anon istemcinin o kolon üzerinde artık yetkisi yok; numara aşağıda
     // ilanTelefonGuncelle() server action'ıyla ayrıca yazılıyor.
     const updateData: any = {
-      listing_type: duzenleData.listing_type, origin_city: duzenleData.origin_city,
-      origin_district: duzenleData.origin_district,
+      listing_type: duzenleData.listing_type,
+      // Kanonik ad yazılıyor ("istanbul" → "İstanbul"); metin ve ID aynı
+      // kaynaktan türüyor, aralarında sapma doğamaz.
+      origin_city: kalkisIl.ad,
+      origin_province_id: kalkisIl.id,
+      origin_district: kalkisIlce?.ad ?? null,
+      origin_district_official: kalkisIlce?.resmi ?? null,
       price_offer: duzenleData.price_offer || null, notes: duzenleData.notes,
       vehicle_type: duzenleData.vehicle_type, body_type: duzenleData.body_type,
     };
@@ -551,12 +598,19 @@ export default function Moderator() {
       // Numara kaydedilemedi — moderatör bunu bilmeli, diğer alanlar kaydedildi.
       alert('Telefon kaydedilemedi: ' + telSonuc.hata);
     }
-    for (let i = 0; i < duzenleData.stops.length; i++) {
-      const stop = duzenleData.stops[i];
-      if (stop.id) {
-        await supabase.from('listing_stops').update({ city: stop.city, district: stop.district, weight_ton: stop.weight_ton || null, pallet_count: stop.pallet_count || null, vehicle_count: stop.vehicle_count, cargo_type: stop.cargo_type, notes: stop.notes || null }).eq('id', stop.id);
+    for (let i = 0; i < cozulmusDuraklar.length; i++) {
+      const d = cozulmusDuraklar[i];
+      const stop = d.kaynak;
+      // `city` + `province_id` yan yana yazılıyor (çift yazım) — Dalga 5 metin
+      // kolonunu düşürene kadar ikisi de gerekli.
+      const konum = {
+        city: d.ad, province_id: d.ilId,
+        district: d.ilceAd, district_official: d.ilceResmi,
+      };
+      if (d.id) {
+        await supabase.from('listing_stops').update({ ...konum, weight_ton: stop.weight_ton || null, pallet_count: stop.pallet_count || null, vehicle_count: stop.vehicle_count, cargo_type: stop.cargo_type, notes: stop.notes || null }).eq('id', d.id);
       } else {
-        await supabase.from('listing_stops').insert({ listing_id: id, stop_order: i + 1, city: stop.city, district: stop.district || null, weight_ton: stop.weight_ton || null, pallet_count: stop.pallet_count || null, vehicle_count: stop.vehicle_count || 1, cargo_type: stop.cargo_type || null, notes: stop.notes || null });
+        await supabase.from('listing_stops').insert({ listing_id: id, stop_order: i + 1, ...konum, weight_ton: stop.weight_ton || null, pallet_count: stop.pallet_count || null, vehicle_count: stop.vehicle_count || 1, cargo_type: stop.cargo_type || null, notes: stop.notes || null });
       }
     }
     if (mod === 'onayla') await aliasOgren(duzenleData);
@@ -570,7 +624,14 @@ export default function Moderator() {
   function stopGuncelle(idx: number, alan: string, deger: any) { const yeni = [...duzenleData.stops]; yeni[idx] = { ...yeni[idx], [alan]: deger }; setDuzenleData({ ...duzenleData, stops: yeni }); }
 
   async function aliasOgren(data: any) {
-    const norm = (s: string) => s.toLowerCase().replace(/ç/g,'c').replace(/ğ/g,'g').replace(/ı/g,'i').replace(/İ/g,'i').replace(/ö/g,'o').replace(/ş/g,'s').replace(/ü/g,'u');
+    // 🚨 KATLAMA SÖZLEŞMESİ — burada eskiden yerel bir `norm` vardı ve SIRASI
+    // YANLIŞTI: önce `.toLowerCase()`, sonra `.replace(/İ/g,'i')`. JS'te
+    // `'İ'.toLowerCase()` "i" + U+0307 (birleşik nokta) üretir, dolayısıyla
+    // sonraki replace ARTIK EŞLEŞMEZ. Sonuç: "İkitelli" → "i̇kitelli" (görünmez
+    // noktalı) olarak yazılıyordu; ne `lib/ilan-sabitler.ts::ilKey()` ne de
+    // `public.il_key()` bu anahtarı üretir → alias hiçbir zaman EŞLEŞMEZDİ.
+    // Sessiz ölü kayıt. Artık tek kaynak `ilKey` kullanılıyor.
+    const norm = ilKey;
     if (data.origin_district && data.origin_city) await supabase.from('aliases').upsert({ alias: norm(data.origin_district), normalized: data.origin_city, district: data.origin_district, type: 'city', is_active: true, priority: 90 }, { onConflict: 'alias' });
     for (const stop of (data.stops || [])) { if (stop.district && stop.city) await supabase.from('aliases').upsert({ alias: norm(stop.district), normalized: stop.city, district: stop.district, type: 'city', is_active: true, priority: 90 }, { onConflict: 'alias' }); }
     for (const vt of (data.vehicle_type || [])) { if (vt) await supabase.from('aliases').upsert({ alias: norm(vt), normalized: vt, type: 'vehicle', is_active: true, priority: 80 }, { onConflict: 'alias' }); }

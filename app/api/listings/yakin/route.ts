@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { enYakinIl } from '../../../../lib/il-koordinatlari';
+import { ilId } from '../../../../lib/lokasyon';
 
 export const runtime = 'nodejs';
 
@@ -29,8 +30,19 @@ export async function GET(req: NextRequest) {
 
   const { il, mesafe_km } = enYakinIl(lat, lng);
 
-  const { data, error } = await supabase.rpc('get_nearby_listings_by_city', {
-    p_city: il,
+  // Dalga 3: RPC adı `_by_city` → `_by_province` ve parametresi `province_id`.
+  // `enYakinIl` IL_KOORDINAT'tan gelir; o tablonun 81 anahtarı locations.json
+  // ile birebir doğrulandı, dolayısıyla burada null BEKLENMİYOR. Yine de
+  // sessizce "tüm iller" sorgusuna düşmemek için 500 veriyoruz — null gelirse
+  // bu bir veri bütünlüğü bozulmasıdır, kullanıcı hatası değil.
+  const provinceId = ilId(il);
+  if (provinceId === null) {
+    console.error('[yakin] IL_KOORDINAT ↔ locations.json uyuşmazlığı:', il);
+    return NextResponse.json({ error: 'İl çözümlenemedi' }, { status: 500 });
+  }
+
+  const { data, error } = await supabase.rpc('get_nearby_listings_by_province', {
+    p_province_id: provinceId,
     p_district: null,
     p_limit: 20,
   });
@@ -42,6 +54,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     success: true,
     il,
+    il_id: provinceId,
     il_merkezine_mesafe_km: mesafe_km,
     data: data ?? [],
     total: data?.length ?? 0,

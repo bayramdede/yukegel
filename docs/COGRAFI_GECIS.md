@@ -107,6 +107,30 @@ Doğrulama: `npx tsc --noEmit` temiz, `test:lokasyon` 21/21, `test:parser` 29/29
 
 ### Dalga 3 — okuma / filtre / moderasyon
 
+> ⏳ **RPC + moderatör tarafı YAZILDI, SQL HENÜZ ÇALIŞTIRILMADI (30 Tem 2026).**
+> Migration: `docs/20260730_dalga3_radar_province_id.sql`. Keşif: `docs/20260730_dalga3_kesif.sql`.
+> Kalan: `HomeClient.tsx` (ayrı iş, sunucu tarafı filtre yolu gerekiyor).
+>
+> 🚨 **Bu dalganın en önemli bulgusu şema değil, süreç:** keşif sorgusu canlı
+> `pg_get_functiondef` çıktısını alınca `docs/` altındaki radar migration'larının
+> **canlı hali temsil etmediği** ortaya çıktı. `get_radar_city_detail` canlıda `ILIKE`
+> değil `=` kullanıyor; `get_radar_intelligence` canlıda `dest_ids AS MATERIALIZED`
+> CTE'siyle çalışıyor. Yani en az iki sürüm elle çalıştırılıp depoya yazılmamış.
+> Aşağıdaki tabloda "dosya" sütununda yazan migration'lardan yeni sürüm türetilseydi
+> bu iyileştirmeler **sessizce geri alınmış** olacaktı.
+> **Kural:** radar fonksiyonlarına dokunmadan önce her zaman `pg_get_functiondef`.
+>
+> 📏 **Kapsama ölçüldü:** 10 örnek ilin hepsinde `sadece_ilike = 0` ve `sadece_id = 0`.
+> Metin ile id bugün **aynı kümeyi** döndürüyor (İstanbul kanonikleştirmesi deliği
+> kapattı). Dolayısıyla Dalga 3 "görünmeyen ilanı kurtarma" işi DEĞİL; kazancı
+> (1) `= integer` gerçek index kullanır, (2) yazım bozulması bir daha radar'ı köreltemez,
+> (3) Dalga 5 metin kolonlarını düşürünce bu fonksiyonlar kırılmaz.
+>
+> 🔀 **API sözleşmesi:** RPC'ler `province_id` alır, HTTP katmanı **il adı almaya devam
+> eder**; çeviri route sınırında `ilId()` ile yapılır. Sebep: `AnalitikClient.tsx`
+> baştan sona il adıyla çalışıyor. Tanınmayan il adı **400** döner — sessizce `null`
+> geçmek RPC tarafında "tüm iller" anlamına gelirdi ve kullanıcı yanlış veriye bakardı.
+
 | Dosya | Değişiklik | Risk |
 |---|---|---|
 | `app/_components/HomeClient.tsx` | `:711` `i.kalkis?.includes(kalkis)` ve `:712` `d.sehir?.includes(varis)` → id eşitliği. `:820`/`:825` select'leri `value={34}`'e geçer | 🔴 **Filtre şu an tamamen istemcide** — tüm ilanlar çekilip JS'te süzülüyor. `includes` büyük/küçük harfe duyarlı: `ÇORLU` yazılmış durak "Çorlu" aramasında hiç çıkmıyor. Spec md.5'in istediği SQL filtresi buraya yeni bir sunucu yolu eklemeyi gerektirir. |
@@ -115,8 +139,11 @@ Doğrulama: `npx tsc --noEmit` temiz, `test:lokasyon` 21/21, `test:parser` 29/29
 | `docs/20260604_radar_intelligence_rpc.sql` | 4 `ILIKE` + trigram index'i **düşür** | 🟡 Trigram index'in varlık sebebi kalmıyor |
 | `docs/20260616_radar_analitik_indexes.sql` | `idx_listings_origin_city_created` → province sürümü | 🟢 |
 | `docs/20260701_nearby_listings_rpc.sql` | `:63` `origin_city ILIKE p_city` | 🟡 |
-| `app/moderator/page.tsx` | İl gösterimi `ilAdi(id)`, filtre `province_id` (spec md.6) | 🟢 |
-| `app/admin/radar/*`, `app/api/admin/radar/*` | RPC dönüşleri | 🟢 |
+| `app/moderator/page.tsx` | ✅ `duzenleKaydet()` çift yazıma geçti (`origin_province_id` + durak `province_id`), `aliasOgren()` katlama hatası düzeltildi | 🔴 **AÇIK BULUNAN BUG:** düzenleme yolu server action'dan geçmiyordu; metni düzeltip id'yi ESKİ DEĞERDE bırakıyordu. Dalga 3'ten sonra moderatör düzeltmesi radar'a hiç işlemeyecekti. |
+| `app/api/admin/radar/route.ts` | ✅ `ilId()` ile ada→id, tanınmayan il 400 | 🟢 |
+| `app/api/admin/radar/analitik/route.ts` | ✅ `city`+`counterpart` → `p_province_id`/`p_counterpart_id` | 🟢 |
+| `app/api/listings/yakin/route.ts` | ✅ `get_nearby_listings_by_city` → `_by_province` | 🟢 `enYakinIl` 81 anahtarı `locations.json` ile birebir doğrulandı |
+| `app/admin/radar/analitik/AnalitikClient.tsx` | **Değişmiyor** — RPC hem `province_id` hem kanonik `city` döndürüyor | 🟢 |
 | `app/ilan/[id]/page.tsx`, `app/panel/*`, `app/u/[username]/*` | Salt gösterim | 🟢 |
 
 ### Dalga 4 — AI parser
@@ -177,11 +204,14 @@ yazım döneminde metin kolonu **birinci sınıf veri olarak kalır** — Dalga 
   **2.4 = 0**. Blok 2'nin güvenliği migration'ın 8.2 çapraz kontrolüne dayanıyordu: id ile metin
   hiçbir yerde çelişmediği için id, metni onaracak **otorite** olarak kullanılabildi. Bu,
   `province_id` migration'ının ilk somut getirisi.
-- **İlçe adımları korunuyor.** `aliases.district` metin kalmaya devam ediyor; runbook'un Adım 3
-  (ilçe yazımı), Adım 4 (NULL ilçe doldurma) ve Adım 6 (elle kararlar) ile
-  `docs/20260729_alias_normalize_trigger.sql` **çalıştırılmalı**.
-- Trigger olmadan `learn-aliases` yeni bozuk satır üretmeye devam edebilir — kanonikleştirme
-  tek seferlik bir temizlik, kalıcı koruma değil.
+- ✅ **Kalıcı koruma kuruldu (30 Tem 2026).** Sıra: `docs/20260730_alias_adim9_kopya_pasiflestir.sql`
+  (612 katlanmış kopya `is_active=false`, kayıpsız, yedek `public.aliases_adim9_yedek`) →
+  `docs/20260729_alias_normalize_trigger.sql` BÖLÜM 1 (`aliases_normalize_trg`) + BÖLÜM 2
+  (kısmi UNIQUE `aliases_katlanmis_anahtar_uniq`) → BÖLÜM 3 doğrulamaları (üçü de geçti).
+  `learn-aliases` artık DB seviyesinde katlanmış kopya üretemiyor; kanonikleştirme tek seferlik
+  bir temizlikti, tekilliği bundan sonra indeks garanti ediyor.
+- **İlçe adımları hâlâ açık.** `aliases.district` metin kalmaya devam ediyor; runbook'un Adım 3
+  (ilçe yazımı), Adım 4 (NULL ilçe doldurma) ve Adım 6 (elle kararlar) **bekliyor**.
 
 ## Bilinen tuzaklar
 

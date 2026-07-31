@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin, getServiceSupabase } from '../../../../../lib/auth';
+import { ilId } from '../../../../../lib/lokasyon';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,13 +29,28 @@ export async function GET(req: NextRequest) {
 
   if (view === 'city') {
     if (!city) return NextResponse.json({ error: 'city parametresi gerekli' }, { status: 400 });
+
+    // Dalga 3: RPC `province_id` alıyor; HTTP katmanı il adı almaya devam ediyor.
+    // Tanınmayan ad → 400. Sessizce null geçmek "filtresiz" anlamına gelir ve
+    // kullanıcı yanlış veriye bakar.
+    const provinceId = ilId(city);
+    if (provinceId === null) {
+      return NextResponse.json({ error: `Tanınmayan il: ${city}` }, { status: 400 });
+    }
+
     const counterpart = searchParams.get('counterpart')?.trim() || null;
-    // p_counterpart her zaman geçilir (null dahil) — Supabase overload belirsizliğini önlemek için
+    const counterpartId = counterpart ? ilId(counterpart) : null;
+    if (counterpart && counterpartId === null) {
+      return NextResponse.json({ error: `Tanınmayan karşı il: ${counterpart}` }, { status: 400 });
+    }
+
+    // p_counterpart_id her zaman geçilir (null dahil) — Supabase overload
+    // belirsizliğini önlemek için (bkz. 20260616_radar_analitik_indexes.sql).
     const { data, error } = await svc.rpc('get_radar_city_detail', {
-      p_city:        city,
-      p_direction:   direction,
-      p_days:        days,
-      p_counterpart: counterpart,
+      p_province_id:    provinceId,
+      p_direction:      direction,
+      p_days:           days,
+      p_counterpart_id: counterpartId,
     });
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json(data ?? {});

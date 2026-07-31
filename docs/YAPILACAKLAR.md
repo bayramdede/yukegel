@@ -19,9 +19,8 @@
 > hem durakta. ⚠️ Testte `source` uydurma değer alamaz — `listings_source_check` var, geçerli
 > küme `whatsapp|facebook|telegram|manual` (ilk denemede 23514 aldık).
 >
-> ⏳ **SIRADAKİ: `npm run deploy`.** SQL canlıda ama kod değil; deploy'a kadar RPC'ye eski
-> gövde gidiyor (id yine de doluyor — v3 metinden türetiyor, bu tasarımın asıl faydası).
-> Deploy'dan **24 saat sonra** v3 dosyasının sonundaki iki kapsama sorgusunu çalıştır:
+> ✅ **DEPLOY YAPILDI** — `main` @ `4f09ee5`, 30 Tem 2026 18:13.
+> ⏳ **SIRADAKİ: kapsama ölçümü.** 31 Tem 18:13'ten sonra v3 dosyasının sonundaki iki sorguyu çalıştır:
 > `eksik` ≈ 0 ve ikinci sorgu **sıfır satır** olmalı; olmazsa RPC'yi atlayan bir yazma yolu var.
 >
 > Migration'daki 6.A geri doldurma güncellemesi idempotent — arada oluşmuş NULL'lar için
@@ -35,6 +34,45 @@
 > `province_id`'yi `origin_city` metninden `il_key()` ile kendisi türetiyor ve metni kanonik ada
 > çevirerek yazıyor. Çağıran unutsa bile id doluyor, ve `origin_city='istanbul'` sınıfı bozulma
 > bir daha doğamıyor. (Tuzak `district_official` gibi DB'den türetilemeyen alanlar için sürüyor.)
+>
+> ✅ **W5 ALIAS DB TARAFI KAPANDI (30 Tem 2026).** Adım 9 →
+> `docs/20260730_alias_adim9_kopya_pasiflestir.sql`: **612** katlanmış kopya `is_active=false`
+> (silinmedi, yedek `public.aliases_adim9_yedek`), **1270** aktif kaldı. Kayıpsız — 552 grubun
+> hiçbirinde `normalized`/`district` ayrışmıyordu. Ardından `20260729_alias_normalize_trigger.sql`
+> BÖLÜM 1 (trigger) + BÖLÜM 2 (kısmi UNIQUE indeks) kuruldu, BÖLÜM 3'ün üç doğrulaması da geçti.
+> Katlanmış alias kopyası artık DB seviyesinde doğamaz.
+> ⏳ Runbook'un **Adım 3, 4, 6** (ilçe yazımı, NULL ilçe, elle kararlar) hâlâ açık.
+>
+> ⏳ **DALGA 3 KODU HAZIR — SQL HENÜZ ÇALIŞTIRILMADI (30 Tem 2026).**
+> Migration `docs/20260730_dalga3_radar_province_id.sql`, keşif `docs/20260730_dalga3_kesif.sql`.
+> Kod tarafı bitti: `api/admin/radar`, `api/admin/radar/analitik`, `api/listings/yakin`
+> (RPC'ler artık `province_id` alıyor, çeviri `ilId()` ile route sınırında) ve
+> `app/moderator/page.tsx` `duzenleKaydet()` çift yazıma geçti.
+> `npx tsc --noEmit` temiz · `test:lokasyon` 21/21 · `test:parser` 29/29.
+>
+> 🚨 **SIRA ÖNEMLİ — ARADA KESİNTİ PENCERESİ VAR.** Eski RPC imzaları DROP ediliyor;
+> SQL çalıştıktan sonra ESKİ kod `PGRST202` alır, SQL çalışmadan YENİ kod da `PGRST202`
+> alır. Yani: **SQL (BÖLÜM 0→1→2→3→4) → hemen `npm run deploy`.** Arayı kısa tut.
+> Kabul kriteri **BÖLÜM 5.6**: eski metin sayımı ile yeni id sayımı ilde ilde eşit olmalı,
+> sorgu **sıfır satır** dönmeli. Satır dönerse **deploy etme**.
+> BÖLÜM 6'daki metin/trigram index DROP'ları bilerek çalıştırılmıyor — önce ~1 hafta
+> `pg_stat_user_indexes` ile boşta olduklarını ölçmek gerekiyor.
+>
+> 🐛 **DALGA 3'TE BULUNAN İKİ SESSİZ BUG (ikisi de düzeltildi):**
+> 1. `app/moderator/page.tsx::duzenleKaydet()` server action'dan geçmiyordu; moderatör
+>    kalkış ilini düzeltince metin değişiyor, `origin_province_id` **eski değerde kalıyordu**.
+>    Dalga 3'ten sonra bu düzeltmeler radar/nearby'ye hiç işlemeyecekti.
+> 2. `aliasOgren()` içindeki yerel `norm` fonksiyonu önce `.toLowerCase()` sonra
+>    `.replace(/İ/g,'i')` yapıyordu — Türkçe tuzağının ta kendisi. "İkitelli" görünmez
+>    birleşik noktayla yazılıyordu; ne `ilKey()` ne `il_key()` o anahtarı üretir, yani
+>    moderatörün öğrettiği alias **hiçbir zaman eşleşmiyordu**. Artık `ilKey` kullanılıyor.
+>
+> ⏳ **Dalga 3'ün kalanı:** `app/_components/HomeClient.tsx`. Filtre şu an tamamen
+> istemcide (`includes`), sunucu tarafı bir filtre yolu eklemek gerekiyor — ayrı iş.
+>
+> ⚠️ **`SUPABASE_ACCESS_TOKEN` eksik** — `~/.config/yukegel/auto-deploy.env`. Edge Function
+> deploy'ları SESSİZCE atlanıyor (`scripts/auto-deploy.log:19565`). Şu an zararsız
+> (`parse-listing`'de davranış değişikliği yok) ama **Dalga 4 öncesi mutlaka geri konmalı**.
 >
 > **Kalan dalgalar (kod):**
 > - [ ] **Dalga 3 — okuma/filtre/moderasyon.** `HomeClient` (🔴 filtre şu an tamamen istemcide,
