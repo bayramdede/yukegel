@@ -53,7 +53,11 @@
 > yani engel "kısa pencere" değil **"Dalga 3 daha dün deploy edildi"** — sayacın %99'u eski
 > kodu ölçtü. 🚨 **Yeni kural, asimetrik okuma:** metin indekslerinde `idx_scan = 0` geçerli
 > kanıttır (Dalga 3 metinden uzaklaştırdı, talep artamaz), `> 0` kanıt DEĞİLDİR.
-> 🚨 Beklenmeyen üçüncü kopya grubu çıktı: `shadow_profiles (listing_count DESC)` ×2, ölçülmemiş.
+> 🚨 **Kopya indeks avında iki ayrı tarama gerekir:** `pg_get_indexdef` metnini karşılaştırmak
+> yalnız METİNSEL kopyayı bulur. `shadow_profiles`'ta `phone_key` (UNIQUE) + `phone_idx` (düz)
+> aynı kolonda — UNIQUE btree düz btree'nin her sorgusunu karşılar, yani düz olan gereksiz;
+> ama imzalar farklı metin olduğu için tarama onu KAÇIRIR. **İşlevsel kapsama** için ayrı
+> sorgu şart (kolon-öneki karşılaştırması) — `20260731_index_temizligi.sql` BÖLÜM 7.E.
 > 🚨 `raw_posts_dedup_idx` kararı tersine döndü — kısıt olarak gereksiz ama **86k tarama** ile
 > aktif sorgu indeksi; düşürülmeyecek. Bugün düşürülebilir ≈ **127 MB**.
 > ✅ **KALICI KORUMA KURULDU (30 Tem 2026).** `20260730_alias_adim9_kopya_pasiflestir.sql`
@@ -861,6 +865,7 @@ Açık rotalar: /giris, /auth/, /profil-tamamla, /nasil-calisir, /hakkimizda,
 - Vercel env → dashboard; `.next` cache → `rm -rf .next`
 - Supabase → Redirect URLs'e production URL eklenmeli
 - **Ağır/çoklu-dosya işleyen API route'ları** (`whatsapp-parse`, `learn-aliases`, `crm/[id]/analiz`) → `export const maxDuration = 60` şart; yoksa Vercel default timeout'ta düz-metin hata sayfası ("An error occurred with your deployment...") döner ve frontend'in `res.json()` çağrısı "Unexpected token" hatasıyla patlar
+- **`maxDuration` bütçesi ile route içindeki `AbortController` süresi AYRI iki şeydir — senkron tutulmazsa bütçe çöpe gider** (31 Tem 2026, `learn-aliases`). Route `maxDuration = 60` ilan ediyordu ama LLM fetch'i `setTimeout(..., 8000)` ile kesiliyordu: panelin en düşük seçeneği olan limit=10'da bile *"LLM 8 saniyede yanit vermedi"* dönüyordu ve fonksiyonun 52 saniyesi hiç kullanılmıyordu. Kural: iç timeout `maxDuration` eksi DB turları payı olacak (burada 45 sn) ve **platform sınırının altında kalacak** — yoksa Vercel'in 504'ü bizim anlamlı hatamızın önüne geçer. İkinci tuzak: **süreyi hata metnine sabit yazma.** Eski mesaj "8 saniyede" diyordu; timeout değişince yalan söylemeye başlardı, artık `LLM_TIMEOUT_MS`'ten türetiliyor. Üçüncüsü: **hata metni kullanıcının yapamayacağı şeyi önermesin** — eski metin "limit azalt" diyordu ama 10 zaten tabandı.
 - **Frontend fetch + `.json()` pattern'i** → önce `res.text()` al, sonra `JSON.parse` dene (try/catch); Vercel platform hataları (413/504) JSON değil HTML/düz-metin döner
 - **`write_file` tüm dosyayı ezer** — küçük değişiklikler için `str_replace` kullan
 - **İnline component anti-pattern**: Parent fonksiyonu içinde tanımlanan component'leri JSX olarak çağırmak (`<EditForm />`) her render'da yeni component tipi yaratır → input focus kaybolur, cursor başa döner. Çözüm: fonksiyon çağrısı (`{EditForm({})}`) veya parent dışına taşı.

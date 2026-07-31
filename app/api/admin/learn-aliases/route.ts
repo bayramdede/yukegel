@@ -12,6 +12,18 @@ import {
 export const runtime = 'nodejs';
 export const maxDuration = 60; // LLM keşif çağrısı için
 
+// 🚨 31 Tem 2026 — "LLM 8 saniyede yanit vermedi" HATASININ KAYNAĞI.
+// `maxDuration` 60 sn bütçe veriyordu ama LLM fetch'i 8000 ms'de abort ediliyordu:
+// fonksiyonun 52 saniyesi hiç kullanılmadan çöpe gidiyordu. Keşif prompt'u küçük
+// değil — `mevcutMap` 500'e kadar alias çiftini (~15 kB) taşıyor, üstüne 10×200
+// karakter ilan metni ve 1024 token çıktı geliyor. Haiku'nun bunu 8 sn'de
+// bitirmesi garanti değil; limit=10 ile bile patlıyordu.
+// Bütçe: 60 sn toplam − ~5 sn (iki DB select + öneri yazma turu) − ~2 sn soğuk
+// başlangıç payı ⇒ LLM'e 45 sn. Vercel fonksiyonu kendi 60 sn'sinde ölmeden
+// önce bizim abort'umuz devreye girsin diye üst sınırın altında bırakıldı;
+// böylece kullanıcı anlamlı bir hata görür, 504 duvarı görmez.
+const LLM_TIMEOUT_MS = 45_000;
+
 // ⚠️ `is_active` / `is_approved` TUZAĞI (W5/D2'de tespit edildi, bilinçli olarak
 // DEĞİŞTİRİLMEDİ — kapsam dışı):
 // `parse-listing/index.ts:44` ve `whatsapp-parse/route.ts:344` alias listesini
@@ -194,6 +206,12 @@ export async function POST(req: NextRequest) {
       .in('type', ['city', 'district'])
       .limit(500);
 
+    // ⚠️ Bu liste prompt'un en büyük parçası: 500 çift ≈ 15 kB, ilan metinlerinin
+    // toplamından kat kat fazla. Gecikmenin ana kaynağı bu (31 Tem timeout'unun
+    // arka planı). Kısaltmak CAZİP ama YAPILMADI: aşağıdaki 5b filtresi mevcut
+    // alias'ları zaten sunucu tarafında eliyor, yani liste doğruluk için değil
+    // VERİM için burada — LLM'e "bunları önerme" demezsen tur başına gelen yeni
+    // alias sayısı düşer, tekrarlar 5b'de silinip boşa dönersin.
     const mevcutMap = (mevcutAliaslar ?? [])
       .map((a: any) => `"${a.alias}"=>"${a.normalized}"`)
       .join(', ');
@@ -269,7 +287,7 @@ KURALLAR:
     let llmResponse: any;
     try {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 8000); // 8s hard timeout
+      const timeout = setTimeout(() => controller.abort(), LLM_TIMEOUT_MS);
       let res: Response;
       try {
         res = await fetch('https://api.anthropic.com/v1/messages', {
@@ -295,8 +313,12 @@ KURALLAR:
       }
       llmResponse = await res!.json();
     } catch (e: any) {
+      // ⚠️ Mesaj sabit yazilmaz: sure LLM_TIMEOUT_MS'ten turetilir. Eski surumde
+      // "8 saniyede" metne gomuluydu ve timeout degisince yalan soylemeye basladi.
+      // Ayrica eski metin "limit azalt" diyordu — panelin en dusuk secenegi zaten
+      // 10; kullanicinin yapabilecegi bir sey yoktu, olu tavsiyeydi.
       const mesaj = e?.name === 'AbortError'
-        ? 'LLM 8 saniyede yanit vermedi — limit azalt veya tekrar dene'
+        ? `LLM ${Math.round(LLM_TIMEOUT_MS / 1000)} saniyede yanit vermedi — tekrar dene, surerse Anthropic tarafinda gecikme var demektir`
         : `LLM erisim hatasi: ${e.message}`;
       console.error('[learn-aliases] Anthropic fetch hatasi:', e?.name, e?.message, e?.cause);
       return NextResponse.json({ error: mesaj }, { status: 502 });

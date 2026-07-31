@@ -18,9 +18,16 @@ CREATE TABLE IF NOT EXISTS public.shadow_profiles (
 );
 
 -- İndeksler
-CREATE INDEX IF NOT EXISTS shadow_profiles_phone_idx ON public.shadow_profiles (phone);
+-- 🚨 31 Tem 2026 — AŞAĞIDAKİ İKİ SATIR BİLEREK YORUMA ALINDI, geri açma.
+-- Gerekçe: `docs/20260731_index_temizligi.sql` BÖLÜM 7.C / 7.E.
+--   • phone_idx      → `shadow_profiles_phone_key` UNIQUE (phone) aynı kolonu
+--     kapsıyor; UNIQUE btree, düz btree'nin karşıladığı her sorguyu karşılar.
+--   • created_at_idx → 122 günlük pencerede 0 tarama.
+-- `IF NOT EXISTS` koruma DEĞİL: indeks düşürüldükten sonra bu dosya yeniden
+-- çalıştırılırsa ikisi de DİRİLİR.
+-- CREATE INDEX IF NOT EXISTS shadow_profiles_phone_idx ON public.shadow_profiles (phone);
 CREATE INDEX IF NOT EXISTS shadow_profiles_status_idx ON public.shadow_profiles (status);
-CREATE INDEX IF NOT EXISTS shadow_profiles_created_at_idx ON public.shadow_profiles (created_at DESC);
+-- CREATE INDEX IF NOT EXISTS shadow_profiles_created_at_idx ON public.shadow_profiles (created_at DESC);
 
 -- updated_at otomatik güncelle
 CREATE OR REPLACE FUNCTION public.set_shadow_profiles_updated_at()

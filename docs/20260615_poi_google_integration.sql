@@ -75,7 +75,12 @@ ALTER TABLE pois ADD CONSTRAINT pois_category_check
 -- ── 4. İndeksler ──────────────────────────────────────────
 
 -- Google Place ID araması
-CREATE INDEX IF NOT EXISTS pois_google_place_id_idx ON pois (google_place_id);
+-- 🚨 31 Tem 2026 — BİLEREK YORUMA ALINDI, geri açma. Sonradan eklenen
+-- `pois_google_place_id_unique` UNIQUE (google_place_id) aynı kolonu kapsıyor;
+-- UNIQUE btree, düz btree'nin karşıladığı her sorguyu karşılar. 568 kB boşuna
+-- bakım. `IF NOT EXISTS` koruma değil — bu dosya yeniden çalıştırılırsa DİRİLİR.
+-- Gerekçe: `docs/20260731_index_temizligi.sql` BÖLÜM 7.E.
+-- CREATE INDEX IF NOT EXISTS pois_google_place_id_idx ON pois (google_place_id);
 
 -- is_active filtresi (public listede sık kullanılır)
 CREATE INDEX IF NOT EXISTS pois_is_active_idx ON pois (is_active);

@@ -61,9 +61,18 @@
 >   pencere **122,6 gün** — "sayaç penceresi kısa" gerekçesi yanlıştı. Ama Dalga 3 kodu
 >   **31 Tem'de** deploy edildi, yani sayacın ~%99'u ESKİ kodu ölçtü. Doğru kural asimetrik:
 >   metin indekslerinde `idx_scan = 0` geçerli kanıt, `> 0` **kanıt değil**.
-> - **🚨 Beklenmeyen üçüncü kopya grubu:** `shadow_profiles` üzerinde iki özdeş
->   `(listing_count DESC)`. BÖLÜM 2 bu tabloyu sorgulamamıştı → kullanım verisi YOK,
->   ölçülmeden düşürülmez (BÖLÜM 7.C).
+> - **Üçüncü kopya grubu ölçüldü (7.C):** `shadow_profiles` `(listing_count DESC)` ×2,
+>   24 ve 12 tarama — ikisi de kullanımda, yani eşdeğer indeks davranışı. En az şişmiş
+>   olan (`shadow_profiles_listing_count_idx`, 160 kB) tutulur. Ayrıca
+>   `shadow_profiles_created_at_idx` 122 günde **0 tarama** ve burada S1 çekincesi yok
+>   (Dalga 3 bu tabloya dokunmadı) → temiz drop.
+> - **🚨 BÖLÜM 1'İN KÖRLÜĞÜ BULUNDU (7.E).** `shadow_profiles_phone_key` (UNIQUE, kısıt)
+>   ile `shadow_profiles_phone_idx` (düz btree) aynı kolonda; UNIQUE btree düz btree'nin
+>   yaptığı her sorguyu yapar, yani düz olan işlevsel olarak gereksiz — ama BÖLÜM 1 bunu
+>   kopya SAYMAZ, çünkü imzayı `pg_get_indexdef` **metninden** çıkarıyor ve
+>   "CREATE UNIQUE INDEX" ≠ "CREATE INDEX". Ders: metinsel kopya ile **işlevsel kapsama**
+>   ayrı iki tarama gerektirir. 7.E'ye hem doğrulama sorgusu hem şema geneli aday tarayıcı
+>   eklendi (kolon-öneki kapsaması; opclass/sıralama farkına bakmaz, karar vermez).
 > - **🚨 `raw_posts_dedup_idx` kararı TERSİNE DÖNDÜ — düşürülmeyecek.** Kısıt olarak
 >   gereksiz (gerekçe kısmi indekslere rağmen ayakta, predikatlar ayrışmıyor **kapsıyor**),
 >   ama **86.319 tarama** almış — `idx_raw_posts_clean_hash`'ten (83.358) fazla. Sorgu
@@ -613,6 +622,24 @@ sayfaya** düşüyordu. Aynı sayfa, iki farklı davranış, sıfır hata sinyal
       döndüğünü doğrula; ayrıca **Google ile girişte de** döndüğünü ayrıca dene
 
 ## ⚠️ BUGLAR
+- [x] **A11 — "AI Keşfi Başlat" her seferinde timeout** ✅ kod tarafı tamam (31 Tem 2026) — **deploy bekliyor**
+  Belirti: `/admin/ogrenme-merkezi` → limit **10** (panelin en düşük seçeneği) ile "AI Keşfi
+  Başlat" → `LLM 8 saniyede yanit vermedi — limit azalt veya tekrar dene`.
+  Sebep: `app/api/admin/learn-aliases/route.ts` `maxDuration = 60` ilan ediyor ama LLM
+  fetch'i `setTimeout(() => controller.abort(), 8000)` ile kesiliyordu. **Bütçenin 52
+  saniyesi hiç kullanılmıyordu.** İş 8 sn'ye sığmıyor: prompt'un en büyük parçası
+  `mevcutMap` (500 alias çifti ≈ 15 kB), üstüne 10×200 karakter ilan metni ve
+  `max_tokens: 1024` çıktı var.
+  Hata mesajının kendisi ikinci bir hataydı: **"limit azalt" diyordu ama 10 zaten tabandı** —
+  kullanıcıya yapamayacağı şey öneriliyordu; ayrıca "8 saniye" metne gömülüydü, timeout
+  değişince yalan söyleyecekti.
+  Çözüm: `LLM_TIMEOUT_MS = 45_000` sabiti (60 sn bütçe − DB turları − soğuk başlangıç payı;
+  Vercel'in 504'ü bizim hatamızın önüne geçmesin diye sınırın altında). Mesaj artık süreyi
+  sabitten türetiyor ve "tekrar dene" diyor.
+  ⚠️ `mevcutMap` **bilerek kısaltılmadı**: 5b filtresi mevcut alias'ları zaten sunucuda eliyor,
+  yani liste doğruluk için değil **verim** için orada — kaldırılırsa LLM tekrarları önerir,
+  tur başına yeni alias sayısı düşer.
+  Doğrulama: `npx tsc --noEmit` temiz. **Canlı test deploy sonrası** (Görev #19 ile aynı turda).
 - [x] **A10 — "Hesabınız birleştirildi" sonsuz giriş döngüsü** ✅ (29 Tem 2026)
   Belirti: giriş yapılıyor → "Hesabınız başka bir hesabınızla birleştirildi… tekrar giriş
   yapın" → tekrar giriş → aynı mesaj. **Hiç giriş yapılamıyor.**

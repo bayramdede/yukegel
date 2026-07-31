@@ -110,7 +110,13 @@ CREATE TABLE IF NOT EXISTS poi_reviews (
   UNIQUE (poi_id, user_id)
 );
 
-CREATE INDEX IF NOT EXISTS poi_reviews_poi_id_idx ON poi_reviews (poi_id);
+-- 🚨 31 Tem 2026 — poi_id indeksi BİLEREK YORUMA ALINDI, geri açma. Yukarıdaki
+-- `UNIQUE (poi_id, user_id)` kısıtının indeksi `poi_id` ile BAŞLIYOR, yani düz
+-- `(poi_id)` indeksinin karşıladığı her sorguyu zaten karşılıyor (kolon öneki
+-- kapsaması). `IF NOT EXISTS` koruma değil — dosya yeniden çalıştırılırsa DİRİLİR.
+-- ⚠️ `user_id` indeksi KALIYOR: unique kısıtta ikinci sırada, önek değil, kapsanmıyor.
+-- Gerekçe: `docs/20260731_index_temizligi.sql` BÖLÜM 7.E.
+-- CREATE INDEX IF NOT EXISTS poi_reviews_poi_id_idx ON poi_reviews (poi_id);
 CREATE INDEX IF NOT EXISTS poi_reviews_user_id_idx ON poi_reviews (user_id);
 
 -- ============================================================

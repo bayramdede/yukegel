@@ -443,6 +443,202 @@ order by s.idx_scan desc;
 -- İkisi de özdeş `(listing_count DESC)` olduğu için hangisinin tutulacağı
 -- performansı değiştirmez; küçük olanı tut, diğerini düşür (toplam 400 kB,
 -- kazanç küçük — asıl fayda yazma yolundan bir indeks bakımı eksilmesi).
+--
+-- ── 7.C ÖLÇÜM SONUCU (31 Tem 2026) ─────────────────────────────────────────
+--   idx_shadow_profiles_listing_count   24 tarama · 240 kB
+--   shadow_profiles_listing_count_idx   12 tarama · 160 kB
+-- İkisi de kullanımda; beklenen davranış (eşdeğer indeksler arasında planlayıcı
+-- keyfî seçer, iş bölünür — B1'deki aynı akıl yürütme). KARAR: en az şişmiş
+-- olanı tut.
+--   TUT:  shadow_profiles_listing_count_idx   (160 kB)
+--   drop index concurrently if exists public.idx_shadow_profiles_listing_count;
+--
+-- ⚠️ Bu ad iki migration dosyasında `create index` olarak duruyor
+--    (`docs/20260610_shadow_profile_listing_count.sql`,
+--     `docs/20260630_crm_denormalize_listing_count.sql`) — o dosyalar yeniden
+--    çalıştırılırsa indeks DİRİLİR. Zararsız ama tekrar kopya olur.
+--
+-- ── BONUS: 122 günde hiç kullanılmamış ──────────────────────────────────────
+--   drop index concurrently if exists public.shadow_profiles_created_at_idx;  -- 208 kB, 0 tarama
+-- (Dalga 3 `shadow_profiles` sorgularına dokunmadı, yani buradaki 0 için
+--  S1'deki "eski kod" çekincesi YOK — kanıt temiz.)
+
+
+-- ───────────────────────────────────────────────────────────────────────────
+-- 7.E — 🚨 BÖLÜM 1'İN KÖRLÜĞÜ: "UNIQUE ÜST-KÜMESİ" KOPYALARI
+-- ───────────────────────────────────────────────────────────────────────────
+-- 7.C çıktısı Bölüm 1'in yakalayamadığı bir kopya sınıfı gösterdi:
+--   shadow_profiles_phone_key   48.868 tarama · 240 kB   (UNIQUE — kısıt)
+--   shadow_profiles_phone_idx        61 tarama · 232 kB   (düz btree)
+--
+-- Bölüm 1 bunları kopya SAYMAZ, çünkü imzayı `pg_get_indexdef` metninden
+-- çıkarıyor ve "CREATE UNIQUE INDEX …" ile "CREATE INDEX …" farklı metinler.
+-- Oysa `(phone)` üzerindeki UNIQUE btree, düz btree'nin yapabildiği HER
+-- sorguyu yapar — düz olan işlevsel olarak gereksizdir. Yani Bölüm 1 yalnız
+-- METİNSEL kopyayı bulur, İŞLEVSEL kapsamayı bulmaz.
+--
+-- 🚨 K2 gereği kısıt destekleyen (`_key`) ASLA düşürülmez; düşürülecek olan
+--    düz indekstir. Ama önce ikisinin AYNI kolon(lar)da olduğu doğrulanmalı —
+--    ad benzerliği kanıt değil.
+
+select
+  ic.relname                    as indeks,
+  i.indisunique                 as unique_mi,
+  exists (select 1 from pg_constraint k where k.conindid = i.indexrelid) as kisit_var,
+  i.indpred is not null         as kismi_mi,
+  pg_get_indexdef(i.indexrelid) as tanim
+from pg_index i
+join pg_class ic on ic.oid = i.indexrelid
+join pg_class c  on c.oid  = i.indrelid
+where c.relname = 'shadow_profiles'
+  and ic.relname in ('shadow_profiles_phone_key', 'shadow_profiles_phone_idx')
+order by ic.relname;
+
+-- ── 7.E DOĞRULAMA SONUCU (31 Tem 2026) ─────────────────────────────────────
+--   shadow_profiles_phone_idx  düz btree (phone)   · kismi_mi=false
+--   shadow_profiles_phone_key  UNIQUE btree (phone) · kismi_mi=false · kisit_var=true
+-- Aynı kolon, ikisi de tam (kısmi değil), UNIQUE olan kısıt destekliyor.
+-- ⇒ Kapsama KANITLANDI. K2 gereği `_key` dokunulmaz, düşürülecek olan düz indeks:
+--   drop index concurrently if exists public.shadow_profiles_phone_idx;   -- 232 kB
+
+
+-- 🚨 ÇALIŞTIRMA TUZAĞI (31 Tem'de yaşandı): aşağıdaki sorgu `with idx as (…)`
+--    ile BAŞLIYOR. Supabase editöründe metni fareyle seçip çalıştırırken CTE'yi
+--    dışarıda bırakmak kolay — o zaman `42P01: relation "idx" does not exist`
+--    gelir. Sorgu HATALI DEĞİL, seçim eksik. `with`'ten `;`ye kadar tamamını al.
+--    (BÖLÜM 1 ve BÖLÜM 4 sorguları da CTE'li — aynı tuzak orada da geçerli.)
+--
+-- ⚠️ Aynı sınıf hata tüm şemada olabilir. Genel tarama (yalnız ADAY listeler,
+--    karar VERMEZ). SINIRLARI:
+--      • Yalnız kolon ÖNEKİ kapsamasına bakar; `opclass`, `collation`, ASC/DESC
+--        ve NULLS FIRST/LAST farkını GÖRMEZ. Aday çıkanı elle `pg_get_indexdef`
+--        ile karşılaştır — sıralama farkı varsa kapsama İDDİASI ÇÖKER.
+--      • İfade (expression) indekslerini dışlar: onlarda `indkey` 0 içerir ve
+--        0'lar birbirine eşit görünüp SAHTE eşleşme üretir.
+--      • Kısmi indeksleri dışlar (`indpred is null`) — predikat kapsaması ayrı iş.
+
+with idx as (
+  select
+    c.relname     as tablo,
+    ic.relname    as indeks,
+    i.indisunique as unique_mi,
+    exists (select 1 from pg_constraint k where k.conindid = i.indexrelid) as kisit_var,
+    i.indrelid,
+    i.indexrelid,
+    -- 🚨 int2vector doğrudan int[]'e cast EDİLEMEZ; metinden geçmek tek güvenli yol.
+    string_to_array(i.indkey::text, ' ')::int[] as kolonlar,
+    pg_relation_size(i.indexrelid)             as boyut
+  from pg_index i
+  join pg_class     ic on ic.oid = i.indexrelid
+  join pg_class     c  on c.oid  = i.indrelid
+  join pg_namespace n  on n.oid  = c.relnamespace
+  where n.nspname = 'public'
+    and c.relkind = 'r'
+    and i.indpred is null                        -- kısmi olanları dışla
+    and i.indisvalid
+    and 0 <> all (string_to_array(i.indkey::text, ' ')::int[])  -- ifade indeksini dışla
+    -- 🚨 erişim yöntemi `pg_index`'te DEĞİL, indeksin `pg_class` satırında:
+    --    `ic.relam`. (`i.indam` diye bir kolon yok → 42703.) GIN/GiST'i burada
+    --    eliyoruz; trigram indeksleri btree kapsamasına girmez.
+    and ic.relam = (select oid from pg_am where amname = 'btree')
+)
+select
+  u.tablo,
+  u.indeks                as kapsayan_unique,
+  d.indeks                as gereksiz_aday,
+  pg_size_pretty(d.boyut) as kazanc,
+  pg_get_indexdef(u.indexrelid) as kapsayan_tanim,
+  pg_get_indexdef(d.indexrelid) as aday_tanim,   -- 🚨 İKİSİNİ ELLE KARŞILAŞTIR
+  format('drop index concurrently if exists public.%I;', d.indeks) as dusur_ddl
+from idx u
+join idx d
+  on d.indrelid = u.indrelid
+ and u.unique_mi
+ and not d.unique_mi
+ and not d.kisit_var
+ and d.indexrelid <> u.indexrelid
+ -- düz indeksin kolonları, unique indeksin kolon ÖNEKİ ise kapsanıyor demektir
+ and u.kolonlar[1:array_length(d.kolonlar, 1)] = d.kolonlar
+order by d.boyut desc;
+
+-- ── 7.E ŞEMA TARAMASI SONUCU (31 Tem 2026) — 5 ADAY, HEPSİ GEÇERLİ ─────────
+-- Beşinin de `aday_tanim`/`kapsayan_tanim` çifti elle karşılaştırıldı: hepsi düz
+-- btree, aynı kolon öneki, DESC/opclass/collation farkı YOK. Kapsama geçerli.
+--
+--   pois            pois_google_place_id_idx   568 kB  ← pois_google_place_id_unique
+--   shadow_profiles shadow_profiles_phone_idx  232 kB  ← shadow_profiles_phone_key
+--   aliases         idx_aliases_alias          104 kB  ← aliases_alias_unique
+--   aliases         idx_aliases_type            56 kB  ← idx_aliases_type_alias
+--   poi_reviews     poi_reviews_poi_id_idx       8 kB  ← poi_reviews_poi_id_user_id_key
+--
+-- 🚨 SIRA TUZAĞI — `aliases`. Tabloda İKİ unique var:
+--     aliases_alias_unique   UNIQUE (alias)
+--     idx_aliases_type_alias UNIQUE (type, alias)
+--   `alias` tek başına tekilse `(type, alias)` zorunlu olarak tekildir; yani
+--   `idx_aliases_type_alias` KISIT olarak gereksiz ve ileride "gereksiz unique"
+--   diye düşürülmeye aday. AMA `idx_aliases_type`'ı BUGÜN düşürmemizin tek
+--   gerekçesi o indeks. İkisi arka arkaya düşerse `type` üzerinde hiç indeks
+--   kalmaz. ⇒ `idx_aliases_type_alias` düşürülecekse ÖNCE `type` sorgusu olup
+--   olmadığı ölçülmeli. (Pratikte `aliases` ~1900 satır ve uygulama tabloyu
+--    `.range()` ile bütün çekiyor — `type` indeksi zaten marjinal.)
+--
+-- 🚨 ÜÇÜ ESKİ MIGRATION'DA `CREATE INDEX IF NOT EXISTS` OLARAK DURUYOR ve o
+--    dosyalar yeniden çalıştırılırsa DİRİLİR. `IF NOT EXISTS` koruma değil —
+--    indeks düşürülmüş olduğu için koşul sağlanır ve yeniden yaratılır.
+--    31 Tem'de üçü de kaynağında yoruma alındı:
+--      docs/20260601_shadow_profiles_crm.sql:21   (phone_idx + created_at_idx)
+--      docs/20260615_poi_google_integration.sql:78 (pois_google_place_id_idx)
+--      docs/20260610_poi_module.sql:113            (poi_reviews_poi_id_idx)
+--    `idx_aliases_alias` / `idx_aliases_type` repoda YOK — panelden elle
+--    yaratılmışlar, dolayısıyla dirilme riski taşımıyorlar.
+
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- 7.F — NİHAİ DÜŞÜRME LİSTESİ (31 Tem 2026 ölçümüyle onaylandı)
+-- ═══════════════════════════════════════════════════════════════════════════
+-- 🚨 HER SATIR AYRI ÇALIŞTIRILIR (K3). Toplam ≈ 128 MB.
+-- 🚨 SIRA: önce bu blok, SONRA 7.A sıfırlama — sıfırlama bu kararların
+--    dayandığı 122 günlük kanıtı siler.
+--
+-- ── Kopya gruplarında hayatta kalan (en az şişmiş olan) ─────────────────────
+--   listing_stops (listing_id)      → TUT: listing_stops_listing_id_idx
+--   listings      (created_at DESC) → TUT: listings_created_at_idx
+--   shadow_profiles (listing_count) → TUT: shadow_profiles_listing_count_idx
+--
+-- drop index concurrently if exists public.idx_listing_stops_listing_id;        -- 17 MB
+-- drop index concurrently if exists public.idx_stops_listing;                   -- 16 MB
+-- drop index concurrently if exists public.idx_listings_created;                -- 11 MB
+-- drop index concurrently if exists public.idx_listings_created_at;             -- 10 MB
+-- drop index concurrently if exists public.idx_shadow_profiles_listing_count;   -- 240 kB
+--
+-- ── 122 günde sıfır tarama ──────────────────────────────────────────────────
+-- drop index concurrently if exists public.idx_listing_stops_city;              -- 21 MB
+-- drop index concurrently if exists public.idx_listing_stops_city_listing_id;   -- 18 MB
+-- drop index concurrently if exists public.listings_origin_city_created_at_idx; -- 17 MB
+-- drop index concurrently if exists public.idx_listings_origin_city_created;    -- 17 MB
+-- drop index concurrently if exists public.idx_listings_no_origin;              -- 8 kB
+-- drop index concurrently if exists public.shadow_profiles_created_at_idx;      -- 208 kB
+--
+-- ── UNIQUE kapsaması (7.E) ──────────────────────────────────────────────────
+-- drop index concurrently if exists public.pois_google_place_id_idx;            -- 568 kB
+-- drop index concurrently if exists public.shadow_profiles_phone_idx;           -- 232 kB
+-- drop index concurrently if exists public.idx_aliases_alias;                   -- 104 kB
+-- drop index concurrently if exists public.idx_aliases_type;                    -- 56 kB
+-- drop index concurrently if exists public.poi_reviews_poi_id_idx;              -- 8 kB
+--
+-- ── DÜŞÜRÜLMEYECEK (bilerek) ───────────────────────────────────────────────
+--   raw_posts_dedup_idx  — kısıt olarak gereksiz AMA 86.319 tarama (S3 / 7.D)
+--   Bölüm 5'teki `tarama > 0` metin indeksleri — ölçüm penceresi Dalga 3'ü
+--   kapsamıyor, karar ~7 Ağu'ya ertelendi (S1 / 7.A)
+--
+-- ── SONRASI ────────────────────────────────────────────────────────────────
+--   1. BÖLÜM 1'i tekrar → sıfır satır
+--   2. BÖLÜM 6.2'yi çalıştır → sıfır satır
+--   3. 7.E taramasını tekrar → sıfır satır
+--   4. analyze listings; analyze listing_stops; analyze raw_posts;
+--      analyze shadow_profiles; analyze pois; analyze poi_reviews; analyze aliases;
+--   5. Duman testi (6.3) + POI sayfası + moderatör alias öğrenme
+--   6. EN SON 7.A sıfırlama
 
 
 -- ───────────────────────────────────────────────────────────────────────────
