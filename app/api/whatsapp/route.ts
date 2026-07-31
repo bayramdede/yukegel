@@ -44,6 +44,20 @@ function normalizePhone(from: string): string {
 }
 
 // ── LLM parse (parse-text ile aynı prompt) ───────────────────────────────────
+//
+// 🚨 `docs/COGRAFI_GECIS.md` Dalga 4 — COĞRAFİ KURALLAR `/api/parse-text` İLE
+// SENKRON TUTULMALI. Prompt iki yerde kopyalı; biri güncellenip diğeri kalırsa
+// iki AI kanalı farklı kalitede veri üretir ve fark yalnızca `province_id` NULL
+// sayısında görünür.
+//
+// ⚠️ BU KANALDA HATA DAHA PAHALI. `/api/parse-text` çıktısı forma prefill oluyor,
+// kullanıcı yanlış kalkışı ekranda düzeltebiliyor. Burada form YOK: `ilanYaz()`
+// `ilCiftYazim()` ile ili çözemezse "Kalkış ili tanınamadı" döner ve ilan HİÇ
+// oluşmaz — kullanıcı WhatsApp'ta düzeltme şansı bulamaz. Bu yüzden "ilçe adını
+// il alanına yazma" kuralı buraya EN AZ parse-text kadar açık yazılmalı.
+//
+// `province_id` AI'dan İSTENMİYOR (plaka kodu saydırmak katlamadan kırılgan);
+// `ilanYaz()` metinden türetiyor.
 async function parseWithLLM(text: string): Promise<any | null> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return null;
@@ -76,12 +90,18 @@ ${text.substring(0, 2000)}
 
 KURALLAR:
 - listing_type: nakliyeci boş araç duyuruyorsa "arac", yük taşıtacak müşteriyse "yuk". Kararsızsan "yuk".
-- origin_city: Türkiye ili, doğru Türkçe yazımıyla.
+- origin_city: SADECE 81 Türkiye İLİNDEN biri, doğru Türkçe yazımıyla ("İstanbul", "Şanlıurfa", "Muğla").
+    ⚠️ ASLA ilçe/belde/semt adı yazma. Metinde yalnızca ilçe geçiyorsa (örn: "Çorlu",
+    "Gebze", "İnegöl") o adı origin_district'e koy, origin_city'ye BAĞLI OLDUĞU İLİ yaz
+    ("Tekirdağ", "Kocaeli", "Bursa"). İl hiç çıkarılamıyorsa null bırak.
+- origin_district: ilçe/semt varsa doğru Türkçe yazımla string, yoksa null.
 - vehicle_type: "TIR" | "Kırkayak" | "Kamyon" | "Kamyonet" | "Panelvan" veya null.
 - body_type: ["Tenteli"|"Açık Kasa"|"Kapalı Kasa"|"Frigorifik"|"Damperli"|"Lowbed"|"Liftli"|"Silo"]. Yoksa [].
 - price: TL sayısı veya null.
 - available_date: YYYY-MM-DD. Bugün: ${bugun}. "yarın" => bugün+1. Belirsizse null.
 - stops: en az 1 varış. Her stop için city zorunlu, diğerleri null olabilir.
+    city: origin_city ile AYNI KURAL — sadece il adı. İlçe geldiyse district'e koy,
+    city'ye bağlı olduğu ili yaz ("Çorlu" → city:"Tekirdağ", district:"Çorlu").
 - contact_phone: 11 haneli, "05" ile başlayan. Bulamazsan null.
 - Bilinmeyenleri null/[] bırak. UYDURMA.
 

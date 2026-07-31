@@ -28,6 +28,20 @@ function extractUrlsFromText(text: string): Array<{ url: string; domain: string;
 // "regex/alias-first, LLM as last resort" felsefesine sadık kalmak için ileride
 // alias-bazlı bir hızlı parse adımı eklenebilir; tekil mesajlarda doğruluk önemli
 // olduğu için ilk versiyonda doğrudan LLM kullanılıyor (Haiku, kısa giriş, ucuz).
+//
+// ── COĞRAFİ SÖZLEŞME (`docs/COGRAFI_GECIS.md` Dalga 4) ──────────────────────
+// 🚨 Bu uç nokta VERİTABANINA YAZMAZ. Çıktı `MetindenIlan.tsx` → `ilan-ver/page.tsx`
+// `aiCiktisiniUygula()` → forma prefill → `ilanYaz()` yolunu izler; `province_id`
+// orada `ilCiftYazim()` ile türetilir. Yani AI'ın plaka kodu üretmesine GEREK YOK
+// ve İSTENMEZ — LLM'e sayı saydırmak, adı katlamaktan çok daha kırılgan.
+// Prompt'un tek işi il adını KATLANABİLİR biçimde vermek.
+//
+// ⚠️ ASIL RİSK yazım hatası değil (`ilCiftYazim` "istanbul", "İSTANBUL", "Istanbul"
+// hepsini katlar); AI'ın `origin_city`'ye İLÇE adı koyması. "Çorlu" gelirse
+// `ilCiftYazim` null döner, `ilNormalize` alanı BOŞ bırakır ve kullanıcı kalkışı
+// elle seçmek zorunda kalır. Prompt kuralları bunu engellemek için var.
+// (Aynı prompt'un ikinci kopyası `app/api/whatsapp/route.ts` — orada aynı hata
+//  formsuz olduğu için ilanı tamamen düşürür. İkisini BİRLİKTE güncelle.)
 
 export async function POST(request: NextRequest) {
   try {
@@ -124,8 +138,11 @@ ${text.substring(0, 2000)}
 
 KURALLAR:
 - listing_type: "yük taşıtacak müşteri" => "yuk", "boş aracı olan nakliyeci" => "arac". Kararsızsan "yuk".
-- origin_city: Türkiye ili, doğru Türkçe yazımla (örn: "İstanbul", "Şanlıurfa", "Kahramanmaraş", "Muğla").
-- origin_district: ilçe varsa Türkçe doğru yazılmış string, yoksa null.
+- origin_city: SADECE 81 Türkiye İLİNDEN biri, doğru Türkçe yazımla (örn: "İstanbul", "Şanlıurfa", "Kahramanmaraş", "Muğla").
+    ⚠️ ASLA ilçe/belde/semt/OSB adı yazma. Metinde yalnızca ilçe geçiyorsa (örn: "Çorlu",
+    "Gebze", "İnegöl", "İkitelli") o adı origin_district'e koy, origin_city'ye BAĞLI OLDUĞU
+    İLİ yaz ("Tekirdağ", "Kocaeli", "Bursa", "İstanbul"). İl hiç çıkarılamıyorsa null bırak.
+- origin_district: ilçe/semt varsa Türkçe doğru yazılmış string, yoksa null.
 - contact_phone: 11 haneli, "05" ile başlayan format. Bulamazsan null. Boşluk/parantez/+90 prefix'i temizle.
 - vehicle_type: ŞU DEĞERLERDEN SADECE BİRİ veya null: "TIR" | "Kırkayak" | "Kamyon" | "Kamyonet" | "Panelvan".
 - body_type: ŞU DEĞERLERDEN sıfır veya birden fazla içeren dizi: "Tenteli" | "Açık Kasa" | "Kapalı Kasa" | "Frigorifik" | "Damperli" | "Lowbed" | "Liftli" | "Silo". Yoksa boş dizi [].
@@ -133,7 +150,9 @@ KURALLAR:
 - available_date: YYYY-MM-DD. Bugün: ${bugun}. "yarın" => bugün+1. "bugün" => ${bugun}. Belirsizse null.
 - date_flexible: metinde "esnek", "her zaman", "haftaya" gibi ifade varsa true, aksi false.
 - stops: en az 1 varış noktası içermeli. Çoklu varış varsa hepsini ekle. Her stop için:
-    - city: zorunlu, Türkiye ili, doğru Türkçe yazımla.
+    - city: zorunlu, SADECE 81 Türkiye İLİNDEN biri, doğru Türkçe yazımla.
+      ⚠️ origin_city ile aynı kural: ilçe adını city'ye YAZMA, district'e koy ve city'ye
+      bağlı olduğu ili yaz ("Çorlu" → city:"Tekirdağ", district:"Çorlu").
     - district, weight_ton, pallet_count, cargo_type: yoksa null.
 - notes: yukarıdaki alanlara sığmayan kısa ek bilgi (yük cinsi, özel şartlar). Yoksa null.
 - Bilinmeyen tüm alanları null/[] olarak bırak. UYDURMA.

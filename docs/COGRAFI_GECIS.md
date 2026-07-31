@@ -149,15 +149,67 @@ Doğrulama: `npx tsc --noEmit` temiz, `test:lokasyon` 21/21, `test:parser` 29/29
 | `app/admin/radar/analitik/AnalitikClient.tsx` | **Değişmiyor** — RPC hem `province_id` hem kanonik `city` döndürüyor | 🟢 |
 | `app/ilan/[id]/page.tsx`, `app/panel/*`, `app/u/[username]/*` | Salt gösterim | 🟢 |
 
-### Dalga 4 — AI parser
+### ✅ DALGA 4 TAMAMLANDI (31 Tem 2026)
 
-`app/api/parse-text/route.ts` ve `supabase/functions/parse-listing/index.ts` prompt'ları
-güncellenir: AI **metin il adı döndürmeye devam eder**, `province_id`'ye çeviriyi
-`lib/lokasyon.ts::ilId()` yapar.
+> ⚠️ **Bu bölümün ilk hâli iki noktada yanlıştı.** Yazan tarafın kaydı olsun diye
+> düzeltilerek bırakıldı — plan metnine güvenip dosya açmadan iş yapılmaması için.
 
-> 🚨 **AI'a doğrudan id ürettirme.** Prompt'a 81 satırlık tabloyu koymak token yakar ve model
-> plaka kodunu uydurur — "Bursa 16 mı 61 mi" hatası ölçülemez biçimde geçer. Deterministik
+**Yanlış 1 — dosyalardan biri hiç LLM kullanmıyor.** Plan
+`supabase/functions/parse-listing/index.ts`'i "prompt güncellenecek" diye listeliyordu.
+O fonksiyon **saf regex + `aliases` tablosu**; içinde prompt YOK. Güncellenecek bir şey
+bulunmadı.
+
+**Yanlış 2 — üçüncü bir prompt kopyası atlanmıştı.** `app/api/whatsapp/route.ts:47`
+`parseWithLLM()` aynı şemayı kendi kopyasıyla istiyor (Twilio webhook'u). Plan bunu hiç
+saymamıştı; yalnız parse-text güncellenseydi iki AI kanalı sessizce ayrışacaktı.
+
+#### Ölçüm: Dalga 4'ün ne kadarı Dalga 2'de zaten kapanmıştı
+
+Üç AI kanalının **yazma** yolu izlendi; hiçbiri `province_id`'yi kendi yazmıyor:
+
+| Kanal | Yazma yolu | `province_id` | `district_official` |
+|---|---|---|---|
+| `/api/parse-text` | ⚠️ **DB'ye yazmıyor** → `MetindenIlan.tsx` → `ilan-ver/page.tsx` `aiCiktisiniUygula()` → forma prefill → `ilanYaz()` | ✅ `ilCiftYazim()` | ✅ `ilceNormalize()` |
+| `/api/whatsapp` (Twilio) | `ilanYaz()` doğrudan | ✅ `ilCiftYazim()` | ✅ `ilceNormalize()` |
+| `parse-listing` (Deno, WhatsApp ZIP) | `ilan_olustur` RPC doğrudan | ✅ RPC v3 `il_key()` ile türetir | ❌ **NULL kalıyor** |
+
+Yani Dalga 2 `ilanYaz()` + RPC v3'ü kapattığı anda id tarafı üç kanalda da bitmişti.
+Dalga 4'e kalan tek gerçek iş prompt kalitesiydi.
+
+#### Yapılan: prompt sertleştirmesi (asıl risk yazım hatası değildi)
+
+`ilCiftYazim()` zaten "istanbul", "İSTANBUL", "Istanbul" hepsini katlıyor — yazım
+varyansı ölü bir risk. **Ölçülen gerçek risk: AI'ın il alanına İLÇE adı koyması.**
+"Çorlu'dan Gebze'ye" metninde model `origin_city:"Çorlu"` döndürüyor; `ilCiftYazim`
+null veriyor.
+
+Sonuç kanala göre farklı ve **WhatsApp'ta çok daha pahalı**:
+
+- `/api/parse-text` → `ilNormalize` alanı boş bırakır, kullanıcı formda ili elle seçer. Rahatsızlık.
+- `/api/whatsapp` → **form yok.** `ilanYaz()` "Kalkış ili tanınamadı" döner, ilan **hiç oluşmaz**,
+  kullanıcı WhatsApp'ta düzeltemez. Sessiz veri kaybı.
+
+Her iki prompt'a aynı kural eklendi: *"SADECE 81 ilden biri; ilçe/belde/semt geldiyse
+onu `district`'e koy, `city`'ye BAĞLI OLDUĞU İLİ yaz (`Çorlu` → `Tekirdağ`+`Çorlu`)."*
+Modelin ilçe→il eşlemesini zaten bilmesi kullanılıyor; 81 satırlık tablo prompt'a
+KONMADI.
+
+> 🚨 **AI'a doğrudan id ürettirme.** Prompt'a plaka tablosunu koymak token yakar ve model
+> kodu uydurur — "Bursa 16 mı 61 mi" hatası ölçülemez biçimde geçer. Deterministik
 > eşleştirme kodda kalmalı. Spec md.4'ün istediği sonuç (DB'ye id yazılması) böyle de sağlanıyor.
+
+> 🚨 **İKİ PROMPT KOPYALI.** `app/api/parse-text/route.ts` ve `app/api/whatsapp/route.ts`.
+> Coğrafi kuralları birini güncelleyip diğerini bırakma; fark yalnızca `province_id` NULL
+> sayısında görünür, hiçbir yerde hata vermez. Her iki dosyanın başında karşılıklı uyarı var.
+
+#### Kapatılmayan tek boşluk
+
+`parse-listing` (Deno) kanalında `district_official` NULL kalıyor: 973 ilçe
+`lib/constants/locations.json`'da, Deno oradan import edemiyor ve **DB'de ilçe tablosu yok**,
+yani RPC de türetemiyor. Kolon şu an **hiçbir yerde OKUNMUYOR** (4 yazma yolu yazıyor, sıfır
+okuyucu) — W5 ilçe temizliği için bir veri kalitesi işareti. Kapatmanın tek temiz yolu
+`provinces` gibi bir `districts` tablosu açmak; Dalga 5 ile birlikte değerlendir, tek başına
+öncelik değil.
 
 ### Dalga 5 — metin kolonlarını düşür
 

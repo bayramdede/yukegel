@@ -53,7 +53,40 @@
 > ⏳ BÖLÜM 6'daki metin/trigram index DROP'ları bilerek çalıştırılmadı — önce ~1 hafta
 > `pg_stat_user_indexes` ile boşta olduklarını ölçmek gerekiyor (**~6 Ağu 2026'da bak**).
 > Aynı bölümde ayrıca **çift index bulgusu** var: `listing_stops` üzerinde üç adet özdeş
-> `(listing_id)`, `listings` üzerinde üç adet özdeş `(created_at DESC)`. Ayrı migration.
+> `(listing_id)`, `listings` üzerinde üç adet özdeş `(created_at DESC)`.
+>
+> 📏 **INDEX ÖLÇÜMÜ ALINDI (31 Tem 2026) — `docs/20260731_index_temizligi.sql` BÖLÜM 7.**
+> Dört sonuç dosyanın ilk varsayımlarını değiştirdi:
+> - **Tarih engeli kalktı ama yerine daha dar bir engel geldi.** `stats_reset = 30 Mar 2026`,
+>   pencere **122,6 gün** — "sayaç penceresi kısa" gerekçesi yanlıştı. Ama Dalga 3 kodu
+>   **31 Tem'de** deploy edildi, yani sayacın ~%99'u ESKİ kodu ölçtü. Doğru kural asimetrik:
+>   metin indekslerinde `idx_scan = 0` geçerli kanıt, `> 0` **kanıt değil**.
+> - **🚨 Beklenmeyen üçüncü kopya grubu:** `shadow_profiles` üzerinde iki özdeş
+>   `(listing_count DESC)`. BÖLÜM 2 bu tabloyu sorgulamamıştı → kullanım verisi YOK,
+>   ölçülmeden düşürülmez (BÖLÜM 7.C).
+> - **🚨 `raw_posts_dedup_idx` kararı TERSİNE DÖNDÜ — düşürülmeyecek.** Kısıt olarak
+>   gereksiz (gerekçe kısmi indekslere rağmen ayakta, predikatlar ayrışmıyor **kapsıyor**),
+>   ama **86.319 tarama** almış — `idx_raw_posts_clean_hash`'ten (83.358) fazla. Sorgu
+>   indeksi olarak çalışıyor. Ayrıntı ve EXPLAIN testi: BÖLÜM 7.D.
+> - **Bugün düşürülebilir ≈ 127 MB** (BÖLÜM 7.B): iki kopya grubunda 4 indeks (54 MB) +
+>   122 günde hiç taranmamış 5 metin indeksi (73 MB). Kopya grubunda **en az şişmiş**
+>   olan tutuluyor — BÖLÜM 4'ün ad uzunluğuna bakan önerisi boyutla ezildi.
+> ⏳ Dalga 5 metin indekslerinin kararı için **7.A ile sayaç sıfırlanıp ~7 Ağu'da yeniden
+> ölçülmeli** (7.B'yi ÖNCE çalıştır — sıfırlama onun kanıtını siler).
+>
+> ⏳ **`docs/20260731_index_temizligi.sql` YAZILDI (31 Tem 2026) — ÇALIŞTIRILMADI, ölçüm bekliyor.**
+> Ayrı migration olarak istenen çift-index temizliği artık **ölç-sonra-düşür** runbook'u hâlinde.
+> Bölüm 1 keşif (imzaya göre gruplama), 2 kullanım ölçümü, 3 `raw_posts_dedup_idx` gerekçesi,
+> 4 DDL üretici (`dusur_ddl` + `geri_alma_ddl`), 5 Dalga 5 metin/trigram adayları, 6 doğrulama.
+> DROP satırları **yorumda**; dosya uçtan uca çalıştırılamaz, bilerek öyle.
+> 🚨 **Karar penceresi kuralı:** `idx_scan = 0` tek başına hiçbir şey kanıtlamaz —
+> `pg_stat_database.stats_reset`'ten bu yana **≥ 7 gün** geçmiş olmalı. Dalga 3, 30–31 Tem'de
+> koştuğu için en erken geçerli ölçüm **~6 Ağu 2026**. Bölüm 2'deki `karar` kolonu pencere
+> kısaysa `⛔ PENCERE < 7 GÜN — KARAR VERME` basar.
+> 🚨 `drop index concurrently` transaction içinde çalışmaz (`25001`) ve Supabase SQL editörü
+> çok-ifadeli çalıştırmayı örtük transaction'a sarar → her CONCURRENTLY satırı **tek başına**.
+> ⚠️ Bölüm 5'te `tarama > 0` çıkması performans değil **kapsam** bulgusudur: metin kolonlarını
+> okuyan, haritalanmamış bir tüketici var demektir — Dalga 5 öncesi bulunmalı.
 >
 > 🐛 **DALGA 3'TE BULUNAN İKİ SESSİZ BUG (ikisi de düzeltildi):**
 > 1. `app/moderator/page.tsx::duzenleKaydet()` server action'dan geçmiyordu; moderatör
@@ -81,17 +114,44 @@
 > ③ "✕ Temizle" → liste SSR verisine geri dönmeli, filtrelenmiş hâlde donmamalı.
 > ④ Filtre açıkken Yük/Araç sekmesi değiştir → yeniden sorgu atmalı ve doğru sonuç gelmeli.
 >
+> ✅ **DALGA 4 TAMAMLANDI (31 Tem 2026).** Kapsam ölçüldükten sonra **plandan küçük ama
+> plandan farklı** çıktı — ayrıntı `docs/COGRAFI_GECIS.md` "Dalga 4" bölümünde.
+> - **Plan iki noktada yanlıştı.** (a) `supabase/functions/parse-listing/index.ts`'in
+>   prompt'u YOK — saf regex + `aliases`; güncellenecek şey bulunmadı. (b) Plan
+>   `app/api/whatsapp/route.ts:47` `parseWithLLM()`'i hiç saymamıştı — prompt'un **ikinci
+>   gerçek kopyası** orada. Yalnız parse-text güncellenseydi iki AI kanalı sessizce
+>   ayrışacaktı.
+> - **id tarafı zaten bitmişti.** Üç AI kanalının da yazma yolu `ilanYaz()` ya da
+>   `ilan_olustur` v3'ten geçiyor; hiçbiri `province_id`'yi kendi yazmıyor — Dalga 2 bunu
+>   kapatmıştı. `/api/parse-text` **DB'ye hiç yazmıyor**; çıktısı forma prefill oluyor.
+> - **Yapılan iş prompt sertleştirmesi.** Asıl risk yazım hatası değildi (`ilCiftYazim`
+>   "istanbul"/"İSTANBUL"/"Istanbul" hepsini katlıyor); **AI'ın il alanına İLÇE adı koyması**.
+>   "Çorlu'dan…" → `origin_city:"Çorlu"` → `ilCiftYazim` null. parse-text'te kullanıcı
+>   formda düzeltir; **WhatsApp'ta form yok, ilan HİÇ oluşmaz** (sessiz kayıp). İki prompt'a
+>   da "sadece 81 ilden biri; ilçe geldiyse `district`'e koy, `city`'ye bağlı olduğu ili yaz
+>   (`Çorlu` → `Tekirdağ`+`Çorlu`)" kuralı eklendi. 81 satırlık tablo prompt'a KONMADI.
+> - `npx tsc --noEmit` temiz.
+>
+> 🐛 **DALGA 4'TEN ÇIKAN AÇIK BOŞLUK — `district_official` (düşük öncelik).**
+> `parse-listing` (Deno) kanalında NULL kalıyor: 973 ilçe `lib/constants/locations.json`'da,
+> Deno oradan import edemiyor ve **DB'de ilçe tablosu YOK** → RPC de türetemiyor. Kolonu şu an
+> **hiçbir yer OKUMUYOR** (4 yazıcı, 0 okuyucu); W5 ilçe temizliği için kalite işareti.
+> Temiz çözüm: `provinces` gibi bir `districts` tablosu. Dalga 5 ile birlikte değerlendir,
+> tek başına öncelik değil.
+>
 > ⚠️ **`SUPABASE_ACCESS_TOKEN` eksik** — `~/.config/yukegel/auto-deploy.env`. Edge Function
-> deploy'ları SESSİZCE atlanıyor (`scripts/auto-deploy.log:19565`). Şu an zararsız
-> (`parse-listing`'de davranış değişikliği yok) ama **Dalga 4 öncesi mutlaka geri konmalı**.
+> deploy'ları SESSİZCE atlanıyor (`scripts/auto-deploy.log:19565`). Dalga 4 `parse-listing`'e
+> DOKUNMADIĞI için bu artık Dalga 4'ün ön koşulu değil — ama `districts` tablosu işine
+> girilirse ilk gereken şey bu, ve o güne kadar her edge fn düzeltmesi sessizce kaybolur.
 >
 > **Kalan dalgalar (kod):**
 > - [x] **Dalga 3 — okuma/filtre/moderasyon.** ✅ 31 Tem 2026. `HomeClient` + `/api/listings/ara`
 >       (sunucu tarafı il filtresi) + radar/nearby RPC'lerinde `ILIKE '%…%'` → `= province_id`
 >       + moderatör paneli (md.6).
-> - [ ] **Dalga 4 — AI parser.** Prompt'lar. 🚨 AI'a **doğrudan plaka kodu ürettirme** — 81 satırlık
+> - [x] **Dalga 4 — AI parser.** ✅ 31 Tem 2026. `api/parse-text` + `api/whatsapp` prompt'ları
+>       (parse-listing'in prompt'u yok). 🚨 AI'a **doğrudan plaka kodu ürettirilmedi** — 81 satırlık
 >       tabloyu prompt'a koymak token yakar ve model uydurur ("Bursa 16 mı 61 mi"). Eşleştirmeyi
->       `lib/lokasyon.ts::ilId()` yapar; spec md.4'ün istediği sonuç böyle de sağlanır.
+>       `lib/lokasyon.ts::ilCiftYazim()` yapıyor; spec md.4'ün istediği sonuç böyle sağlanıyor.
 > - [ ] **Dalga 5 — drop.** `origin_city`, `listing_stops.city`, ölü `destination_city`, eski
 >       metin index'leri (trigram dahil). Ön koşul: Adım 8.2 **bir hafta** sıfır satır.
 >
@@ -605,7 +665,7 @@ Tam analiz: `docs/WHATSAPP_IMPORT_ANALIZ.md` (bulgu kodları A1–A5, B1–B8, C
 
 ### Açık kalanlar (öncelik sırasıyla)
 - [ ] **⚠️ B2 doğrulama** — `raw_posts` trigger'ının koşulsuz çalıştığı VARSAYILDI. Doğrula: `SELECT tgname, pg_get_triggerdef(oid) FROM pg_trigger WHERE tgrelid='public.raw_posts'::regclass AND NOT tgisinternal;` — `WHEN` içinde `is_repost` filtresi varsa repost satırları hiç ilan üretmez, o koşul kaldırılmalı.
-- [x] **`raw_posts` unique kuralları dokümante edildi** (28 Tem 2026) — CONSTRAINT değil INDEX olarak tanımlılar. Bağlayıcı kural `idx_raw_posts_hash_day UNIQUE (clean_hash, post_date) WHERE clean_hash IS NOT NULL`. `upsert`'e geçilemiyor: her iki unique indeks de **kısmi**, PostgreSQL kısmi indeksi `ON CONFLICT` hedefi olarak çıkarsayamıyor.
+- [x] **`raw_posts` unique kuralları dokümante edildi** (28 Tem 2026) — CONSTRAINT değil INDEX olarak tanımlılar. Bağlayıcı kural ~~`idx_raw_posts_hash_day UNIQUE (clean_hash, post_date)`~~ → **`idx_raw_posts_hash_msgdate UNIQUE (clean_hash, message_date) WHERE clean_hash IS NOT NULL`** (aşağıdaki `post_date` sadeleştirmesi taşıdı; 31 Tem 2026'da canlı indeks listesiyle doğrulandı — `hash_day` diye bir indeks yok). `upsert`'e geçilemiyor: her iki unique indeks de **kısmi**, PostgreSQL kısmi indeksi `ON CONFLICT` hedefi olarak çıkarsayamıyor.
 - [x] **23505 fırtınasının asıl sebebi kapatıldı** — batch-içi dedup anahtarı `hash__tarih`'e çekildi (DB indeksiyle birebir); `existingMap` `post_date` üzerinden kuruluyor; kurtarma bloğu artık `(clean_hash, post_date)` çiftine bakıyor (önceden sadece `clean_hash`'e bakıp başka güne ait meşru repost'ları da eliyordu).
 - [x] **Telefon geriye-doldurma ayrıldı** — `POST /api/raw-posts/telefon-doldur`. İçe aktarmanın doğruluğunu etkilemiyordu ama satır başına 2 UPDATE ile bütçeyi yiyordu. Telefon regex'i `lib/whatsapp/telefon.ts`'e alındı.
 - [x] **Gatekeeper substring eşleşmesi düzeltildi** (28 Tem 2026) — `norm.includes(alias)` yerine token eşitliği + ek soyma. `"lojistik"→İstanbul`, `"getirin"→TIR`, `"balyası"→Balıkesir` gibi sahte eşleşmeler bitti.
@@ -616,7 +676,7 @@ Tam analiz: `docs/WHATSAPP_IMPORT_ANALIZ.md` (bulgu kodları A1–A5, B1–B8, C
 - [ ] **Alias homonim temizliği — ölçüldü, tek suçlu `araç`** (28 Tem 2026). 3000 mesajın 580'inde (%19) geçiyor, sıralamada Bursa'nın üstünde; `Kastamonu/Araç` ilçesi ama metinde "vasıta" anlamında. `olur`/`merkez`/`pazar` ilk 40'a girmedi. Kalan: `docs/20260728_alias_homonim_temizligi.sql` ADIM 3 ile `is_active = false`.
 - [ ] **Gatekeeper düzeltmesi sonrası ölçüm** — düzeltme öncesi `isAd` fiilen "telefon var mı" idi, yani geçmişte kaydedilen bir kısım `raw_posts` aslında ilan değil. Düzeltilmiş kodla aynı dosya yeniden içe aktarılıp `kaydedilen` sayısındaki düşüş ölçülmeli; büyük düşüş varsa eski kayıtlar için temizlik gerekebilir.
 - [x] **1000 satır sessiz kesilmesi kapatıldı** (28 Tem 2026) — `aliases` (1887 aktif satır) hem `whatsapp-parse` gatekeeper'ında hem `parse-listing` edge fonksiyonunda tek sorguyla çekiliyordu; PostgREST 1000'de kesiyordu. İkisi de `.range()` + `.order('id')` ile sayfalandı. ⚠️ `parse-listing` bir Edge Function — ayrıca `supabase functions deploy parse-listing` gerekiyor.
-- [ ] **`raw_posts_dedup_idx` gereksiz — düşürülebilir** (düşük öncelik, 28 Tem 2026). `UNIQUE (clean_hash, contact_phone, message_date)`; ama `idx_raw_posts_hash_msgdate UNIQUE (clean_hash, message_date)` daha katı olduğu için bu indeks hiçbir zaman ek bir kural dayatamaz. Sorgu tarafında da karşılığı yok (`idx_raw_posts_clean_hash` mevcut). Yalnızca INSERT maliyeti ekliyor. `DROP INDEX public.raw_posts_dedup_idx;`
+- [x] **`raw_posts_dedup_idx` — DÜŞÜRÜLMEYECEK, ölçüm kararı tersine çevirdi** (31 Tem 2026, `docs/20260731_index_temizligi.sql` BÖLÜM 7 S3). Kısıt gerekçesi ayakta: `idx_raw_posts_hash_msgdate UNIQUE (clean_hash, message_date)`'in satır kümesi dedup'ınkinin **üst kümesi** ve kolonları daha katı, dolayısıyla dedup hiçbir zaman ek kural dayatamaz — ikisi de kısmi olmasına rağmen gerekçe çökmüyor. 🚨 Ama bu maddedeki **"sorgu tarafında karşılığı yok" cümlesi ölçümle yanlışlandı**: dedup_idx **86.319 tarama** almış, `idx_raw_posts_clean_hash`'in (83.358) üstünde. Planlayıcı `clean_hash` öncüllü iki indeks arasında iş bölüştürüyor; unique kontrolü `_bt_check_unique`'ten gider ve `idx_scan`'i artırmaz, yani bunlar gerçek sorgu taramaları. Düşürmek istenirse önce BÖLÜM 7.D'deki `begin; drop index …; explain …; rollback;` testi.
 - [x] **`post_date` sadeleştirme TAMAMLANDI** (28 Tem 2026). Unique indeks `message_date`'e taşındı (`idx_raw_posts_hash_msgdate`, valid+unique), kod `post_date` yazmayı bıraktı (commit dd02073), kolon düşürüldü. Teşhis özeti: Adım 0 doğrulaması 0 yerine **1543 ayrışmış satır** döndü. ADIM 0b teşhisi (28 Tem 2026): ayrışan satırların **tamamında** `post_date = created_at::date` ve `post_date > message_date` → `post_date` mesajın gününü değil **içe aktarma gününü** tutuyor, yani anlamsız bir kolon; otorite `message_date`. Ayrışma penceresi **kapalı** (12–20 May 2026), bugünkü kod bu hatayı yapmıyor. Her iki kolonda `column_default = NULL`, sebep bir DEFAULT değil eski bir kod sürümü. `(clean_hash, message_date)` kopya sorgusu **boş döndü** → yeni unique indeks hatasız kurulur. Tablo 59.533 satır / 54 MB → **Seçenek A (CONCURRENTLY'siz) yeterli, uygulanabilir**. — `docs/20260728_raw_posts_post_date_sadelestirme.sql`. SIRA ÖNEMLİ: (1) SQL adım 0–2, (2) koddan `post_date` yazımını kaldır + dağıt, (3) SQL adım 3 ile kolonu düşür. Sırayı bozmak tüm insert'leri kırar.
 - [ ] **B5** — Hata alan kayıtlar `processing_status: 'pending'`de asılı kalıyor; `error` durumu + retry yok.
 - [ ] **B1** — Sabit hat numaraları (`0212...`, `0332...`) hiç yakalanmıyor; `isAd` telefon şartına bağlı olduğu için bu ilanların tamamı gate'ten geçemiyor.

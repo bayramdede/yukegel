@@ -33,6 +33,29 @@
 > `HomeClient:711 .includes()` satırı ARTIK YOK: filtre `origin_province_id` / `listing_stops.province_id`
 > tamsayı eşitliğiyle **sunucuda** çalışıyor (`/api/listings/ara`). Yazım bozulması bu yolu bir daha
 > etkileyemez — metin kolonları yalnız gösterim.
+> ✅ **DALGA 4 TAMAM (31 Tem 2026) — AI prompt'ları.** Ölçüm planı iki yerde yalanladı:
+> (a) `supabase/functions/parse-listing/index.ts`'in **prompt'u yok** (saf regex + `aliases`),
+> (b) prompt'un ikinci kopyası plana hiç yazılmamış `app/api/whatsapp/route.ts:47`'de.
+> `province_id` tarafı Dalga 2'de zaten kapanmıştı (üç kanal da `ilanYaz()` / `ilan_olustur` v3'ten
+> geçiyor; `/api/parse-text` DB'ye hiç yazmıyor, çıktısı forma prefill oluyor). Gerçek risk yazım
+> hatası değil **AI'ın il alanına ilçe adı koyması**ydı ("Çorlu" → `ilCiftYazim` null → WhatsApp'ta
+> ilan HİÇ oluşmuyor, form yok ki düzeltilsin). İki prompt'a da "sadece 81 ilden biri; ilçe geldiyse
+> `district`'e koy, `city`'ye bağlı olduğu ili yaz" kuralı eklendi.
+> ⏳ **`docs/20260731_index_temizligi.sql` YAZILDI (31 Tem 2026) — ÇALIŞTIRILMADI.** Dalga 3'ün
+> ertelediği çift-index temizliği (`listing_stops` üç özdeş `(listing_id)`, `listings` üç özdeş
+> `(created_at DESC)`, artı `raw_posts_dedup_idx`) **ölç-sonra-düşür** runbook'u olarak yazıldı:
+> 1 keşif · 2 kullanım ölçümü · 3 `raw_posts_dedup_idx` gerekçesi · 4 DDL üretici (düşür + geri alma)
+> · 5 Dalga 5 metin/trigram adayları · 6 doğrulama. **DROP satırları yorumda**, dosya uçtan uca
+> çalışmaz — bilerek. 🚨 `idx_scan = 0` tek başına kanıt değil: `pg_stat_database.stats_reset`'ten
+> beri **≥ 7 gün** şart. 🚨 `drop index concurrently` transaction içinde çalışmaz (`25001`),
+> Supabase editörü çok-ifadeyi örtük sarar → her satır tek başına.
+> 📏 **ÖLÇÜM ALINDI 31 Tem 2026 (BÖLÜM 7).** Pencere zaten 122,6 gündü (`stats_reset` 30 Mar),
+> yani engel "kısa pencere" değil **"Dalga 3 daha dün deploy edildi"** — sayacın %99'u eski
+> kodu ölçtü. 🚨 **Yeni kural, asimetrik okuma:** metin indekslerinde `idx_scan = 0` geçerli
+> kanıttır (Dalga 3 metinden uzaklaştırdı, talep artamaz), `> 0` kanıt DEĞİLDİR.
+> 🚨 Beklenmeyen üçüncü kopya grubu çıktı: `shadow_profiles (listing_count DESC)` ×2, ölçülmemiş.
+> 🚨 `raw_posts_dedup_idx` kararı tersine döndü — kısıt olarak gereksiz ama **86k tarama** ile
+> aktif sorgu indeksi; düşürülmeyecek. Bugün düşürülebilir ≈ **127 MB**.
 > ✅ **KALICI KORUMA KURULDU (30 Tem 2026).** `20260730_alias_adim9_kopya_pasiflestir.sql`
 > (612 satır pasif, kayıpsız) → `20260729_alias_normalize_trigger.sql` BÖLÜM 1+2 → doğrulama.
 > `aliases_normalize_trg` ve **kısmi** `aliases_katlanmis_anahtar_uniq` canlıda; katlanmış alias
@@ -695,8 +718,8 @@ ZIP/TXT → raw_posts → DB trigger → parse-listing Edge Fn → listings → 
 | `/api/auth/dogrulama-tekrar` | 🔒 Doğrulama e-postasını tekrar gönder (A6). POST + Origin. 3 kota: adres 1/60sn, IP 5 farklı adres/saat, IP 10 toplam/saat. ⚠️ Yanıt **daima aynı** (hesap sayımına kapalı); sayaçlar hata yolunda da işlenir |
 | `/api/ilan/[id]/telefon` | 🔒 **TEK** telefon kaynağı. GET, authed + profil tam + hesap aktif + ilan yayında. `logPhoneAccess`, 20/dk, `no-store` |
 | `/api/ilan/[id]/sahiplen` | 🔒 GET maskeli numara, POST `{adim:'gonder'\|'dogrula'}`. İlan başına 60 sn SMS cooldown (429 + `Retry-After`) |
-| `/api/parse-text` | Tekil kullanıcı metnini Haiku ile JSON'a çevirir + per-user günlük quota kontrolü (429) |
-| `/api/whatsapp` | Twilio WhatsApp webhook — kayıt/kota kontrolü + LLM parse + ilan oluştur |
+| `/api/parse-text` | Tekil kullanıcı metnini Haiku ile JSON'a çevirir + per-user günlük quota kontrolü (429). ⚠️ **DB'ye YAZMAZ** — çıktı forma prefill olur; `province_id` `ilanYaz()`'da türer. Prompt'u `/api/whatsapp` ile kopyalı |
+| `/api/whatsapp` | Twilio WhatsApp webhook — kayıt/kota kontrolü + LLM parse + `ilanYaz()`. ⚠️ Prompt'un ikinci kopyası burada (`parseWithLLM`); coğrafi kuralları parse-text ile senkron tut |
 | `/api/admin/kullanici` | role / is_active / moderator_sources / **ai_listing_quota_daily** PATCH |
 | `/api/admin/crm` | Shadow Profile listesi (GET) + güncelle (PATCH) |
 | `/api/admin/crm/[id]` | Shadow Profile detay + ilan geçmişi (GET) |
@@ -903,6 +926,8 @@ Açık rotalar: /giris, /auth/, /profil-tamamla, /nasil-calisir, /hakkimizda,
 - ⚠️ **Aynı sekmeye/moda tekrar tıklamak hiçbir şeyi sıfırlamamalı** (29 Tem 2026, `SPRINT_01` F1). Koşulsuz `setMod('giris')` yüzünden `?mod=kayit` ile gelen kullanıcı, zaten aktif olan sekmeye tekrar tıklayınca sessizce giriş formuna düşüyordu. Ayrıca URL param'ı ile mod kurarken **render koşulunun tamamını** kur: kayıt formu `sekme === 'eposta' && mod === 'kayit'` istiyor; yalnız `mod`'u kurmak sessiz bir no-op'tur.
 - ⚠️ **Liste sayacı, LİSTEYİ saymalı** (29 Tem 2026, `SPRINT_01` L4). `count: 'exact'` toplamı platform genelini verir (tüm sekmeler, kırpma öncesi); altındaki liste ise tek sekmenin ilk `ILAN_LIMITI` kaydı. Ekranda "519 ilan" yazıp 40 kart göstermek kullanıcıya sayfa bozuk hissi verir. Kırpma varsa **"en yeni" ön eki filtreden bağımsız** yazılmalı. Limit tek yerden: `lib/ilan-liste.ts`.
 - 🚨 **İSTEMCİDE FİLTRELEME, KIRPILMIŞ PENCEREDE YALAN SÖYLER** (31 Tem 2026, Dalga 3). L4'ün yukarıdaki maddesi *sayacı* düzeltti ama filtrenin kendisi 200'lük pencerenin içinde kalmıştı. Pencere `created_at`e göre kesiliyor, **ile göre değil**: Muş'ta aktif ilan olsa bile son 200 ilan İstanbul/Ankara/Bursa'dan geliyorsa kullanıcı "Muş" seçince **boş liste** görüyordu — hata yok, uyarı yok. Genel kural: **daraltıcı bir filtre, verinin kırpıldığı yerde uygulanmalı — kırpmadan sonra değil.** Ana sayfa il filtresi artık `/api/listings/ara`'da, `province_id` tamsayı eşitliğiyle sunucuda; limit o ilin **kendi** sonucuna uygulanıyor. Araç/kasa tipi bilinçli olarak istemcide kaldı (il seçildikten sonraki daraltma + `vehicle_type` boşsa `cargo_type`'a düşen türetme SQL'e taşınırsa iki ayrı tanım olur).
+- 🚨 **AYNI LLM PROMPT'U İKİ DOSYADA KOPYALI — `/api/parse-text` ve `/api/whatsapp`** (31 Tem 2026, Dalga 4). Twilio webhook'u `parseWithLLM()` ile kendi kopyasını taşıyor. Birini güncelleyip diğerini bırakmak **hiçbir yerde hata vermez**; fark yalnız veri kalitesinde (`province_id` NULL sayısı) görünür. İki dosyanın başında karşılıklı uyarı var — coğrafi kuralları **birlikte** değiştir.
+- 🚨 **LLM'e "il" dedirtmek yetmez, "ilçe yazma" demek gerekir** (31 Tem 2026, Dalga 4). Prompt "Türkiye ili, doğru Türkçe yazımla" diyordu; asıl kayıp yazım hatasından DEĞİL (`ilCiftYazim` "istanbul"/"İSTANBUL"/"Istanbul" hepsini katlar), modelin **il alanına ilçe adı koymasından** geliyordu: "Çorlu'dan Gebze'ye" → `origin_city:"Çorlu"` → `ilCiftYazim` null. `/api/parse-text`'te alan boş kalır, kullanıcı formda düzeltir. **`/api/whatsapp`'ta form yok** — `ilanYaz()` "Kalkış ili tanınamadı" der ve **ilan hiç oluşmaz**; kullanıcı düzeltemez. Aynı LLM çıktısının maliyeti kanala göre değişir: **formsuz kanalda prompt kuralı daha katı yazılmalı.** Çözüm modelin zaten bildiği ilçe→il eşlemesini kullanmak ("`Çorlu` → `city:Tekirdağ`, `district:Çorlu`"); 81 satırlık plaka tablosunu prompt'a koymak DEĞİL.
 - 🚨 **Auth hata dallarında Türkçe METNE göre dallanma** (29 Tem 2026, `SPRINT_01` A5). Metin değişince dal sessizce ölür. Sunucu makine okunur `kod` dönmeli (`eposta_dogrulanmamis` | `kimlik_hatali`), istemci ona baksın. Hesap sayımı endişesi yok: GoTrue password grant'ta şifre, `Email not confirmed` kontrolünden **önce** doğrulanıyor.
 - 🚨 **`resend()` / `signUp()` çağrısında `emailRedirectTo` VERİLMEZSE** Supabase kendi "Site URL" ayarına düşer; kullanıcı `/auth/callback` yerine ana sayfaya çıkar, oturum takası **hiç yapılmaz** ve "linke tıkladım ama giremiyorum" der (29 Tem 2026, `SPRINT_01` A6). Değer `NEXT_PUBLIC_SITE_URL`'den gelmeli — **`request.url` kullanma**, Vercel'de proxy arkasındaki iç adres olabilir.
 - ⚠️ **E-posta gönderen uç noktalar hesap sayımına (enumeration) kapalı olmalı** (29 Tem 2026, `SPRINT_01` A6). `/api/auth/dogrulama-tekrar` adres kayıtlı olsun olmasın **aynı yanıtı** döner; sebep yalnız loga yazılır. Kotalar hata yolunda da işlenir — buradaki "hata"ların çoğu "böyle adres yok / zaten doğrulanmış", yani saldırganın aradığı bilgi; saymazsak o yol bedava olur. (`otp/route.ts`'ten bilinçli ayrılık: orada hata = sağlayıcı arızası, sayaç işlenmeden 502 döner.)
