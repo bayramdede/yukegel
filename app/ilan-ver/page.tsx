@@ -100,6 +100,9 @@ export default function IlanVer() {
   // Telefonun "henüz gelmedi" ile "gelemedi" hâlini ayır — ikisi de boş string
   // olduğu için eskiden ikisi de sonsuz "Yükleniyor..." gösteriyordu.
   const [telDurum, setTelDurum] = useState<'yukleniyor' | 'var' | 'numara-yok' | 'hata'>('yukleniyor');
+  // 31 Tem 2026 — hangi ALT durum olduğu ekranda görünsün (satir-yok / alan-bos /
+  // sorgu / istisna / oturum-yok). İki genel mesaj kök nedeni ayırt edemiyordu.
+  const [telKod, setTelKod] = useState('');
   const [duraklar, setDuraklar] = useState<Durak[]>([{ sehir: '', ilce: '', ton: '', palet: '', yuk_cinsi: '', notlar: '' }]);
   const [gonderildi, setGonderildi] = useState(false);
   // ILAN_VER_ANALIZ V4 — sonuç ekranı artık VARSAYMIYOR, sunucunun döndürdüğü
@@ -149,10 +152,12 @@ export default function IlanVer() {
         setTelDurum('var');
       } else if (telefon.durum === 'numara-yok') {
         setTelDurum('numara-yok');
+        setTelKod(telefon.kod);
       } else {
         // 'oturum-yok' buraya normalde düşmez (yukarıda /giris'e yönlendik);
         // düşerse gerçek bir tutarsızlık var, hata gibi göster.
         setTelDurum('hata');
+        setTelKod(telefon.durum === 'hata' ? telefon.kod : 'oturum-yok');
       }
     }
     // 🚨 `init()` bir promise döndürür; içindeki reddetme YAKALANMAZSA hiçbir yerde
@@ -682,6 +687,13 @@ export default function IlanVer() {
                     : 'Sayfayı yenileyin; sürerse bize bildirin'}
               </span>
             </div>
+            {/* Teşhis ipucu — kök nedeni ayırt etmek için. Ham hata mesajı DEĞİL,
+                yalnız kısa kod (bkz. actions.ts TelefonDurumu). */}
+            {!tel && telKod && (
+              <div style={{ color: '#4b5563', fontSize: '0.68rem', marginTop: 6, fontFamily: 'monospace' }}>
+                kod: {telKod}
+              </div>
+            )}
           </div>
         )}
 

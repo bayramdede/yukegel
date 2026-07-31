@@ -626,14 +626,46 @@ anahtarıyla aynı mı. Deploy sonrası logda `phone-privacy` ara.
 - `app/ilan/[id]/page.tsx:428`'deki `/profil-tamamla` bağlantısı **doğru** ve
   değiştirilmedi — orası gerçekten `user_type` olmayan kullanıcı dalı.
 
+#### 🔴 İKİNCİ TUR — "profilde numara VAR, `/ilan-ver` yine getiremiyor" (31 Tem 2026)
+
+**Yeni bilgi (Bayram):** panel profil ekranında numara **görünüyor.** Bu, yukarıdaki
+`numara-yok` senaryosunu tek başına açıklamıyor.
+
+**Bu bilgi neyi eliyor:** `app/panel/page.tsx:24-32` **aynı satırı**, **aynı
+`SUPABASE_SERVICE_ROLE_KEY` ile**, **aynı `.eq('id', user.id)` ile** okuyup numarayı
+gösterebiliyor. Yani ne anahtar eksik/dönmüş, ne satır kayıp, ne de `users.phone` boş —
+29 Tem'deki "Kalan (Bayram)" hipotezi (service-role anahtarı) **bu kanıtla zayıflıyor.**
+
+**Kalan olasılıklar ve ekrandaki iki mesajın bunları ayırt EDEMEMESİ:** "numara yok" ve
+"alınamadı" dört farklı kök nedeni ikiye çöküyordu — satır mı gelmedi, alan mı boş,
+server action'da oturum mu düştü (panel bir GET Server Component, `kullanicitelefon()`
+ise POST server action — auth okuma yolları aynı şekilde yazılmış ama aynı istek değil),
+sorgu mu hata verdi. Log'a bakmadan ilerlemek tahmin yürütmekti.
+
+> 🚨 **Ders:** Aynı veriyi okuyan iki ekrandan biri çalışıp öteki çalışmıyorsa,
+> **fark ettiği şeyi izole et** (anahtar? satır? oturum? istek tipi?) — "muhtemelen
+> env değişkeni" deyip geçme. Burada çalışan ekranın varlığı, en güçlü hipotezi çürüttü.
+
+**Yapılanlar (31 Tem 2026, tsc temiz):**
+- [x] `TelefonDurumu` artık `kod` taşıyor: `numara-yok` → `satir-yok` | `alan-bos`,
+      `hata` → `sorgu` | `istisna`; `oturum-yok` da ekranda `kod: oturum-yok` oluyor.
+- [x] `!data` dalı ayrıldı + `structuredLog('WARN', 'phone-privacy', 'users satırı yok')`.
+      **Panelde numara varken burada `satir-yok` çıkarsa sorun telefon değil KİMLİK:
+      iki farklı auth id (hesap birleştirme kalıntısı).**
+- [x] `data.phone` artık `replace(/\D/g,'')` ile normalize ediliyor — boşluklu/tireli
+      kayıt `data.phone ? …` testini geçiyordu ama `ilanTelefonu()` `/^0\d{10}$/` istiyor.
+- [x] `page.tsx` kartın altında küçük gri `kod: …` gösteriyor. ⚠️ Ham Supabase mesajı ve
+      `user_id` **ekrana konmadı**; ayrıntı yalnız `phone-privacy` log satırında.
+
 **Kalan:**
-- [ ] **Bayram — şimdi yapılabilir, deploy beklemez:** Panel → 👤 Profilim → 📞 İletişim
-      Bilgileri → Telefon **Değiştir** → SMS OTP. Numara girince #29 testi açılır.
-- [ ] Ekranda hangi mesaj çıktığını not et: **"⚠️ Profilinizde telefon numarası yok"**
-      = `numara-yok` (yukarıdaki döngü, `users.phone` boş). **"⚠️ Telefon numarası
-      alınamadı"** = `hata` — bu farklı bir arıza, `service_role` anahtarı; Vercel
-      logunda `phone-privacy` ERROR satırı olur. İkincisi çıktıysa yukarıdaki
-      "Kalan (Bayram)" maddesine dön.
+- [ ] **Bayram — DEPLOY gerekiyor** (`npm run deploy`), sonra `/ilan-ver`'i aç ve
+      `kod:` satırını oku. Karşılıkları:
+      - `satir-yok` → auth id ≠ profil satırı. Hesap birleştirme (`merged_into`) bak.
+      - `alan-bos` → `users.phone` gerçekten boş; panelde gördüğün başka bir alan.
+      - `sorgu` → PostgREST hatası; Vercel logunda `phone-privacy` ERROR satırında kod var.
+      - `istisna` → `getServiceSupabase()` fırlattı (env) ya da ağ; aynı log satırı.
+      - `oturum-yok` → server action'a cookie gitmiyor; panel GET çalışırken POST düşüyor.
+- [ ] Kod okununca **#29 form kanalı testi** açılır.
 - [ ] Kalıcı çözüm adayı (ayrı iş): `numara-yok` durumunda forma telefon input'u koy —
       `ilanTelefonu()`'nun kendi kendini onaran dalı zaten hazır, sadece kanal ona
       değer göndermiyor. Ama numara SMS ile doğrulanmamış olur; ürün kararı gerekiyor.

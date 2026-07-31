@@ -86,11 +86,25 @@ export async function ilanKaydet(formData: IlanKaydetGirdi): Promise<IlanKaydetS
  * "An error occurred in the Server Components render..." çıkıyor; iki belirti
  * tek kök. Artık durum açıkça dönüyor ve hata LOGLANIYOR.
  */
+/**
+ * 31 Tem 2026 — `kod` alanı EKLENDİ.
+ *
+ * Belirti: "profilde numara var ama /ilan-ver getiremiyor". Panel (`app/panel/page.tsx`)
+ * AYNI satırı AYNI service-role anahtarıyla okuyup numarayı gösterebiliyor — yani
+ * ne anahtar eksik ne satır kayıp. Bu durumda kalan olasılıkları ekrandaki iki
+ * genel mesaj ("numara yok" / "alınamadı") ayırt EDEMİYOR: satır mı gelmedi,
+ * alan mı boş, oturum mu düştü, sorgu mu hata verdi? Log'a bakmadan ilerlemek
+ * tahmin yürütmek demekti.
+ *
+ * `kod` bu dört hâli ayırıyor ve ekranda küçük gri bir ipucu olarak gösteriliyor.
+ * ⚠️ Buraya ASLA ham Supabase mesajı ya da `user_id` koyma — ekranda görünüyor.
+ * Ayrıntı yine yalnız `structuredLog('phone-privacy')` satırında.
+ */
 export type TelefonDurumu =
   | { durum: 'var'; tel: string }
   | { durum: 'oturum-yok' }
-  | { durum: 'numara-yok' }
-  | { durum: 'hata' };
+  | { durum: 'numara-yok'; kod: 'satir-yok' | 'alan-bos' }
+  | { durum: 'hata'; kod: 'sorgu' | 'istisna' };
 
 export async function kullanicitelefon(): Promise<TelefonDurumu> {
   try {
@@ -110,10 +124,25 @@ export async function kullanicitelefon(): Promise<TelefonDurumu> {
         supabase_error: error.message,
         error_code: error.code ?? null,
       });
-      return { durum: 'hata' };
+      return { durum: 'hata', kod: 'sorgu' };
     }
 
-    return data?.phone ? { durum: 'var', tel: data.phone } : { durum: 'numara-yok' };
+    // 🚨 `satir-yok` ile `alan-bos` AYRI. İlki "bu auth id'ye ait users satırı yok"
+    // demektir — hesap birleştirme (merge) sonrası ya da satırı hiç açılmamış admin
+    // hesaplarında olur ve profil ekranında numara GÖRÜNÜYOR olsa bile (o ekran
+    // başka bir satırı okuyorsa) buradan boş döner. Panelde numara varken burada
+    // `satir-yok` görüyorsan sorun telefon değil, KİMLİK: iki farklı auth id.
+    if (!data) {
+      structuredLog('WARN', 'phone-privacy', 'kullanicitelefon: users satırı yok', {
+        user_id: user.id,
+      });
+      return { durum: 'numara-yok', kod: 'satir-yok' };
+    }
+
+    // Boşluk/tire ile kaydedilmiş numaralar `data.phone ? …` testini geçer ama
+    // `ilanTelefonu()` `/^0\d{10}$/` istiyor — normalize edip öyle karar ver.
+    const temiz = String(data.phone ?? '').replace(/\D/g, '');
+    return temiz ? { durum: 'var', tel: temiz } : { durum: 'numara-yok', kod: 'alan-bos' };
   } catch (e) {
     const hata = e as { message?: string; name?: string; stack?: string };
     structuredLog('ERROR', 'phone-privacy', 'kullanicitelefon beklenmeyen istisna', {
@@ -121,6 +150,6 @@ export async function kullanicitelefon(): Promise<TelefonDurumu> {
       error_message: hata?.message ?? String(e),
       stack: typeof hata?.stack === 'string' ? hata.stack.slice(0, 1200) : null,
     });
-    return { durum: 'hata' };
+    return { durum: 'hata', kod: 'istisna' };
   }
 }
