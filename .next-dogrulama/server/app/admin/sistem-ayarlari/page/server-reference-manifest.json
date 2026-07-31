@@ -1,0 +1,29 @@
+{
+  "node": {
+    "78b39db9f91ac92ee29d349aea7b86268785b807d8": {
+      "workers": {
+        "app/admin/sistem-ayarlari/page": {
+          "moduleId": 53296,
+          "async": false,
+          "exportedName": "ayarKaydet",
+          "filename": "app/admin/sistem-ayarlari/actions.ts"
+        }
+      },
+      "exportedName": "ayarKaydet",
+      "filename": "app/admin/sistem-ayarlari/actions.ts"
+    },
+    "406b2799a711e0a308bb720ca3507438123acdac57": {
+      "workers": {
+        "app/admin/sistem-ayarlari/page": {
+          "moduleId": 53296,
+          "async": false,
+          "exportedName": "dosyaYukle",
+          "filename": "app/admin/sistem-ayarlari/actions.ts"
+        }
+      },
+      "exportedName": "dosyaYukle",
+      "filename": "app/admin/sistem-ayarlari/actions.ts"
+    }
+  },
+  "edge": {}
+}

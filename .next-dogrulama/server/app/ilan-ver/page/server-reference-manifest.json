@@ -1,0 +1,29 @@
+{
+  "node": {
+    "40d756d6e45c1112d153ce333424519f420b8f5250": {
+      "workers": {
+        "app/ilan-ver/page": {
+          "moduleId": 86144,
+          "async": false,
+          "exportedName": "ilanKaydet",
+          "filename": "app/ilan-ver/actions.ts"
+        }
+      },
+      "exportedName": "ilanKaydet",
+      "filename": "app/ilan-ver/actions.ts"
+    },
+    "000d9cc6977e63bb8d86ba56ba6033ea09742d8a97": {
+      "workers": {
+        "app/ilan-ver/page": {
+          "moduleId": 86144,
+          "async": false,
+          "exportedName": "kullanicitelefon",
+          "filename": "app/ilan-ver/actions.ts"
+        }
+      },
+      "exportedName": "kullanicitelefon",
+      "filename": "app/ilan-ver/actions.ts"
+    }
+  },
+  "edge": {}
+}

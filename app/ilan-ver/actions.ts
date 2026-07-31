@@ -3,7 +3,7 @@ import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { getServiceSupabase } from '../../lib/auth';
 import { structuredLog } from '../../lib/logger';
-import { ilanYaz, type IlanYazGirdi, type IlanYazSonuc, type IlanDurumu } from '../../lib/ilan-yaz';
+import { ilanYaz, type IlanYazGirdi, type IlanYazSonuc } from '../../lib/ilan-yaz';
 
 /**
  * `ILAN_VER_ANALIZ` W0/W1 — bu dosya artık YALNIZCA bir auth kapısı.
@@ -15,9 +15,43 @@ import { ilanYaz, type IlanYazGirdi, type IlanYazSonuc, type IlanDurumu } from '
  * 🚨 Yeni bir ilan yazma kanalı eklerken INSERT'i kopyalama; `ilanYaz()` çağır.
  */
 
-export type { IlanDurumu };
-export type IlanKaydetGirdi = IlanYazGirdi;
-export type IlanKaydetSonuc = IlanYazSonuc;
+/**
+ * 🚨 `'use server'` DOSYASINDAN TİP EXPORT ETME (31 Tem 2026 — CANLI ARIZA).
+ *
+ * Burada üç satır vardı:
+ *     export type { IlanDurumu };
+ *     export type IlanKaydetGirdi = IlanYazGirdi;
+ *     export type IlanKaydetSonuc = IlanYazSonuc;
+ *
+ * `tsc --noEmit` bunlara TEMİZ diyor — tipler silinir, sorun yok. Ama Next'in
+ * server-action dönüşümü `'use server'` modülünün HER export'unu bir çalışma
+ * zamanı değeri (async fonksiyon) sayar. Turbopack üretim derlemesinde
+ * `export type { IlanDurumu }` re-export'u silinmeyip değer bağlaması olarak
+ * kaldı ve modül değerlendirmesinde patladı:
+ *
+ *     ReferenceError: IlanDurumu is not defined
+ *       at module evaluation (.next/server/chunks/ssr/…)
+ *
+ * ETKİSİ ORANTISIZDI: modül hiç yüklenemediği için `/ilan-ver`'in TÜM server
+ * action'ları öldü. Ekranda görünen tek iz "⚠️ Telefon numarası alınamadı" idi
+ * (`init().catch()` istemcide çağrının reddini yakalıyor) — yani telefonla
+ * hiç ilgisi olmayan bir arıza, telefon hatası gibi göründü ve iki tur yanlış
+ * yerde arattı. Tip re-export'u ile "profildeki numara gelmiyor" arasında
+ * hiçbir görünür bağ yok.
+ *
+ * KURAL — dar ve kanıta dayalı: `'use server'` dosyasından **başka bir modülden
+ * gelen tipi RE-EXPORT etme.** Dosyanın KENDİ içinde tanımladığı tipleri export
+ * etmek sorun çıkarmıyor (`TelefonDurumu` aşağıda, ayrıca `profil-tamamla`,
+ * `panel`, `moderator` actions dosyalarındaki `ProfilGirdi` / `PanelSonuc` /
+ * `ModSonuc` — hepsi aylardır canlıda sorunsuz). Patlayan tek biçim, içe aktarılan
+ * bir bağlamayı dışa veren `export type { X }` idi. Tüketici tipi kaynağından
+ * alsın: `import type { IlanDurumu } from '../../lib/ilan-yaz'`.
+ *
+ * ⚠️ `tsc --noEmit` bu hatayı YAKALAMAZ — yalnız üretim derlemesi (`npm run deploy`)
+ * ortaya çıkarır. Doğrulama listesine tsc'yi tek başına yazma.
+ */
+type IlanKaydetGirdi = IlanYazGirdi;
+type IlanKaydetSonuc = IlanYazSonuc;
 
 async function oturumKullanicisi() {
   const cookieStore = await cookies();

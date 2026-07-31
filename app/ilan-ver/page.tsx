@@ -1,6 +1,10 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { ilanKaydet, kullanicitelefon, type IlanDurumu } from './actions';
+import { ilanKaydet, kullanicitelefon } from './actions';
+// 🚨 Tip KAYNAĞINDAN alınıyor, `./actions` üzerinden DEĞİL — `'use server'`
+// dosyasından tip re-export'u Turbopack üretim derlemesinde çalışma zamanı
+// bağlaması bırakıp modülü öldürüyor (bkz. actions.ts başındaki not).
+import type { IlanDurumu } from '../../lib/ilan-yaz';
 import { createClient } from '../../lib/supabase';
 import { olayGonder } from '../../lib/analiz';
 import TopluYukle from './TopluYukle';

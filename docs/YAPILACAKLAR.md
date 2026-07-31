@@ -657,9 +657,59 @@ sorgu mu hata verdi. Log'a bakmadan ilerlemek tahmin yürütmekti.
 - [x] `page.tsx` kartın altında küçük gri `kod: …` gösteriyor. ⚠️ Ham Supabase mesajı ve
       `user_id` **ekrana konmadı**; ayrıntı yalnız `phone-privacy` log satırında.
 
+#### ✅ ÜÇÜNCÜ TUR — KÖK NEDEN BULUNDU: `'use server'` dosyasından tip re-export (31 Tem 2026)
+
+**Kanıt (Vercel, 14:48:55):**
+```
+[error] ReferenceError: IlanDurumu is not defined
+    at module evaluation (.next/server/chunks/ssr/_0wmprg3._.js:2:2316)
+  digest: '4277401530'
+```
+
+**Kök neden:** `app/ilan-ver/actions.ts:18` `export type { IlanDurumu };` — başka bir
+modülden (`lib/ilan-yaz.ts`) gelen bir tipin **re-export**'u. `'use server'` modülünün
+her export'u Next tarafından çalışma zamanı değeri sayılıyor; Turbopack üretim
+derlemesinde bu re-export silinmeyip değer bağlaması olarak kaldı.
+
+**Neden iki tur yanlış yerde arattı:** modül **hiç değerlendirilemediği** için
+`/ilan-ver`'in TÜM server action'ları öldü. İstemcide görünen tek iz
+`init().catch(() => setTelDurum('hata'))` üzerinden gelen **"⚠️ Telefon numarası
+alınamadı"** oldu. Yani telefonla hiç ilgisi olmayan bir arıza, telefon arızası gibi
+göründü. Aranan `phone-privacy` log satırı da hiç yazılmadı — çünkü fonksiyonun
+gövdesine hiç girilmedi.
+
+> 🚨 **Ders 1:** `tsc --noEmit` bu hatayı **YAKALAMAZ**. Tip silinmesi TypeScript'in
+> semantiğinde doğru; kıran şey bundler'ın `'use server'` dönüşümü. Doğrulama
+> listesine tsc'yi tek başına yazma — bu sınıf yalnız üretim derlemesinde/çalışma
+> zamanında görünür.
+>
+> 🚨 **Ders 2:** Bir hata mesajının GÖSTERDİĞİ yer ile OLDUĞU yer alakasız olabilir.
+> "Telefon alınamadı" mesajı, telefon kodunun hiç çalışmadığı bir dünyada üretildi.
+> Belirti bir `catch`'ten geliyorsa, önce **catch'in ne yakaladığını** sor.
+
+**Yapılan:**
+- [x] `actions.ts` — `export type { IlanDurumu }` kaldırıldı; `IlanKaydetGirdi` /
+      `IlanKaydetSonuc` yerel (export'suz) tip aliası yapıldı. Dosya artık yalnız
+      iki `async function` export ediyor.
+- [x] `page.tsx` — `import type { IlanDurumu } from '../../lib/ilan-yaz'` (kaynağından).
+- [x] **Kural dar tutuldu:** yerel tanımlı tip export'u sorun DEĞİL. `TelefonDurumu`
+      (aynı dosya), `ProfilGirdi`/`ProfilSonuc`, `DurakGirdi`/`IlanGuncelleGirdi`/
+      `PanelSonuc`, `ModSonuc`/`ModDurakGirdi`/`ModIlanGirdi` — hepsi aylardır canlıda
+      sorunsuz. Patlayan tek biçim içe aktarılan bağlamayı dışa veren `export type { X }`.
+      Tarama yapıldı: projede başka re-export yok.
+- [x] **Üretim derlemesiyle doğrulandı** (tsc değil): hatanın geldiği **tam chunk**
+      `server/chunks/ssr/_0wmprg3._.js` yeniden derlendi → `IlanDurumu` geçiş sayısı
+      **0** (yeni kodun derlendiği `satir-yok` dizesi ise 1). Kaynak haritalarında
+      (`.map`) görünmesi normal.
+
 **Kalan:**
-- [ ] **Bayram — DEPLOY gerekiyor** (`npm run deploy`), sonra `/ilan-ver`'i aç ve
-      `kod:` satırını oku. Karşılıkları:
+- [ ] 🧹 **Bayram — `rm -rf .next-dogrulama`** (kum havuzu silemiyor, FUSE izni).
+      Aynı sınıf artık: eski `.next-verify`.
+- [ ] **Deploy et**, `/ilan-ver`'i aç. Beklenen: numara geliyor. Gelmiyorsa artık
+      `kod:` satırı var, aşağıdaki tabloyla oku.
+- [ ] Numara gelince → **#29 form kanalı testi.**
+
+**`kod:` karşılıkları (arıza sürerse):**
       - `satir-yok` → auth id ≠ profil satırı. Hesap birleştirme (`merged_into`) bak.
       - `alan-bos` → `users.phone` gerçekten boş; panelde gördüğün başka bir alan.
       - `sorgu` → PostgREST hatası; Vercel logunda `phone-privacy` ERROR satırında kod var.

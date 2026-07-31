@@ -1,0 +1,17 @@
+{
+  "node": {
+    "401702df3b2e80eb29d3472a7a1707bc67124a29e5": {
+      "workers": {
+        "app/profil-tamamla/page": {
+          "moduleId": 79523,
+          "async": false,
+          "exportedName": "profilKaydet",
+          "filename": "app/profil-tamamla/actions.ts"
+        }
+      },
+      "exportedName": "profilKaydet",
+      "filename": "app/profil-tamamla/actions.ts"
+    }
+  },
+  "edge": {}
+}

@@ -1,0 +1,3 @@
+{
+  "/api/admin/poi-import/[id]/summarize/route": "app/api/admin/poi-import/[id]/summarize/route.js"
+}

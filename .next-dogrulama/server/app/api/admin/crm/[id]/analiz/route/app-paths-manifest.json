@@ -1,0 +1,3 @@
+{
+  "/api/admin/crm/[id]/analiz/route": "app/api/admin/crm/[id]/analiz/route.js"
+}
