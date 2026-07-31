@@ -95,7 +95,7 @@ disiplinle değil. Çağıran yine de açıkça `province_id` gönderirse o kaza
 
 | Dosya | Durum | Not |
 |---|---|---|
-| `docs/20260730_ilan_olustur_v3.sql` | ✅ **çalıştırıldı 30 Tem 2026** | Duman testi: `'istanbul'` + `'ANKARA'` → `İstanbul \| 34`, `Ankara \| 6`. ⚠️ Testte `source` uydurulamaz (`listings_source_check`; geçerli: `whatsapp\|facebook\|telegram\|manual`). |
+| `docs/20260730_ilan_olustur_v3.sql` | ✅ **çalıştırıldı 30 Tem 2026** | Duman testi: `'istanbul'` + `'ANKARA'` → `İstanbul \| 34`, `Ankara \| 6`. ⚠️ Testte `source` uydurulamaz (`listings_source_check`). 🚨 Burada "geçerli: `whatsapp\|facebook\|telegram\|manual`" yazıyordu — **yanlış tablo** (düzeltildi 31 Tem 2026): o küme `app/moderator/actions.ts:149`'daki **`raw_posts.source`** beyaz listesi. `listings.source`'a form kanalı `'form'` yazar. |
 | `lib/ilan-yaz.ts` | ✅ | `ilNormalize` → `ilCiftYazim` + `ilceNormalize`. `p_listing`'e `origin_province_id`/`origin_district_official`, `p_stops`'a `province_id`/`district_official`. `listings` yazan tek TS yolu; whatsapp + excel-import buradan geçiyor. |
 | `app/moderator/actions.ts` | ✅ | `ilanYaz()` kullanmıyor, RPC'yi doğrudan çağırıyor — ayrı güncellendi. |
 | `app/panel/actions.ts` | ✅ | RPC'yi **atlayan tek yazma yolu** (`update` + durak replace). 🚨 Buradaki tehlike id'nin boş kalması değil, **eski değerde kalması**: metin Ankara'ya çevrilip id 34'te kalırsa satır kendi kendisiyle çelişir. Bu yüzden id ve metin aynı yerde birlikte hesaplanıyor. Beyaz listeye yeni kolonlar eklendi. |

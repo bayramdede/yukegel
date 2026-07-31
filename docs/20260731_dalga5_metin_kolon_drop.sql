@@ -10,8 +10,9 @@
 --
 -- Hedef:
 --   listings.origin_city         → düş (yerine origin_province_id, Dalga 1)
---   listings.destination_city    → düş (zaten ölü kolon, hiçbir kod yazmıyor)
 --   listing_stops.city           → düş (yerine province_id, Dalga 2)
+--   listings.destination_city    → 🚫 HEDEF DEĞİL: **KOLON YOK** (31 Tem 2026'da
+--                                  42703 ile öğrenildi; "ölü kolon" sanılıyordu)
 --   + bu kolonlara bağlı 7 metin/trigram indeksi (~72 MB)
 --
 -- ⚠️ SIRA ÖNEMLİ. Kolon drop'u en SONA gelir. Önce yazan taraf (BÖLÜM 1), sonra
@@ -44,19 +45,32 @@
 --          metin ile id birbirini tutmuyor demektir; metni silmek o uyuşmazlığı
 --          çözmez, sadece görünmez yapar.
 --
--- [ ] 0.4  destination_city ölçümü NİHAYET ALINDI.
---          `docs/20260729_alias_runbook.md:121` — ölçüm 0.4 hâlâ alınmadı,
---          yanlışlıkla `listing_stops.city` sorgulanmıştı (244.379 = toplam
---          durak satırı, alakasız). Doğrusu:
+-- [x] 0.4  destination_city — ✅ KAPANDI 31 Tem 2026. **KOLON YOK.**
+--          Ölçüm denendi, dönen: `ERROR: 42703: column "destination_city"
+--          does not exist`. Yani sorunun ön kabulü ("ölü ama var") yanlıştı;
+--          ölçülecek veri de, düşürülecek kolon da yok.
+--          🚨 BU DOSYADAKİ İKİ SATIR BUNA GÖRE DÜZELTİLDİ: BÖLÜM 5'teki
+--          `drop column destination_city` ve BÖLÜM 7'deki yedek sorgusu —
+--          ikisi de çalıştırılsa 42703 verirdi.
+--          Ayrıntı ve ders: `docs/20260731_dalga5_olcumler.sql` ÖLÇÜM 0.4.
 --
---              select count(*) as toplam,
---                     count(destination_city) as dolu
---              from public.listings;
+-- [x] 0.5  BÖLÜM 3 veri kaybı ölçümü ALINDI — ✅ 31 Tem 2026, KAYIP SIFIR.
+--          listings: 234.885 satır · pid_yok_metin_var 0 · telafisiz_kayip 0
+--          listing_stops: 245.152 satır · pid_yok_metin_var 0 · zaten_bos 0
+--          3.3.a ve 3.3.b sıfır satır. Karar: `origin_serbest_metin` kolonuna
+--          GEREK YOK; drop veri kaybettirmiyor.
 --
---          `dolu = 0` beklenir (kolon ölü). Sıfır değilse orada veri var ve
---          düşürmeden önce nereye gideceğine karar verilmeli.
---
--- [ ] 0.5  BÖLÜM 3 veri kaybı ölçümü alındı ve kararı verildi.
+--          🚨 AMA "BUGÜN SIFIR" ≠ "YARIN DA SIFIR". Sayı sıfır çünkü
+--          `lib/ilan-yaz.ts` ili çözemezse ilanı RPC'ye HİÇ göndermiyor
+--          ("Kalkış ili tanınamadı"). Yani v3'ün `coalesce(provinces.name,
+--          ham metin)` bacağı, TS yolundan gelen ilanlar için zaten ölü koddu.
+--          Bacağa erişebilen İKİ yol var ve ikisi de `ilanYaz()`'ı ATLIYOR:
+--            • app/moderator/actions.ts  (RPC'yi doğrudan çağırıyor)
+--            • supabase/functions/parse-listing/index.ts (Edge Function)
+--          v3'te bu yollardan çözülemeyen bir il gelirse metin KORUNUYOR.
+--          v4'te aynı durum: province_id NULL + metin yok = KALKIŞI OLMAYAN İLAN,
+--          sessizce. Ölçüm bugünü temize çıkarıyor, geleceği değil.
+--          → BÖLÜM 1'e guard eklendi (aşağıda, ⬅️ GUARD).
 --
 -- [ ] 0.6  BÖLÜM 1 (ilan_olustur v4) canlıda ve doğrulandı.
 -- [ ] 0.7  BÖLÜM 2 (kod temizliği) deploy edildi ve duman testi geçti.
@@ -128,9 +142,30 @@ begin
   -- ⬅️ v3'teki `v_origin_city := coalesce(provinces.name, ham metin)` SİLİNDİ.
   --    O coalesce'in ikinci bacağı bilinçli bir veri koruma kararıydı: il
   --    çözülemezse ham metin (yurt dışı, serbest giriş, yazım hatası) korunuyordu.
-  --    Kolon düşünce O KORUMA DA DÜŞÜYOR. Bunun bedeli BÖLÜM 3'te ölçülüyor;
-  --    ölçüm sıfırdan büyük çıkarsa buraya dönülüp `origin_serbest_metin`
-  --    kolonu eklenmesi gerekir.
+  --    Kolon düşünce O KORUMA DA DÜŞÜYOR. BÖLÜM 3 ölçümü (31 Tem 2026) bugün
+  --    kayıp olmadığını gösterdi: her iki tabloda da `pid_yok_metin_var = 0`.
+
+  -- ⬅️ GUARD (31 Tem 2026 — ölçümün ORTAYA ÇIKARDIĞI eksik).
+  --
+  -- 🚨 Ölçüm sıfır çıktı diye guard'sız bırakma. Sıfır olmasının sebebi verinin
+  --    doğası değil, `lib/ilan-yaz.ts`'in ili çözemediğinde ilanı RPC'ye HİÇ
+  --    göndermemesi ("Kalkış ili tanınamadı"). Yani koruma TS katmanında, DB'de
+  --    değil. RPC'yi `ilanYaz()`'ı atlayarak çağıran İKİ yol var:
+  --      • app/moderator/actions.ts
+  --      • supabase/functions/parse-listing/index.ts
+  --    v3'te bu yollardan çözülemeyen bir il gelse metin kolona yazılıp
+  --    korunuyordu. v4'te aynı çağrı KALKIŞI OLMAYAN bir ilan üretir — ne id,
+  --    ne metin — ve hata vermez. Sessiz bozulma, gürültülü bozulmadan pahalıdır.
+  --
+  -- ⚠️ `22023` (invalid_parameter_value) bilinçli: `lib/ilan-yaz.ts` ve çağıranlar
+  --    zaten `PGRST202`/`23514` gibi kodları ayırt ediyor; yeni bir sınıf değil,
+  --    "girdi geçersiz" ailesinden. `raise` transaction'ı geri alır, yani yarım
+  --    ilan kalmaz (V5 atomiklik garantisi korunur).
+  if v_origin_pid is null then
+    raise exception 'ilan_olustur: kalkış ili çözümlenemedi (origin_city=%, origin_province_id=%)',
+      p_listing->>'origin_city', p_listing->>'origin_province_id'
+      using errcode = '22023';
+  end if;
 
   insert into public.listings (
     listing_type, origin_district, contact_phone,   -- ⬅️ origin_city çıkarıldı
@@ -181,7 +216,28 @@ begin
   -- ⚠️ Burada veri kaybı riski `listings`tekinden DAHA AĞIR. `listings`in bir
   --    `raw_text` yedeği var; `listing_stops`un yok. İl çözülemeyen bir durak
   --    v4'te `province_id IS NULL` + metin yok = TAMAMEN BOŞ SATIR olur.
-  --    BÖLÜM 3.2 ölçümü bunun için.
+  --    BÖLÜM 3.2 ölçümü bunun için (31 Tem 2026: 245.152 satırda 0).
+
+  -- ⬅️ GUARD — duraklar. Kalkıştakiyle aynı gerekçe, daha sert sonuç: kalkışı
+  --    olmayan ilan hiç değilse duraklarından okunabilir, ama durağı boş bir ilan
+  --    rotasını sessizce eksiltir ve bunu fark etmenin bir yolu yoktur.
+  --    ⚠️ Kontrol INSERT'ten ÖNCE: sonra bakmak "yazdım, sonra beğenmedim"dir;
+  --    transaction geri alsa bile sequence/trigger yan etkileri boşa çalışır.
+  if exists (
+    select 1
+    from jsonb_array_elements(p_stops) as t(s)
+    where coalesce(
+      nullif(t.s->>'province_id', '')::smallint,
+      (select p2.id from public.provinces p2
+        where public.il_key(p2.name) = public.il_key(t.s->>'city'))
+    ) is null
+  ) then
+    raise exception 'ilan_olustur: en az bir durağın ili çözümlenemedi (%)',
+      (select string_agg(coalesce(t.s->>'city', '<boş>'), ', ')
+       from jsonb_array_elements(p_stops) as t(s))
+      using errcode = '22023';
+  end if;
+
   insert into public.listing_stops (
     listing_id, stop_order, district, province_id, district_official,  -- ⬅️ city çıkarıldı
     vehicle_count, cargo_type, weight_ton, pallet_count, notes
@@ -298,8 +354,10 @@ commit;
 --    `app/_components/HomeClient.tsx:743`'teki "Dalga 5'te düşünce" uyarısı
 --    tarihe karışır — güncellenir.
 --
--- ✅ `destination_city` için kod temizliği YOK: `.ts`/`.tsx` içinde SIFIR eşleşme.
---    Doğrulandı 31 Tem 2026.
+-- ✅ `destination_city` için kod temizliği YOK — ama sebebi sanıldığı gibi
+--    "kimse okumuyor" değil, **kolon hiç yok** (31 Tem 2026, 42703).
+--    `.ts`/`.tsx` içinde sıfır eşleşme olması zaten bunun beklenen sonucuydu;
+--    o gözlem "ölü kolon" olarak yorumlanmıştı, oysa yokluğun kanıtıydı.
 
 
 -- ============================================================================
@@ -364,7 +422,7 @@ group by 1 order by 2 desc limit 50;
 --    ilgili satırları yorum satırına alınır.
 --
 -- 31 Tem 2026 taban taramaları (8.A) — 8.B'de bu sayıların FARKI 0 olmalı:
---   idx_listings_origin            110   ← ⚠️ province_id indeksi DEĞİL, kontrol et
+--   idx_listings_origin            110   ← ✅ ÇÖZÜLDÜ: origin_city indeksi (aş. bkz.)
 --   idx_listings_origin_city_lower  44
 --   listings_origin_city_trgm_idx   29
 --   listing_stops_city_trgm_idx     25
@@ -372,8 +430,24 @@ group by 1 order by 2 desc limit 50;
 --   idx_listings_origin_city        11
 --   listing_stops_city_idx           2
 
+-- ✅ `idx_listings_origin` TANIMI OKUNDU — 31 Tem 2026:
+--      CREATE INDEX idx_listings_origin ON public.listings USING btree (origin_city)
+--    Yani `origin_province_id` değil, düpedüz `origin_city` indeksi. Adı yanıltıcı.
+--    → DROP LİSTESİNE EKLENDİ (aşağıda).
+--
+-- 🚨 BUNUN 8.B İÇİN SONUCU, drop listesine eklenmesinden DAHA ÖNEMLİ:
+--    110 tarama ile yedi indeksin EN AKTİFİ ve artık biliyoruz ki `origin_city`
+--    metnini tarıyor. Yani "Dalga 3'ten sonra metin kolonunu okuyan kalmadı"
+--    varsayımının en güçlü karşı adayı bu indeks. 8.B'de (#21, ~7 Ağu) farkı
+--    SIFIRDAN BÜYÜK çıkarsa canlı bir tüketici var demektir ve BÖLÜM 5
+--    çalıştırılmaz — 8.C ile tüketici bulunur.
+--    ⚠️ `learn-aliases:437` (0.2 pozitif kontrolü) da bu indeksi kullanıyor
+--    olabilir. Fark > 0 çıkarsa önce onu ele: 2.1 dönüşümü yapılıp bir hafta
+--    daha ölçülür. İkisini ayırt etmeden "tüketici var" deme.
+
 -- ⚠️ Aşağıdakiler TEK TEK çalıştırılır:
 
+-- drop index concurrently if exists public.idx_listings_origin;
 -- drop index concurrently if exists public.idx_listings_origin_city_lower;
 -- drop index concurrently if exists public.listings_origin_city_trgm_idx;
 -- drop index concurrently if exists public.idx_listing_stops_city_lower;
@@ -381,12 +455,15 @@ group by 1 order by 2 desc limit 50;
 -- drop index concurrently if exists public.idx_listings_origin_city;
 -- drop index concurrently if exists public.listing_stops_city_idx;
 
--- ⚠️ `idx_listings_origin` BİLEREK LİSTEDE DEĞİL. Adı `origin_city`yi ima
---    etmiyor ve 110 taramayla listenin en aktifi. Düşürmeden önce tanımını oku:
---      select indexdef from pg_indexes
---       where schemaname='public' and indexname='idx_listings_origin';
---    `origin_city` içeriyorsa listeye eklenir; `origin_province_id` içeriyorsa
---    KALIR — o Dalga 1'in indeksidir ve 110 tarama onun canlı olduğunun kanıtıdır.
+-- ✅ Diğer tanımlar da doğrulandı (31 Tem 2026) — hepsi gerçekten metin indeksi:
+--   listing_stops_city_idx          btree (city)
+--   idx_listings_origin_city_lower  btree (lower(origin_city), created_at DESC)
+--   idx_listings_origin_city        btree (origin_city) WHERE origin_city IS NOT NULL
+--   listings_origin_city_trgm_idx   gin (origin_city gin_trgm_ops)
+-- ⚠️ `idx_listing_stops_city_lower` ve `listing_stops_city_trgm_idx` bu turda
+--    LİSTELENMEDİ — sorgunun filtresi `%origin_city%` idi, `listing_stops.city`
+--    indekslerini yakalamadı. Yokluk kanıtı DEĞİL. Drop öncesi tanımlarını
+--    `20260731_index_temizligi.sql:279` sorgusuyla teyit et.
 --
 -- 💡 Kolon drop'u (BÖLÜM 5) o kolona bağlı indeksleri ZATEN otomatik düşürür.
 --    Bu bölüm yine de ayrı duruyor çünkü `concurrently` tablo kilidi almaz;
@@ -408,14 +485,16 @@ group by 1 order by 2 desc limit 50;
 -- begin;
 --
 -- alter table public.listings      drop column origin_city;
--- alter table public.listings      drop column destination_city;
 -- alter table public.listing_stops drop column city;
 --
 -- commit;
 
--- ⚠️ `destination_city` 0.4 ölçümü alınmadan bu satır çalıştırılmaz. Ölü
---    olduğuna dair kanıt "kodda geçmiyor"; kolonun İÇİNDE veri olup olmadığı
---    hiç bakılmadı. İkisi farklı sorular.
+-- 🚨 `alter table public.listings drop column destination_city;` BURADAN
+--    ÇIKARILDI (31 Tem 2026). O kolon YOK — sorgu 42703 verir ve transaction'ı
+--    komple geri alır, yani yanındaki iki meşru drop da yapılmamış olurdu.
+--    Kanıt ve ders: `docs/20260731_dalga5_olcumler.sql` ÖLÇÜM 0.4.
+--    ⚠️ `if exists` ekleyip geçiştirme; o, hatayı susturur ama belgelerdeki
+--    yanlış inancı yerinde bırakır.
 
 
 -- ============================================================================
@@ -490,9 +569,10 @@ group by 1 order by 2 desc limit 50;
 --
 -- ✅ BU YÜZDEN BÖLÜM 5'TEN ÖNCE YEDEK:
 --   create table public.dalga5_yedek_20260807 as
---   select l.id, l.origin_city, l.destination_city, l.origin_province_id
+--   select l.id, l.origin_city, l.origin_province_id
 --     from public.listings l
---    where l.origin_city is not null or l.destination_city is not null;
+--    where l.origin_city is not null;
+--   (⬅️ `destination_city` çıkarıldı — kolon yok, 42703 verirdi.)
 --
 --   create table public.dalga5_yedek_stops_20260807 as
 --   select s.id, s.listing_id, s.stop_order, s.city, s.province_id

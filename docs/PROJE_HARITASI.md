@@ -44,9 +44,17 @@
 > ✅ **DALGA 2/4 KAPSAMA DOĞRULAMASI GEÇTİ (31 Tem 2026).** Deploy'dan 24 saat sonra:
 > `excel` 45/45, `whatsapp` 609/609 — **eksik 0**. Çapraz kontrol (`origin_city <> provinces.name`)
 > **sıfır satır**. Yani RPC'yi atlayan yazma yolu yok ve metin ile id hiçbir yerde çelişmiyor.
-> 📌 24 saatte `source='manual'` hiç görünmedi — form kanalı bu pencerede ilan üretmedi, yani
-> kapsaması **ölçülmedi** (bozuk olduğu değil). Dalga 5 öncesi form üzerinden en az bir ilan
-> açılıp `origin_province_id` kontrol edilmeli.
+> ✅ **FORM KANALI DA DOĞRULANDI — 31 Tem 2026** (`docs/20260731_form_kanali_dogrulama.sql`).
+> Tüm tablo: `whatsapp` 234.781/234.781 · `excel` 100/100 · `form` 3/3, **eksik 0**.
+> Canlı test (2 ilan / 3 durak, Tekirdağ→Van+Malatya ve Tekirdağ/Çorlu→İzmir/Kemalpaşa):
+> `origin_province_id` ve `listing_stops.province_id` dolu, metin kanonik, çelişki 0.
+> **Dört yazma yolunun dördü de ölçüldü.**
+> 🚨 Bu not önce `source='manual'` diyordu; **yanlış**. Canlı kısıt:
+> `listings_source_check = source IN ('form','excel','whatsapp','facebook')` — `'manual'` yok.
+> O küme `app/moderator/actions.ts:149`'daki **`raw_posts.source`** beyaz listesidir.
+> Aynı karışıklık `lib/ilan-yaz.ts`'te de vardı: `IlanKaynak` `'moderator'` içeriyor,
+> `'facebook'` içermiyordu → DB'nin reddedeceği bir değeri tip onaylıyordu. Kısıtla
+> birebir eşitlendi (31 Tem 2026).
 >
 > ⏳ **`docs/20260731_dalga5_metin_kolon_drop.sql` + `docs/20260731_districts_tablosu.sql`
 > YAZILDI (31 Tem 2026) — İKİSİ DE ÇALIŞTIRILMADI.** Dalga 5 migration'ı bir hafta önceden
@@ -61,6 +69,23 @@
 > (`Merkez` 51 ilde, 24 ad daha çok ilde) — `provinces_il_key_uniq`'in tek satır garantisi
 > ilçede yok, "metinden id çöz" sessizce yanlış il seçer.
 >
+> ✅ **DALGA 5 BÖLÜM 0 ÖLÇÜMLERİ ALINDI (31 Tem 2026) — `docs/20260731_dalga5_olcumler.sql`.**
+> **`ilanlar`** 234.885 satır → `pid_yok_metin_var` **0**, `telafisiz_kayip` **0**.
+> **`duraklar`** 245.152 satır → `pid_yok_metin_var` **0**, `zaten_bos` **0**.
+> 📌 `origin_serbest_metin` yedek kolonu **gerekmiyor**; drop veri kaybettirmiyor.
+> 🚨 **Ölçüm v4'ten (#26) ÖNCE alındı, bilerek:** v4 metin kolonlarına yazmayı bıraktığı an
+> her yeni satır `origin_city IS NULL` olur ve bu sayaçlar bir daha okunamaz.
+> **Ölçüm, ölçtüğü şeyi değiştiren işlemden önce alınır.**
+> 🚨 **Sıfırın sebebi veri değil, TS katmanı.** `lib/ilan-yaz.ts` ili çözemediğinde ilanı
+> RPC'ye hiç göndermiyor → v3'ün `coalesce(provinces.name, ham metin)` koruması TS yolu için
+> zaten ölü koddu. Ama `app/moderator/actions.ts` ve
+> `supabase/functions/parse-listing/index.ts` `ilanYaz()`'ı **atlıyor**. Kolon düşünce o iki
+> yol kalkışsız ilan / bomboş durak yazabilir ve hata vermez → **v4 gövdesine iki `22023`
+> guard eklendi** (`v_origin_pid is null`; ve `p_stops` üzerinde, **INSERT'ten ÖNCE**).
+> ⚠️ "Ölçüm sıfır, guard gereksiz" DENMEZ: ölçüm korumanın bugün çalıştığını gösterir,
+> yarın yerinde kalacağını değil.
+> 🔎 `idx_listings_origin` çözüldü: `btree (origin_city)` — `origin_province_id` değil.
+> Drop listesine eklendi (7 indeks) ve 110 taramayla **8.B farkının pozitif kontrol adayı**.
 > ⏳ **`docs/20260731_index_temizligi.sql` YAZILDI (31 Tem 2026) — ÇALIŞTIRILMADI.** Dalga 3'ün
 > ertelediği çift-index temizliği (`listing_stops` üç özdeş `(listing_id)`, `listings` üç özdeş
 > `(created_at DESC)`, artı `raw_posts_dedup_idx`) **ölç-sonra-düşür** runbook'u olarak yazıldı:
@@ -500,12 +525,16 @@ Migration: `docs/20260610_poi_module.sql`
 moderation_status: 'pending'|'approved'|'rejected'|'auto_published'|'archived'|'correction_needed'
 status: 'active'|'passive'|'completed'|'expired'
 is_shadow_banned, audit_score, internal_audit_logs (JSONB)
-user_id (nullable), source: 'form'|'whatsapp'|'excel'
+user_id (nullable)
+source — 🚨 listings_source_check: 'form'|'excel'|'whatsapp'|'facebook' (31 Tem 2026'da
+         canlıdan okundu). `'manual'`/`'telegram'` BURADA YOK; onlar `raw_posts.source`.
+         TS karşılığı `lib/ilan-yaz.ts` → `IlanKaynak`; ikisi birebir aynı kalmalı.
 shadow_profile_id (nullable FK → shadow_profiles.id) — kayıtsız kullanıcı ilanları için
 vehicle_id (nullable FK → vehicles.id, on delete set null) — ILAN_VER_ANALIZ B3 (29 Tem 2026)
 contact_phone — 🔒 anon/authenticated için REVOKE edildi (SPRINT_01 L1e). Yalnız service-role.
 origin_province_id (nullable FK → provinces.id) — 30 Tem 2026, backfill %100 (234.229 satır).
-                    origin_city'nin YERİNİ ALACAK. ⚠️ YENİ satırlarda NULL — kod henüz yazmıyor.
+                    origin_city'nin YERİNİ ALACAK. ✅ YENİ satırlarda da DOLU — dört yazma
+                    yolunun dördü de 31 Tem 2026'da ölçüldü (form/excel/whatsapp/moderatör).
 origin_district_official (nullable bool) — true=resmî ilçe, false=serbest giriş (İkitelli, İSTOÇ)
 ```
 > 🗺️ **İL ARTIK ID (30 Tem 2026, `docs/COGRAFI_GECIS.md`).** `origin_city` metin kolonu
@@ -603,12 +632,17 @@ cargo_type, weight_ton, pallet_count, vehicle_count, notes
 > - `get_nearby_listings_by_city` RPC varışı `listing_stops`'un **son durağından**
 >   `DISTINCT ON` ile alıyor.
 >
-> ⚰️ **`listings.destination_city` ÖLÜ KOLON** (29 Tem 2026, W5). Uygulama kodunda tek bir
-> yazma veya okuma yok. `app/panel/actions.ts` patch whitelist'inde bile yer almıyor.
-> `docs/20260728_alias_kopya_temizligi.sql` BÖLÜM 6 bu ölü kolonu onarmaya çalışıp asıl canlı
-> kolonu (`listing_stops.city`) atlıyor → **o bölümü olduğu gibi çalıştırma**, yerine
-> `docs/20260729_alias_runbook.md` Adım 8'i kullan (dört kolonu birlikte onarıyor).
-> Kolonun düşürülmesi `YAPILACAKLAR.md`'de bilet.
+> 🚫 **`listings.destination_city` DİYE BİR KOLON YOK** (31 Tem 2026'da 42703 ile öğrenildi).
+> Burada 29 Tem'den beri "ÖLÜ KOLON" yazıyordu — yanlıştı. Ölü değil, **hiç var olmamış**.
+> `information_schema.columns` teyit etti. Varış verisi tamamen `listing_stops` satırlarında.
+> ⚠️ Fark önemli: "ölü" onu var sayar, "yok" saymaz. Yaklaşık 10 belge bu kolonu var sayarak
+> yazılmış ve **ikisi ona `UPDATE` atıyor**
+> (`docs/20260728_alias_kopya_temizligi.sql`:288, `docs/20260728_alias_homonim_temizligi.sql`:261)
+> — çalıştırılsalardı 42703 verirlerdi. Temizlik bileti: `YAPILACAKLAR.md` #32.
+> Alias onarımı için yine `docs/20260729_alias_runbook.md` Adım 8 kullanılır (canlı
+> `listing_stops.city`'yi de kapsıyor).
+> 📌 **DERS:** "kodda geçmiyor" ≠ "içinde veri yok" ≠ **"kolon var"**. Bir nesne hakkında
+> ölçüm planlamadan önce **varlığını** doğrula; yoksa yokluğu "boş" sanılır.
 >
 > ⚖️ **Aynı şehir içi taşıma meşrudur.** `origin_city = stops.city` bir bozukluk sinyali
 > **değildir**. Sahte güzergâh parmak izi şudur: *katlanmış anahtar eşit, ham yazım farklı*
@@ -793,10 +827,11 @@ Açık rotalar: /giris, /auth/, /profil-tamamla, /nasil-calisir, /hakkimizda,
   tabloyu kilitlemek, üstüne yetkisiz bir view koyduğun anda anlamsızlaşır.
 - 🚨 **Güzergâh sorgusu yazarken `listings`'i tek başına sorgulama** (29 Tem 2026, W5).
   Kalkış `listings.origin_city`'de, varışlar `listing_stops` satırlarında. `listings`
-  içindeki `destination_city` **ölü kolondur** — dolu görünse bile kimse okumaz.
+  içinde `destination_city` diye bir kolon **YOKTUR** (31 Tem 2026, 42703) — burada
+  "ölü kolon" yazıyordu, o da yanlıştı.
   Bir güzergâh sorgusu `JOIN public.listing_stops s ON s.listing_id = l.id` içermiyorsa
-  yanlıştır. Bu tuzak bir kez gerçek zarar verdi: eski temizlik script'i (BÖLÜM 6) ölü
-  kolonu onarıp kullanıcıya görünen `listing_stops.city`'yi atlamıştı.
+  yanlıştır. Bu tuzak bir kez gerçek zarar verdi: eski temizlik script'i (BÖLÜM 6) olmayan
+  bir kolonu onarmaya çalışıp kullanıcıya görünen `listing_stops.city`'yi atlamıştı.
 - 🚨 **`stops[0]` OKUMA — durak verisi ÇOKLU'dur** (29 Tem 2026). Yukarıdaki kuralın
   arayüz tarafındaki devamı: sorgun `listing_stops`'u doğru çekse bile **ilk satırı
   okumak veriyi sessizce kırpar**. Ana sayfa kartı `duraklar[0].ton` yazdığı için

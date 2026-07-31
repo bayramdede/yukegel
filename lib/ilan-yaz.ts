@@ -80,8 +80,33 @@ export interface IlanYazGirdi {
   ai_parsed?: boolean;
 }
 
-/** `listings.source` — hangi kanaldan geldi. Beyaz liste; istemci belirleyemez. */
-export type IlanKaynak = 'form' | 'excel' | 'whatsapp' | 'moderator';
+/**
+ * `listings.source` — hangi kanaldan geldi. Beyaz liste; istemci belirleyemez.
+ *
+ * 🚨 BU BİRLEŞİM `listings_source_check` İLE BİREBİR AYNI OLMAK ZORUNDA
+ * (31 Tem 2026'da canlı şemadan okundu):
+ *
+ *     CHECK (source = ANY (ARRAY['form','excel','whatsapp','facebook']))
+ *
+ * Burada `'moderator'` vardı ve `'facebook'` YOKTU — ikisi de yanlış. `'moderator'`
+ * DB'de geçersiz: derleyici `ilanYaz(..., 'moderator')` çağrısını onaylar, RPC
+ * çalışma zamanında 23514 ile patlardı. Bugün çağıranı yok (moderatör akışı
+ * `app/moderator/actions.ts` üzerinden RPC'yi doğrudan çağırıyor, çünkü orada
+ * `user_id` NULL ve telefon metinden okunuyor) — yani bu, patlamamış bir mayındı,
+ * çalışan bir özellik değil.
+ *
+ * ⚠️ Bir TS birleşimi DB kısıtını DOĞRULAMAZ, yalnız TAKLİT eder. İkisi ayrışırsa
+ * derleyici sessiz kalır. Kısıta değer eklerken/çıkarırken burayı da güncelle;
+ * emin değilsen tahmin etme, oku:
+ *   select pg_get_constraintdef(oid) from pg_constraint
+ *   where conrelid='public.listings'::regclass and contype='c'
+ *     and pg_get_constraintdef(oid) ilike '%source%';
+ *
+ * ⚠️ `raw_posts.source` BAŞKA bir sütun ve başka bir küme
+ * (`whatsapp|facebook|telegram|manual`, bkz. `app/moderator/actions.ts:149`).
+ * Bu ikisi üç ayrı belgede birbirine karıştırıldı; karıştırma.
+ */
+export type IlanKaynak = 'form' | 'excel' | 'whatsapp' | 'facebook';
 
 /**
  * Kanal politikası — `ILAN_VER_ANALIZ` W1+.
@@ -94,12 +119,18 @@ export type IlanKaynak = 'form' | 'excel' | 'whatsapp' | 'moderator';
  * WhatsApp için açık, çünkü oradaki metin bir formdan değil serbest sohbetten
  * geliyor ve LLM'in yorumu doğrulanmamış; skorlayıcı "temiz" dese bile insan gözü
  * görmeli. Form ve Excel'de kullanıcı ne yazdığını ekranda görüp onaylıyor.
+ *
+ * `Record<IlanKaynak, …>` bilerek — birleşime kanal eklenince burası derleme
+ * hatası verir ve politikayı yazmayı unutamazsın.
  */
 const KANAL_POLITIKA: Record<IlanKaynak, { daimaIncele: boolean }> = {
   form:      { daimaIncele: false },
   excel:     { daimaIncele: false },
   whatsapp:  { daimaIncele: true  },
-  moderator: { daimaIncele: false },
+  // WhatsApp ile aynı gerekçe: serbest metinden LLM ile çıkarılıyor, form yok.
+  // Bugün çağıranı yok ama DB kısıtı bu değeri kabul ediyor; kanal açılırsa
+  // varsayılanı "incelemesiz yayına çıksın" OLMAMALI.
+  facebook:  { daimaIncele: true  },
 };
 
 // ── Yardımcılar ────────────────────────────────────────────────────────────

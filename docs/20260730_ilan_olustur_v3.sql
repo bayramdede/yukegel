@@ -192,8 +192,17 @@ commit;
 --
 -- ⚠️ `source` DEĞERİ SERBEST DEĞİL. `listings_source_check` kısıtı var; testte
 -- 'test' gibi uydurma bir değer verirsen 23514 alırsın ve fonksiyonu değil
--- kısıtı test etmiş olursun. Geçerli küme (bkz. `app/moderator/actions.ts`
--- KAYNAK_SETI): 'whatsapp', 'facebook', 'telegram', 'manual'.
+-- kısıtı test etmiş olursun.
+--
+-- 🚨 DÜZELTME (31 Tem 2026): burada "Geçerli küme (bkz. KAYNAK_SETI):
+-- 'whatsapp','facebook','telegram','manual'" yazıyordu — YANLIŞ TABLO.
+-- `app/moderator/actions.ts:149`'daki `KAYNAK_SETI`, kendi yorumunun da dediği
+-- gibi **`raw_posts.source`** beyaz listesidir. `listings.source` ayrı bir sütun
+-- ve form kanalı oraya 'form' yazar (`app/ilan-ver/actions.ts:90`).
+-- Kısıtın gerçek tanımını tahmin etme, oku:
+--   select pg_get_constraintdef(oid) from pg_constraint
+--   where conrelid='public.listings'::regclass and contype='c'
+--     and pg_get_constraintdef(oid) ilike '%source%';
 --
 -- 1) ESKİ ÇAĞIRAN (yalnız metin gönderiyor) id yazıyor mu? + bozuk yazım
 --    kanonikleşiyor mu? Bu, Dalga 2'nin tüm iddiasının testi.
