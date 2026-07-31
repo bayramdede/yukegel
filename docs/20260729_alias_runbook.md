@@ -498,6 +498,53 @@ anahtar değeri ile yukarıdaki ölçüm sorgusuna bak.
 
 ---
 
+## 🚨 DALGA 5 ETKİLEŞİMİ — bu runbook'un son kullanma tarihi var (31 Tem 2026)
+
+Dalga 5 (`docs/20260731_dalga5_metin_kolon_drop.sql`, en erken 7 Ağu) şu kolonları
+**düşürüyor**: `listings.origin_city`, `listings.destination_city`, `listing_stops.city`.
+Bu runbook'un bazı adımları tam olarak o kolonlara dokunuyor. Sıra artık serbest değil.
+
+**Dalga 5'ten SONRA çalıştırılamaz hâle gelenler:**
+
+| Adım | Neden |
+|---|---|
+| **8.1** şehir kolonu onarımı | Onardığı iki kolon da düşüyor. Drop'tan sonra çalıştırmak 42703 verir. |
+| **8.3** `destination_city` | Kolon düşüyor. Zaten "dokunma" diyordu. |
+| **8.4** doğrulama (`l.origin_city <> s.city`) | Her iki taraf da düşüyor; sorgu yazılamaz. |
+| **0.1 / 0.1b / 0.2 / 0.3** ölçümleri | Aynı kolonlara dayanıyor; "önce/sonra" karşılaştırması bir daha kurulamaz. |
+
+**Dalga 5'ten sonra da geçerli kalanlar — ve bu yüzden ASIL İŞ olanlar:**
+
+Adım **3, 4, 6** ve **8.2** yalnız `district` alanlarına dokunuyor.
+`listings.origin_district` ve `listing_stops.district` Dalga 5'te **düşmüyor** — çünkü
+DB'de ilçe tablosu yok, `province_id` gibi bir `district_id` karşılığı da yok. Yani
+Dalga 5 sonrasında **ilçe, sistemde kalan tek metin konum alanı** olacak. Yazım kalitesi
+oraya kilitleniyor.
+
+Bu, Adım 0.3 ölçümüyle de örtüşüyor: hasarın 16 grubunun **14'ü ilçe kolonlarında**
+(`listing_stops.district` 11, `listings.origin_district` 3), yalnız 2'si şehirde. Yani
+zaten düzeltilmesi gereken kısım, düşmeyecek olan kısım.
+
+**Karar:**
+
+1. Adım **3 → 4 → 6 → 7 → 8.2** sırası korunarak tamamlanır. Bunların Dalga 5 ile
+   yarışı yok, ne zaman yapılırsa yapılsın geçerli.
+2. Adım **8.1 + 8.4** yapılacaksa **Dalga 5'ten önce** yapılır. Ama önce şunu tart:
+   Dalga 3 sonrası şehir filtresi artık `origin_province_id`/`province_id` tamsayısına
+   bakıyor, metnin yazımı kullanıcıya hiçbir şey göstermiyor. Ve Adım 0.3'e göre
+   `listings.origin_city`'de toplam **3 satır** bozuk (22.471 `İstanbul`'a karşı
+   3 `Istanbul`). **Birkaç gün sonra düşecek bir kolonda 3 satır onarmak** işin
+   kendisinden çok işin kaydını tutmaya benziyor — atlanabilir, ama bilinçli atlanır,
+   unutularak değil.
+3. Adım **9 + 10** (`aliases` katlanmış kopyalar + UNIQUE indeks) Dalga 5'ten tamamen
+   bağımsız — `aliases` tablosuna dokunuyorlar, `listings`e değil. Kendi sıralarında.
+
+⚠️ Adım 8.1'i atlama kararı verilirse **Adım 8.4 doğrulaması da düşer**, yani "yazım
+farkından doğan sahte güzergâh kalmadı" bir daha kanıtlanamaz. Adım 0.1 zaten **0**
+dönmüştü (29 Tem) — kanıt orada duruyor, tekrar üretilemeyecek olan da o.
+
+---
+
 ## Özet sıra
 
 | # | Ne | Kaynak | Zorunlu |
@@ -510,6 +557,10 @@ anahtar değeri ile yukarıdaki ölçüm sorgusuna bak.
 | 5 | `payas` → Hatay | K · BÖLÜM 4.1 | ✅ |
 | 6 | Elle kararlar | K · BÖLÜM 4.2-4.6 | seçmeli |
 | 7 | Doğrulama (boş dönmeli) | K · BÖLÜM 5 | ✅ |
-| 8 | Geçmiş konum onarımı — **4 kolon** (`origin_city`, `origin_district`, `listing_stops.city`, `listing_stops.district`) + tekrar ölç | bu dosya (K · BÖLÜM 6 **eksik**) | ✅ |
+| 8 | Geçmiş konum onarımı — **4 kolon** (`origin_city`, `origin_district`, `listing_stops.city`, `listing_stops.district`) + tekrar ölç | bu dosya (K · BÖLÜM 6 **eksik**) | ✅ · ⏳ 8.1/8.3/8.4 Dalga 5'ten önce, 8.2 her zaman |
 | 9 | Katlanmış alias kopyalarını pasifleştir | bu dosya | ✅ (D3 önkoşulu) |
 | 10 | Trigger + kısmi UNIQUE indeks | `20260729_alias_normalize_trigger.sql` | ✅ |
+
+> ⏳ sütunu için bkz. bir üstteki **DALGA 5 ETKİLEŞİMİ** bölümü. Kısaca: 3/4/6/8.2
+> ilçelere dokunuyor ve süresizdir; 8.1/8.3/8.4 şehir metin kolonlarına dokunuyor ve
+> o kolonlar Dalga 5'te düşüyor.

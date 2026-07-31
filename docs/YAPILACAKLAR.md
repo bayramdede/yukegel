@@ -20,8 +20,13 @@
 > küme `whatsapp|facebook|telegram|manual` (ilk denemede 23514 aldık).
 >
 > ✅ **DEPLOY YAPILDI** — `main` @ `4f09ee5`, 30 Tem 2026 18:13.
-> ⏳ **SIRADAKİ: kapsama ölçümü.** 31 Tem 18:13'ten sonra v3 dosyasının sonundaki iki sorguyu çalıştır:
-> `eksik` ≈ 0 ve ikinci sorgu **sıfır satır** olmalı; olmazsa RPC'yi atlayan bir yazma yolu var.
+> ✅ **KAPSAMA ÖLÇÜMÜ GEÇTİ — 31 Tem 2026.** 24 saatlik pencere:
+> `excel` 45/45 · `whatsapp` 609/609 · **eksik 0**. Çapraz kontrol (`origin_city <> provinces.name`)
+> **sıfır satır**. RPC'yi atlayan yazma yolu yok; metin ile id hiçbir yerde çelişmiyor.
+> ⚠️ **Ama `source='manual'` bu pencerede HİÇ görünmedi.** Form kanalı 24 saatte ilan üretmemiş,
+> yani kapsaması **doğrulanmadı** — bozuk olduğu değil, ÖLÇÜLMEDİĞİ. Dalga 5'ten önce
+> `/ilan-ver` üzerinden bir ilan açılıp `origin_province_id` dolu mu diye bakılmalı.
+> "İki sorgu da temiz döndü" ile "dört yazma yolunun dördü de doğrulandı" aynı şey değil.
 >
 > Migration'daki 6.A geri doldurma güncellemesi idempotent — arada oluşmuş NULL'lar için
 > tekrar çalıştırılabilir (`where origin_province_id is null` koşulu zaten var).
@@ -42,6 +47,13 @@
 > BÖLÜM 1 (trigger) + BÖLÜM 2 (kısmi UNIQUE indeks) kuruldu, BÖLÜM 3'ün üç doğrulaması da geçti.
 > Katlanmış alias kopyası artık DB seviyesinde doğamaz.
 > ⏳ Runbook'un **Adım 3, 4, 6** (ilçe yazımı, NULL ilçe, elle kararlar) hâlâ açık.
+> 📌 **31 Tem 2026 — bu üç adım artık işin ASIL kısmı.** Dalga 5 `origin_city` ve
+> `listing_stops.city`'yi düşürüyor, `origin_district`/`listing_stops.district` DÜŞMÜYOR:
+> yani ilçe, sistemde kalan **tek metin konum alanı** oluyor. Adım 0.3 ölçümü de bunu
+> destekliyor — 16 çakışma grubunun **14'ü ilçe kolonlarında**. Buna karşılık runbook'un
+> Adım **8.1/8.3/8.4**'ü düşecek kolonlara dokunuyor ve Dalga 5'ten sonra çalıştırılamaz
+> hâle geliyor; `listings.origin_city`'de toplam **3 bozuk satır** olduğu için atlanması
+> savunulabilir, ama bilinçli atlanmalı. Detay: runbook'un yeni **DALGA 5 ETKİLEŞİMİ** bölümü.
 >
 > ✅ **DALGA 3 TAMAMLANDI (31 Tem 2026).** Migration `docs/20260730_dalga3_radar_province_id.sql`
 > canlıda çalıştırıldı; kabul kriteri **BÖLÜM 5.6 sıfır satır** döndü (metin sayımı = id sayımı,
@@ -80,8 +92,89 @@
 > - **Bugün düşürülebilir ≈ 127 MB** (BÖLÜM 7.B): iki kopya grubunda 4 indeks (54 MB) +
 >   122 günde hiç taranmamış 5 metin indeksi (73 MB). Kopya grubunda **en az şişmiş**
 >   olan tutuluyor — BÖLÜM 4'ün ad uzunluğuna bakan önerisi boyutla ezildi.
-> ⏳ Dalga 5 metin indekslerinin kararı için **7.A ile sayaç sıfırlanıp ~7 Ağu'da yeniden
-> ölçülmeli** (7.B'yi ÖNCE çalıştır — sıfırlama onun kanıtını siler).
+> ✅ **7.B DROP'LARI ÇALIŞTIRILDI + doğrulama + duman testi geçti (31 Tem 2026, Bayram).**
+>
+> 🚨 **7.A SIFIRLAMASI REDDEDİLDİ — `42501 permission denied for function
+> pg_stat_reset_single_table_counters`.** Supabase'de bu fonksiyon superuser'a bağlı.
+> Bu, "sayacı sıfırla → bir hafta bekle → tekrar ölç" planını komple geçersiz kılar:
+> sıfırlanamayan sayaçta beklemek, 122 günlük ESKİ KOD birikintisinin üstüne bir hafta
+> yeni veri koymaktan ibarettir ve ikisi toplamın içinden ayrılamaz.
+> **Yerine FARK yöntemi kondu — `docs/20260731_index_temizligi.sql` BÖLÜM 8.**
+> Bugün `public.idx_taban_20260731` taban tablosu alınır (8.A), ~7 Ağu'da
+> `simdi − taban` farkı okunur (8.B). Sıfırlamayla matematiksel olarak aynı sonuç,
+> yıkıcı değil, yetki istemiyor. ⚠️ Fark alırken `stats_reset` de karşılaştırılır:
+> Postgres yeniden başlarsa sayaç geri sayar, **negatif fark "kullanılmadı" değil
+> "taban geçersiz"** demektir.
+>
+> 📌 **31 Tem BÖLÜM 5 çıktısı (taban değerleri, 122 günlük pencere):**
+> `idx_listings_origin` 110 · `idx_listings_origin_city_lower` 44 ·
+> `listings_origin_city_trgm_idx` 29 · `listing_stops_city_trgm_idx` 25 ·
+> `idx_listing_stops_city_lower` 24 · `idx_listings_origin_city` 11 ·
+> `listing_stops_city_idx` 2. Toplam ~72 MB. Sayılar **çok düşük** (110 tarama /
+> 122 gün ≈ günde 1) — bunlar sıcak yol değil, seyrek çalışan tüketiciler.
+>
+> 🔎 **İlk tüketici koddan bulundu (8.D):** `app/api/admin/learn-aliases/route.ts`:437
+> `.in('origin_city', kesfedilenNorm)` — AI Keşfi yeni alias bulduğunda çalışan bir
+> UPDATE. `idx_listings_origin`'in düz btree kullanımını ve seyrekliğini birebir
+> açıklıyor. **Dalga 5 öncesi `origin_province_id`'ye çevrilmeli**, yoksa kolon
+> düştüğü an keşif 42703 ile patlar.
+> ✅ **TÜKETİCİ AVI KAPANDI (31 Tem 2026, BÖLÜM 8.F).** Üç kanal da tarandı:
+> - **DB fonksiyonları:** dört eşleşme çıktı, dördü de yanlış pozitif ya da yazma.
+>   `get_radar_city_*`'in `city`'leri jsonb ANAHTARI veya `provinces.name`;
+>   `get_nearby_listings_by_province`'ın `origin_city`'si `po.name as origin_city`
+>   yani çıktı kolonu ADI; `ilan_olustur` INSERT yapıyor ve **INSERT `idx_scan`
+>   artırmaz**. Hiçbiri `listings.origin_city`'yi WHERE'de kullanmıyor.
+> - **View + RLS politikaları:** ikisi de sıfır satır.
+> - **Uygulama sorguları:** `origin_city`/`stops.city` geçen her TS satırı ya
+>   `select` kolon listesi, ya JSX, ya da **fetch sonrası bellek içi JS filtresi**
+>   (`moderator/page.tsx`:297,301 · `PanelClient.tsx`:242 — DB'ye gitmez).
+>   Tek istisna `learn-aliases`:437.
+>
+> 📌 **Sonuç:** `lower()` ve trigram indekslerinin (`idx_listings_origin_city_lower`,
+> `listings_origin_city_trgm_idx`, `idx_listing_stops_city_lower`,
+> `listing_stops_city_trgm_idx` — toplam ~62 MB) **canlı tüketicisi YOK**.
+> 44/29/25/24 tarama Dalga 3 öncesi ILIKE'lı RPC sürümlerinden kalıntı.
+> 7 Ağu farkında 0 bekleniyor → Dalga 5'te temiz drop.
+>
+> ⚠️ **`learn-aliases`:437 bilerek ŞİMDİ değiştirilmedi** — 8.B ölçümünün **pozitif
+> kontrolü** o. 7 Ağu'da `idx_listings_origin` farkı >0, diğer dördü 0 çıkarsa
+> ölçümün gerçekten çalıştığını biliriz. Hepsi 0 çıkarsa "tüketici yok" ile
+> "hiç trafik gelmemiş" ayırt edilemez. Sıra: 8.B oku → kodu çevir → Dalga 5.
+>
+> ⏳ **`docs/20260731_dalga5_metin_kolon_drop.sql` YAZILDI (31 Tem 2026) — ÇALIŞTIRILMADI.**
+> Bir hafta önceden yazılmasının sebebi çalıştırmak değil, gözden kaçan bağımlılıkları
+> çıkarmaktı. **İkisi çıktı ve ikisi de `COGRAFI_GECIS.md`'nin Dalga 5 madde listesinde yoktu:**
+> 1. 🚨 **`ilan_olustur` hâlâ her iki metin kolonuna INSERT ediyor** (v3, satır 88-99 ve 139-146).
+>    plpgsql gövdesi DDL anında doğrulanmaz: `drop column` **hatasız geçer**, sonra ilk ilan
+>    oluşturma denemesinde 42703 ile patlar. Hata deploy'da değil canlıda çıkar ve dört yazma
+>    yolunun dördü de bu RPC'den geçtiği için **ilan girişi tamamen durur**. → `ilan_olustur` v4
+>    (migration BÖLÜM 1) drop'tan ÖNCE canlıda olmalı. RPC'nin JSON *girdi* anahtarları değişmez.
+> 2. **Çözülemeyen yer adları geri getirilemez.** v3'ün `coalesce(provinces.name, ham metin)`
+>    bacağı bilinçli bir koruma: il çözülemezse (yurt dışı, serbest giriş) ham metin saklanıyordu.
+>    `listing_stops`ta `raw_text` yedeği bile yok → çözülemeyen durak **tamamen boş satır** olur.
+>    → Migration BÖLÜM 3 ölçümü drop'tan önce alınır.
+>
+> Ayrıca: `origin_city` repoda 30 dosyada 97 kez geçiyor ama hepsi kolon değil — migration
+> BÖLÜM 2 bunları üç kovaya ayırıyor (DB predikatı / select+gösterim / LLM anahtarı ve yorum).
+> Üçüncü kovaya (`whatsapp`, `parse-text`, `llm-parse`, RPC girdileri) **dokunulmaz**;
+> değiştirmek ayrıştırmayı bozar. `destination_city` için kod temizliği yok: `.ts`/`.tsx`
+> içinde sıfır eşleşme.
+>
+> ⏳ **`docs/20260731_districts_tablosu.sql` YAZILDI (31 Tem 2026) — ÇALIŞTIRILMADI.**
+> 973 ilçe + `il_key()` katlamalı `(province_id, ad)` UNIQUE + `public.ilce_resmi()` fonksiyonu.
+> `COGRAFI_GECIS.md:205-212`'deki "kapatılmayan tek boşluk" (Deno'da `district_official` NULL)
+> buradan kapanıyor — **Deno'ya liste vererek değil, kararı DB'ye taşıyarak**, böylece dört
+> yazma yolu da aynı cevabı verir.
+> 📌 **Tasarım kararı: `district_id` kolonu EKLENMİYOR.** İl için yapılan 5 dalga ilçede
+> tekrarlanamaz çünkü ilçe adı tek başına tekil değil: `Merkez` **51 ilde**, 24 ad daha iki-üç
+> ilde birden (`Gölbaşı`, `Kemalpaşa`, `Yenişehir`…). `provinces_il_key_uniq`'in verdiği tek
+> satır garantisi ilçede YOK, dolayısıyla "metinden id çöz" adımı sessizce yanlış il seçer.
+> Tablo bunun yerine **doğrulama sözlüğü**: "bu il için bu ilçe var mı?".
+> 📌 Bu liste alias runbook Adım 6.5/6.6'yı da doğruluyor — `gölbaşı`/`kemalpaşa` belirsizliği
+> uydurma değil, resmî ilçe listesinin kendisinden geliyor. ⚠️ Runbook 6.6 Artvin/Kemalpaşa'yı
+> "belde" diyor; 2020'de ilçe oldu, gerekçe eskimiş (karar yine de doğru).
+> ⚠️ **Tek kaynak ikiye çıkıyor:** `locations.json` + tablo. Ayrışırlarsa `district_official`
+> sessizce yanlış cevap verir. İkisini karşılaştıran test **henüz yazılmadı** (BÖLÜM 4.3).
 >
 > ⏳ **`docs/20260731_index_temizligi.sql` YAZILDI (31 Tem 2026) — ÇALIŞTIRILMADI, ölçüm bekliyor.**
 > Ayrı migration olarak istenen çift-index temizliği artık **ölç-sonra-düşür** runbook'u hâlinde.
@@ -501,6 +594,49 @@ reddedilirse hiçbir yerde yakalanmaz. Error boundary tetiklenmez, kullanıcı h
 dönmüş/yanlış ortama işaretlenmiş olabilir. Kontrol: Settings → Environment Variables →
 anahtarın **Production** kutusu işaretli mi + Supabase panelindeki güncel `service_role`
 anahtarıyla aynı mı. Deploy sonrası logda `phone-privacy` ara.
+
+#### 🔴 Devamı — "telefon numarasını bulamıyor" KAPALI DÖNGÜ (31 Tem 2026)
+
+**Belirti (Bayram, canlı):** `/ilan-ver`'de telefon bulunamıyor, bu yüzden **görev #29
+(form kanalı `source='manual'` kapsama testi) yapılamadı.**
+
+**Kök neden — üç parçalı, hiçbiri tek başına hata üretmiyor:**
+
+1. `/ilan-ver` formunda **telefon input'u YOK** (`page.tsx:657-680`). Kart sadece
+   `users.phone`'u *gösteriyor*. Profil boşsa kullanıcının yazabileceği bir alan yok,
+   yani ilan hiç verilemiyor. (`lib/ilan-yaz.ts::ilanTelefonu()`'nun istemciden gelen
+   `0XXXXXXXXXX`'i kabul edip profile geri yazan **kendi kendini onaran dalı bu kanalda
+   ÖLÜ** — form `tel` olarak hep boş string gönderiyor.)
+2. `numara-yok` durumundaki "Profilden ekleyin →" bağlantısı `/profil-tamamla`'ya
+   gidiyordu. Ama `profil-tamamla/page.tsx:120`: `user_type` doluysa form **hiç
+   render edilmeden** `/panel`'e geri atılıyor. Yani bağlantı kapalı bir döngüydü.
+3. Numarayı ekleyen tek gerçek ekran — panel Profilim sekmesi, SMS OTP ile
+   (`PanelClient.tsx:834-852`) — sadece **local state** ile açılıyordu, dışarıdan
+   hedeflenemiyordu.
+
+> 🚨 **Ders:** "X yoksa Y'ye git" bağlantısı yazarken **Y'nin o kullanıcıyı geri
+> çevirmediğini** doğrula. Buradaki üç parçanın her biri tek başına makul; birleşince
+> kullanıcı hiçbir hata mesajı görmeden hiçbir şey yapamıyor.
+
+**Yapılanlar (31 Tem 2026, tsc temiz):**
+- [x] `app/panel/PanelClient.tsx` — `?sekme=ilanlarim|araclarim|profilim` derin bağlantı
+      (beyaz listeli, `window.location` ile — `useSearchParams` CSR bailout'u yüzünden).
+- [x] `app/ilan-ver/page.tsx:675` — bağlantı `/panel?sekme=profilim`, metin
+      "Panelden ekleyin →".
+- `app/ilan/[id]/page.tsx:428`'deki `/profil-tamamla` bağlantısı **doğru** ve
+  değiştirilmedi — orası gerçekten `user_type` olmayan kullanıcı dalı.
+
+**Kalan:**
+- [ ] **Bayram — şimdi yapılabilir, deploy beklemez:** Panel → 👤 Profilim → 📞 İletişim
+      Bilgileri → Telefon **Değiştir** → SMS OTP. Numara girince #29 testi açılır.
+- [ ] Ekranda hangi mesaj çıktığını not et: **"⚠️ Profilinizde telefon numarası yok"**
+      = `numara-yok` (yukarıdaki döngü, `users.phone` boş). **"⚠️ Telefon numarası
+      alınamadı"** = `hata` — bu farklı bir arıza, `service_role` anahtarı; Vercel
+      logunda `phone-privacy` ERROR satırı olur. İkincisi çıktıysa yukarıdaki
+      "Kalan (Bayram)" maddesine dön.
+- [ ] Kalıcı çözüm adayı (ayrı iş): `numara-yok` durumunda forma telefon input'u koy —
+      `ilanTelefonu()`'nun kendi kendini onaran dalı zaten hazır, sadece kanal ona
+      değer göndermiyor. Ama numara SMS ile doğrulanmamış olur; ürün kararı gerekiyor.
 
 ### 🔴 `shadow_profile_summary` view'ı RLS bypass ediyor (29 Tem 2026) — SQL BEKLİYOR
 

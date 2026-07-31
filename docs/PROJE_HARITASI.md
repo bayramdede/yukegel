@@ -41,6 +41,26 @@
 > hatası değil **AI'ın il alanına ilçe adı koyması**ydı ("Çorlu" → `ilCiftYazim` null → WhatsApp'ta
 > ilan HİÇ oluşmuyor, form yok ki düzeltilsin). İki prompt'a da "sadece 81 ilden biri; ilçe geldiyse
 > `district`'e koy, `city`'ye bağlı olduğu ili yaz" kuralı eklendi.
+> ✅ **DALGA 2/4 KAPSAMA DOĞRULAMASI GEÇTİ (31 Tem 2026).** Deploy'dan 24 saat sonra:
+> `excel` 45/45, `whatsapp` 609/609 — **eksik 0**. Çapraz kontrol (`origin_city <> provinces.name`)
+> **sıfır satır**. Yani RPC'yi atlayan yazma yolu yok ve metin ile id hiçbir yerde çelişmiyor.
+> 📌 24 saatte `source='manual'` hiç görünmedi — form kanalı bu pencerede ilan üretmedi, yani
+> kapsaması **ölçülmedi** (bozuk olduğu değil). Dalga 5 öncesi form üzerinden en az bir ilan
+> açılıp `origin_province_id` kontrol edilmeli.
+>
+> ⏳ **`docs/20260731_dalga5_metin_kolon_drop.sql` + `docs/20260731_districts_tablosu.sql`
+> YAZILDI (31 Tem 2026) — İKİSİ DE ÇALIŞTIRILMADI.** Dalga 5 migration'ı bir hafta önceden
+> yazıldı ve **iki gizli bağımlılık** çıkardı (ikisi de `COGRAFI_GECIS.md` madde listesinde yoktu):
+> 🚨 **`ilan_olustur` hâlâ `origin_city` + `listing_stops.city` INSERT ediyor.** plpgsql gövdesi
+> DDL anında doğrulanmaz → `drop column` hatasız geçer, ilk ilan oluşturmada 42703 patlar,
+> dört yazma yolu da bu RPC'den geçtiği için **ilan girişi tamamen durur**. v4 drop'tan önce şart.
+> ⚠️ **Çözülemeyen yer adları geri getirilemez:** v3'ün `coalesce(provinces.name, ham metin)`
+> bacağı bilinçli koruma; `listing_stops`ta `raw_text` yedeği bile yok → boş satır kalır.
+> `districts` tablosu (973 ilçe + `ilce_resmi()`) Deno'daki `district_official` boşluğunu
+> **kararı DB'ye taşıyarak** kapatıyor. 📌 `district_id` kolonu EKLENMİYOR: ilçe adı tekil değil
+> (`Merkez` 51 ilde, 24 ad daha çok ilde) — `provinces_il_key_uniq`'in tek satır garantisi
+> ilçede yok, "metinden id çöz" sessizce yanlış il seçer.
+>
 > ⏳ **`docs/20260731_index_temizligi.sql` YAZILDI (31 Tem 2026) — ÇALIŞTIRILMADI.** Dalga 3'ün
 > ertelediği çift-index temizliği (`listing_stops` üç özdeş `(listing_id)`, `listings` üç özdeş
 > `(created_at DESC)`, artı `raw_posts_dedup_idx`) **ölç-sonra-düşür** runbook'u olarak yazıldı:
@@ -302,7 +322,7 @@ yukegel/
 │   │                                     #    canlı hesaba devreder. hashed_token + verifyOtp → cookie ✅
 │   ├── profil-tamamla/page.tsx
 │   ├── profil-tamamla/actions.ts         # 🔒 SPRINT_01 K2 — users upsert'i sunucuda, KOLON BEYAZ LİSTESİ ✅
-│   ├── panel/ (page + PanelClient + IlanYonetim)
+│   ├── panel/ (page + PanelClient + IlanYonetim)   # ?sekme=ilanlarim|araclarim|profilim derin bağlantı (31 Tem 2026)
 │   ├── panel/actions.ts                  # 🔒 SPRINT_01 L1e — ilanGuncelle + ilanTamamlandiToggle.
 │   │                                     #    Sahiplik sunucuda, gövde beyaz listeden geçiyor ✅
 │   ├── ilan/[id]/ (page + Aksiyonlar + sahiplen)
@@ -865,6 +885,7 @@ Açık rotalar: /giris, /auth/, /profil-tamamla, /nasil-calisir, /hakkimizda,
 - Vercel env → dashboard; `.next` cache → `rm -rf .next`
 - Supabase → Redirect URLs'e production URL eklenmeli
 - **Ağır/çoklu-dosya işleyen API route'ları** (`whatsapp-parse`, `learn-aliases`, `crm/[id]/analiz`) → `export const maxDuration = 60` şart; yoksa Vercel default timeout'ta düz-metin hata sayfası ("An error occurred with your deployment...") döner ve frontend'in `res.json()` çağrısı "Unexpected token" hatasıyla patlar
+- **Supabase'de `pg_stat_reset_single_table_counters` ÇALIŞMAZ (`42501`) — sayaç penceresi sıfırlanamaz, FARK alınır** (31 Tem 2026). Fonksiyon superuser'a bağlı, `postgres` rolü de alamıyor. Bunun sonucu ölçüm stratejisini komple değiştiriyor: bir kod deploy'undan sonra "sayacı sıfırla, bir hafta bekle, tekrar bak" planı Supabase'de **kurulamaz** — beklemek yalnız eski birikintinin üstüne yeni veri koyar ve ikisi ayrılamaz. Doğru yöntem: `pg_stat_user_indexes` anlık görüntüsünü bir tabloya yaz (taban çizgisi), bir hafta sonra `simdi - taban` farkını al. Matematiksel olarak sıfırlamayla aynı, yıkıcı değil, yetki istemiyor. 🚨 Fark alırken `pg_stat_database.stats_reset`'i de sakla ve karşılaştır: Postgres yeniden başlarsa sayaç geri sayar, fark **negatif** çıkar ve bu "kullanılmadı" değil "taban geçersiz" demektir. Uygulaması: `docs/20260731_index_temizligi.sql` BÖLÜM 8, taban tablosu `public.idx_taban_20260731`.
 - **`maxDuration` bütçesi ile route içindeki `AbortController` süresi AYRI iki şeydir — senkron tutulmazsa bütçe çöpe gider** (31 Tem 2026, `learn-aliases`). Route `maxDuration = 60` ilan ediyordu ama LLM fetch'i `setTimeout(..., 8000)` ile kesiliyordu: panelin en düşük seçeneği olan limit=10'da bile *"LLM 8 saniyede yanit vermedi"* dönüyordu ve fonksiyonun 52 saniyesi hiç kullanılmıyordu. Kural: iç timeout `maxDuration` eksi DB turları payı olacak (burada 45 sn) ve **platform sınırının altında kalacak** — yoksa Vercel'in 504'ü bizim anlamlı hatamızın önüne geçer. İkinci tuzak: **süreyi hata metnine sabit yazma.** Eski mesaj "8 saniyede" diyordu; timeout değişince yalan söylemeye başlardı, artık `LLM_TIMEOUT_MS`'ten türetiliyor. Üçüncüsü: **hata metni kullanıcının yapamayacağı şeyi önermesin** — eski metin "limit azalt" diyordu ama 10 zaten tabandı.
 - **Frontend fetch + `.json()` pattern'i** → önce `res.text()` al, sonra `JSON.parse` dene (try/catch); Vercel platform hataları (413/504) JSON değil HTML/düz-metin döner
 - **`write_file` tüm dosyayı ezer** — küçük değişiklikler için `str_replace` kullan
@@ -922,6 +943,7 @@ Açık rotalar: /giris, /auth/, /profil-tamamla, /nasil-calisir, /hakkimizda,
 - 🚨 **Query param Google/e-posta doğrulama zincirinde ÖLÜR — cookie'ye de yaz** (29 Tem 2026). `signInWithOAuth` yalnız `/auth/callback`e döner, callback de hedefi **sadece `yk_redirect` cookie'sinden** okur. `/giris?redirect=…` bağlantıyla gelindiğinde (proxy'ye uğramadan) cookie'yi kimse yazmıyordu → telefon/e-posta ile girenler doğru yere giderken **Google ile girenler ana sayfaya düşüyordu**. Aynı sayfada iki farklı davranış, hiçbir hata mesajı yok. `app/giris/page.tsx` artık `?redirect=`'i mount'ta cookie'ye kopyalıyor (`redirectCookieYaz`, `guvenliRedirect` süzgecinden geçerek, `samesite=lax`).
 - **Giriş duvarına yönlendirirken `?redirect=` HER ZAMAN doldurulmalı** (29 Tem 2026, `SPRINT_01` L2/L3). Düz `/giris`'e atmak kullanıcıyı giriş sonrası ana sayfaya düşürür; akan ilan listesinde baktığı ilanı bir daha bulamaz. `lib/redirect.ts`'teki `guvenliRedirect` query string'i korur, o yüzden `/ilan-ver?tip=arac` gibi hedefler de güvenle taşınabilir.
 - 🚨 **Yönlendirme hedefini `guvenliRedirect`'siz kullanma — TEK bir dal bile yeter** (29 Tem 2026). `app/profil-tamamla/page.tsx` hedefi iki yerde okuyor; biri süzgeçten geçiyordu, "profil zaten tamam" dalı ise `router.push(redirect || '/panel')` ile **ham** kullanıyordu. `/profil-tamamla?redirect=https://kotu.site` açık yönlendirme demekti. Bir dosyada birden çok yönlendirme dalı varsa **hepsi** aynı süzgeçten geçmeli.
+- 🚨 **"X yoksa Y'ye git" bağlantısı — Y'nin o kullanıcıyı GERİ ÇEVİRMEDİĞİNİ doğrula** (31 Tem 2026). `/ilan-ver` telefonu olmayan kullanıcıya "Profilden ekleyin → `/profil-tamamla`" diyordu; ama `profil-tamamla/page.tsx:120` `user_type` doluysa formu **hiç render etmeden** `/panel`'e geri atıyor. Üstelik `/ilan-ver` formunda **telefon input'u yok** (kart sadece `users.phone`'u gösteriyor), yani kullanıcı ne numarasını ekleyebiliyor ne ilan verebiliyordu — **tek bir hata mesajı bile çıkmadan**. Numarayı ekleyen tek ekran (panel Profilim sekmesi, SMS OTP) ise yalnız local state'le açılıyordu, dışarıdan hedeflenemiyordu. Düzeltme: `PanelClient.tsx`'e beyaz listeli `?sekme=ilanlarim|araclarim|profilim` derin bağlantısı, `/ilan-ver` bağlantısı `/panel?sekme=profilim`. Genel kural: **bir "buraya git" bağlantısının hedefi koşullu yönlendirme yapıyorsa, bağlantıyı yazan koşulun hedefteki koşulla çeliştiğini varsay ve kontrol et.** Yan not: `lib/ilan-yaz.ts::ilanTelefonu()`'nun istemciden gelen numarayı kabul edip profile geri yazan **kendi kendini onaran dalı bu kanalda ölüydü** — form ona hiç değer göndermiyor; "kod var" ≠ "kod çalışıyor".
 - ⚠️ **GA'ya kişisel veri gönderme** (`lib/analiz.ts`). Telefon, e-posta, TCKN/VKN, tam ad → GA'ya **gitmez**. Yalnız kategorik/sayısal alanlar (`tip: 'yuk' | 'arac'` gibi). KVKK gereği: GA verisi yurt dışına çıkar.
 - 🚨 **BÜYÜK HARF KONTROLÜNDE `/[A-Z]/` KULLANMA — Türkçe'de yanlış** (29 Tem 2026, `SPRINT_01` R2). "Şifre123" ve "Ölçü1234" tamamen geçerli parolalar ama `[A-Z]` bunları "büyük harf yok" diye reddeder; kullanıcı ne yaptığını anlamadan kayıt olamaz. Doğrusu `\p{Lu}` + `/u` bayrağı (Ç, Ğ, İ, Ö, Ş, Ü dahil). Aynı tuzak küçük harf (`\p{Ll}`) ve harf (`\p{L}`) kontrolleri için de geçerli. tsconfig `target: ES2017` bunu destekliyor. Şifre kuralları **tek kaynak**: `lib/sifre.ts`.
 - ⚠️ **İstemci şifre doğrulaması güvenlik değil UX'tir.** Gerçek zorunluluk Supabase Dashboard → Authentication → Policies → Password Requirements'ta ayarlanır. `lib/sifre.ts` yalnız kullanıcıya ne beklendiğini gösterir. Ayrıca **mevcut kullanıcıların girişine yeni kural uygulanmaz** — eski zayıf parolalılar kilitlenmesin (`epostaGiris` bilinçli olarak kapıya bağlı değil).

@@ -213,14 +213,33 @@ okuyucu) — W5 ilçe temizliği için bir veri kalitesi işareti. Kapatmanın t
 
 ### Dalga 5 — metin kolonlarını düşür
 
-Ayrı migration. Ön koşul: Dalga 2 + 3 canlıda, Adım 8.2 çapraz kontrolü **en az bir hafta**
+Ayrı migration: **`docs/20260731_dalga5_metin_kolon_drop.sql`** (31 Tem 2026'da yazıldı,
+çalıştırılmadı). Ön koşul: Dalga 2 + 3 canlıda, Adım 8.2 çapraz kontrolü **en az bir hafta**
 sıfır satır dönüyor.
 
 - `alter table public.listings drop column origin_city;`
 - `alter table public.listing_stops drop column city;`
-- `listings.destination_city` — zaten **ölü kolon** (uygulamada tek okuma/yazma yok), aynı
-  migration'da düşür.
+- `listings.destination_city` — uygulamada tek okuma/yazma yok, aynı migration'da düşür.
 - Eski metin index'lerini (`idx_listings_origin_city*`, `listing_stops_city_trgm_idx` vb.) düşür.
+
+> 🚨 **YUKARIDAKİ LİSTE EKSİKTİ.** Migration yazılırken iki bağımlılık çıktı; ikisi de bu
+> maddelerin hiçbirinde yoktu ve listeye göre hareket edilseydi canlı kırılırdı. Migration'ı
+> bir hafta önceden yazmanın tek sebebi buydu.
+>
+> 1. **`ilan_olustur` hâlâ her iki metin kolonuna INSERT ediyor** (v3, satır 88-99 ve 139-146).
+>    plpgsql gövdesi DDL anında doğrulanmaz: `drop column` **hatasız geçer**, fonksiyon geçerli
+>    görünmeye devam eder, ilk ilan oluşturma denemesinde 42703 ile patlar. Hata deploy'da değil
+>    canlıda, kullanıcıda çıkar — ve ana sayfa/WhatsApp/Edge Function/moderatör hepsi bu tek
+>    RPC'den geçtiği için **ilan girişi tamamen durur**. `ilan_olustur` v4 (metin kolonlarına
+>    yazmayı bırakan sürüm) drop'tan ÖNCE canlıda olmalı. RPC'nin JSON *girdi* anahtarları
+>    (`p_listing->>'origin_city'`, `t.s->>'city'`) değişmez — onlar kolon değil, sözleşme.
+> 2. **Çözülemeyen yer adları geri getirilemez şekilde kaybolur.** v3'ün
+>    `coalesce(provinces.name, ham metin)` bacağı bilinçli bir veri koruma kararıydı: il
+>    çözülemezse (yurt dışı, serbest giriş, yazım hatası) ham metin saklanıyordu. Kolon düşünce
+>    o koruma da düşer. `listing_stops`ta durum daha ağır — `listings`in `raw_text` yedeği var,
+>    durakların yok, yani çözülemeyen bir durak **tamamen boş satıra** döner. Drop'tan önce
+>    migration BÖLÜM 3 ölçümü alınır; sıfırdan büyükse alias öğretme / `origin_serbest_metin`
+>    kolonu / kayıp kabul kararlarından biri verilir.
 
 ## W5 alias runbook'u ne olacak
 

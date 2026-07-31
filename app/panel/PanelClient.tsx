@@ -58,6 +58,22 @@ export default function PanelClient({ userId, userEmail, profil, ilanlar, aracla
   const [sekme, setSekme] = useState<Tab>('ilanlarim');
   const isNakliyeci = profil?.user_type === 'arac_sahibi';
 
+  // 31 Tem 2026 — `?sekme=profilim` ile derin bağlantı.
+  //
+  // NEDEN: `/ilan-ver` telefonu olmayan kullanıcıyı `/profil-tamamla`'ya yolluyordu,
+  // ama orası `user_type` doluysa formu HİÇ göstermeden `/panel`'e geri atıyor
+  // (profil-tamamla/page.tsx:120). Yani telefon eklemenin tek gerçek yeri olan bu
+  // sekmeye giden bağlantı kapalı bir döngüydü. Sekme sadece local state olduğu için
+  // dışarıdan hedeflenemiyordu; artık URL'den seçilebiliyor.
+  //
+  // `useSearchParams` yerine `window.location` bilinçli — bkz. ilan-ver/page.tsx:122:
+  // bu ağaç Suspense sınırı içinde değil, eklemek tümünü CSR bailout'a sokardı.
+  useEffect(() => {
+    const gelen = new URLSearchParams(window.location.search).get('sekme');
+    // Beyaz liste: URL'den gelen ham değer state'e yazılmaz.
+    if (gelen === 'ilanlarim' || gelen === 'araclarim' || gelen === 'profilim') setSekme(gelen);
+  }, []);
+
   const aktifIlan = ilanlar.filter(i =>
     !i.completed_at && i.status === 'active' &&
     ['approved', 'auto_published'].includes(i.moderation_status)

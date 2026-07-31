@@ -672,7 +672,13 @@ export default function IlanVer() {
                 {tel || telDurum === 'yukleniyor'
                   ? 'Profilinizdeki numara kullanılacak'
                   : telDurum === 'numara-yok'
-                    ? <a href="/profil-tamamla" style={{ color: '#3b82f6' }}>Profilden ekleyin →</a>
+                    // 31 Tem 2026 — burası `/profil-tamamla` idi ve KAPALI DÖNGÜYDÜ:
+                    // o sayfa `user_type` doluysa formu hiç göstermeden `/panel`'e geri
+                    // atıyor (profil-tamamla/page.tsx:120). Telefonu olmayan mevcut bir
+                    // kullanıcı numarasını ekleyebileceği ekrana HİÇ ulaşamıyordu —
+                    // ve bu formda telefon input'u yok, yani ilan da veremiyordu.
+                    // Numarayı SMS OTP ile ekleyen tek yer panel profil sekmesi.
+                    ? <a href="/panel?sekme=profilim" style={{ color: '#3b82f6' }}>Panelden ekleyin →</a>
                     : 'Sayfayı yenileyin; sürerse bize bildirin'}
               </span>
             </div>

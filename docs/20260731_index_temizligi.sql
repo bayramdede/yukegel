@@ -657,3 +657,244 @@ order by d.boyut desc;
 -- `set enable_indexscan`/`enable_bitmapscan` oynatarak DEĞİL,
 -- `begin; drop index …; explain …; rollback;` ile dene — düz `drop index`
 -- transaction içinde çalışır ve rollback geri alır (kilit kısa sürer).
+
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- BÖLÜM 8 — 7.A SIFIRLAMA REDDEDİLDİ (42501) · TELAFİ YÖNTEMİ
+-- ═══════════════════════════════════════════════════════════════════════════
+-- 31 Tem 2026: `pg_stat_reset_single_table_counters` → `42501 permission
+-- denied`. Supabase'de bu fonksiyon superuser'a bağlı; `postgres` rolü de
+-- alamıyor. Yani 7.A ASLA çalışmayacak, "bir hafta bekle" planı olduğu gibi
+-- ÇÖKTÜ: sayaç sıfırlanamıyorsa bir hafta beklemek, 122 günlük eski-kod
+-- birikintisinin ÜSTÜNE bir hafta yeni veri koymaktan ibaret. Toplamın içinden
+-- yeni haftayı ayıklayamazsın.
+--
+-- ── ÇÖZÜM: SIFIRLAMA YERİNE FARK (DELTA) ──────────────────────────────────
+-- Sayacı sıfırlayamıyoruz ama BUGÜNKÜ DEĞERİNİ SAKLAYABİLİRİZ. Bir hafta sonra
+-- yeni okumadan bugünkünü çıkarınca elde kalan, yalnız Dalga 3 sonrası trafik.
+-- Sıfırlamayla matematiksel olarak aynı sonuç, üstelik yıkıcı değil (başka
+-- hiçbir ölçümü bozmuyor) ve superuser istemiyor.
+
+
+-- ───────────────────────────────────────────────────────────────────────────
+-- 8.A — TABAN ÇİZGİSİ (BUGÜN ÇALIŞTIR — hafta buradan başlar)
+-- ───────────────────────────────────────────────────────────────────────────
+-- Tüm public indekslerini alıyoruz, yalnız metin indekslerini değil: ileride
+-- başka bir soru çıkarsa aynı tabandan cevaplanabilsin.
+create table if not exists public.idx_taban_20260731 as
+select
+  now()                                     as alindi,
+  s.relname                                 as tablo,
+  s.indexrelname                            as indeks,
+  s.idx_scan                                as tarama,
+  s.idx_tup_read                            as okunan_tuple,
+  sd.stats_reset                            as sayac_sifirlama
+from pg_stat_user_indexes s
+join pg_stat_database sd on sd.datname = current_database()
+where s.schemaname = 'public';
+
+-- Kontrol: satır geldi mi?
+-- select count(*), min(alindi), min(sayac_sifirlama) from public.idx_taban_20260731;
+
+
+-- ───────────────────────────────────────────────────────────────────────────
+-- 8.B — FARK SORGUSU  (~7 Ağu 2026'da çalıştır)
+-- ───────────────────────────────────────────────────────────────────────────
+-- 🚨 `sayac_sifirlama` KONTROLÜ ŞART. Postgres yeniden başlarsa veya crash
+--    recovery olursa istatistik dosyası sıfırlanır ve sayaç geri sayar; o
+--    zaman `simdi - taban` NEGATİF çıkar. Negatif fark "kullanılmadı" DEĞİL,
+--    "taban geçersiz" demektir — pencere o an yeniden başlamıştır, `simdi`
+--    değerinin kendisi yeni penceredir.
+select
+  t.tablo,
+  t.indeks,
+  t.tarama                    as taban_31tem,
+  s.idx_scan                  as simdi,
+  s.idx_scan - t.tarama       as fark,
+  round(extract(epoch from (now() - t.alindi)) / 86400.0, 1) as gecen_gun,
+  pg_size_pretty(pg_relation_size(s.indexrelid))             as boyut,
+  case
+    when sd.stats_reset is distinct from t.sayac_sifirlama
+      then '⛔ SAYAÇ ARADA SIFIRLANMIŞ — taban geçersiz, `simdi` sütununu oku'
+    when s.idx_scan - t.tarama = 0
+      then '✅ Dalga 3 sonrası HİÇ kullanılmadı — Dalga 5 için serbest'
+    else '🚨 Dalga 3 sonrası KULLANILIYOR — tüketiciyi bul (8.C), düşürme'
+  end                         as karar
+from public.idx_taban_20260731 t
+join pg_stat_user_indexes s
+  on s.schemaname = 'public'
+ and s.relname = t.tablo
+ and s.indexrelname = t.indeks
+join pg_stat_database sd on sd.datname = current_database()
+where t.indeks in (
+  'idx_listings_origin',
+  'idx_listings_origin_city',
+  'idx_listings_origin_city_lower',
+  'listings_origin_city_trgm_idx',
+  'listing_stops_city_idx',
+  'listing_stops_city_trgm_idx',
+  'idx_listing_stops_city_lower'
+)
+order by fark desc;
+
+
+-- ───────────────────────────────────────────────────────────────────────────
+-- 8.C — TÜKETİCİ AVI: metin kolonlarına DB İÇİNDEN dokunan ne var?
+-- ───────────────────────────────────────────────────────────────────────────
+-- Beklemeye gerek yok, bu bugün çalıştırılabilir. Kod taraması yalnız TS/Deno
+-- dosyalarını görür; `lower()` ve trigram indekslerini kullanan sorgular büyük
+-- ihtimalle DB İÇİNDEKİ fonksiyonlarda (radar/nearby RPC'leri) — onlar
+-- repodaki .sql dosyalarının canlı karşılığı olmayabilir (docs ≠ canlı DB).
+-- 🚨 31 Tem — BU SORGUNUN İLK SÜRÜMÜ SINIFLANDIRMA YAPIYORDU VE BOZUKTU.
+--    `lower\s*\(\s*[a-z_.]*origin_city` deseni `lower((origin_city)::text)`
+--    biçimini KAÇIRIYOR: kolon adından önce fazladan bir `(` var ve
+--    `[a-z_.]*` parantez eşleştirmiyor. Postgres kaynağı TAM OLARAK böyle
+--    yazdırır (indeks tanımına bak: `btree (lower((origin_city)::text), …)`).
+--    Yani her fonksiyon sessizce `else` dalına düşüp "düz eşitlik / IN"
+--    görünüyordu — yanlış negatif, üstelik güven verici yönde.
+--    Ders: fonksiyon gövdesini SINIFLANDIRMA, EŞLEŞEN SATIRI DÖNDÜR.
+--    Sınıflandırmada regex hatası sessizce yanlış cevap üretir; ham satırda
+--    hata gözle görülür.
+select
+  p.proname                        as fonksiyon,
+  p.provolatile                    as volatilite,
+  trim(satir)                      as eslesen_satir
+from pg_proc p
+join pg_namespace n on n.oid = p.pronamespace
+cross join lateral unnest(string_to_array(pg_get_functiondef(p.oid), E'\n')) as satir
+where n.nspname = 'public'
+  and p.prokind in ('f', 'p')
+  and satir ~* '(origin_city|destination_city|\mcity\M)'
+order by p.proname, satir;
+
+-- View'lar ve RLS politikaları da sorgu üretir — onları da tara:
+-- select schemaname, viewname from pg_views
+--  where schemaname = 'public' and definition ~* '(origin_city|destination_city)';
+-- select polrelid::regclass as tablo, polname,
+--        pg_get_expr(polqual, polrelid) as kosul
+--   from pg_policy
+--  where pg_get_expr(polqual, polrelid) ~* '(origin_city|destination_city|\mcity\M)';
+
+
+-- ───────────────────────────────────────────────────────────────────────────
+-- 8.D — KODDAN ÇIKAN İLK TÜKETİCİ (31 Tem 2026, doğrulandı)
+-- ───────────────────────────────────────────────────────────────────────────
+-- `app/api/admin/learn-aliases/route.ts`:437
+--   .from('listings').update({ slh_scanned_at: … })
+--   .is('slh_scanned_at', null).in('origin_city', kesfedilenNorm);
+--
+-- Bu bir UPDATE ... WHERE origin_city IN (…) — `idx_listings_origin` (düz btree,
+-- 110 tarama) için birebir uyuyor. Sıklık de uyuyor: yalnız "AI Keşfi Başlat"
+-- yeni alias bulduğunda çalışır, yani 122 günde onlarca kez. Bugün panelden
+-- keşif çalıştırıldı (Görev #22) — o taramalardan biri muhtemelen bu.
+--
+-- ⚠️ Ama `lower()` ve trigram indekslerini AÇIKLAMIYOR. Onlar `lower(x)=…` veya
+--    `ILIKE '%…%'` ister; TS tarafında böyle bir sorgu YOK. Demek ki kaynak DB
+--    içinde — 8.C onu bulacak.
+--
+-- ── Dalga 5 için anlamı ────────────────────────────────────────────────────
+-- Bu satır kolon silinmeden ÖNCE `province_id`'ye çevrilmeli:
+--   .in('origin_province_id', kesfedilenNorm.map(il_key))
+-- Aksi halde Dalga 5'te kolon düştüğü an AI Keşfi 42703 ile patlar.
+
+
+-- ───────────────────────────────────────────────────────────────────────────
+-- 8.E — 8.C İLK TURU (31 Tem 2026) VE OKUNUŞU
+-- ───────────────────────────────────────────────────────────────────────────
+-- Metin kolonlarına dokunan DÖRT fonksiyon çıktı:
+--   get_nearby_listings_by_province   (STABLE)
+--   get_radar_city_detail             (STABLE)
+--   get_radar_city_overview           (STABLE)
+--   ilan_olustur                      (VOLATILE)
+--
+-- ⚠️ Aynı turda dönen `kullanim_bicimi` sütunu ÇÖPTÜR — yukarıdaki regex
+--    hatası yüzünden dördü de `else` dalına düşmüştü. Fonksiyon LİSTESİ
+--    geçerli (o filtre düz kolon adı arıyordu, doğru çalıştı); biçim
+--    sınıflandırması geçersiz. Düzeltilmiş satır bazlı sorgu tekrar
+--    çalıştırılmalı.
+--
+-- ── Yine de listenin kendisi çok şey söylüyor ──────────────────────────────
+-- Üç radar/nearby fonksiyonu Dalga 3'ün HEDEFİYDİ; ILIKE'tan `province_id`'ye
+-- geçirildiler. `ilan_olustur` ise YAZAR — INSERT `idx_scan` ARTIRMAZ, indeks
+-- ekleme sayacı ayrıdır. Dolayısıyla `lower()` / trigram indekslerini besleyen
+-- CANLI bir tüketici görünmüyor.
+--
+-- Bu, 122 günlük sayaçlardaki 44 / 29 / 25 / 24 taramanın büyük olasılıkla
+-- **Dalga 3 ÖNCESİ ILIKE'lı RPC sürümlerinden kalma kalıntı** olduğu anlamına
+-- gelir — tam da S1'in "`> 0` kanıt değildir" dediği durum. Beklenti: 8.B
+-- farkı 7 Ağu'da bu dört indekste **0** çıkacak.
+--
+-- 🚨 TEK BAŞINA YETMEZ, ÇÜNKÜ FONKSİYON HER ŞEY DEĞİL. Tarama üreten üç kaynak
+--    daha var ve 8.C onları KAPSAMIYOR:
+--      • VIEW tanımları
+--      • RLS politikaları (`pg_policy`)
+--      • Uygulamadan gelen ham sorgular (PostgREST `or=`, `ilike=` filtreleri —
+--        DB'de saklı değildir, koddan gelir)
+--    İlk ikisi için aşağıdaki iki sorgu; üçüncüsü için kod taraması (8.D).
+
+-- View'lar:
+select schemaname, viewname
+from pg_views
+where schemaname = 'public'
+  and definition ~* '(origin_city|destination_city|\mcity\M)';
+
+-- RLS politikaları:
+select polrelid::regclass as tablo,
+       polname,
+       pg_get_expr(polqual, polrelid)      as using_kosulu,
+       pg_get_expr(polwithcheck, polrelid) as with_check_kosulu
+from pg_policy
+where coalesce(pg_get_expr(polqual, polrelid), '') ~* '(origin_city|destination_city|\mcity\M)'
+   or coalesce(pg_get_expr(polwithcheck, polrelid), '') ~* '(origin_city|destination_city|\mcity\M)';
+
+
+-- ───────────────────────────────────────────────────────────────────────────
+-- 8.F — TÜKETİCİ AVI KAPANDI (31 Tem 2026)
+-- ───────────────────────────────────────────────────────────────────────────
+-- Üç kanalın üçü de tarandı. Sonuç: metin kolonlarını WHERE'de kullanan
+-- CANLI tek bir tüketici var, o da uygulamada.
+--
+-- ── Kanal 1: DB fonksiyonları (8.C, satır bazlı) ───────────────────────────
+-- Dört fonksiyon eşleşti, DÖRDÜ DE YANLIŞ POZİTİF ya da yazma:
+--   • get_radar_city_detail / get_radar_city_overview
+--     Eşleşen satırların tamamı `'city'` jsonb ANAHTARI veya `p.name as city`
+--     — yani `provinces.name`. `listings.origin_city` ile ilgisi yok.
+--     `\mcity\M` kelime sınırı deseninin yakaladığı gürültü.
+--   • get_nearby_listings_by_province
+--     `po.name as origin_city` → yine `provinces`, çıktı kolonu ADLANDIRMASI.
+--     `RETURNS TABLE(... origin_city text ...)` → imza. Bir de listing_stops
+--     projeksiyonunda `city` geçiyor: PROJEKSİYON tarama üretmez, tarama için
+--     WHERE gerekir.
+--   • ilan_olustur (VOLATILE)
+--     `il_key(p.name) = il_key(p_listing->>'origin_city')` → soldaki
+--     `provinces`, sağdaki JSON GİRDİSİ. `listings` taranmıyor. Kalanı INSERT
+--     kolon listesi. 🚨 INSERT `idx_scan` ARTIRMAZ — indekse yazma ayrı sayaç.
+--
+-- ── Kanal 2: View'lar ve RLS politikaları (8.E) ────────────────────────────
+--   İkisi de SIFIR SATIR.
+--
+-- ── Kanal 3: Uygulamadan gelen ham PostgREST sorguları ─────────────────────
+--   Tüm TS/TSX taraması yapıldı. `origin_city` / `stops.city` geçen her yer
+--   ya `select` kolon listesi, ya JSX gösterimi, ya da FETCH SONRASI bellek
+--   içi JS filtresi (`moderator/page.tsx`:297,301 · `PanelClient.tsx`:242 —
+--   `.toLowerCase().includes()` DB'ye gitmez).
+--   TEK İSTİSNA — `app/api/admin/learn-aliases/route.ts`:437
+--     .from('listings').update({slh_scanned_at}).in('origin_city', …)
+--
+-- ── KARAR ──────────────────────────────────────────────────────────────────
+-- `idx_listings_origin` (+ muhtemelen kısmi ikizi `idx_listings_origin_city`)
+--   → CANLI tüketicisi var: yukarıdaki IN sorgusu. Eşitlik/IN düz btree'ye
+--     birebir uyar, seyrekliği de uyar (yalnız AI Keşfi yeni alias bulunca).
+-- `idx_listings_origin_city_lower`, `listings_origin_city_trgm_idx`,
+-- `idx_listing_stops_city_lower`, `listing_stops_city_trgm_idx`
+--   → `lower(x)=…` veya `ILIKE '%…%'` ister; ÜÇ KANALIN HİÇBİRİNDE YOK.
+--     44/29/25/24 tarama, Dalga 3 öncesi ILIKE'lı RPC sürümlerinden KALINTI.
+--     Beklenti: 8.B farkı 7 Ağu'da bunlarda 0.
+--
+-- ── learn-aliases:437 BİLEREK ŞİMDİ DEĞİŞTİRİLMEDİ ────────────────────────
+-- Dalga 5'ten önce `origin_province_id`'ye çevrilmesi ŞART (kolon düştüğü an
+-- 42703). Ama BUGÜN çevirmiyoruz, çünkü 8.B ölçümünün POZİTİF KONTROLÜ o:
+-- 7 Ağu'da `idx_listings_origin` farkı > 0 ve diğer dördü 0 çıkarsa, ölçümün
+-- gerçekten çalıştığını biliriz. Hepsi birden 0 çıkarsa ayırt edemeyiz —
+-- "tüketici yok" ile "ölçüm bozuk/hiç trafik gelmemiş" aynı görünür.
+-- Sırası: 8.B okunur → sonra kod çevrilir → sonra Dalga 5.
