@@ -107,9 +107,10 @@ Doğrulama: `npx tsc --noEmit` temiz, `test:lokasyon` 21/21, `test:parser` 29/29
 
 ### Dalga 3 — okuma / filtre / moderasyon
 
-> ⏳ **RPC + moderatör tarafı YAZILDI, SQL HENÜZ ÇALIŞTIRILMADI (30 Tem 2026).**
+> ✅ **DALGA 3 TAMAMLANDI (31 Tem 2026).** Migration canlıda çalıştırıldı ve doğrulandı
+> (§5.6 sıfır satır = metin ile id il il aynı sayıyı veriyor), kod deploy edildi (`bd0c7d1`).
 > Migration: `docs/20260730_dalga3_radar_province_id.sql`. Keşif: `docs/20260730_dalga3_kesif.sql`.
-> Kalan: `HomeClient.tsx` (ayrı iş, sunucu tarafı filtre yolu gerekiyor).
+> Son parça olan `HomeClient.tsx` da bitti — aşağıdaki tabloya bak.
 >
 > 🚨 **Bu dalganın en önemli bulgusu şema değil, süreç:** keşif sorgusu canlı
 > `pg_get_functiondef` çıktısını alınca `docs/` altındaki radar migration'larının
@@ -133,7 +134,9 @@ Doğrulama: `npx tsc --noEmit` temiz, `test:lokasyon` 21/21, `test:parser` 29/29
 
 | Dosya | Değişiklik | Risk |
 |---|---|---|
-| `app/_components/HomeClient.tsx` | `:711` `i.kalkis?.includes(kalkis)` ve `:712` `d.sehir?.includes(varis)` → id eşitliği. `:820`/`:825` select'leri `value={34}`'e geçer | 🔴 **Filtre şu an tamamen istemcide** — tüm ilanlar çekilip JS'te süzülüyor. `includes` büyük/küçük harfe duyarlı: `ÇORLU` yazılmış durak "Çorlu" aramasında hiç çıkmıyor. Spec md.5'in istediği SQL filtresi buraya yeni bir sunucu yolu eklemeyi gerektirir. |
+| `app/_components/HomeClient.tsx` | ✅ İl filtresi **sunucuya taşındı**: il seçilince `/api/listings/ara` çağrılıyor, `includes` yerine `province_id` tamsayı eşitliği. Select'ler `value={plaka}`. Elle yazılmış 4. `ILLER` kopyası silindi (artık `lib/ilan-sabitler`) | 🟢 **Ama asıl bulunan hata `includes` değildi.** Filtre 200'lük pencerenin içinde çalışıyordu ve pencere `created_at`e göre kesiliyor, ile göre değil → **Muş'ta ilan olsa bile son 200 ilan büyük illerdense kullanıcı boş liste görüyordu.** Sessiz, kullanıcıya dönük veri kaybı. Ders `PROJE_HARITASI` §tuzaklar'a yazıldı. |
+| `app/api/listings/ara/route.ts` | ✅ **YENİ.** Service role; `origin_province_id` + `listing_stops.province_id` filtresi, rozetler yanıtın içinde | 🟢 Varış filtresi iki sorgu: önce `listing_stops!inner` ile **yalnız id**, sonra tam duraklarla gövde. Tek sorguda yapılsaydı `!inner` gömülü durak dizisini de kırpar, çok duraklı ilanın tonaj toplamı yanlış görünürdü. |
+| `lib/ilan-liste.ts` | ✅ `ILAN_SELECT` + `ilanNormalize()` eklendi | 🟢 Aynı sorgu artık üç yerden atılıyor (SSR / istemci / filtre). Kolon listesi tek yerde olmasa Dalga 5'te `origin_city`'yi üç ayrı yerden silmek gerekecekti. |
 | `docs/20260630_radar_rpc_perf_fix.sql` | `ILIKE '%…%'` → `= p_province_id` | 🟡 |
 | `docs/20260609_radar_analitik_counterpart_filter.sql` | 6 ayrı `ILIKE` | 🟡 |
 | `docs/20260604_radar_intelligence_rpc.sql` | 4 `ILIKE` + trigram index'i **düşür** | 🟡 Trigram index'in varlık sebebi kalmıyor |

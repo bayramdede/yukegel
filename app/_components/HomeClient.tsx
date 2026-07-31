@@ -2,24 +2,21 @@
 import { useState, useEffect } from 'react';
 import { createClient } from '../../lib/supabase';
 import { olayGonder } from '../../lib/analiz';
-import { ILAN_LIMITI, durakToplami } from '../../lib/ilan-liste';
+import { ILAN_LIMITI, ILAN_SELECT, ilanNormalize, uyeYeniMi, durakToplami } from '../../lib/ilan-liste';
+// 🚨 DALGA 3 — burada eskiden 81 ilin ELLE YAZILMIŞ DÖRDÜNCÜ KOPYASI vardı.
+// `lib/ilan-sabitler.ts::ILLER` ile birebir aynıydı ama hiçbir test onu
+// korumuyordu: biri güncellenip diğeri unutulsa ana sayfa filtresi sessizce
+// eksik il gösterecekti. Artık tek kaynak, `npm run test:lokasyon` kapsamında.
+//
+// ⚠️ `index + 1 = plaka kodu = province_id` SÖZLEŞMESİ. `ILLER` dizisinin sırası
+//    `lib/constants/locations.json` ile birebir aynı olmak ZORUNDA; bunu
+//    `npm run test:lokasyon` doğruluyor. Dropdown değeri bu id — filtreye il ADI
+//    değil id gidiyor, sunucu da `ilId()` beyaz listesinden bir kez daha geçiriyor.
+import { ILLER } from '../../lib/ilan-sabitler';
 import GirisLink from './GirisLink';
 import type { AuthChangeEvent, Session } from '@supabase/supabase-js';
 
 const supabase = createClient();
-
-const ILLER = [
-  'Adana','Adıyaman','Afyonkarahisar','Ağrı','Amasya','Ankara','Antalya','Artvin',
-  'Aydın','Balıkesir','Bilecik','Bingöl','Bitlis','Bolu','Burdur','Bursa','Çanakkale',
-  'Çankırı','Çorum','Denizli','Diyarbakır','Edirne','Elazığ','Erzincan','Erzurum',
-  'Eskişehir','Gaziantep','Giresun','Gümüşhane','Hakkari','Hatay','Isparta','Mersin',
-  'İstanbul','İzmir','Kars','Kastamonu','Kayseri','Kırklareli','Kırşehir','Kocaeli',
-  'Konya','Kütahya','Malatya','Manisa','Kahramanmaraş','Mardin','Muğla','Muş',
-  'Nevşehir','Niğde','Ordu','Rize','Sakarya','Samsun','Siirt','Sinop','Sivas',
-  'Tekirdağ','Tokat','Trabzon','Tunceli','Şanlıurfa','Uşak','Van','Yozgat',
-  'Zonguldak','Aksaray','Bayburt','Karaman','Kırıkkale','Batman','Şırnak','Bartın',
-  'Ardahan','Iğdır','Yalova','Karabük','Kilis','Osmaniye','Düzce'
-];
 
 // ilan-ver/page.tsx ile aynı listeler — statik, değişmez
 const ARAC_TIPLERI_FILTRE = ['TIR', 'Kırkayak', 'Kamyon', 'Kamyonet', 'Panelvan'];
@@ -31,10 +28,6 @@ const KAYNAK_ETIKET: Record<string, { label: string; bg: string; color: string }
   facebook: { label: '👥 Facebook', bg: '#1e3a5f', color: '#60a5fa' },
 };
 
-function yeniUye(createdAt: string | null): boolean {
-  if (!createdAt) return false;
-  return new Date(createdAt) > new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-}
 
 /**
  * SPRINT_01 L5 — "Yük / Araç" sekmesi artık URL'de yaşıyor (`/?tip=arac`).
@@ -607,31 +600,90 @@ export default function HomeClient({ initialIlanlar = [], totalCount = 0 }: { in
     return () => { cancelled = true; subscription.unsubscribe(); };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  /**
+   * 🚨 DALGA 3 — İL FİLTRESİ ARTIK SUNUCUDA (31 Tem 2026).
+   *
+   * ESKİ DAVRANIŞ: sayfa en yeni 200 ilanı BİR KEZ çekiyor, il filtresi bu
+   * 200'lük pencerenin İÇİNDE `origin_city.includes(kalkis)` ile çalışıyordu.
+   * Pencere `created_at`e göre kesiliyor, ile göre değil — yani Muş'ta aktif
+   * ilan olsa bile son 200 ilan İstanbul/Ankara/Bursa'dan geliyorsa kullanıcı
+   * "Muş" seçtiğinde BOŞ LİSTE görüyordu. Hata yok, uyarı yok.
+   *
+   * YENİ DAVRANIŞ: il seçilir seçilmez `/api/listings/ara` çağrılıyor; filtre
+   * `origin_province_id` / `listing_stops.province_id` TAMSAYI eşitliğiyle
+   * sunucuda çalışıyor ve limit o ilin kendi sonucuna uygulanıyor.
+   *
+   * ⚠️ ANAHTAR BOŞSA filtresiz yol. `tip` anahtara YALNIZ filtre açıkken
+   *    giriyor: sekme değişimi filtre yokken ağ isteği tetiklememeli (200'lük
+   *    liste zaten iki sekmeyi de içeriyor), filtre açıkken ise tetiklemeli —
+   *    aksi halde limit iki sekme arasında paylaşılıp yine kırpardı.
+   * ⚠️ Araç/kasa tipi anahtarda YOK: sunucu onları filtrelemiyor (bkz. route
+   *    dosyasındaki not), istemcide daraltılıyorlar.
+   */
+  const ilFiltreAnahtari = (kalkis || varis) ? `${kalkis}|${varis}|${tip}` : '';
+
   // İlanlar — SSR verisi varsa ilk yükte atla; yenilemeKey ile retry desteği
   useEffect(() => {
-    if (yenilemeKey === 0 && initialIlanlar.length > 0) return;
+    // ⚠️ Filtre TEMİZLENDİĞİNDE de buraya düşülür ve `yenilemeKey` hâlâ 0'dır.
+    //    Eskiden burada düz `return` vardı; o hâliyle `ilanlar` FİLTRELENMİŞ
+    //    listede donup kalırdı — "Temizle"ye basınca hiçbir şey değişmezdi.
+    //    O yüzden erken çıkış listeyi SSR verisine geri koyarak çıkıyor.
+    if (ilFiltreAnahtari === '' && yenilemeKey === 0 && initialIlanlar.length > 0) {
+      setIlanlar(initialIlanlar);
+      setYukleniyor(false);
+      setHata(null);
+      return;
+    }
 
     let cancelled = false;
     setYukleniyor(true);
     setHata(null);
 
+    // Her iki yol da `{ data, error }` şekline indirgeniyor ki zaman aşımı
+    // sarmalayıcısı tek olsun. 8 sn'de yanıt gelmezse `error.message === 'timeout'`.
+    type SorguSonuc = { data: any; error: { message: string } | null };
+    const zamanAsimi = (p: PromiseLike<any>): Promise<SorguSonuc> => Promise.race([
+      p as Promise<SorguSonuc>,
+      new Promise<SorguSonuc>(resolve =>
+        setTimeout(() => resolve({ data: null, error: { message: 'timeout' } }), 8000)
+      ),
+    ]);
+
     (async () => {
       try {
-        // listing_stops RLS anon'u blokluyor — joined query ile tek seferde çek
-        // (listing_stops SELECT politikası eklenince anon client da çalışır;
-        //  yoksa SSR initialIlanlar verisi kullanılır, retry hâlâ boş döner)
+        // ── A) İL FİLTRELİ YOL — sunucu tarafı ────────────────────────────────
+        if (ilFiltreAnahtari !== '') {
+          const qs = new URLSearchParams({ tip });
+          if (kalkis) qs.set('kalkis', kalkis);
+          if (varis) qs.set('varis', varis);
+
+          const res = await zamanAsimi(
+            fetch(`/api/listings/ara?${qs}`).then(async r => ({
+              data: r.ok ? await r.json() : null,
+              error: r.ok ? null : new Error(String(r.status)),
+            }))
+          );
+          if (cancelled) return;
+          if (res.error || !res.data) {
+            setHata(res.error?.message === 'timeout' ? 'timeout' : 'error');
+            setYukleniyor(false);
+            return;
+          }
+          // Rozetler yanıtın içinde geldi — ikinci istek yok.
+          setIlanlar((res.data as any).data ?? []);
+          setYukleniyor(false);
+          return;
+        }
+
+        // ── B) FİLTRESİZ YOL — anon key, tek joined sorgu ─────────────────────
+        // listing_stops'un anon SELECT politikası varsa duraklar da gelir;
+        // yoksa SSR initialIlanlar verisi kullanılır, retry boş döner.
         const sorgu = supabase
           .from('listings')
-          // ⚠️ SPRINT_01 L1 — `contact_phone` BURADA ÇEKİLMEZ.
-          // Bu sorgu anon key ile çalışıyor; seçilen her kolon giriş yapmamış
-          // ziyaretçiye açık demektir. Telefon yalnızca /api/ilan/[id]/telefon'dan.
-          .select(`
-            id, listing_type, origin_city, origin_district,
-            price_offer, source, created_at,
-            trust_level, user_id, vehicle_type, body_type,
-            available_date, date_flexible,
-            listing_stops ( listing_id, stop_order, city, district, vehicle_count, cargo_type, weight_ton, pallet_count )
-          `)
+          // ⚠️ SPRINT_01 L1 — `contact_phone` ÇEKİLMEZ; kural `ILAN_SELECT`'in
+          // tanımında yazılı. Bu sorgu anon key ile çalışıyor: seçilen her kolon
+          // giriş yapmamış ziyaretçiye açık demektir.
+          .select(ILAN_SELECT)
           .in('moderation_status', ['approved', 'auto_published'])
           .eq('is_shadow_banned', false)
           .eq('status', 'active')
@@ -640,10 +692,7 @@ export default function HomeClient({ initialIlanlar = [], totalCount = 0 }: { in
           // "Tekrar dene"ye basan kullanıcının listesi sessizce 170 ilan eksiliyordu.
           .limit(ILAN_LIMITI);
 
-        const timeout = new Promise<{ data: null; error: Error }>(resolve =>
-          setTimeout(() => resolve({ data: null, error: new Error('timeout') }), 8000)
-        );
-        const { data, error: sorguHata } = await Promise.race([sorgu, timeout]);
+        const { data, error: sorguHata } = await zamanAsimi(sorgu as any);
 
         if (cancelled) return;
 
@@ -653,33 +702,13 @@ export default function HomeClient({ initialIlanlar = [], totalCount = 0 }: { in
           return;
         }
 
-        if (!data || data.length === 0) {
+        if (!data || (data as any[]).length === 0) {
           setIlanlar([]);
           setYukleniyor(false);
           return;
         }
 
-        const baseList = (data as any[]).map((ilan: any) => {
-          const stops = ((ilan.listing_stops || []) as any[])
-            .sort((a: any, b: any) => a.stop_order - b.stop_order);
-          const aracTipiList: string[] = ilan.vehicle_type?.length
-            ? ilan.vehicle_type
-            : ([...new Set(stops.map((s: any) => s.cargo_type).filter(Boolean))] as string[]);
-          return {
-            id: ilan.id, tip: ilan.listing_type,
-            kalkis: ilan.origin_city, kalkis_ilce: ilan.origin_district || '',
-            duraklar: stops.map((s: any) => ({ sehir: s.city, ilce: s.district || '', ton: s.weight_ton, palet: s.pallet_count, arac_adet: s.vehicle_count })),
-            kaynak: ilan.source || 'form',
-            sure: new Date(ilan.created_at).toLocaleDateString('tr-TR'),
-            fiyat: ilan.price_offer?.toString() ?? null,
-            tarih: ilan.available_date, tarihEsnek: ilan.date_flexible,
-            aracTipleri: aracTipiList, ustyapilari: (ilan.body_type || []) as string[],
-            dogrulanmamis: !ilan.user_id || ilan.trust_level === 'social',
-            telefonDogrulandi: false,
-            yeniUye: false,
-            user_id: ilan.user_id,
-          };
-        });
+        const baseList = (data as any[]).map((ilan: any) => ilanNormalize(ilan));
         setIlanlar(baseList);
         setYukleniyor(false);
 
@@ -692,7 +721,7 @@ export default function HomeClient({ initialIlanlar = [], totalCount = 0 }: { in
           for (const k of (ks || []) as any[]) kullaniciMap[k.id] = k;
           setIlanlar(prev => prev.map(ilan => {
             const kb = ilan.user_id ? kullaniciMap[ilan.user_id] : null;
-            return { ...ilan, telefonDogrulandi: kb?.phone_verified === true, yeniUye: kb ? yeniUye(kb.created_at) : false };
+            return { ...ilan, telefonDogrulandi: kb?.phone_verified === true, yeniUye: kb ? uyeYeniMi(kb.created_at) : false };
           }));
         }
       } catch (err) {
@@ -702,14 +731,25 @@ export default function HomeClient({ initialIlanlar = [], totalCount = 0 }: { in
     })();
 
     return () => { cancelled = true; };
-  }, [yenilemeKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [yenilemeKey, ilFiltreAnahtari]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const filterAktif = !!(kalkis || varis || aracTipi || kasaTipi);
 
+  /**
+   * ⚠️ İL KARŞILAŞTIRMASI ARTIK TAMSAYI — `includes` DEĞİL.
+   *    `kalkis`/`varis` state'i il ADI değil PLAKA KODU (string) taşıyor;
+   *    `kalkis_il_id` / `duraklar[].il_id` ise `ilanNormalize`'dan geliyor.
+   *    Metin karşılaştırması yazım bozulduğunda sessizce eşleşmiyordu ve
+   *    Dalga 5'te `origin_city` düşünce büsbütün kırılacaktı.
+   *
+   * ⚠️ İl filtresi sunucuda ZATEN uygulandı; buradaki tekrar bilinçli. Sunucu
+   *    yolu ile istemci görünümü arasında bir sapma olursa kullanıcı yanlış il
+   *    değil, boş liste görür — sessiz yanlış sonuçtan iyidir.
+   */
   const filtered = ilanlar.filter((i: any) => {
     if (i.tip !== tip) return false;
-    if (kalkis && !i.kalkis?.includes(kalkis)) return false;
-    if (varis && !i.duraklar.some((d: any) => d.sehir?.includes(varis))) return false;
+    if (kalkis && i.kalkis_il_id !== Number(kalkis)) return false;
+    if (varis && !i.duraklar.some((d: any) => d.il_id === Number(varis))) return false;
     if (aracTipi && !i.aracTipleri.some((a: string) => a === aracTipi)) return false;
     if (kasaTipi && !i.ustyapilari.some((u: string) => u === kasaTipi)) return false;
     return true;
@@ -820,12 +860,13 @@ export default function HomeClient({ initialIlanlar = [], totalCount = 0 }: { in
           <select value={kalkis} onChange={e => setKalkis(e.target.value)}
             style={{ background: '#0d1117', color: '#e2e8f0', border: '1px solid #30363d', borderRadius: 6, padding: '5px 10px', fontSize: '0.82rem', cursor: 'pointer' }}>
             <option value=''>📍 Kalkış İli</option>
-            {ILLER.map(il => <option key={il}>{il}</option>)}
+            {/* value = plaka kodu (index+1). Filtreye il adı GİTMİYOR. */}
+            {ILLER.map((il, i) => <option key={il} value={String(i + 1)}>{il}</option>)}
           </select>
           <select value={varis} onChange={e => setVaris(e.target.value)}
             style={{ background: '#0d1117', color: '#e2e8f0', border: '1px solid #30363d', borderRadius: 6, padding: '5px 10px', fontSize: '0.82rem', cursor: 'pointer' }}>
             <option value=''>🏁 Varış İli</option>
-            {ILLER.map(il => <option key={il}>{il}</option>)}
+            {ILLER.map((il, i) => <option key={il} value={String(i + 1)}>{il}</option>)}
           </select>
           <select value={aracTipi} onChange={e => setAracTipi(e.target.value)}
             style={{ background: '#0d1117', color: '#e2e8f0', border: '1px solid #30363d', borderRadius: 6, padding: '5px 10px', fontSize: '0.82rem', cursor: 'pointer' }}>

@@ -29,6 +29,10 @@
 > ✅ **`docs/20260730_istanbul_kanonik.sql` ÇALIŞTIRILDI (30 Tem 2026).** Blok 1 alias kaynağını
 > kuruttu (= runbook Adım 2), Blok 2 metni `province_id`'den onardı. Doğrulama **2.4 = 0** →
 > farklı yazımlı aynı il satırı kalmadı; 22.474 ilan İstanbul filtresinde artık görünüyor.
+> ✅ **DALGA 3 TAMAM (31 Tem 2026) — ana sayfa filtresi de `province_id`'ye geçti.** Yukarıdaki
+> `HomeClient:711 .includes()` satırı ARTIK YOK: filtre `origin_province_id` / `listing_stops.province_id`
+> tamsayı eşitliğiyle **sunucuda** çalışıyor (`/api/listings/ara`). Yazım bozulması bu yolu bir daha
+> etkileyemez — metin kolonları yalnız gösterim.
 > ✅ **KALICI KORUMA KURULDU (30 Tem 2026).** `20260730_alias_adim9_kopya_pasiflestir.sql`
 > (612 satır pasif, kayıpsız) → `20260729_alias_normalize_trigger.sql` BÖLÜM 1+2 → doğrulama.
 > `aliases_normalize_trg` ve **kısmi** `aliases_katlanmis_anahtar_uniq` canlıda; katlanmış alias
@@ -326,7 +330,11 @@ yukegel/
 ├── lib/sifre.ts                          # 🔒 SPRINT_01 R2 — sifreKriterleri()/sifreHatasi()/SIFRE_KURAL_METNI.
 │                                         #    Gösterge ile kapı AYNI kaynaktan beslenir.
 │                                         #    ⚠️ Büyük harf: `\p{Lu}` + /u — `[A-Z]` Türkçe'de YANLIŞ ✅
-├── lib/ilan-liste.ts                     # 📋 SPRINT_01 L4 — ILAN_LIMITI: SSR ve istemci sorgusu AYNI
+├── lib/ilan-liste.ts                     # 📋 SPRINT_01 L4 — ILAN_LIMITI + ILAN_SELECT + ilanNormalize().
+│                                         #    ÜÇ çağıran: app/page.tsx (SSR), HomeClient (istemci),
+│                                         #    /api/listings/ara (filtre). Kolon listesi tek yerde ✅
+│                                         #    ⚠️ contact_phone BURAYA EKLENMEZ (L1) ✅
+│                                         #    ILAN_LIMITI: SSR ve istemci sorgusu AYNI
 │                                         #    limiti kullanır. ⚠️ İstemci paketine girer, server-only YOK ✅
 │                                         #    ⚖ durakToplami(duraklar, alanlar[]) — TÜM durakların tonaj/palet
 │                                         #    toplamı. Kartlar eskiden stops[0]'ı okuyup yükü eksik gösteriyordu.
@@ -540,10 +548,11 @@ cargo_type, weight_ton, pallet_count, vehicle_count, notes
 > - Yazan: `supabase/functions/parse-listing/index.ts` (`ilan_olustur` RPC'si, lane grubu → `p_stops`),
 >   `app/panel/actions.ts:96-157` (önce `delete .eq('listing_id')` sonra toplu insert — yani
 >   duraklar **replace** ediliyor, patch değil).
-> - Okuyan: `app/_components/HomeClient.tsx:696` varış filtresi
->   (`i.duraklar.some(d => d.sehir?.includes(varis))`) — bozuk yazım burada **doğrudan
->   kullanıcıya** "ilan bulunamadı" olarak yansır. `includes` **büyük/küçük harfe duyarlı**:
->   `ÇORLU` yazılmış bir durak "Çorlu" aramasında hiç çıkmaz (bkz. §9 tuzağı).
+> - Okuyan: **`/api/listings/ara`** varış filtresi — `listing_stops.province_id` tamsayı eşitliği
+>   (Dalga 3, 31 Tem 2026). ⚠️ Bu ~~eskiden `HomeClient.tsx:696` `d.sehir?.includes(varis)`~~ idi;
+>   `includes` büyük/küçük harfe duyarlı olduğu için `ÇORLU` yazılmış bir durak "Çorlu"
+>   aramasında hiç çıkmıyordu. **Artık yazım bozulması varış filtresini etkilemez** —
+>   `province_id` metinden bağımsız. Durak İLÇESİ hâlâ serbest metin, o tarafta tuzak sürüyor.
 > - `get_nearby_listings_by_city` RPC varışı `listing_stops`'un **son durağından**
 >   `DISTINCT ON` ile alıyor.
 >
@@ -698,6 +707,7 @@ ZIP/TXT → raw_posts → DB trigger → parse-listing Edge Fn → listings → 
 | `/api/admin/poi-import` | Google Places'ten il+kategori bazlı veri çek (POST), kategori listesi (GET) |
 | `/api/admin/poi-import/[id]/summarize` | POI için Claude yorum özeti üret (POST) |
 | `/api/listings/yakin` | Yakınımdaki Yükler: lat/lng → en yakın il (offline haversine) → o ildeki aktif ilanlar (GET) |
+| `/api/listings/ara` | **Ana sayfa il filtresi (GET, Dalga 3).** `?kalkis=<plaka>&varis=<plaka>&tip=yuk\|arac`. Service role; `origin_province_id` / `listing_stops.province_id` tamsayı eşitliği. En az bir il zorunlu (yoksa 400) — filtresiz liste zaten SSR'den geliyor. Tanınmayan il → **400**, sessiz "tüm iller" değil. Yanıt rozetleri de içerir (ikinci istek yok). |
 
 ---
 
@@ -759,8 +769,10 @@ Açık rotalar: /giris, /auth/, /profil-tamamla, /nasil-calisir, /hakkimizda,
   (`Istanbul` vs `İstanbul`). Veri kalitesi ölçerken bu ikisini karıştırma — biri
   düzeltilecek hasar, öteki korunacak iş.
 - 🚨 **KONUM ARAMASI BÜYÜK/KÜÇÜK HARFE DUYARLI — depolanan yazım kullanıcıya yansıyor**
-  (29 Tem 2026, W5 Adım 0 ölçümü). `HomeClient.tsx:696` varış filtresi düz
-  `d.sehir?.includes(varis)` kullanıyor; iki taraf da katlanmıyor. Ölçüm, DB'de **~76 satırın
+  (29 Tem 2026, W5 Adım 0 ölçümü). ✅ **İL tarafı Dalga 3'te kapandı** (31 Tem 2026): varış
+  filtresi artık `listing_stops.province_id` tamsayı eşitliği. Aşağıdaki hikâye **İLÇE için
+  aynen geçerli** — ilçe hâlâ serbest metin ve `includes`/`ILIKE` ile aranıyor.
+  Eski hâli `d.sehir?.includes(varis)` idi; iki taraf da katlanmıyordu. Ölçüm, DB'de **~76 satırın
   tamamı büyük harf** yazıldığını gösterdi (`ÇORLU` 42 · `KEMALPAŞA` 17 · `ÇERKEZKÖY` 6 …).
   Bu satırlar arama sonuçlarında **hiç görünmüyor** — sessiz, kullanıcıya dönük veri hasarı.
   ⚠️ Çoğunluk oyu ile onarma: `KEMALPAŞA` (17) doğru `Kemalpaşa`'dan (11) **daha kalabalık**.
@@ -889,7 +901,8 @@ Açık rotalar: /giris, /auth/, /profil-tamamla, /nasil-calisir, /hakkimizda,
 - 🚨 **Tip/mod değiştiren butonlar, açık input'u ÖNCE blur eder** (29 Tem 2026, `SPRINT_01` K3). Sıra: mousedown → blur → click. `onBlur`'da asenkron kontrol yapan bir alan varsa, istek uçarken form temizlenir ve dönen sonuç **temizlenmiş state'in üzerine** yazar. `profil-tamamla`'da bu, "Kaydet" butonunu kalıcı pasif bırakıyor ve **uyarı metni de görünmüyordu** (ilgili blok yeni tipte gizli) — sebebi görünmeyen sessiz çıkmaz. Çözüm: epoch/abort sayacı (`tipEpoch` ref); uçuştaki istek dönüşte epoch'u doğrulamazsa sonucunu yazmaz. Spinner yine de kapatılmalı.
 - 🚨 **Görünmeyen form alanı MUTLAKA temizlenmeli** (29 Tem 2026, `SPRINT_01` K3). `handleSubmit` alanı `x || undefined` ile gönderiyor ve `profil-tamamla/actions.ts` `company_name`'i **kullanıcı tipinden bağımsız** yazıyor — yani ekranda olmayan veri sessizce kaydediliyor. `ALAN_GORUNUR` haritası ile JSX koşulları **birbirinin aynası**; biri değişirse diğeri de değişmeli.
 - ⚠️ **Aynı sekmeye/moda tekrar tıklamak hiçbir şeyi sıfırlamamalı** (29 Tem 2026, `SPRINT_01` F1). Koşulsuz `setMod('giris')` yüzünden `?mod=kayit` ile gelen kullanıcı, zaten aktif olan sekmeye tekrar tıklayınca sessizce giriş formuna düşüyordu. Ayrıca URL param'ı ile mod kurarken **render koşulunun tamamını** kur: kayıt formu `sekme === 'eposta' && mod === 'kayit'` istiyor; yalnız `mod`'u kurmak sessiz bir no-op'tur.
-- ⚠️ **Liste sayacı, LİSTEYİ saymalı** (29 Tem 2026, `SPRINT_01` L4). `count: 'exact'` toplamı platform genelini verir (tüm sekmeler, kırpma öncesi); altındaki liste ise tek sekmenin ilk `ILAN_LIMITI` kaydı. Ekranda "519 ilan" yazıp 40 kart göstermek kullanıcıya sayfa bozuk hissi verir. Kırpma varsa **"en yeni" ön eki filtreden bağımsız** yazılmalı: filtre bu pencerenin içinde, istemcide çalışıyor — sunucuya gitmiyor. Limit tek yerden: `lib/ilan-liste.ts`.
+- ⚠️ **Liste sayacı, LİSTEYİ saymalı** (29 Tem 2026, `SPRINT_01` L4). `count: 'exact'` toplamı platform genelini verir (tüm sekmeler, kırpma öncesi); altındaki liste ise tek sekmenin ilk `ILAN_LIMITI` kaydı. Ekranda "519 ilan" yazıp 40 kart göstermek kullanıcıya sayfa bozuk hissi verir. Kırpma varsa **"en yeni" ön eki filtreden bağımsız** yazılmalı. Limit tek yerden: `lib/ilan-liste.ts`.
+- 🚨 **İSTEMCİDE FİLTRELEME, KIRPILMIŞ PENCEREDE YALAN SÖYLER** (31 Tem 2026, Dalga 3). L4'ün yukarıdaki maddesi *sayacı* düzeltti ama filtrenin kendisi 200'lük pencerenin içinde kalmıştı. Pencere `created_at`e göre kesiliyor, **ile göre değil**: Muş'ta aktif ilan olsa bile son 200 ilan İstanbul/Ankara/Bursa'dan geliyorsa kullanıcı "Muş" seçince **boş liste** görüyordu — hata yok, uyarı yok. Genel kural: **daraltıcı bir filtre, verinin kırpıldığı yerde uygulanmalı — kırpmadan sonra değil.** Ana sayfa il filtresi artık `/api/listings/ara`'da, `province_id` tamsayı eşitliğiyle sunucuda; limit o ilin **kendi** sonucuna uygulanıyor. Araç/kasa tipi bilinçli olarak istemcide kaldı (il seçildikten sonraki daraltma + `vehicle_type` boşsa `cargo_type`'a düşen türetme SQL'e taşınırsa iki ayrı tanım olur).
 - 🚨 **Auth hata dallarında Türkçe METNE göre dallanma** (29 Tem 2026, `SPRINT_01` A5). Metin değişince dal sessizce ölür. Sunucu makine okunur `kod` dönmeli (`eposta_dogrulanmamis` | `kimlik_hatali`), istemci ona baksın. Hesap sayımı endişesi yok: GoTrue password grant'ta şifre, `Email not confirmed` kontrolünden **önce** doğrulanıyor.
 - 🚨 **`resend()` / `signUp()` çağrısında `emailRedirectTo` VERİLMEZSE** Supabase kendi "Site URL" ayarına düşer; kullanıcı `/auth/callback` yerine ana sayfaya çıkar, oturum takası **hiç yapılmaz** ve "linke tıkladım ama giremiyorum" der (29 Tem 2026, `SPRINT_01` A6). Değer `NEXT_PUBLIC_SITE_URL`'den gelmeli — **`request.url` kullanma**, Vercel'de proxy arkasındaki iç adres olabilir.
 - ⚠️ **E-posta gönderen uç noktalar hesap sayımına (enumeration) kapalı olmalı** (29 Tem 2026, `SPRINT_01` A6). `/api/auth/dogrulama-tekrar` adres kayıtlı olsun olmasın **aynı yanıtı** döner; sebep yalnız loga yazılır. Kotalar hata yolunda da işlenir — buradaki "hata"ların çoğu "böyle adres yok / zaten doğrulanmış", yani saldırganın aradığı bilgi; saymazsak o yol bedava olur. (`otp/route.ts`'ten bilinçli ayrılık: orada hata = sağlayıcı arızası, sayaç işlenmeden 502 döner.)

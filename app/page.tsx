@@ -4,7 +4,8 @@ import Footer from './_components/Footer';
 import { createPublicServerClient } from '../lib/supabase-server';
 import { createClient } from '@supabase/supabase-js';
 // SPRINT_01 L4 — limit tek yerden; HomeClient'taki yenileme sorgusu da bunu kullanır.
-import { ILAN_LIMITI } from '../lib/ilan-liste';
+// Dalga 3 — kolon listesi ve satır normalizasyonu da tek yerden (üç çağıran var).
+import { ILAN_LIMITI, ILAN_SELECT, ilanNormalize, type RozetBilgi } from '../lib/ilan-liste';
 
 // Service role client — RLS'i bypass eder; listings + listing_stops birlikte çekilir
 function createServiceClient() {
@@ -16,11 +17,6 @@ function createServiceClient() {
 
 // 30 saniyede bir arka planda yenilenir (stale-while-revalidate)
 export const revalidate = 30;
-
-function yeniUye(createdAt: string | null): boolean {
-  if (!createdAt) return false;
-  return new Date(createdAt) > new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-}
 
 async function fetchTotalIlanCount(): Promise<number> {
   try {
@@ -45,18 +41,11 @@ async function fetchInitialIlanlar() {
 
     const { data, error } = await serviceSupabase
       .from('listings')
-      // ⚠️ SPRINT_01 L1 — `contact_phone` BURADA ÇEKİLMEZ.
-      // Bu sayfa ISR'li (revalidate=30): çıktı tüm ziyaretçiler arasında paylaşılıyor,
-      // dolayısıyla oturuma göre koşullu render mümkün değil. Client component'e prop
-      // olarak geçen her alan flight payload'ı ile HTML'e gömülür ve misafir kullanıcı
-      // sayfa kaynağından okuyabilir. Telefon yalnızca /api/ilan/[id]/telefon üzerinden.
-      .select(`
-        id, listing_type, origin_city, origin_district,
-        price_offer, source, created_at,
-        trust_level, user_id, vehicle_type, body_type,
-        available_date, date_flexible,
-        listing_stops ( listing_id, stop_order, city, district, vehicle_count, cargo_type, weight_ton, pallet_count )
-      `)
+      // ⚠️ SPRINT_01 L1 — `contact_phone` ÇEKİLMEZ; kural artık `ILAN_SELECT`'in
+      // başında yazılı (lib/ilan-liste.ts). Bu sayfa ISR'li (revalidate=30):
+      // çıktı tüm ziyaretçiler arasında paylaşılıyor, oturuma göre koşullu
+      // render mümkün değil. Telefon yalnızca /api/ilan/[id]/telefon üzerinden.
+      .select(ILAN_SELECT)
       .in('moderation_status', ['approved', 'auto_published'])
       .eq('is_shadow_banned', false)
       .eq('status', 'active')
@@ -65,8 +54,8 @@ async function fetchInitialIlanlar() {
 
     if (error || !data || data.length === 0) return [];
 
-    const userIds = [...new Set(data.map((i) => i.user_id).filter(Boolean))];
-    const kullaniciMap: Record<string, { phone_verified: boolean; created_at: string }> = {};
+    const userIds = [...new Set((data as any[]).map((i) => i.user_id).filter(Boolean))];
+    const kullaniciMap: Record<string, RozetBilgi> = {};
     if (userIds.length > 0) {
       const { data: ks } = await publicSupabase
         .from('users')
@@ -75,40 +64,9 @@ async function fetchInitialIlanlar() {
       for (const k of (ks || []) as any[]) kullaniciMap[k.id] = k;
     }
 
-    return data.map((ilan: any) => {
-      const stops = ((ilan.listing_stops || []) as any[])
-        .sort((a: any, b: any) => a.stop_order - b.stop_order);
-      const aracTipiList: string[] = ilan.vehicle_type?.length
-        ? ilan.vehicle_type
-        : ([...new Set(stops.map((s: any) => s.cargo_type).filter(Boolean))] as string[]);
-      const kb = ilan.user_id ? kullaniciMap[ilan.user_id] : null;
-      return {
-        id: ilan.id,
-        tip: ilan.listing_type,
-        kalkis: ilan.origin_city,
-        kalkis_ilce: ilan.origin_district || '',
-        duraklar: stops.map((s: any) => ({
-          sehir: s.city,
-          ilce: s.district || '',
-          ton: s.weight_ton,
-          palet: s.pallet_count,
-          arac_adet: s.vehicle_count,
-        })),
-        kaynak: ilan.source || 'form',
-        sure: new Date(ilan.created_at).toLocaleDateString('tr-TR'),
-        // tel alanı bilinçli olarak yok — bkz. yukarıdaki L1 notu.
-        // İstemci "Ara"ya bastığında /api/ilan/[id]/telefon'dan çeker.
-        fiyat: ilan.price_offer?.toString() ?? null,
-        tarih: ilan.available_date,
-        tarihEsnek: ilan.date_flexible,
-        aracTipleri: aracTipiList,
-        ustyapilari: (ilan.body_type || []) as string[],
-        dogrulanmamis: !ilan.user_id || ilan.trust_level === 'social',
-        telefonDogrulandi: kb?.phone_verified === true,
-        yeniUye: kb ? yeniUye(kb.created_at) : false,
-        user_id: ilan.user_id,
-      };
-    });
+    return (data as any[]).map((ilan: any) =>
+      ilanNormalize(ilan, ilan.user_id ? kullaniciMap[ilan.user_id] : null)
+    );
   } catch {
     return [];
   }

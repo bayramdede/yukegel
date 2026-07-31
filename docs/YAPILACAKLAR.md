@@ -43,20 +43,17 @@
 > Katlanmış alias kopyası artık DB seviyesinde doğamaz.
 > ⏳ Runbook'un **Adım 3, 4, 6** (ilçe yazımı, NULL ilçe, elle kararlar) hâlâ açık.
 >
-> ⏳ **DALGA 3 KODU HAZIR — SQL HENÜZ ÇALIŞTIRILMADI (30 Tem 2026).**
-> Migration `docs/20260730_dalga3_radar_province_id.sql`, keşif `docs/20260730_dalga3_kesif.sql`.
-> Kod tarafı bitti: `api/admin/radar`, `api/admin/radar/analitik`, `api/listings/yakin`
-> (RPC'ler artık `province_id` alıyor, çeviri `ilId()` ile route sınırında) ve
-> `app/moderator/page.tsx` `duzenleKaydet()` çift yazıma geçti.
-> `npx tsc --noEmit` temiz · `test:lokasyon` 21/21 · `test:parser` 29/29.
+> ✅ **DALGA 3 TAMAMLANDI (31 Tem 2026).** Migration `docs/20260730_dalga3_radar_province_id.sql`
+> canlıda çalıştırıldı; kabul kriteri **BÖLÜM 5.6 sıfır satır** döndü (metin sayımı = id sayımı,
+> il il). Kod deploy edildi (`bd0c7d1`). Kapsam: `api/admin/radar`, `api/admin/radar/analitik`,
+> `api/listings/yakin`, `app/moderator/page.tsx` ve son parça `app/_components/HomeClient.tsx`
+> + yeni `app/api/listings/ara`.
+> `npx tsc --noEmit` temiz · `test:lokasyon` geçti · `test:parser` 29/29.
 >
-> 🚨 **SIRA ÖNEMLİ — ARADA KESİNTİ PENCERESİ VAR.** Eski RPC imzaları DROP ediliyor;
-> SQL çalıştıktan sonra ESKİ kod `PGRST202` alır, SQL çalışmadan YENİ kod da `PGRST202`
-> alır. Yani: **SQL (BÖLÜM 0→1→2→3→4) → hemen `npm run deploy`.** Arayı kısa tut.
-> Kabul kriteri **BÖLÜM 5.6**: eski metin sayımı ile yeni id sayımı ilde ilde eşit olmalı,
-> sorgu **sıfır satır** dönmeli. Satır dönerse **deploy etme**.
-> BÖLÜM 6'daki metin/trigram index DROP'ları bilerek çalıştırılmıyor — önce ~1 hafta
-> `pg_stat_user_indexes` ile boşta olduklarını ölçmek gerekiyor.
+> ⏳ BÖLÜM 6'daki metin/trigram index DROP'ları bilerek çalıştırılmadı — önce ~1 hafta
+> `pg_stat_user_indexes` ile boşta olduklarını ölçmek gerekiyor (**~6 Ağu 2026'da bak**).
+> Aynı bölümde ayrıca **çift index bulgusu** var: `listing_stops` üzerinde üç adet özdeş
+> `(listing_id)`, `listings` üzerinde üç adet özdeş `(created_at DESC)`. Ayrı migration.
 >
 > 🐛 **DALGA 3'TE BULUNAN İKİ SESSİZ BUG (ikisi de düzeltildi):**
 > 1. `app/moderator/page.tsx::duzenleKaydet()` server action'dan geçmiyordu; moderatör
@@ -67,17 +64,31 @@
 >    birleşik noktayla yazılıyordu; ne `ilKey()` ne `il_key()` o anahtarı üretir, yani
 >    moderatörün öğrettiği alias **hiçbir zaman eşleşmiyordu**. Artık `ilKey` kullanılıyor.
 >
-> ⏳ **Dalga 3'ün kalanı:** `app/_components/HomeClient.tsx`. Filtre şu an tamamen
-> istemcide (`includes`), sunucu tarafı bir filtre yolu eklemek gerekiyor — ayrı iş.
+> 🐛 **ÜÇÜNCÜ SESSİZ BUG — `HomeClient` il filtresi (düzeltildi, 31 Tem 2026).**
+> Beklenen sorun `includes`'un büyük/küçük harfe duyarlılığıydı; asıl sorun daha kötü
+> çıktı: filtre **200'lük pencerenin içinde** çalışıyordu ve pencere `created_at`e göre
+> kesiliyor, ile göre değil. Yani **Muş'ta aktif ilan olsa bile son 200 ilan İstanbul/
+> Ankara/Bursa'dansa kullanıcı "Muş" seçince boş liste görüyordu.** İl filtresi artık
+> `/api/listings/ara`'da sunucu tarafında, `province_id` tamsayı eşitliğiyle; limit o ilin
+> kendi sonucuna uygulanıyor. Araç/kasa tipi bilinçli olarak istemcide kaldı.
+> Yan temizlik: 81 ilin elle yazılmış **4. kopyası** silindi (`lib/ilan-sabitler::ILLER`
+> artık tek kaynak); `ILAN_SELECT` + `ilanNormalize()` `lib/ilan-liste.ts`'e alındı —
+> aynı sorgu üç yerden atılıyordu.
+>
+> 🧪 **Ana sayfada elle doğrulanacak (deploy sonrası):** ① Kalkış = **Muş** (veya başka
+> düşük hacimli il) → eskiden boştu, artık ilan gelmeli. ② Varış = herhangi bir il →
+> çok duraklı bir ilanın **tonaj/palet toplamı** kartta doğru mu (duraklar kırpılmamalı).
+> ③ "✕ Temizle" → liste SSR verisine geri dönmeli, filtrelenmiş hâlde donmamalı.
+> ④ Filtre açıkken Yük/Araç sekmesi değiştir → yeniden sorgu atmalı ve doğru sonuç gelmeli.
 >
 > ⚠️ **`SUPABASE_ACCESS_TOKEN` eksik** — `~/.config/yukegel/auto-deploy.env`. Edge Function
 > deploy'ları SESSİZCE atlanıyor (`scripts/auto-deploy.log:19565`). Şu an zararsız
 > (`parse-listing`'de davranış değişikliği yok) ama **Dalga 4 öncesi mutlaka geri konmalı**.
 >
 > **Kalan dalgalar (kod):**
-> - [ ] **Dalga 3 — okuma/filtre/moderasyon.** `HomeClient` (🔴 filtre şu an tamamen istemcide,
->       `includes` büyük/küçük harfe duyarlı — spec md.5'in SQL filtresi yeni sunucu yolu ister)
->       + 5 radar/nearby RPC'sindeki `ILIKE '%…%'` → `= province_id` + moderatör paneli (md.6).
+> - [x] **Dalga 3 — okuma/filtre/moderasyon.** ✅ 31 Tem 2026. `HomeClient` + `/api/listings/ara`
+>       (sunucu tarafı il filtresi) + radar/nearby RPC'lerinde `ILIKE '%…%'` → `= province_id`
+>       + moderatör paneli (md.6).
 > - [ ] **Dalga 4 — AI parser.** Prompt'lar. 🚨 AI'a **doğrudan plaka kodu ürettirme** — 81 satırlık
 >       tabloyu prompt'a koymak token yakar ve model uydurur ("Bursa 16 mı 61 mi"). Eşleştirmeyi
 >       `lib/lokasyon.ts::ilId()` yapar; spec md.4'ün istediği sonuç böyle de sağlanır.
