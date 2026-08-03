@@ -1,5 +1,41 @@
 # Yükegel — Yapılacaklar Listesi
 
+> ✅✅ **3 AĞU 2026 — `ilan_olustur` v4 CANLIDA (#26).** RPC artık
+> `listings.origin_city` ve `listing_stops.city` metin kolonlarına **yazmıyor**;
+> yalnız `province_id` yazıyor. Doğrulama: 2.1 mutlu yol geçti · 2.2
+> `origin_city` NULL / `origin_province_id` 34 / `city` NULL / `province_id` 6 ·
+> 2.3 her iki guard da `22023` attı (`Rotterdam` kalkış ve durak) ·
+> guard sonrası `V4_GUARD_SIL` sayısı **0**, yani `raise` yarım satırı gerçekten
+> geri aldı · test satırları silindi. ⏳ Kalan: **2.5 duman testi** (#39).
+>
+> 🚨🚨 **YOLDA CANLI KESİNTİ OLDU — `origin_city` NOT NULL'DI.** v4
+> uygulandıktan sonra her `ilan_olustur` çağrısı `23502` attı; ilan oluşturma
+> beş kanalda birden durdu. Çözüm: `alter table … drop not null` (kolonlar
+> BÖLÜM 5'te zaten düşüyor, bu onun ön adımı). Ayrıntı ve kural v4 dosyasının
+> yeni **ADIM 0.5** bölümünde.
+> 📌 **Neden kaçtı:** plan "kolona yazmayı bırakmak" ile "kolonu düşürmek"
+> arasında günlerce pencere olacağını doğru kurgulamıştı; o pencerede kolonun
+> hâlâ **dolu olmayı zorunlu kıldığı** hiç sorulmadı. Ne v4 dosyası ne drop
+> dosyası "NOT NULL" kelimesini bir kez geçiriyordu.
+> → **Kural:** bir yazma yolunu kesmeden önce hedef kolonun KISITLARINA bak.
+>   "Artık yazmıyoruz" ancak kolon bunu kabul ediyorsa doğrudur.
+>
+> 🚨 **SÜRÜM TESPİTİ İKİ KEZ YANLIŞ CEVAP VERDİ, İKİSİ DE ARAÇ HATASI.**
+> **(1)** İlk denemede ADIM 1 hiç uygulanmamıştı ama bu ancak 2.2 metin
+> döndürünce anlaşıldı. Ele veren şey KASA oldu: girdi `'istanbul'`/`'ANKARA'`,
+> çıktı `İstanbul`/`Ankara` — kanonik yazım, yani değer `provinces.name`'den
+> geliyor, yani v3'ün `coalesce(provinces.name, ham metin)` satırı hâlâ canlı.
+> *Ham girdinin kanonikleşmiş hâli, hangi kod yolunun çalıştığını söyleyen bir
+> parmak izidir.*
+> **(2)** Ardından yazılan `pg_get_functiondef(p.oid) ~ 'v_origin_city'` sorgusu
+> v4'te de TRUE döndü — çünkü `pg_get_functiondef` **yorumları da** döndürür ve
+> v4 gövdesi üç yerde "v_origin_city KALDIRILDI" diye anlatıyor. Sorgu,
+> kaldırıldığını söyleyen yorumu **kaldırılmamışlığın kanıtı** saydı.
+> → `destination_city` mitiyle aynı sınıf: **"kodda geçiyor" ≠ "kod bunu
+>   yapıyor".** Gövdede metin ararken yorum satırları elenmeli;
+>   `20260803_get_nearby_cte_temizligi.sql` 2.1 bunu zaten doğru yapıyordu ama
+>   teknik v4'e taşınmamıştı.
+
 > 🗺️ **COĞRAFİ STANDARDİZASYON — DALGA 1 CANLIDA, DALGA 2 KODU HAZIR** (30 Tem 2026,
 > tam plan `docs/COGRAFI_GECIS.md`). İl metin olmaktan çıkıp `province_id` (plaka kodu 1-81)
 > oluyor; ilçe metin kalıyor ama **seçmeli** (81 il / 973 resmî ilçe `lib/constants/locations.json`).
@@ -275,9 +311,23 @@
 > ⚠️ Bu bug **v4'ten bağımsız ve önceden vardı** — bugün de 23514/22P02 gibi her
 > RPC hatası aynı şekilde mesaj kaybediyor. v4 onu kenar durumdan beklenen akışa
 > çevirdiği için görünür oldu. → **Görev #33** (deploy, v4'ün ön koşulu).
-> 🚨 `SUPABASE_ACCESS_TOKEN` eksik olduğu için bu düzeltme **sessizce deploy
+> ~~🚨 `SUPABASE_ACCESS_TOKEN` eksik olduğu için bu düzeltme **sessizce deploy
 > edilmemiş olabilir**; token eklenmeden ve deploy zamanı gözle doğrulanmadan
-> v4 çalıştırılmaz. Aksi hâlde tam olarak yukarıdaki kayıp senaryosu yaşanır.
+> v4 çalıştırılmaz.~~ → ✅ **CANLIDA DOĞRULANDI (3 Ağu 2026).**
+> Dashboard → Edge Functions → `parse-listing` → Code:
+> `created > 0 ? 'processed' : 'no_lane'` **var**, koşulsuz
+> `processing_status: 'processed'` **yok**. v4'ün ön koşulu karşılandı.
+>
+> 📌 **Doğrulama zaman damgasıyla YAPILAMADI, kodu okuyarak yapıldı.**
+> Dashboard "4 saat önce güncellendi" diyordu; dosyanın içeriği 31 Tem 15:57'de
+> yazılmış ama commit'i (`c2fd071`) 3 Ağu 11:04'te atılmıştı — yani deploy,
+> commit'ten iki saat ÖNCE görünüyordu. Bu ne kanıt ne de yalanlama:
+> **commit deploy değildir**, deploy çalışma ağacından okur. Üç tarih üç ayrı
+> şeyi ölçüyordu ve hiçbiri "canlıda hangi kod var" sorusunu cevaplamıyordu.
+> → **Kural:** deploy doğrulaması zaman damgası karşılaştırması değil,
+> **canlı gövdede tek bir ayırt edici satırı aramaktır.** Aynı kural
+> `pg_get_functiondef` ile DB tarafında zaten uygulanıyordu (#37 ADIM 0);
+> Edge Function tarafında da aynısı geçerli.
 >
 > 🚨 **BEŞİNCİ BULGU — KOVA SAYISI ÜÇ DEĞİL, DÖRT (3 Ağu 2026, → Görev #34).**
 > BÖLÜM 2 envanteri `origin_city`'yi *geçtiği yere* göre tasnif etmişti:
@@ -317,10 +367,34 @@
 > → **Kural:** bir yazma yolunu kovaya koymadan önce importer zincirini sonuna
 > kadar sür. Zincir kopuyorsa madde "dönüştürülecek" değil, **"ölü — silinecek"**
 > kovasına gider.
-> ⚠️ Ölü dosyalar duruyor (silme kararı Bayram'da): `panel/actions.ts`,
-> `panel/IlanYonetim.tsx`, `u/[username]/IlanListesi.tsx`. IlanYonetim 3 Ağu'da
+> ~~⚠️ Ölü dosyalar duruyor (silme kararı Bayram'da): `panel/actions.ts`,
+> `panel/IlanYonetim.tsx`, `u/[username]/IlanListesi.tsx`.~~ IlanYonetim 3 Ağu'da
 > yine de KOVA B kalıbına çevrildi (o an ölü olduğu bilinmiyordu — zararsız ama
 > gereksiz); IlanListesi **çevrilmedi**, başına ölü-dosya başlığı yazıldı.
+>
+> ✅ **3 AĞU 2026 — #38 BİTTİ: 11 dosya `git rm` ile silindi.**
+> Üç ölü kaynak (`app/panel/actions.ts`, `app/panel/IlanYonetim.tsx`,
+> `app/u/[username]/IlanListesi.tsx`), `scripts/_chk-iller.mjs` (#36'nın geçici
+> betiği) ve yedi scratch `.txt` (`app/_fix.txt`, `app/panel/_fix.txt`,
+> `app/u/[username]/_fix.txt`, `app/moderator/` altında `_fn` `_fns_new`
+> `_patch` `_siradakine`). Hepsi git'te izleniyordu, o yüzden `rm` değil
+> `git rm`. **Kanıt `npx tsc --noEmit` (temiz)** — grep sadece "importer yok"
+> diyordu, ölü olduklarını kesin söyleyen derleyici.
+>
+> ⚠️ **`app/panel/` karma bir dizindi** — `page.tsx` ve `PanelClient.tsx`
+> ikisi de KOVA B'de dönüştürülmüş CANLI dosyalar. Dizin bazlı bir silme
+> (`rm -rf app/panel`) paneli komple götürürdü. Aynı şekilde
+> `app/moderator/actions.ts` adı `panel/actions.ts`'e benziyor ama **canlı**
+> (`moderator/page.tsx`:6 üç fonksiyonunu import ediyor).
+> → Silme listesi dizin değil, **dosya** bazlı olmalıydı ve öyle yapıldı.
+>
+> 📌 Scratch dosyaların gerçek konumu ancak `find` ile çıktı: önceki not
+> üçünü dizin öneki olmadan taşıyordu ve hepsi `app/moderator/` altındaydı;
+> ayrıca listede hiç olmayan iki `_fix.txt` daha vardı. Beş sanılan scratch
+> yedi çıktı. **Yol tahmin edilmez, aranır.**
+> 🧹 Kalan tek scratch: `app/ilan/[id]/_aksiyonlar_props.txt` (izleniyor, altı
+> satırlık JSX parçası, hiçbir yerden referans yok) — bu turda listede olmadığı
+> için dokunulmadı, bir sonraki temizlikte silinebilir.
 >
 > ✅ **3 AĞU 2026 — #36 BİTTİ: 81 il listesi beş kopyadan ikiye indi.**
 > Aynı dizi `moderator/page.tsx`:14, `admin/poi-onay/PoiOnayClient.tsx`:63,
@@ -352,6 +426,27 @@
 > tsc temiz · `test:lokasyon` tümü geçti · `test:parser` 29/29.
 > 🧹 `scripts/_chk-iller.mjs` (geçici doğrulama betiği) silinemedi — sandbox FUSE
 > `rm`'e izin vermiyor. Ölü dosya listesine eklendi.
+>
+> ✅ **3 AĞU 2026 — #37 (KOVA E) ÇALIŞTIRILDI VE DOĞRULANDI.**
+> `docs/20260803_get_nearby_cte_temizligi.sql` canlıda uygulandı.
+> ADIM 2 sonuçları: **2.1** 0 satır (gövdede metin kolonu kalmadı) ·
+> **2.2** `anon` + `authenticated` + `postgres` + `service_role` hepsi EXECUTE
+> — `create or replace`'in GRANT'ları koruduğu teyit edildi · **2.3** `0/0`.
+>
+> ⚠️ **2.3'ün `0` dönmesi ilk bakışta "fonksiyon boşa düştü" gibi okunuyordu.**
+> Adımın amacı değişiklik öncesi/sonrası satır sayısını karşılaştırmaktı ama
+> ÖNCESİ ölçülmemişti — yani `0` tek başına hiçbir şey kanıtlamıyordu.
+> Kontrol sorgusuyla ayrıştırıldı: `listings` içinde `origin_province_id = 34`
+> + `status='active'` + `moderation_status in (approved, auto_published)`
+> + `is_shadow_banned = false` koşulunu sağlayan ilan sayısı da **0**.
+> → Fonksiyon doğru; İstanbul'da gösterilebilir aktif ilan yok.
+> 📌 **Ders:** "beklenen çıktı" bir taban çizgisine dayanmıyorsa doğrulama
+> adımı değildir. Sıfır dönen bir sayaç, ya doğru cevabı ya da tamamen kırık
+> bir sorguyu aynı şekilde gösterir; ayırt etmek için ikinci bir sorgu şart.
+>
+> ⏳ Kalan: **2.4 duman testi** (canlı, deploy sonrası) — `/yol-rehberi` →
+> "Yakınımdaki Yükler" konum izniyle sonuç veriyor mu, `dest_city` dolu mu.
+> Deploy (Adım 1) yapılmadan bu kutu işaretlenemez.
 >
 > ✅ **KOVA B'nin çözümü join değil, `ilAdi()`.** İlk plan
 > "`provinces!origin_province_id(name)` gömülü sorgusu" diyordu; gereksiz.

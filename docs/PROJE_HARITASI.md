@@ -88,10 +88,22 @@
 > ⚠️ "Ölçüm sıfır, guard gereksiz" DENMEZ: ölçüm korumanın bugün çalıştığını gösterir,
 > yarın yerinde kalacağını değil.
 >
-> 📄 **`docs/20260731_ilan_olustur_v4.sql` (31 Tem 2026, #26) — ÇALIŞTIRILMADI.** BÖLÜM 1'in
-> çalıştırılabilir hâli, ayrı dosyada: v4 drop'u beklemez, BÖLÜM 2 koduyla aynı release'te
-> çıkar. ADIM 0 ön ölçümü: `listings.origin_province_id IS NULL` **0 satır**,
-> `listing_stops.province_id IS NULL` **0** → guard geriye dönük hiçbir akışı kırmıyor.
+> 📄 **`docs/20260731_ilan_olustur_v4.sql` (31 Tem 2026, #26) — ✅ ÇALIŞTIRILDI 3 Ağu 2026.**
+> BÖLÜM 1'in çalıştırılabilir hâli, ayrı dosyada: v4 drop'u beklemez, BÖLÜM 2 koduyla aynı
+> release'te çıkar. ADIM 0 ön ölçümü (31 Tem'de ve 3 Ağu'da yeniden): `listings.origin_province_id
+> IS NULL` **0 satır**, `listing_stops.province_id IS NULL` **0** → guard geriye dönük hiçbir
+> akışı kırmıyor. Doğrulama: 2.2 → `origin_city` NULL · `origin_province_id` 34 · `city` NULL ·
+> `province_id` 6 · 2.3 → iki guard da `22023` · guard sonrası yarım satır **0**.
+> ⏳ Kalan: 2.5 duman testi (beş yazma yolu, özellikle parse-listing).
+>
+> 🚨🚨 **ŞEMA DEĞİŞTİ — `listings.origin_city` ve `listing_stops.city` ARTIK NULLABLE**
+> (3 Ağu 2026, v4 ADIM 0.5). v4 uygulandıktan sonra her `ilan_olustur` çağrısı `23502` attı
+> (`origin_city` NOT NULL'dı) ve ilan oluşturma **beş kanalda birden durdu**; kısıt düşürülerek
+> çözüldü. Kolonlar BÖLÜM 5'te zaten tamamen gidiyor, bu onun ön adımı.
+> 📌 Plan "yazmayı bırakmak" ile "düşürmek" arasında günlerce pencere olacağını doğru
+> kurgulamıştı; o pencerede kolonun hâlâ **dolu olmayı zorunlu kıldığı** sorulmamıştı — ne v4
+> ne drop dosyası "NOT NULL" kelimesini bir kez geçiriyordu.
+> → **Kural: bir yazma yolunu kesmeden önce hedef kolonun KISITLARINA bak.**
 >
 > 🐛 **DÖRDÜNCÜ SESSİZ BUG (v4 yazılırken bulundu, düzeltildi).**
 > `parse-listing/index.ts`:884 döngü **dışında koşulsuz** `processing_status='processed'`
@@ -119,8 +131,12 @@
 > 📌 Ders: **`grep` bir çağrı grafiği değildir.** "Bu dosya kolona yazıyor mu?" soruldu,
 > "bu dosya çalışıyor mu?" sorulmadı — ölü bir dosya üç belgeye kritik madde olarak yazıldı.
 > KOVA E ile aynı kök: orada kapsam *dile*, burada *erişilebilirliğe* göre daralmıştı.
-> ⚠️ Ölü dosyalar duruyor (silme Bayram'da): `panel/actions.ts`, `panel/IlanYonetim.tsx`,
-> `u/[username]/IlanListesi.tsx` (sonuncusu bilerek çevrilmedi, ölü-dosya başlığı eklendi).
+> ~~⚠️ Ölü dosyalar duruyor (silme Bayram'da): `panel/actions.ts`, `panel/IlanYonetim.tsx`,
+> `u/[username]/IlanListesi.tsx`~~ → ✅ **SİLİNDİ (3 Ağu 2026, #38).** Üç ölü kaynak +
+> `scripts/_chk-iller.mjs` + yedi scratch `.txt`, toplam 11 dosya `git rm` ile kalktı;
+> `npx tsc --noEmit` temiz — ölü olduklarının kanıtı grep değil derleyici.
+> ⚠️ `app/panel/` KARMA dizindi: `page.tsx` + `PanelClient.tsx` CANLI (KOVA B'de çevrildi),
+> `app/moderator/actions.ts` de canlı (`moderator/page.tsx`:6). Silme dizin değil dosya bazlı.
 > ✅ **3 Ağu 2026 — BÖLÜM 2 KOD TEMİZLİĞİ BİTTİ (#34 + #35), v4 (#26) artık çıkabilir.**
 > Çevrilen dosyalar: `api/admin/radar/route.ts` + `admin/radar/RadarClient.tsx`,
 > `api/admin/crm/[id]/route.ts` + `admin/crm/CrmClient.tsx`, `api/admin/learn-aliases/route.ts`
@@ -412,9 +428,10 @@ yukegel/
 │   │                                     #    canlı hesaba devreder. hashed_token + verifyOtp → cookie ✅
 │   ├── profil-tamamla/page.tsx
 │   ├── profil-tamamla/actions.ts         # 🔒 SPRINT_01 K2 — users upsert'i sunucuda, KOLON BEYAZ LİSTESİ ✅
-│   ├── panel/ (page + PanelClient + IlanYonetim)   # ?sekme=ilanlarim|araclarim|profilim derin bağlantı (31 Tem 2026)
-│   ├── panel/actions.ts                  # 🔒 SPRINT_01 L1e — ilanGuncelle + ilanTamamlandiToggle.
-│   │                                     #    Sahiplik sunucuda, gövde beyaz listeden geçiyor ✅
+│   ├── panel/ (page + PanelClient)       # ?sekme=ilanlarim|araclarim|profilim derin bağlantı (31 Tem 2026)
+│   │                                     # ⚠️ IlanYonetim.tsx ve panel/actions.ts 3 Ağu 2026'da SİLİNDİ (#38 —
+│   │                                     #    ölü çift: actions'ı yalnız IlanYonetim import ediyordu, onu hiç kimse).
+│   │                                     #    Panelin canlı düzenleme yolu /api/ilan/duzelt.
 │   ├── ilan/[id]/ (page + Aksiyonlar + sahiplen)
 │   ├── ilan-ver/ (page + actions + TopluYukle + MetindenIlan)
 │   ├── araclarim/page.tsx
@@ -1207,6 +1224,7 @@ sayfalara **miras bırakmaz**. Dinamik OG görseli de yok (kök karta düşüyor
   - `lib/il-koordinatlari.ts`: 81 il merkez koordinatı (`app/api/admin/poi-import/route.ts` içindeki tablonun kopyası) + `enYakinIl(lat,lng)` — GPS'ten offline haversine ile en yakın ili bulur (Geocoding API çağrısı YOK, ek maliyet yok).
   - `docs/20260701_nearby_listings_rpc.sql`: `get_nearby_listings_by_city(p_city, p_district, p_limit)` RPC — **gerçek şema** (`origin_city`/`origin_district`, varış `listing_stops`'un son durağından `DISTINCT ON` ile) ile yazıldı.
     - ⏳ **Dalga 3 (30 Tem 2026) bu fonksiyonun ADINI DEĞİŞTİRİYOR:** `get_nearby_listings_by_province(p_province_id, p_district, p_limit)` — `docs/20260730_dalga3_radar_province_id.sql` BÖLÜM 4. Ad değişti çünkü `_by_city` artık yalan olurdu. İlçe karşılaştırması `ILIKE` yerine `public.il_key()` (katlanmış eşitlik); güvenli çünkü `eslesme` bir **sıralama ipucu**, filtre değil. SQL çalıştırılana kadar yeni kod `PGRST202` alır.
+    - ✅ **KOVA E TEMİZLENDİ (3 Ağu 2026, #37 — `docs/20260803_get_nearby_cte_temizligi.sql`, ÇALIŞTIRILDI).** Dalga 3 dönüş ifadesini doğru çevirmişti (`dest_city` artık `pd.name`'den geliyor) ama `son_durak` CTE'sinin SELECT listesinde ölü bir `city` kalmıştı. Dalga 5 / BÖLÜM 5 `listing_stops.city`'yi düşürdüğünde fonksiyon `42703` atacak, `route.ts`:44 → `YolRehberiClient.tsx` zinciri yani **GPS'e dayalı keşif akışının tamamı sessizce ölecekti**. 🚨 Bu bulguyu `.ts`/`.tsx` taraması ASLA gösteremezdi — bağımlılık yalnızca fonksiyon GÖVDESİNDE, yani Postgres'te. Ders: "kod temizliği" envanteri ikinci bir kod tabanını (DB fonksiyonları) unutmamalı. Doğrulama: gövdede metin kolonu kalmadı · dört GRANT (`anon`/`authenticated`/`postgres`/`service_role`) `create or replace` sayesinde korundu · çağrı `0/0` döndü ve bu **kontrol sorgusuyla** doğrulandı (34'te aktif+onaylı ilan sayısı da 0). ⏳ Kalan tek adım 2.4 duman testi (deploy sonrası `/yol-rehberi` → "Yakınımdaki Yükler").
   - **Not:** `docs/20260610_poi_module.sql` içindeki eski `get_nearby_listings_for_parked_driver` fonksiyonu `listings.dest_city`/`title`/`load_type` gibi olmayan kolonları referans alıyor — çağrılırsa hata verir, kullanılmıyor, silinmedi (geriye dönük doküman amaçlı duruyor).
   - `/api/listings/yakin` (GET, `?lat=&lng=`): en yakın ili bulur, RPC'yi çağırır, ilan listesini döner.
   - UI: `YolRehberiClient.tsx` — Liste/Harita yanına "📦 Yükler" toggle, `YukListeKart` bileşeni (kalkış→varış, fiyat, araç tipi, "YAKININDA" rozeti ilçe eşleşmesinde), `/ilan/[id]`'e link.

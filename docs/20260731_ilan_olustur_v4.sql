@@ -142,6 +142,60 @@ where province_id is null;
 --    Bu senaryo tam olarak yukarıdaki KAYIP durumudur.
 --    → Token eklenmeden v4 çalıştırılmaz. Doğrulama: Supabase Dashboard →
 --      Edge Functions → parse-listing → son deploy zamanı bugünü göstermeli.
+--
+-- ✅ DOĞRULANDI 3 Ağu 2026 — ama ZAMAN DAMGASIYLA DEĞİL, GÖVDEYLE.
+--    Dashboard "4 saat önce" diyordu; dosyanın içeriği 31 Tem'de yazılmış,
+--    commit'i 3 Ağu 11:04'te atılmıştı — deploy commit'ten ÖNCE görünüyordu.
+--    Üç tarih üç ayrı şeyi ölçüyor ve hiçbiri "canlıda hangi kod var" sorusunu
+--    cevaplamıyor. Cevabı Code sekmesinde tek bir ayırt edici satır verdi:
+--    `created > 0 ? 'processed' : 'no_lane'` VAR, koşulsuz `'processed'` YOK.
+--    → Kural: deploy doğrulaması tarih karşılaştırması değil, canlı gövdede
+--      ayırt edici satır aramaktır. (DB tarafında `pg_get_functiondef` ile
+--      zaten böyle yapılıyordu; Edge Function tarafı da aynı.)
+
+
+-- ============================================================================
+-- ADIM 0.5 — 🚨 NOT NULL KISITLARINI DÜŞÜR (ZORUNLU, ADIM 1'DEN ÖNCE)
+-- ============================================================================
+--
+-- 3 Ağu 2026'da CANLIDA ÖĞRENİLDİ: v4 uygulandıktan sonra HER `ilan_olustur`
+-- çağrısı `23502` attı —
+--   null value in column "origin_city" of relation "listings"
+--   violates not-null constraint
+-- Yani ilan oluşturma tüm kanallarda (form · Excel · WhatsApp · moderatör ·
+-- parse-listing) durdu. Süre kısa tutuldu, kısıt düşürülerek çözüldü.
+--
+-- 📌 NEDEN KAÇTI — plan iki fiili ayırdı ama arayı düşünmedi. "Kolona yazmayı
+--    bırakmak" (v4, bugün) ile "kolonu düşürmek" (BÖLÜM 5, ~7 Ağu) arasında
+--    GÜNLERCE bir pencere olacağı doğru kurgulanmıştı; o pencerede kolonun
+--    hâlâ DOLU OLMAYI ZORUNLU KILDIĞI sorulmadı. Ne bu dosya ne drop dosyası
+--    "NOT NULL" kelimesini bir kez geçiriyordu.
+--    → Kural: bir yazma yolunu kesmeden önce hedef kolonun kısıtlarına bak.
+--      "Artık yazmıyoruz" ancak kolon bunu KABUL EDİYORSA doğrudur.
+--
+-- ✅ Güvenli: kolonlar BÖLÜM 5'te zaten tamamen düşüyor; bu onun küçük ön
+--    adımı. Katalog değişikliği, tablo taraması yok, anında biter.
+--    (`drop column` kısıtı da beraberinde götürür — çakışma olmaz.)
+
+-- 0.5.1 — Durum tespiti
+-- select table_name, column_name, is_nullable
+--   from information_schema.columns
+--  where (table_name, column_name) in
+--        (('listings','origin_city'), ('listing_stops','city'))
+--    and table_schema = 'public';
+--
+-- ✅ ÇALIŞTIRILDI 3 Ağu 2026 (kısıt düşürüldükten SONRA) →
+--    listings.origin_city = YES · listing_stops.city = YES
+
+-- 0.5.2 — Kısıtları düşür
+-- alter table public.listings      alter column origin_city drop not null;
+-- alter table public.listing_stops alter column city        drop not null;
+--
+-- ✅ ÇALIŞTIRILDI 3 Ağu 2026.
+-- ⚠️ `listing_stops.city` muhtemelen zaten nullable'dı; ikinci satır o hâlde
+--    zararsızca geçer. Yine de körlemesine bırakılmadı — 0.5.1 ikisini de
+--    kayda geçiriyor, çünkü "biri patladıysa diğeri de patlar mı" sorusunun
+--    cevabı tahmin edilecek bir şey değil.
 
 
 -- ============================================================================
@@ -327,6 +381,35 @@ commit;
 --
 -- ⚠️ Bu testi kolon drop'undan ÖNCE yap. Amaç kolonların artık YAZILMADIĞINI
 --    görmek. Drop'tan sonra yapmak anlamsız — orada zaten geri dönüş yok.
+--
+-- ✅✅ ÇALIŞTIRILDI 3 Ağu 2026 — 2.1/2.2/2.3 GEÇTİ.
+--     2.2 → origin_city NULL · origin_province_id 34 · city NULL · province_id 6
+--     2.3a → 22023 "kalkış ili çözümlenemedi (origin_city=Rotterdam, origin_province_id=<NULL>)"
+--     2.3b → 22023 "en az bir durağın ili çözümlenemedi (Rotterdam)"
+--     Kalan: 2.5 duman testi (özellikle parse-listing — guard'ın tek müşterisi).
+--
+-- 🚨 SÜRÜM DOĞRULAMASI İKİ KEZ YANLIŞ CEVAP VERDİ — İKİSİ DE ARAÇ HATASIYDI.
+--    (1) İlk denemede ADIM 1 hiç uygulanmamıştı ama bu ancak 2.2 metin
+--        döndürünce anlaşıldı. İpucu KASADAN geldi: girdi 'istanbul'/'ANKARA'
+--        idi, çıktı 'İstanbul'/'Ankara' — yani KANONİK yazım, `provinces.name`
+--        imzası, v3'ün `coalesce(provinces.name, ham metin)` satırı.
+--        📌 Ham girdinin kanonikleşmiş hâli, hangi kod yolunun çalıştığını
+--           söyleyen bir parmak izidir; "değer geldi" deyip geçilmemeli.
+--    (2) Ardından yazılan tespit sorgusu `pg_get_functiondef(...) ~ 'v_origin_city'`
+--        idi ve v4'te de TRUE döndü — çünkü `pg_get_functiondef` YORUMLARI da
+--        döndürür ve v4 gövdesi üç yerde "v_origin_city KALDIRILDI" diye
+--        anlatıyor. Sorgu, kaldırıldığını söyleyen yorumu kaldırılmamışlığın
+--        kanıtı saydı.
+--        📌 Aynı hata sınıfı `destination_city` mitiyle aynı: "kodda geçiyor"
+--           ile "kod bunu yapıyor" farklı şeyler. Gövdede metin ararken yorum
+--           satırları ELENMELİ — `20260803_get_nearby_cte_temizligi.sql` 2.1
+--           bunu zaten doğru yapıyordu, buraya taşınmamıştı.
+--    Doğru hâli:
+--      select exists (select 1 from unnest(string_to_array(
+--                       pg_get_functiondef(p.oid), E'\n')) as l
+--                      where l !~ '^\s*--' and l ~ 'v_origin_city') as v3_mu
+--        from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+--       where n.nspname = 'public' and p.proname = 'ilan_olustur';
 
 -- 2.1 — Mutlu yol: metin girdisi verildi, id çözüldü, kolonlar boş kaldı.
 -- select public.ilan_olustur(

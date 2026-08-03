@@ -1,1 +1,0 @@
-      const donusturulmus = (data || []).map((ilan: any) => ({
