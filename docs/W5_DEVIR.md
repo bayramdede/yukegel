@@ -85,7 +85,9 @@ Aşağıdakiler 29 Tem 2026'da kaynak kodundan **okunarak** doğrulandı:
 
 - ~~`listings` tablosunda kaç satır `origin_city = destination_city`?~~ 🚨 **BU SORU
   YANLIŞ KURULMUŞ** (Bayram düzeltti, 29 Tem 2026). Varışlar `listings`'te değil,
-  `public.listing_stops` satırlarında; `listings.destination_city` ölü kolon. Ayrıca
+  `public.listing_stops` satırlarında; `listings.destination_city` **diye bir kolon
+  YOK** (🚫 31 Tem 2026 / #28 — burada önce "ölü kolon" yazıyordu; 42703 ile
+  düzeltildi, `information_schema.columns` teyit etti). Ayrıca
   şehir içi taşıma meşru olduğu için "aynı şehir" sahtelik sinyali değil. Doğru soru:
   `listings.origin_city` ile `listing_stops.city`'nin **katlanmış anahtarı eşit ama ham
   yazımı farklı** kaç satır var? Sorgu: `docs/20260729_alias_runbook.md` Adım 0.1
@@ -155,8 +157,9 @@ düzeltiyor).
 4. Kopya BÖLÜM 4.2-4.6
 5. Kopya BÖLÜM 5 doğrulama — **iki sorgu da boş dönmeli**; dönmüyorsa dur ve raporla
 6. Geçmiş konum onarımı — 🚨 **BÖLÜM 6'yı KULLANMA**, `20260729_alias_runbook.md`
-   Adım 8'i kullan. BÖLÜM 6 ölü `destination_city`'yi onarıp canlı `listing_stops.city`
-   ile `listing_stops.district` ve `listings.origin_district`'i atlıyor.
+   Adım 8'i kullan. BÖLÜM 6 var olmayan `destination_city`'yi (#28 — kolon YOK, 42703)
+   onarmaya çalışıp canlı `listing_stops.city` ile `listing_stops.district` ve
+   `listings.origin_district`'i atlıyor. Yani yalnız eksik değil, **çalışmaz**.
 7. Sahte güzergâh ölçümü — runbook Adım 0.1 (`listings` ⋈ `listing_stops`, katlanmış
    anahtar eşit + ham yazım farklı). **Düzeltmeden ÖNCE de al**, yoksa D4'ün etkisi
    ölçülemez. Meşru şehir içi taşıma tabanını 0.2 ile ayrı tut.

@@ -5,6 +5,7 @@ import Aksiyonlar from './Aksiyonlar';
 import { cookies } from 'next/headers';
 import { createServerClient } from '@supabase/ssr';
 import { durakToplami } from '../../../lib/ilan-liste';
+import { ilAdi } from '../../../lib/lokasyon';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -18,10 +19,10 @@ async function fetchIlanTemel(id: string) {
   const { data } = await supabase
     .from('listings')
     .select(`
-      id, listing_type, origin_city, origin_district,
+      id, listing_type, origin_province_id, origin_district,
       vehicle_type, body_type, price_offer, available_date,
       notes, audit_score, moderation_status, is_shadow_banned, status,
-      listing_stops ( stop_order, city, district, weight_ton, cargo_type )
+      listing_stops ( stop_order, province_id, district, weight_ton, cargo_type )
     `)
     .eq('id', id)
     .single();
@@ -39,12 +40,14 @@ export async function generateMetadata(
   }
 
   const stops = (ilan.listing_stops || []).sort((a: any, b: any) => a.stop_order - b.stop_order);
-  const varis = stops.at(-1)?.city ?? '';
+  const varis = ilAdi(stops.at(-1)?.province_id) ?? '';
   const aracTip = (ilan.vehicle_type as string[] | null)?.[0] ?? '';
   const isYuk = ilan.listing_type === 'yuk';
+  // Dalga 5: metin kolonu düştü, gösterim id'den türüyor.
+  const kalkis = ilAdi(ilan.origin_province_id) ?? '';
 
   const baslik = [
-    ilan.origin_city,
+    kalkis,
     varis && `→ ${varis}`,
     aracTip,
     isYuk ? 'Yük İlanı' : 'Araç İlanı',
@@ -58,7 +61,7 @@ export async function generateMetadata(
   const kargoTip = stops.find((s: any) => s.cargo_type)?.cargo_type;
 
   const description = [
-    `${ilan.origin_city}${ilan.origin_district ? ` (${ilan.origin_district})` : ''}`,
+    `${kalkis}${ilan.origin_district ? ` (${ilan.origin_district})` : ''}`,
     varis ? `→ ${varis}` : null,
     kargoTip ? `${kargoTip} yükü` : null,
     agirlik ? `${agirlik} ton` : null,
@@ -116,14 +119,14 @@ export default async function IlanDetay({ params }: { params: Promise<{ id: stri
   const { data: ilan } = await supabase
     .from('listings')
     .select(`
-      id, listing_type, origin_city, origin_district,
+      id, listing_type, origin_province_id, origin_district,
       contact_phone, price_offer, price_negotiable,
       available_date, date_flexible, notes, source,
       created_at, moderation_status, is_shadow_banned,
       trust_level, user_id, audit_score,
       vehicle_type, body_type,
       listing_stops (
-        stop_order, city, district,
+        stop_order, province_id, district,
         vehicle_count, cargo_type, weight_ton, pallet_count, notes
       )
     `)
@@ -176,6 +179,7 @@ export default async function IlanDetay({ params }: { params: Promise<{ id: stri
 
   const stops = (ilan.listing_stops || []).sort((a: any, b: any) => a.stop_order - b.stop_order);
   const isYuk = ilan.listing_type === 'yuk';
+  const kalkis = ilAdi(ilan.origin_province_id) ?? '';
 
   const aracTipleri = dedupNormalize(
     ilan.vehicle_type?.length
@@ -200,11 +204,13 @@ export default async function IlanDetay({ params }: { params: Promise<{ id: stri
     '@context': 'https://schema.org',
     '@type': 'Service',
     name: isYuk ? 'Karayolu Yük Nakliye İlanı' : 'Nakliye Aracı İlanı',
-    description: `${ilan.origin_city} - ${stops.at(-1)?.city ?? ''} arası nakliye`,
+    description: `${kalkis} - ${ilAdi(stops.at(-1)?.province_id) ?? ''} arası nakliye`,
     provider: { '@type': 'Organization', name: 'Yükegel', url: SITE_URL },
+    // ⚠️ schema.org `City` `name` alanı METİN bekler — id basılamaz. Bu yüzden
+    //    JSON-LD, metin kolonunun düşmesinden sonra da `ilAdi()`'ye muhtaç.
     areaServed: [
-      { '@type': 'City', name: ilan.origin_city },
-      ...stops.map((s: any) => ({ '@type': 'City', name: s.city })),
+      { '@type': 'City', name: kalkis },
+      ...stops.map((s: any) => ({ '@type': 'City', name: ilAdi(s.province_id) ?? '' })),
     ],
     datePosted: ilan.created_at,
     ...(ilan.available_date && { availabilityStarts: ilan.available_date }),
@@ -256,9 +262,9 @@ export default async function IlanDetay({ params }: { params: Promise<{ id: stri
             // (girişli + profili tamam) kullanıcıya açık; diğerlerine sadece rozet.
             const telefon = (user && profilTamamlandi) ? ilan.contact_phone?.replace(/\D/g, '') : null;
             const waNumara = telefon ? (telefon.startsWith('90') ? telefon : `90${telefon.replace(/^0/, '')}`) : null;
-            const stops = (ilan.listing_stops as { stop_order: number; city: string }[] | null) ?? [];
-            const varis = stops.sort((a, b) => a.stop_order - b.stop_order).at(-1)?.city;
-            const ilanOzet = [ilan.origin_city, varis, ilan.vehicle_type].filter(Boolean).join('-');
+            const stops = (ilan.listing_stops as { stop_order: number; province_id: number | null }[] | null) ?? [];
+            const varis = ilAdi(stops.sort((a, b) => a.stop_order - b.stop_order).at(-1)?.province_id);
+            const ilanOzet = [kalkis, varis, ilan.vehicle_type].filter(Boolean).join('-');
             const mesaj = encodeURIComponent(`Merhaba, "${ilanOzet || 'yük'}" ilanınızı Yükegel'de gördüm.\nYükegel'de sahiplenerek yönetebilirsiniz: ${process.env.NEXT_PUBLIC_SITE_URL || 'https://yukegel.com'}/ilan/${ilan.id}/sahiplen`);
             return waNumara ? (
               <a href={`https://wa.me/${waNumara}?text=${mesaj}`} target="_blank" rel="noopener noreferrer"
@@ -325,14 +331,18 @@ export default async function IlanDetay({ params }: { params: Promise<{ id: stri
             </div>
             <div>
               <div style={{ color: '#8b949e', fontSize: '0.72rem', marginBottom: 2 }}>KALKIŞ</div>
-              <div style={{ color: '#e2e8f0', fontWeight: 800, fontSize: '1.2rem' }}>{ilan.origin_city}</div>
+              <div style={{ color: '#e2e8f0', fontWeight: 800, fontSize: '1.2rem' }}>{kalkis}</div>
               {ilan.origin_district && <div style={{ color: '#8b949e', fontSize: '0.85rem' }}>{ilan.origin_district}</div>}
             </div>
           </div>
           {/* Adım 3: Duraklar ol listesi olarak (semantik) */}
           <ol style={{ listStyle: 'none', padding: 0, margin: 0 }} aria-label="Rota durakları">
-          {stops.map((s: any, i: number) => (
-            <li key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: i < stops.length - 1 ? 16 : 0 }} data-ai-label="stop" data-stop-order={s.stop_order} data-city={s.city}>
+          {stops.map((s: any, i: number) => {
+          // ⚠️ `data-city` bir AI/scraper sözleşmesi — il ADI basmaya devam
+          //    ediyor. Buraya id koymak dış tüketiciyi sessizce kırardı.
+          const durakIl = ilAdi(s.province_id) ?? '';
+          return (
+            <li key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: i < stops.length - 1 ? 16 : 0 }} data-ai-label="stop" data-stop-order={s.stop_order} data-city={durakIl}>
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 4 }}>
                 <div style={{ width: 12, height: 12, borderRadius: '50%', background: '#f97316', flexShrink: 0 }} />
                 {i < stops.length - 1 && <div style={{ width: 2, background: '#30363d', flex: 1, minHeight: 24, marginTop: 4 }} />}
@@ -341,7 +351,7 @@ export default async function IlanDetay({ params }: { params: Promise<{ id: stri
                 <div style={{ color: '#8b949e', fontSize: '0.72rem', marginBottom: 2 }}>
                   {stops.length > 1 ? `VARIŞ ${i + 1}` : 'VARIŞ'}
                 </div>
-                <div style={{ color: '#e2e8f0', fontWeight: 800, fontSize: '1.2rem' }} data-ai-label="city">{s.city}</div>
+                <div style={{ color: '#e2e8f0', fontWeight: 800, fontSize: '1.2rem' }} data-ai-label="city">{durakIl}</div>
                 {s.district && <div style={{ color: '#8b949e', fontSize: '0.85rem' }} data-ai-label="district">{s.district}</div>}
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
                   {s.vehicle_count > 1 && <span key="adet" style={chipStyle('#1e3a5f', '#60a5fa')} data-ai-label="vehicle_count">🚛 {s.vehicle_count} araç</span>}
@@ -351,7 +361,8 @@ export default async function IlanDetay({ params }: { params: Promise<{ id: stri
                 {s.notes && <div style={{ color: '#6b7280', fontSize: '0.78rem', marginTop: 6 }}>📝 {s.notes}</div>}
               </div>
             </li>
-          ))}
+          );
+          })}
           </ol>
         </div>
 

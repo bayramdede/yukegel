@@ -60,20 +60,53 @@
 --          3.3.a ve 3.3.b sıfır satır. Karar: `origin_serbest_metin` kolonuna
 --          GEREK YOK; drop veri kaybettirmiyor.
 --
---          🚨 AMA "BUGÜN SIFIR" ≠ "YARIN DA SIFIR". Sayı sıfır çünkü
---          `lib/ilan-yaz.ts` ili çözemezse ilanı RPC'ye HİÇ göndermiyor
---          ("Kalkış ili tanınamadı"). Yani v3'ün `coalesce(provinces.name,
---          ham metin)` bacağı, TS yolundan gelen ilanlar için zaten ölü koddu.
---          Bacağa erişebilen İKİ yol var ve ikisi de `ilanYaz()`'ı ATLIYOR:
---            • app/moderator/actions.ts  (RPC'yi doğrudan çağırıyor)
---            • supabase/functions/parse-listing/index.ts (Edge Function)
---          v3'te bu yollardan çözülemeyen bir il gelirse metin KORUNUYOR.
---          v4'te aynı durum: province_id NULL + metin yok = KALKIŞI OLMAYAN İLAN,
---          sessizce. Ölçüm bugünü temize çıkarıyor, geleceği değil.
---          → BÖLÜM 1'e guard eklendi (aşağıda, ⬅️ GUARD).
+--          🚨 AMA "BUGÜN SIFIR" ≠ "YARIN DA SIFIR". Sayı sıfır çünkü çağıranlar
+--          ili çözemezse ilanı RPC'ye HİÇ göndermiyor ("Kalkış ili tanınamadı").
+--          Yani v3'ün `coalesce(provinces.name, ham metin)` bacağı çoktan ölü
+--          koddu. Koruma UYGULAMA katmanında, DB'de değil.
+--
+--          ❌ BURADA ÖNCE "İKİ KORUMASIZ YOL VAR" YAZIYORDU — YANLIŞTI.
+--             Kod okundu (31 Tem 2026), gerçek şu:
+--               ✅ lib/ilan-yaz.ts:247,271            kontrol VAR
+--               ✅ app/moderator/actions.ts:180,196   kontrol VAR
+--               ❌ supabase/functions/parse-listing/index.ts:836  kontrol YOK
+--             `moderator/actions.ts` `ilanYaz()`'ı atlıyor ama aynı kontrolleri
+--             kendi içinde tekrarlıyor. **"ilanYaz()'ı atlıyor" ≠ "korumasız"**
+--             — ilki çağrı grafiği, ikincisi davranış; grafiğe bakıp davranış
+--             çıkarmak bu hatayı üretti. Korumasız yol BİR TANE: Edge Function
+--             (Deno `lib/lokasyon.ts`'i import edemiyor, `origin_province_id`
+--             bile göndermiyor, tüm çözümlemeyi RPC'ye devretmiş).
+--
+--          v3'te o yoldan çözülemeyen bir il gelse metin KORUNUYORDU. v4'te aynı
+--          çağrı KALKIŞI OLMAYAN ilan üretir, sessizce. Ölçüm bugünü temize
+--          çıkarıyor, geleceği değil. → BÖLÜM 1'e guard eklendi (⬅️ GUARD).
+--
+--          ⚠️ 3.1 BİR HÜCREYİ ÖLÇMEDİ: `pid IS NULL AND metin IS NULL`.
+--             Guard onu da reddeder. Ön ölçüm `20260731_ilan_olustur_v4.sql`
+--             ADIM 0.1'de; v4 ondan önce çalıştırılmaz.
 --
 -- [ ] 0.6  BÖLÜM 1 (ilan_olustur v4) canlıda ve doğrulandı.
+--          📄 Çalıştırılabilir hâli AYRI DOSYADA: `docs/20260731_ilan_olustur_v4.sql`
+--             (31 Tem 2026, #26). Sebep: v4 drop'u beklemez, drop'tan günler
+--             önce ve BÖLÜM 2 koduyla aynı release'te çıkar. Aşağıdaki BÖLÜM 1
+--             gövdesi referans olarak duruyor; **çalıştırılacak olan o dosya**.
+--             İkisi ayrışmasın: değişiklik önce v4 dosyasına, sonra buraya.
 -- [ ] 0.7  BÖLÜM 2 (kod temizliği) deploy edildi ve duman testi geçti.
+--
+-- [ ] 0.8  🚨 FONKSİYON GÖVDESİ TARAMASI — **DROP'TAN ÖNCE** çalıştırıldı ve
+--          kalan her eşleşme GÖZLE sınıflandırıldı.
+--          Sorgu BÖLÜM 6.2'nin AYNISI; fark yalnızca ZAMANLAMA.
+--
+--          NEDEN AYRI BİR ÖN KOŞUL: 6.2 aynı taramayı drop'tan SONRA yapıyor.
+--          Bir eşleşme bulursa artık "uyarı" değil, canlıda kırık fonksiyon
+--          raporudur. 3 Ağu 2026'da bu tarama statik olarak (grep ile, 5 dakika)
+--          yapıldı ve `get_nearby_listings_by_province` içinde ölü bir
+--          `listing_stops.city` referansı çıktı — bkz. BÖLÜM 2 / KOVA E.
+--          O bulgu, taramanın drop'tan önce de gerektiğinin kanıtı.
+--
+--          ⚠️ False positive'ler beklenir (`->>'city'`, `provinces.name as city`,
+--             `returns table(... origin_city text ...)`). Sınıflandırma regex'i
+--             YAZILMAZ — 31 Tem'de tam olarak o hata yapılmıştı.
 
 
 -- ============================================================================
@@ -147,15 +180,15 @@ begin
 
   -- ⬅️ GUARD (31 Tem 2026 — ölçümün ORTAYA ÇIKARDIĞI eksik).
   --
-  -- 🚨 Ölçüm sıfır çıktı diye guard'sız bırakma. Sıfır olmasının sebebi verinin
-  --    doğası değil, `lib/ilan-yaz.ts`'in ili çözemediğinde ilanı RPC'ye HİÇ
-  --    göndermemesi ("Kalkış ili tanınamadı"). Yani koruma TS katmanında, DB'de
-  --    değil. RPC'yi `ilanYaz()`'ı atlayarak çağıran İKİ yol var:
-  --      • app/moderator/actions.ts
-  --      • supabase/functions/parse-listing/index.ts
-  --    v3'te bu yollardan çözülemeyen bir il gelse metin kolona yazılıp
-  --    korunuyordu. v4'te aynı çağrı KALKIŞI OLMAYAN bir ilan üretir — ne id,
-  --    ne metin — ve hata vermez. Sessiz bozulma, gürültülü bozulmadan pahalıdır.
+  -- 🚨 Ölçüm sıfır çıktı diye guard'sız bırakma. Sıfırın sebebi verinin doğası
+  --    değil, çağıranların kendi kontrolü. Koruma UYGULAMA katmanında, DB'de
+  --    değil — ve üç çağırandan BİRİ o kontrolü yapmıyor:
+  --      ✅ lib/ilan-yaz.ts:247,271
+  --      ✅ app/moderator/actions.ts:180,196  (ilanYaz()'ı atlar ama kontrolü var)
+  --      ❌ supabase/functions/parse-listing/index.ts:836  — KORUMASIZ
+  --    v3'te o yoldan çözülemeyen bir il gelse metin kolona yazılıp korunuyordu.
+  --    v4'te aynı çağrı KALKIŞI OLMAYAN bir ilan üretir — ne id, ne metin — ve
+  --    hata vermez. Sessiz bozulma, gürültülü bozulmadan pahalıdır.
   --
   -- ⚠️ `22023` (invalid_parameter_value) bilinçli: `lib/ilan-yaz.ts` ve çağıranlar
   --    zaten `PGRST202`/`23514` gibi kodları ayırt ediyor; yeni bir sınıf değil,
@@ -302,7 +335,20 @@ commit;
 -- ============================================================================
 --
 -- 31 Tem 2026 taraması: `origin_city` repoda 30 dosyada 97 kez geçiyor. Hepsi
--- kolon referansı DEĞİL. Üç kovaya ayrılır:
+-- kolon referansı DEĞİL. Dört kovaya ayrılır (aşağıdaki düzeltmeye bak):
+--
+-- 🚨 3 AĞU 2026 DÜZELTMESİ — KOVA SAYISI ÜÇ DEĞİL, DÖRT.
+--    Aşağıdaki ilk tasnif `origin_city`'yi geçtiği yere göre ayırmıştı:
+--    "predikat / gösterim / prompt". Ama **gösterim ile yazma aynı kovaya
+--    düşmüştü**: `app/panel/actions.ts:135` ve `app/moderator/page.tsx:580`
+--    KOVA B'de "SELECT listesi + gösterim" başlığı altında duruyor — oysa
+--    ikisi de `listings.update({ origin_city: ... })` ÇAĞIRIYOR.
+--
+--    Fark önemsiz değil: KOVA B'nin bir maddesini atlarsan bir ekran boş şehir
+--    gösterir. KOVA D'nin bir maddesini atlarsan **panelde ilan düzenleyen her
+--    kullanıcı 42703 yer** — ve BÖLÜM 1'in guard'ı bunu GÖRMEZ, çünkü guard
+--    `ilan_olustur` içinde; bu yollar RPC'yi hiç çağırmıyor.
+--    → yeni kova aşağıda: KOVA D.
 --
 -- ── KOVA A — DB PREDİKATI (drop kırar, MUTLAKA dönüştürülür) ────────────────
 --   app/api/admin/learn-aliases/route.ts:89   .is('origin_city', null)
@@ -319,24 +365,121 @@ commit;
 --         çözülememiş" — anlam birebir korunuyor.
 --
 -- ── KOVA B — SELECT LİSTESİ + GÖSTERİM (drop 42703 verir, dönüştürülür) ─────
---   Her biri `origin_city` yerine `provinces!origin_province_id(name)` join'i
---   veya `lib/lokasyon.ts` yardımcısı kullanacak.
+--
+--   ✅ 3 AĞU 2026 — KOVA B TAMAMLANDI (Görev #35). Aşağıdaki dosya listesinin
+--      tamamı `ilAdi(province_id)` kalıbına çevrildi, `tsc --noEmit` temiz,
+--      `test:lokasyon` + `test:parser` (29/29) geçiyor. İki istisna, ikisi de
+--      BİLEREK:
+--        · `app/yol-rehberi/YolRehberiClient.tsx:64,723` — DOKUNULMADI.
+--          Oradaki `origin_city` tablo kolonu değil, RPC'nin ÇIKIŞ kolonu ve
+--          kaynağı `provinces.name`. Drop'tan etkilenmiyor; değiştirmek
+--          çalışan bir sözleşmeyi kırardı. (Bkz. KOVA E dosyası.)
+--        · `app/u/[username]/IlanListesi.tsx:23,29` — DOKUNULMADI, ÖLÜ DOSYA.
+--          Canlı profil listesi `app/u/[username]/page.tsx` içinde ve zaten
+--          çevrilmişti (:103, :107). Ölü kodu çevirmek onu canlı gösterir.
+--      Ayrıca iki ÖLÜ SELECT ALANI çevrilmek yerine SİLİNDİ — aynı gerekçe:
+--        · `app/api/admin/crm/[id]/analiz/route.ts:83` (LLM prompt'una hiç
+--          girmiyordu) · `app/api/admin/learn-aliases/route.ts:88` (tüketici
+--          basmıyor, predikat gereği zaten hep NULL).
+
+--
+--   ✅ ÇÖZÜM JOIN DEĞİL — `lib/lokasyon.ts:83` `ilAdi(id)`.
+--      İlk plan "`provinces!origin_province_id(name)` gömülü sorgusu" diyordu.
+--      Gereksiz: 81 satırlık il tablosu zaten `lib/constants/locations.json`
+--      içinde (25 KB) ve `ilAdi()` id→ad haritasını bellekte tutuyor. Üstelik
+--      `app/moderator/page.tsx` gibi İSTEMCİ bileşenleri bu modülü BUGÜN
+--      import ediyor — yeni paket ağırlığı yok.
+--
+--      Join tercih edilseydi bedeli: her liste sorgusuna bir gömülü ilişki,
+--      PostgREST'te ek `provinces` okuması, ve dönen JSON'da `origin_city`
+--      (metin) yerine `provinces:{name}` (nesne) — yani tüm tüketicilerin
+--      yine de değişmesi. Aynı işi yapıp daha pahalıya mal oluyordu.
+--
+--      Dönüşüm kalıbı, her satır için:
+--        SELECT'te   `origin_city`      → `origin_province_id`
+--        gösterimde  `ilan.origin_city` → `ilAdi(ilan.origin_province_id)`
+--        duraklarda  `s.city`           → `ilAdi(s.province_id)`
+--      Tel üzerinden giden veri de küçülür (smallint ⟵ text).
+--
+--   ⚠️ `ilAdi()` `null` dönebilir (id NULL ise). Gösterimde `?? '—'` şart;
+--      `origin_city` metni boşsa bugün de aynı boşluk görünüyordu, davranış
+--      değişmiyor — ama `undefined` basmamak için açıkça yazılır.
+--
 --   lib/ilan-liste.ts:46,78
---   app/panel/page.tsx:34            · app/panel/PanelClient.tsx:242,365,394,483
---   app/panel/IlanYonetim.tsx:131,208,256,279
---   app/panel/actions.ts:42,96,135
---   app/ilan/[id]/page.tsx:21,47,61,119,203,206,261,328
---   app/ilan/[id]/sahiplen/page.tsx:15,57,210
---   app/u/[username]/page.tsx:82,102 · app/u/[username]/IlanListesi.tsx:23
---   app/moderator/page.tsx:49,243,297,508,543,545,580,635,647,688,1024,1045,1150
---   app/moderator/actions.ts:135,179,229,302
+--   app/panel/page.tsx:34,37        · app/panel/PanelClient.tsx:258,259,381,410,499
+--   app/panel/IlanYonetim.tsx:131,137,208,212,248,267,328
+--   app/ilan/[id]/page.tsx:21,24,41,47,61,119,125,203,206,207,259,261,328,344
+--   app/ilan/[id]/sahiplen/page.tsx:15,19,57,59,210,216
+--   app/u/[username]/page.tsx:82,86,102,106 · app/u/[username]/IlanListesi.tsx:23,29
+--   app/moderator/page.tsx:49,243,247,297,301,302,508,516,647,1092,1150,1156
 --   app/yol-rehberi/YolRehberiClient.tsx:64,723
 --   app/admin/radar/RadarClient.tsx:37,866 · app/api/admin/radar/route.ts:125
 --   app/admin/crm/CrmClient.tsx:38,495 · app/api/admin/crm/[id]/route.ts
 --   app/api/admin/crm/[id]/analiz/route.ts:83
 --   app/api/ilanlar/[id]/route.ts:26,77,106   ⚠️ PUBLIC API — yanıt sözleşmesi.
---       `rota.kalkis.sehir` alan adı KORUNUR, kaynağı provinces.name olur.
+--       `rota.kalkis.sehir` alan adı KORUNUR, kaynağı `ilAdi(province_id)` olur.
+--       Dış tüketici için hiçbir şey değişmez — değişirse sözleşme kırılır.
 --   app/admin/ogrenme-merkezi/OgrenmeMerkeziClient.tsx:31,576
+--
+-- ── KOVA D — RPC'Yİ ATLAYAN DOĞRUDAN YAZMALAR (3 Ağu 2026'da eklendi) ───────
+--
+--   Bunlar `ilan_olustur`'u ÇAĞIRMAZ; `listings` / `listing_stops` üzerine
+--   doğrudan `update`/`insert` atar. Dolayısıyla BÖLÜM 1'in guard'ı bu yolları
+--   KORUMAZ ve BÖLÜM 5 drop'u bunları 42703 ile kırar.
+--
+--   ✅ app/moderator/page.tsx:580   listings.update({ origin_city: … })   → SİLİNDİ
+--   ✅ app/moderator/page.tsx:606   listing_stops.update/insert({ city: }) → SİLİNDİ
+--   ⚰️ app/panel/actions.ts:135     listings.update({ origin_city: … })   → ULAŞILAMAZ
+--   ⚰️ app/panel/actions.ts:167     listing_stops.insert({ city: … })     → ULAŞILAMAZ
+--
+--   Dönüşüm: `origin_city` / `city` anahtarını patch nesnesinden SİL. `*_id`
+--   zaten yan yana yazılıyor (çift yazım) — tek yapılacak metin anahtarını
+--   düşürmek. Moderatörde `:606`'daki `konum` nesnesi hem UPDATE hem INSERT
+--   dalında kullanıldığı için tek satırlık silme iki yolu birden kapattı.
+--
+--
+--   🚨🚨 3 AĞU 2026 — BU KOVANIN "ASIL MESELE"Sİ YANLIŞTI. DÖRT DEĞİL, İKİ YOL.
+--
+--   Bu blok ilk yazıldığında `app/panel/actions.ts`'i kovanın en tehlikeli
+--   maddesi ilan ediyor ve buradan bir KARAR türetiyordu ("reddet mi, NULL mü").
+--   O karar YOK HÜKMÜNDE: **`ilanGuncelle` ULAŞILAMAZ KOD.**
+--
+--     app/panel/actions.ts::ilanGuncelle
+--       ← tek import eden: app/panel/IlanYonetim.tsx
+--           ← IlanYonetim.tsx'i import eden: HİÇ KİMSE
+--     Panelin canlı düzenleme yolu `/api/ilan/duzelt`; o uç nokta yalnız
+--     `notes, vehicle_type, body_type, moderation_status, status,
+--      is_shadow_banned, audit_score, internal_audit_logs, reviewed_at`
+--     yazıyor — TEK BİR konum alanı bile yok. Kullanıcı panelden ilanının
+--     ilini bugün zaten DEĞİŞTİREMİYOR.
+--
+--   Yani "drop'tan sonra kalkış bilgisi büsbütün kaybolur" senaryosunun
+--   tetiklenebileceği bir kullanıcı akışı YOK. Kalan tek canlı doğrudan yazma
+--   yolu moderatör paneliydi ve o zaten `:543-548` / `:558-564`'te çözülemeyen
+--   ili REDDEDİYOR (`alert('Kalkış ili tanınamadı…')`), üstelik il girdileri
+--   serbest metin değil `<select>`. Yani sorulacak bir soru da kalmıyor:
+--   KOVA D salt mekanik anahtar silmeye indi ve 3 Ağu'da tamamlandı.
+--
+--   ── NEDEN YANLIŞ TASNİF ETTİM (asıl ders) ──────────────────────────────
+--   Envanteri çıkarırken sorduğum soru şuydu: "bu dosya kolona YAZIYOR MU?"
+--   Sorulmayan soru: "bu dosya ÇALIŞIYOR MU?" Erişilebilirlik hiç kontrol
+--   edilmedi — `grep` bir çağrı grafiği değildir, yalnızca bir metin eşleşmesi.
+--   Sonuç: ölü bir dosya, runbook'un en kritik maddesi ve bir "ürün kararı"
+--   olarak üç ayrı belgeye yazıldı.
+--
+--   Bu KOVA E ile aynı kökten: orada kapsam DİLE göre (yalnız .ts/.tsx),
+--   burada ULAŞILABİLİRLİĞE göre daralmıştı. İkisi de "envanter tamam"
+--   dedirtip yanlış tarafta bıraktı.
+--
+--   → KURAL: bir yazma yolunu kovaya koymadan önce importer zincirini sonuna
+--     kadar sür. Zincir bir yerde kopuyorsa madde "dönüştürülecek" değil,
+--     "ölü — silinecek" kovasına gider.
+--
+--   ⚠️ `app/panel/actions.ts` ve `app/panel/IlanYonetim.tsx` ÖLÜ DOSYA olarak
+--     duruyor (silme kararı Bayram'da). IlanYonetim 3 Ağu'da yine de KOVA B
+--     kalıbına çevrildi — o an ölü olduğu bilinmiyordu; zararsız ama gereksiz.
+--     `app/u/[username]/IlanListesi.tsx` de aynı durumda ve ÇEVRİLMEDİ:
+--     tespit ondan sonra yapıldığı için başına ölü-dosya başlığı yazıldı.
 --
 -- ── KOVA C — LLM JSON ANAHTARI / DOKÜMANTASYON (DOKUNULMAZ) ─────────────────
 --   Bunlar kolon değil; prompt sözleşmesi ve RPC girdi anahtarı. Değiştirmek
@@ -345,8 +488,16 @@ commit;
 --   app/api/parse-text/route.ts:40,125,141,143,154,203
 --   app/api/llm-parse/route.ts:26
 --   app/ilan-ver/page.tsx:246 · app/ilan-ver/MetindenIlan.tsx:6
---   lib/ilan-yaz.ts:330,381,433 (RPC girdisi)
+--   lib/ilan-yaz.ts:361,412,464 (RPC girdisi)
+--   app/moderator/actions.ts:135,179,195,229 (tip + guard + RPC girdisi), 302 (log alanı)
 --   supabase/functions/parse-listing/index.ts:815,818,824,839 (RPC girdisi)
+--
+--   ⚠️ `origin_city` RPC GİRDİSİ OLARAK KALIR. v4 kolona yazmayı bırakıyor ama
+--      `p_listing->>'origin_city'`'yi HÂLÂ OKUYOR — `origin_province_id`
+--      gelmediğinde `il_key()` ile çözümlemek için. Tek çağıranı bu yedeğe
+--      gerçekten muhtaç: `parse-listing` (Deno `lib/lokasyon.ts`'i import
+--      edemiyor, yalnız metin gönderiyor). Bu anahtarı payload'dan silmek
+--      WhatsApp kanalını tamamen kapatır.
 --   lib/lokasyon.ts:3,7,164 · app/_components/HomeClient.tsx:607,743
 --     app/api/listings/ara/route.ts:11,13,22 (yorum satırları)
 --
@@ -358,6 +509,53 @@ commit;
 --    "kimse okumuyor" değil, **kolon hiç yok** (31 Tem 2026, 42703).
 --    `.ts`/`.tsx` içinde sıfır eşleşme olması zaten bunun beklenen sonucuydu;
 --    o gözlem "ölü kolon" olarak yorumlanmıştı, oysa yokluğun kanıtıydı.
+--
+-- ── KOVA E — SQL FONKSİYONLARINDA KALAN METİN REFERANSI (3 Ağu 2026'da bulundu)
+--
+--   🚨 BU KOVA BAŞTA HİÇ YOKTU, ÇÜNKÜ BÖLÜM 2 "KOD" DEYİNCE `.ts`/`.tsx`
+--      ANLAŞILMIŞTI. Oysa metin kolonunu okuyan ikinci bir kod tabanı var:
+--      Postgres fonksiyonlarının gövdeleri. BÖLÜM 1 bunlardan yalnız BİRİNİ
+--      (`ilan_olustur`) ele alıyor — çünkü o, YAZAN taraftı ve göze batıyordu.
+--      OKUYAN fonksiyonlar için hiçbir kova açılmamıştı.
+--
+--   BULUNAN (statik grep, 3 Ağu 2026):
+--     docs/20260730_dalga3_radar_province_id.sql:586
+--       → `public.get_nearby_listings_by_province` içindeki `son_durak` CTE'si:
+--           select distinct on (listing_id)
+--             listing_id, province_id, city, district      ← `city` ÖLÜ
+--           from public.listing_stops
+--         `sd.city` fonksiyonun HİÇBİR YERİNDE okunmuyor; `dest_city` zaten
+--         `pd.name`'den (provinces join'i) geliyor. Dalga 3 fonksiyonu
+--         province_id'ye çevirirken RETURN ifadesini düzeltmiş ama CTE'nin
+--         select listesini temizlemeyi atlamış — sonuç bugün DOĞRU, ama kolona
+--         bir bağımlılık bırakıyor.
+--
+--   ETKİ: BÖLÜM 5 kolonu düşürdüğü an bu fonksiyon 42703 atar. Çağıranı
+--   `app/api/listings/yakin/route.ts:44`, onun da tüketicisi `/yol-rehberi`
+--   "yakınımdaki yükler" sekmesi. Yani drop, GPS'e dayalı tüm keşif akışını
+--   sessizce öldürür — TS tarafında tek satır `origin_city` geçmediği için
+--   BÖLÜM 2'nin `.ts` taramaları bunu ASLA göstermez.
+--
+--   DÜZELTME: CTE'den `city`'yi çıkar, fonksiyonu yeniden yarat. Davranış
+--   değişmiyor (kullanılmayan bir kolonu select'ten çıkarmak), bu yüzden
+--   BÖLÜM 5'ten önce TEK BAŞINA güvenle çıkar — v4 ile aynı release'i beklemez.
+--
+--   ⚠️ ASIL DERS, BU TEK SATIRDAN DAHA ÖNEMLİ:
+--      BÖLÜM 6.2 zaten "kırık fonksiyon kaldı mı" taraması içeriyor ve bu satırı
+--      YAKALARDI. Ama 6.2 **DROP'TAN SONRA** çalışıyor. Yani tasarım gereği bu
+--      hatayı ancak canlıda 42703 aldıktan sonra öğrenirdik. Aynı sorgu
+--      DROP'TAN ÖNCE de çalıştırılabilirdi ve çalıştırılmalıydı:
+--
+--        select p.proname, trim(satir)
+--          from pg_proc p
+--          join pg_namespace n on n.oid = p.pronamespace
+--          cross join lateral unnest(string_to_array(pg_get_functiondef(p.oid), E'\n')) as satir
+--         where n.nspname='public' and p.prokind in ('f','p')
+--           and satir ~* '(origin_city|destination_city|\mcity\M)'
+--         order by 1, 2;
+--
+--      → BÖLÜM 0'a ön koşul olarak eklendi (0.8). "Doğrulama" adımını drop'un
+--        SONRASINA koymak, onu doğrulama değil OTOPSİ yapar.
 
 
 -- ============================================================================

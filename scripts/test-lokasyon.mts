@@ -7,7 +7,7 @@
 // var; `locations.json` ya da `ILLER` her değiştiğinde çalıştır.
 
 import { ILLER } from '../lib/ilan-sabitler';
-import { ILLER_TAM, ilId, ilAdi, ilceler, ilceNormalize, ilAra, ilceAra, ilCiftYazim, ilceResmiMi } from '../lib/lokasyon';
+import { ILLER_TAM, IL_ADLARI, IL_ADLARI_ALFABETIK, ilId, ilAdi, ilceler, ilceNormalize, ilAra, ilceAra, ilCiftYazim, ilceResmiMi } from '../lib/lokasyon';
 
 let hata = 0;
 const ok = (ad: string, kosul: boolean) => { if (!kosul) { console.log('❌', ad); hata++; } else console.log('✓', ad); };
@@ -21,6 +21,25 @@ ok('plate sıfır dolgulu ve id ile tutarlı',
 ok('973 ilçe', ILLER_TAM.reduce((a, p) => a + p.districts.length, 0) === 973);
 ok('il içi ilçe kopyası yok',
   ILLER_TAM.every(p => new Set(p.districts).size === p.districts.length));
+
+// 1.b IL_ADLARI / IL_ADLARI_ALFABETIK — dropdown'ların TEK kaynağı (Görev #36)
+//
+// 🚨 Bu üç kontrol, repoda dört yerde ELLE kopyalanmış 81 elemanlı listelerin
+//    yerini alan türetilmiş dizileri koruyor. Kritik olan ilki: moderatör il
+//    filtresi `ilAdi(id) === seçilenAd` diye TAM EŞİTLİK karşılaştırıyor, yani
+//    dropdown ile `ilAdi()` aynı metni üretmek ZORUNDA. Aşağıdaki eşitlik
+//    bozulursa filtre patlamaz — sessizce boş sonuç döndürür.
+ok('IL_ADLARI ILLER ile birebir aynı sırada',
+  IL_ADLARI.length === 81 && IL_ADLARI.every((ad, i) => ad === ILLER[i]));
+ok('IL_ADLARI_ALFABETIK aynı kümenin permütasyonu',
+  IL_ADLARI_ALFABETIK.length === 81 &&
+  new Set(IL_ADLARI_ALFABETIK).size === 81 &&
+  IL_ADLARI_ALFABETIK.every(ad => IL_ADLARI.includes(ad)));
+// `Intl.Collator('tr')` şart: varsayılan sıralama Ş/İ/Ğ'yi yanlış yere koyar.
+// Eski elle yazılmış RadarClient listesi tam bu hatayı taşıyordu.
+ok('IL_ADLARI_ALFABETIK Türkçe kurallı sıralı',
+  IL_ADLARI_ALFABETIK.every((ad, i) =>
+    i === 0 || new Intl.Collator('tr').compare(IL_ADLARI_ALFABETIK[i - 1], ad) < 0));
 
 // 2. ilId
 ok('ilId ad', ilId('İstanbul') === 34 && ilId('istanbul') === 34 && ilId('ISTANBUL') === 34);

@@ -258,7 +258,13 @@ ORDER BY k.norm_alias, a.alias;
 -- Alias düzeltilse bile GEÇMİŞTE kaydedilmiş ilanlar bozuk kalır. Önce ölç:
 -- SELECT origin_city, count(*) FROM public.listings
 -- WHERE origin_city IN ('Istanbul','İstanbul') GROUP BY 1;
--- (aynısını destination_city için de çalıştır)
+-- 🚫 ESKİ HÂLİ: "(aynısını destination_city için de çalıştır)" — ÇALIŞTIRMA.
+--    `listings.destination_city` diye bir kolon YOK (31 Tem 2026, #28 — 42703
+--    `column "destination_city" does not exist`). "Ölü kolon" değil, hiç yok.
+--    ✅ Varış tarafının doğru karşılığı `public.listing_stops.city`; ilan başına
+--    ÇOK satır olduğu için sorgu da farklı yazılır:
+--      SELECT city, count(*) FROM public.listing_stops
+--      WHERE city IN ('Istanbul','İstanbul') GROUP BY 1;
 -- Sayı anlamlıysa UPDATE ile 'İstanbul'a çevrilmeli. ⚠️ ÖNCE ölç, sonra karar ver.
 
 -- =============================================================================

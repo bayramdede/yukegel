@@ -36,6 +36,41 @@ export const ILLER_TAM: readonly Il[] = locationsJson as readonly Il[];
 /** 81 il, plaka sırasında. Dropdown'lar bunu doğrudan map'leyebilir. */
 export const IL_SAYISI = ILLER_TAM.length;
 
+/**
+ * 81 il ADI, plaka sırasında (`index + 1 = province_id`).
+ *
+ * 🚨 3 AĞU 2026 (Görev #36) — BU DİZİ NEDEN VAR: aynı 81 elemanlı liste repoda
+ * DÖRT YERDE daha elle kopyalanmıştı (`moderator/page.tsx`, `poi-onay`,
+ * `u/[username]/page.tsx`, `radar/RadarClient.tsx`). Hiçbiri test edilmiyordu;
+ * `lib/ilan-sabitler.ts::ILLER` ↔ `locations.json` sözleşmesini `test:lokasyon`
+ * korurken bu dördü sessizce ayrışabilirdi.
+ *
+ * ⚠️ ASIL RİSK KOZMETİK DEĞİL: dropdown ile ekrana basılan ad AYNI KAYNAKTAN
+ *    gelmek ZORUNDA. `moderator/page.tsx`'teki il filtresi Dalga 5'ten sonra
+ *    `ilAdi(id) === filtreKalkis` diye TAM EŞİTLİK karşılaştırıyor — `ilAdi()`
+ *    buradaki `ILLER_TAM`'dan okuyor. Dropdown ayrı bir kopyadan beslenirse
+ *    tek harflik bir sapma (bir "Hakkari"/"Hakkâri") filtreyi SESSİZCE hiçbir
+ *    şey döndürmez hale getirir. Türetmek bu sınıf hatayı imkânsız kılıyor.
+ *
+ * `lib/ilan-sabitler.ts::ILLER` ile birebir aynıdır — o dosya `ilKey`'i buraya
+ * verdiği için ters yönde import EDEMEZ (döngü); iki dizinin eşitliğini
+ * `scripts/test-lokasyon.mts` ("id = index+1 ve ad ILLER ile birebir") tutuyor.
+ */
+export const IL_ADLARI: readonly string[] = ILLER_TAM.map(il => il.name);
+
+/**
+ * Aynı 81 ad, TÜRKÇE alfabetik. Yalnız gösterim sırası için — değer yine il adı.
+ *
+ * ⚠️ `Intl.Collator('tr')` şart: varsayılan sıralama `Ş`/`İ`/`Ğ` harflerini
+ *    yanlış yere koyar. `radar/RadarClient.tsx`'teki elle yazılmış eski liste
+ *    tam olarak bu hataya sahipti — `Şanlıurfa` Siirt'ten ÖNCE, `Kilis`
+ *    `Kırıkkale`'den önce geliyordu. Buraya geçiş o sırayı DÜZELTİR (dokuz
+ *    satır yer değiştirir); seçilen DEĞER değişmediği için filtre davranışı
+ *    aynı kalır, yalnız liste doğru Türkçe sırada görünür.
+ */
+export const IL_ADLARI_ALFABETIK: readonly string[] =
+  [...IL_ADLARI].sort(new Intl.Collator('tr').compare);
+
 const ID_INDEKS: ReadonlyMap<number, Il> = new Map(ILLER_TAM.map(il => [il.id, il]));
 const AD_INDEKS: ReadonlyMap<string, Il> = new Map(ILLER_TAM.map(il => [ilKey(il.name), il]));
 

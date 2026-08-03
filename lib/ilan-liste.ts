@@ -19,6 +19,8 @@
  */
 
 /** Ana sayfada tek seferde çekilen azami ilan sayısı. SSR ve istemci AYNI değeri kullanır. */
+import { ilAdi } from '@/lib/lokasyon';
+
 export const ILAN_LIMITI = 200;
 
 /**
@@ -37,17 +39,26 @@ export const ILAN_LIMITI = 200;
  *    key'li istemci sorgusunda hem de ISR çıktısında (tüm ziyaretçilerle
  *    paylaşılan HTML) kullanılıyor. Telefon yalnızca /api/ilan/[id]/telefon.
  *
- * ⚠️ DALGA 3 — `origin_province_id` ve `listing_stops.province_id` metin
- *    kolonlarının YANINDA çekiliyor, yerine değil. Metin kolonları hâlâ ekrana
- *    basılan değer; id'ler filtre/karşılaştırma değeri. Dalga 5'te metin
- *    kolonları düşünce buradan da silinecekler.
+ * ✅ DALGA 5 (3 Ağu 2026) — metin kolonları bu select'ten ÇIKARILDI.
+ *    Dalga 3'te `origin_province_id` / `listing_stops.province_id` metnin
+ *    YANINA eklenmişti (id filtre için, metin gösterim için). Artık gösterim de
+ *    id'den türüyor: `ilAdi(id)`. 81 il `lib/constants/locations.json`'da (25 KB)
+ *    ve `lib/lokasyon.ts` haritayı bellekte tutuyor — `provinces` join'ine gerek
+ *    yok, tel üzerindeki veri de küçülüyor (smallint ⟵ text).
+ *
+ * 🚨 BU SELECT METİN KOLONLARINDAN ÖNCE TEMİZLENDİ, BU BİLEREK.
+ *    Sıra "önce okuyanlar, sonra yazanlar": `province_id` bugün %100 dolu
+ *    (31 Tem 2026 ölçümü: `listings`te 0 NULL, `listing_stops`ta 0), yani bu
+ *    değişiklik TEK BAŞINA güvenle canlıya çıkar. Ters sırada — önce v4 metne
+ *    yazmayı bıraksa — yeni ilanlar okuma yolları dönene kadar boş şehir
+ *    gösterirdi. Okuyucu önce dönerse böyle bir ara pencere hiç oluşmaz.
  */
 export const ILAN_SELECT = `
-  id, listing_type, origin_city, origin_province_id, origin_district,
+  id, listing_type, origin_province_id, origin_district,
   price_offer, source, created_at,
   trust_level, user_id, vehicle_type, body_type,
   available_date, date_flexible,
-  listing_stops ( listing_id, stop_order, city, province_id, district, vehicle_count, cargo_type, weight_ton, pallet_count )
+  listing_stops ( listing_id, stop_order, province_id, district, vehicle_count, cargo_type, weight_ton, pallet_count )
 `;
 
 export type RozetBilgi = { phone_verified: boolean; created_at: string };
@@ -75,12 +86,15 @@ export function ilanNormalize(ilan: any, rozet?: RozetBilgi | null) {
   return {
     id: ilan.id,
     tip: ilan.listing_type,
-    kalkis: ilan.origin_city,
+    // Dalga 5: gösterim de id'den türüyor. `?? ''` — id NULL ise (yalnız
+    // düzeltilmemiş eski satırlarda mümkün) kart boş şehir gösterir; `undefined`
+    // basıp React'te sessizce kaybolmasındansa boş dize daha dürüst.
+    kalkis: ilAdi(ilan.origin_province_id) ?? '',
     // Dalga 3: filtre bu alanı kullanır, `kalkis` yalnız gösterim.
     kalkis_il_id: (ilan.origin_province_id ?? null) as number | null,
     kalkis_ilce: ilan.origin_district || '',
     duraklar: stops.map((s: any) => ({
-      sehir: s.city,
+      sehir: ilAdi(s.province_id) ?? '',
       il_id: (s.province_id ?? null) as number | null,
       ilce: s.district || '',
       ton: s.weight_ton,

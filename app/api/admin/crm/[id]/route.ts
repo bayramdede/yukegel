@@ -20,7 +20,9 @@ export async function GET(
   const [profileRes, listingsRes] = await Promise.all([
     svc.from('shadow_profiles').select('*').eq('id', id).maybeSingle(),
     svc.from('listings')
-      .select('id, origin_city, listing_type, moderation_status, status, created_at, notes, vehicle_type, raw_text')
+      // Dalga 5: metin kolonu düştü. Tüketici `app/admin/crm/CrmClient.tsx`
+      // (arayüz :38, gösterim :495) aynı anda çevrildi.
+      .select('id, origin_province_id, listing_type, moderation_status, status, created_at, notes, vehicle_type, raw_text')
       .eq('shadow_profile_id', id)
       .order('created_at', { ascending: false })
       .limit(200),

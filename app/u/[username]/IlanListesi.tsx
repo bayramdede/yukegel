@@ -1,5 +1,19 @@
 'use client';
 
+// ⚠️ ÖLÜ DOSYA — 3 Ağu 2026 tespiti. HİÇBİR YERDEN import EDİLMİYOR.
+//    Canlı profil listesi `app/u/[username]/page.tsx` içinde, o dosyanın kendi
+//    `PublicIlanListesi` bileşeninde çiziliyor ve o zaten `ilAdi(province_id)`
+//    kullanıyor (bkz. :103, :107).
+//
+//    Bu yüzden aşağıdaki `ilan.origin_city` / `s.city` okumaları Dalga 5'te
+//    `ilAdi()`'ye ÇEVRİLMEDİ. Ölü kodu çevirmek onu canlıymış gibi gösterir —
+//    aynı gerekçeyle `analiz/route.ts` ve `learn-aliases`'taki ölü select
+//    alanları da çevrilmek yerine silinmişti.
+//
+//    Bunlar prop okuması, sorgu değil; kolon düştüğünde 42703 atamazlar,
+//    yalnızca `undefined` basarlar — ama bu kod zaten hiç çalışmıyor.
+//    Doğru çözüm dosyayı silmek; silme kararı Bayram'a bırakıldı
+//    (bkz. `docs/YAPILACAKLAR.md` — ölü dosya temizliği).
 export default function IlanListesi({ ilanlar }: { ilanlar: any[] }) {
   return (
     <div style={{ display: 'grid', gap: 10 }}>

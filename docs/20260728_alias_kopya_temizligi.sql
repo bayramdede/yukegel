@@ -255,8 +255,16 @@ GROUP BY 2 HAVING count(DISTINCT district) > 1;
 -- 🚨🚨 BU BÖLÜM YANLIŞ TABLOYU ONARIYOR (29 Tem 2026, W5'te tespit edildi).
 --
 -- İki hata:
---   1) `listings.destination_city` ÖLÜ KOLON. Uygulama kodunda tek bir yazma
---      veya okuma yok. Varış verisi `public.listing_stops` satırlarında:
+--   1) `listings.destination_city` diye bir kolon **YOKTUR**.
+--      🚨🚨 DÜZELTME (31 Tem 2026, #28): buraya önce "ÖLÜ KOLON" yazılmıştı.
+--      Yanlıştı — kolon ölü değil, HİÇ YOK. Ölçüm denendiğinde Postgres
+--      `ERROR: 42703: column "destination_city" does not exist` döndü;
+--      `information_schema.columns` teyit etti. Yani aşağıdaki blok
+--      "gereksiz iş yapıyor" değil, **ilk UPDATE'te patlıyor**.
+--      ⚠️ Bu ayrım önemli: "ölü kolon" denince akla "sonra düşürürüz" gelir ve
+--      madde Dalga 5 drop listesine yazılır — nitekim yazıldı, oradan da
+--      42703 verecekti. "Kolon yok" denince madde tamamen DÜŞER.
+--      Varış verisi `public.listing_stops` satırlarında:
 --      yazan  supabase/functions/parse-listing/index.ts:825
 --      okuyan app/_components/HomeClient.tsx:696 (ana sayfa varış filtresi)
 --      Yani bu bölüm kullanıcıya GÖRÜNEN kolonu (`listing_stops.city`) hiç
@@ -273,11 +281,13 @@ GROUP BY 2 HAVING count(DISTINCT district) > 1;
 --    HAVING count(DISTINCT …) = 1 ile elle bırakılıyor).
 --
 -- Aşağıdaki blok yalnızca TARİHSEL KAYIT olarak bırakıldı — tamamı yorumda.
+-- 🚫 `destination_city` geçen satırlar 42703 verir (kolon yok); yorumdan
+--    çıkarılmamalı, "düzeltilip kullanılabilir" bir taslak DEĞİL.
 -- ---------------------------------------------------------------------------
 -- SELECT 'origin' AS yon, origin_city AS sehir, count(*) FROM public.listings
 -- WHERE origin_city IN ('Istanbul','Izmir','Mugla','Bingol') GROUP BY 1,2
 -- UNION ALL
--- SELECT 'destination', destination_city, count(*) FROM public.listings
+-- SELECT 'destination', destination_city, count(*) FROM public.listings   ← 42703
 -- WHERE destination_city IN ('Istanbul','Izmir','Mugla','Bingol') GROUP BY 1,2
 -- ORDER BY 3 DESC;
 --
@@ -285,12 +295,12 @@ GROUP BY 2 HAVING count(DISTINCT district) > 1;
 --   WHEN 'Istanbul' THEN 'İstanbul' WHEN 'Izmir' THEN 'İzmir'
 --   WHEN 'Mugla' THEN 'Muğla' WHEN 'Bingol' THEN 'Bingöl' END
 -- WHERE origin_city IN ('Istanbul','Izmir','Mugla','Bingol');
--- UPDATE public.listings SET destination_city = CASE destination_city
+-- UPDATE public.listings SET destination_city = CASE destination_city   ← 42703
 --   WHEN 'Istanbul' THEN 'İstanbul' WHEN 'Izmir' THEN 'İzmir'
 --   WHEN 'Mugla' THEN 'Muğla' WHEN 'Bingol' THEN 'Bingöl' END
 -- WHERE destination_city IN ('Istanbul','Izmir','Mugla','Bingol');
 --
--- SELECT count(*) FROM public.listings WHERE origin_city = destination_city;
+-- SELECT count(*) FROM public.listings WHERE origin_city = destination_city;  ← 42703
 
 -- =============================================================================
 -- NOT — Kalıcı çözüm (bu script tekrarı ÖNLEMEZ)

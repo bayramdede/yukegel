@@ -122,7 +122,11 @@ async function handlePhoneHistory(
   const { data, error } = await svc
     .from('listings')
     .select(
-      'id, created_at, origin_city, raw_text, listing_type, moderation_status, status, vehicle_type, listing_stops(city, stop_order)'
+      // Dalga 5: metin kolonları düştü; rota gösterimi id'den türüyor.
+      // Bu uç noktanın TÜKETİCİSİ `app/admin/radar/RadarClient.tsx` — orada da
+      // `HistoryListing` arayüzü ve rota satırı aynı anda değişti. İkisi ayrı
+      // ayrı deploy edilemez.
+      'id, created_at, origin_province_id, raw_text, listing_type, moderation_status, status, vehicle_type, listing_stops(province_id, stop_order)'
     )
     .or(`contact_phone.eq.${normalized},contact_phone.eq.${local}`)
     .order('created_at', { ascending: false })

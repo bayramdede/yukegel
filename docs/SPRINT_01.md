@@ -654,8 +654,9 @@ imkânsızlaştır). D4 bağımsız, her an yapılabilir.
      yazılıyor**. Doğru satır (`id=1844`) tabloda zaten var.
   4. Kopya BÖLÜM 4.2-4.6 (`kazan`→Kahramankazan, `ömerli`, `kıraç`, `gölbaşı`, `kemalpaşa`).
   5. Kopya BÖLÜM 5 doğrulama — **iki sorgu da boş dönmeli**, dönmüyorsa durup bana getir.
-  6. Geçmiş konum onarımı — 🚨 **kopya BÖLÜM 6'yı KULLANMA** (ölü `destination_city`'yi
-     onarıp canlı `listing_stops.city`/`district` ve `listings.origin_district`'i atlıyor);
+  6. Geçmiş konum onarımı — 🚨 **kopya BÖLÜM 6'yı KULLANMA** (var olmayan
+     `destination_city`'yi — #28, kolon YOK, 42703 — onarmaya çalışıp canlı
+     `listing_stops.city`/`district` ve `listings.origin_district`'i atlıyor);
      `20260729_alias_runbook.md` Adım 8 dört kolonu birlikte onarıyor.
   7. Sahte güzergâh ölçümü: runbook Adım 0.1 — `listings` ⋈ `listing_stops`, katlanmış
      anahtar eşit + ham yazım farklı. D4 öncesi ve sonrası karşılaştırılabilsin diye

@@ -80,7 +80,12 @@ export async function POST(
     // 1. İlanları çek
     const { data: listings, error: listErr } = await svc
       .from('listings')
-      .select('raw_text, origin_city, created_at')
+      // Dalga 5: `origin_city` buradan tamamen ÇIKARILDI, `origin_province_id`
+      // ile değiştirilmedi — çünkü hiç kullanılmıyordu. Aşağıdaki `mesajlar`
+      // yalnızca `created_at` + `raw_text` okuyor; il alanı LLM prompt'una hiç
+      // girmiyordu. Ölü select alanını id'ye çevirmek onu canlıymış gibi
+      // gösterirdi.
+      .select('raw_text, created_at')
       .eq('shadow_profile_id', id)
       .not('raw_text', 'is', null)
       .order('created_at', { ascending: false })

@@ -31,10 +31,14 @@ export default async function Panel() {
       .select('display_name, email, phone, phone_verified, user_type, tckn, vkn, company_name, bio, username')
       .eq('id', user.id).single(),
     svc.from('listings')
-      .select(`id, listing_type, origin_city, origin_district, status, moderation_status, created_at,
+      // Dalga 5 (3 Ağu 2026): metin kolonları düştü, gösterim `ilAdi(id)`'den.
+      // ⚠️ Bu ilanlar PanelClient'a HAM gidiyor (normalize edilmeden), yani
+      //    `origin_province_id` adı tüketicide de aynen görünür. Çeviri
+      //    PanelClient/IlanYonetim içinde, gösterim anında yapılıyor.
+      .select(`id, listing_type, origin_province_id, origin_district, status, moderation_status, created_at,
         expires_at, price_offer, completed_at, vehicle_type, body_type, available_date, notes, contact_phone,
         internal_audit_logs,
-        listing_stops ( id, stop_order, city, district, cargo_type, weight_ton, pallet_count, vehicle_count )`)
+        listing_stops ( id, stop_order, province_id, district, cargo_type, weight_ton, pallet_count, vehicle_count )`)
       .eq('user_id', user.id)
       .order('created_at', { ascending: false }),
     svc.from('vehicles')

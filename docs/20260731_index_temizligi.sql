@@ -272,11 +272,17 @@ select
       then '🚨 KULLANILIYOR — metin kolonunu okuyan bir tüketici var, Dalga 5 öncesi BUL'
     else '✅ boşta'
   end                                              as karar
+-- ℹ️ Aşağıdaki (ve bu dosyadaki diğer) desenlerde geçen `destination_city`
+--    yalnız bir ARAMA DESENİDİR; öyle bir kolon YOK (31 Tem 2026, #28 — 42703).
+--    Zararsız: var olmayan kolon adı hiçbir indeks/view/policy tanımında
+--    eşleşmez, yani sonucu değiştirmez. Desen bilerek bırakıldı ki eski
+--    belgelerden gelen okuyucu "acaba atlandı mı?" diye tekrar aramasın.
+--    🚫 Ama bu desenin varlığı kolonun VAR OLDUĞU anlamına GELMEZ.
 from pg_stat_user_indexes s
 where s.schemaname = 'public'
   and (
         pg_get_indexdef(s.indexrelid) ilike '%origin_city%'
-     or pg_get_indexdef(s.indexrelid) ilike '%destination_city%'
+     or pg_get_indexdef(s.indexrelid) ilike '%destination_city%'   -- ← kolon yok; desen zararsız
      or (s.relname = 'listing_stops' and pg_get_indexdef(s.indexrelid) ilike '%(city%')
      or pg_get_indexdef(s.indexrelid) ilike '%trgm%'
   )

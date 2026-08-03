@@ -28,7 +28,6 @@ interface NoLaneData {
     id: string;
     raw_text: string | null;
     source: string;
-    origin_city: string | null;
     created_at: string;
     moderation_status: string;
   }>;
@@ -573,7 +572,7 @@ function KesifSekme() {
           {noLane.listings_no_origin.length > 0 && (
             <>
               <div style={{ color: '#6e7681', fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>
-                Form ilanlari — origin_city bos ({noLane.listings_no_origin.length})
+                Form ilanlari — kalkis ili cozulemedi ({noLane.listings_no_origin.length})
               </div>
               <div style={{ maxHeight: 260, overflowY: 'auto' }}>
                 {noLane.listings_no_origin.map(il => (

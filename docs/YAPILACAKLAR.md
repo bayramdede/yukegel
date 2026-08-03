@@ -202,7 +202,9 @@
 > BÖLÜM 2 bunları üç kovaya ayırıyor (DB predikatı / select+gösterim / LLM anahtarı ve yorum).
 > Üçüncü kovaya (`whatsapp`, `parse-text`, `llm-parse`, RPC girdileri) **dokunulmaz**;
 > değiştirmek ayrıştırmayı bozar. `destination_city` için kod temizliği yok: `.ts`/`.tsx`
-> içinde sıfır eşleşme.
+> içinde sıfır eşleşme — 🚫 ve sebebi "kolon terk edilmiş" değil, **öyle bir kolon hiç
+> yok** (#28, 42703). Aynı gözlemden yanlış sonuca varılıp madde bir dönem "ölü kolon,
+> Dalga 5'te düşürülecek" diye taşındı.
 >
 > ✅ **BÖLÜM 0 ÖN KOŞULLARI ALINDI (31 Tem 2026) — `docs/20260731_dalga5_olcumler.sql`.**
 > Ölçüm bilerek **v4'ten (#26) ÖNCE** alındı: v4 canlıya çıktığı an her yeni satır
@@ -229,6 +231,138 @@
 > Guard'lar `docs/20260731_dalga5_metin_kolon_drop.sql` BÖLÜM 1'de hazır.
 > ⚠️ "Ölçüm sıfır çıktı, guard gereksiz" denmemeli — ölçüm mevcut korumanın *çalıştığını*
 > gösterir, kolon düştükten sonra o korumanın *yerinde kalacağını* değil.
+>
+> ⏳ **`docs/20260731_ilan_olustur_v4.sql` YAZILDI (31 Tem 2026, #26) — ÇALIŞTIRILMADI.**
+> Dalga 5 BÖLÜM 1'in çalıştırılabilir hâli, ayrı dosyaya alındı çünkü v4 drop'u
+> beklemez: BÖLÜM 2 kod temizliğiyle **aynı release'te**, drop'tan günler önce çıkar.
+>
+> ✅ **3 AĞU 2026 — BÖLÜM 2 KOD TEMİZLİĞİ BİTTİ, v4 ARTIK ÇIKABİLİR.**
+> KOVA A/2.2 (#35 içinde), KOVA B (#35) ve KOVA D (#34) tamamlandı; `tsc --noEmit`
+> temiz, `test:lokasyon` ve `test:parser` (29/29) geçiyor. **v4 ile aynı release'te
+> çıkması gereken tek zorunlu kod değişikliği** `learn-aliases`'in predikatıydı
+> (`.is('origin_city', null)` → `.is('origin_province_id', null)`): v4 metne
+> yazmayı bıraktığı an eski predikat kuyruğu **ili gayet güzel çözülmüş ~234 bin
+> satırla** doldururdu. O da yapıldı.
+> ⚠️ **#24 (`learn-aliases`:437 `.in('origin_city', …)`) BİLEREK BEKLİYOR** — 8.B
+> ölçümünün (#21, ~7 Ağu) **pozitif kontrolü**. v4'ü bloke etmez: `.in()` predikatı
+> metin kolonu hâlâ *var* olduğu sürece çalışır; yalnız BÖLÜM 5 drop'undan önce
+> çevrilmesi şart.
+> ADIM 0 ön ölçümü çalıştırıldı → **`listings`te `origin_province_id IS NULL` 0 satır**,
+> `listing_stops`ta `province_id IS NULL` **0**. Yani guard geriye dönük hiçbir akışı
+> kırmıyor. (3.1 bu hücreyi ölçmemişti: "pid yok **metin de yok**" hiç sayılmamıştı.)
+>
+> ❌ **DÜZELTME — "iki korumasız yazma yolu var" YANLIŞTI.** Kod okundu:
+> `lib/ilan-yaz.ts`:247,271 ve `app/moderator/actions.ts`:180,196 **ikisi de**
+> "Kalkış/Varış ili tanınamadı" kontrolünü yapıyor. `moderator/actions.ts`
+> `ilanYaz()`'ı atlıyor ama kontrolü kendi içinde tekrarlıyor —
+> **"ilanYaz()'ı atlıyor" ≠ "korumasız"**; ilki çağrı grafiği, ikincisi davranış.
+> Grafiğe bakıp davranış çıkarmak hatayı üretti. Korumasız yol **bir tane**:
+> `supabase/functions/parse-listing/index.ts`:836 (Deno `lib/lokasyon.ts`'i import
+> edemiyor, `origin_province_id` bile göndermiyor, çözümlemeyi tümüyle RPC'ye devretmiş).
+> → Guard "olmayacak şeye sigorta" değil, **tek korumasız kanalın tek koruması**.
+>
+> 🐛 **DÖRDÜNCÜ SESSİZ BUG — v4 yazılırken bulundu (düzeltildi, 31 Tem 2026).**
+> `parse-listing/index.ts`:884 döngü dışında **koşulsuz**
+> `processing_status='processed'` yazıyordu; döngü ise RPC hatasında `continue`
+> ediyor. Yani **hiç ilan oluşmasa bile** ham mesaj `processed` işaretlenip
+> `no_lane` kuyruğundan düşüyordu — moderatör bir daha görmüyordu.
+> 🚨 v4 ile birleşince guard **amacının tersini** yapardı: v3'te çözümsüz il
+> "görünür bozuk ilan" (moderatör alias öğretir, düzelir) üretiyordu; v4 + eski
+> satır bunu **hiçbir kuyrukta olmayan kayıp mesaja** çevirirdi.
+> **Bir katmandaki gürültü, üst katman onu yutuyorsa gürültü değildir.**
+> Düzeltme: `created > 0 ? 'processed' : 'no_lane'` + WARN log. Böylece mesaj
+> kuyrukta kalır, alias öğretilince `reprocess-no-lane` yeniden dener.
+> ⚠️ Bu bug **v4'ten bağımsız ve önceden vardı** — bugün de 23514/22P02 gibi her
+> RPC hatası aynı şekilde mesaj kaybediyor. v4 onu kenar durumdan beklenen akışa
+> çevirdiği için görünür oldu. → **Görev #33** (deploy, v4'ün ön koşulu).
+> 🚨 `SUPABASE_ACCESS_TOKEN` eksik olduğu için bu düzeltme **sessizce deploy
+> edilmemiş olabilir**; token eklenmeden ve deploy zamanı gözle doğrulanmadan
+> v4 çalıştırılmaz. Aksi hâlde tam olarak yukarıdaki kayıp senaryosu yaşanır.
+>
+> 🚨 **BEŞİNCİ BULGU — KOVA SAYISI ÜÇ DEĞİL, DÖRT (3 Ağu 2026, → Görev #34).**
+> BÖLÜM 2 envanteri `origin_city`'yi *geçtiği yere* göre tasnif etmişti:
+> "predikat / gösterim / prompt". Ama **gösterim ile yazma aynı kovaya düşmüştü**:
+> `app/panel/actions.ts`:135 ve `app/moderator/page.tsx`:580 KOVA B'de
+> "SELECT listesi + gösterim" başlığı altındaydı — oysa ikisi de
+> `listings.update({ origin_city: … })` çağırıyor. Duraklar için de aynısı
+> (`panel/actions.ts`:167, `moderator/page.tsx`:606). Dört yer, hiçbiri RPC'den
+> geçmiyor → **BÖLÜM 1 guard'ı bu yolları göremez**, BÖLÜM 5 drop'u 42703 ile kırar.
+> Bir KOVA B maddesini atlarsan ekran boş şehir gösterir; bir KOVA D maddesini
+> atlarsan panelde ilan düzenleyen **her kullanıcı hata alır**.
+>
+> 🚨🚨 **ALTINCI BULGU — YUKARIDAKİ BEŞİNCİ BULGUNUN "ASIL MESELE"Sİ YANLIŞTI
+> (3 Ağu 2026, aynı gün). DÖRT YAZMA YOLU DEĞİL, İKİ.**
+> Beşinci bulgu `panel/actions.ts`'in "sessiz NULL"unu kovanın en tehlikeli
+> maddesi ilan etmiş ve buradan bir **ürün kararı** türetmişti ("çözülemeyen ilde
+> reddet mi, NULL'a mı çek"). O karar **yok hükmünde: `ilanGuncelle` ulaşılamaz
+> kod.** Zincir: `panel/actions.ts::ilanGuncelle` ← tek import eden
+> `panel/IlanYonetim.tsx` ← **hiç kimse**. Panelin canlı düzenleme yolu
+> `/api/ilan/duzelt` ve o uç nokta **tek bir konum alanı bile yazmıyor**
+> (`notes, vehicle_type, body_type, moderation_status, status, is_shadow_banned,
+> audit_score, internal_audit_logs, reviewed_at`) — kullanıcı panelden ilanının
+> ilini bugün zaten **değiştiremiyor**. Yani "drop'tan sonra kalkış bilgisi
+> büsbütün kaybolur" senaryosunu tetikleyecek bir kullanıcı akışı **yok**.
+> Kalan tek canlı doğrudan yazma yolu moderatör paneliydi; o da çözülemeyen ili
+> zaten **reddediyor** (`moderator/page.tsx`:543-548, :558-564 —
+> `alert('Kalkış ili tanınamadı…')`) ve il girdileri serbest metin değil
+> `<select>`. → **KOVA D salt mekanik anahtar silmeye indi ve 3 Ağu'da bitti.**
+>
+> 📌 **Asıl ders — `grep` bir çağrı grafiği değildir.** Envanteri çıkarırken
+> sorulan soru "bu dosya kolona yazıyor mu?" idi; sorulmayan soru "bu dosya
+> **çalışıyor mu?**". Erişilebilirlik hiç kontrol edilmedi ve ölü bir dosya,
+> runbook'un en kritik maddesi + bir ürün kararı olarak **üç ayrı belgeye**
+> yazıldı. Bu, KOVA E ile aynı kökten hata: orada kapsam *dile* göre (yalnız
+> `.ts`/`.tsx`), burada *erişilebilirliğe* göre daralmıştı; ikisi de "envanter
+> tamam" dedirtip yanlış tarafta bıraktı.
+> → **Kural:** bir yazma yolunu kovaya koymadan önce importer zincirini sonuna
+> kadar sür. Zincir kopuyorsa madde "dönüştürülecek" değil, **"ölü — silinecek"**
+> kovasına gider.
+> ⚠️ Ölü dosyalar duruyor (silme kararı Bayram'da): `panel/actions.ts`,
+> `panel/IlanYonetim.tsx`, `u/[username]/IlanListesi.tsx`. IlanYonetim 3 Ağu'da
+> yine de KOVA B kalıbına çevrildi (o an ölü olduğu bilinmiyordu — zararsız ama
+> gereksiz); IlanListesi **çevrilmedi**, başına ölü-dosya başlığı yazıldı.
+>
+> ✅ **3 AĞU 2026 — #36 BİTTİ: 81 il listesi beş kopyadan ikiye indi.**
+> Aynı dizi `moderator/page.tsx`:14, `admin/poi-onay/PoiOnayClient.tsx`:63,
+> `u/[username]/page.tsx`:10 ve `admin/radar/RadarClient.tsx`:116 (`SEHIRLER`)
+> içinde **elle** duruyordu; dördü de artık `lib/lokasyon.ts`'in yeni
+> `IL_ADLARI` / `IL_ADLARI_ALFABETIK` export'larından türüyor.
+>
+> 📌 **Bunu şimdi yapmanın sebebi Dalga 5.** Filtre Dalga 5'ten önce metin
+> kolonunu okuyordu; artık `ilAdi(id) === filtreKalkis` diye **tam eşitlik**
+> karşılaştırıyor. Yani dropdown'ın kopyası ile `ilAdi()`'nin kaynağı arasındaki
+> tek harflik bir sapma — bir `Hakkari`/`Hakkâri`, bir `Afyon`/`Afyonkarahisar` —
+> hata fırlatmaz, filtreyi **sessizce hiçbir şey döndürmez** hale getirir.
+> Dört kopyanın hiçbiri test edilmiyordu; `ILLER` ↔ `locations.json`
+> sözleşmesini `test:lokasyon` korurken bu dördü serbestçe ayrışabilirdi.
+>
+> 🔧 **RadarClient'ta liste sırası bilerek DEĞİŞTİ.** Elle yazılmış dizi Türkçe
+> kurallı değildi: `Şanlıurfa` Siirt'ten ÖNCE, `Kilis` `Kırıkkale`'den önce
+> (`Ş`/`S` ve `ı`/`i` katlaması). `Intl.Collator('tr')` ile **dokuz konum** yer
+> değiştirdi. Seçilen DEĞER il adı olduğu için filtre davranışı değişmez;
+> yalnız açılır liste doğru sırada görünür. Ekran görüntüsü karşılaştıran olursa
+> bu fark BEKLENEN.
+>
+> ⚠️ **Beşinci kopya kasten duruyor:** `lib/ilan-sabitler.ts::ILLER`.
+> `lokasyon.ts` ondan `ilKey`'i import ediyor, ters yön **döngü** olurdu.
+> İkisini `scripts/test-lokasyon.mts`:17 zaten bağlıyordu; aynı dosyaya üç yeni
+> assert eklendi (`IL_ADLARI ↔ ILLER` birebir · alfabetik permütasyon · Türkçe
+> sıra). `HomeClient` / `ilan-ver` / `TopluYukle` zaten `ilan-sabitler`'den
+> import ediyordu — dokunulmadı, zaten korunuyorlar.
+> tsc temiz · `test:lokasyon` tümü geçti · `test:parser` 29/29.
+> 🧹 `scripts/_chk-iller.mjs` (geçici doğrulama betiği) silinemedi — sandbox FUSE
+> `rm`'e izin vermiyor. Ölü dosya listesine eklendi.
+>
+> ✅ **KOVA B'nin çözümü join değil, `ilAdi()`.** İlk plan
+> "`provinces!origin_province_id(name)` gömülü sorgusu" diyordu; gereksiz.
+> 81 il zaten `lib/constants/locations.json`'da (25 KB) ve `lib/lokasyon.ts`:83
+> `ilAdi(id)` haritayı bellekte tutuyor — `app/moderator/page.tsx` gibi **istemci**
+> bileşenleri bu modülü bugün import ediyor, yeni paket ağırlığı yok. Join'in
+> bedeli her liste sorgusuna bir gömülü ilişki + dönen JSON'da `origin_city`
+> yerine `provinces:{name}` nesnesi olurdu: aynı iş, daha pahalıya.
+> Kalıp: SELECT'te `origin_city`→`origin_province_id`, gösterimde
+> `ilan.origin_city`→`ilAdi(ilan.origin_province_id) ?? '—'`. Tel üzerindeki
+> veri de küçülür (smallint ⟵ text).
 >
 > 🔎 **EK — `idx_listings_origin` çözüldü:** tanımı
 > `CREATE INDEX idx_listings_origin ON public.listings USING btree (origin_city)` —
@@ -377,10 +511,14 @@
 > 0. ✅ **Adım 0 ölçümü ALINDI** (29 Tem 2026, sonuçlar runbook'ta "ÖLÇÜM SONUÇLARI" bölümünde).
 >    Özet: sahte güzergâh **0 satır** (geçmiş hasar yok, D4 önleyici) · aynı şehir 6.173 satır
 >    (meşru, korunacak) · **16 yazım çakışması ~88 satır** (~12 ASCII + 🆕 ~76 TAMAMI BÜYÜK HARF)
->    · 0.4 hâlâ ölçülmedi (yanlış tablo sorgulandı).
+>    · 🚫 0.4 SORU DÜŞTÜ (31 Tem 2026, #28): kolon yok, 42703. Bu satır önce "hâlâ
+>    ölçülmedi (yanlış tablo sorgulandı)" diyordu — asıl mesele yanlış tablo değil,
+>    **ölçülecek kolonun hiç var olmaması** idi.
 > 1. `docs/20260729_alias_runbook.md` → Adım 1-9. ⚠️ Adım 8 **eski
->    `20260728_alias_kopya_temizligi.sql` BÖLÜM 6'yı geçersiz kılıyor**: o bölüm ölü
->    `destination_city`'yi onarıp canlı `listing_stops`'u atlıyor. Ölçüm bunu doğruladı:
+>    `20260728_alias_kopya_temizligi.sql` BÖLÜM 6'yı geçersiz kılıyor**: o bölüm var
+>    olmayan `destination_city`'yi (#28 — kolon YOK, 42703) onarmaya çalışıp canlı
+>    `listing_stops`'u atlıyor; yani eksik olmasından önce **çalışmıyor**.
+>    Ölçüm bunu doğruladı:
 >    BÖLÜM 6'nın elle yazılmış 4 şehirlik listesi 16 grubun **13'ünü** kaçırırdı.
 > 2. `docs/20260729_alias_normalize_trigger.sql` → **en son**; runbook Adım 9 yapılmadan indeks
 >    23505 ile reddedilir.
@@ -995,7 +1133,7 @@ Tam analiz: `docs/WHATSAPP_IMPORT_ANALIZ.md` (bulgu kodları A1–A5, B1–B8, C
 - [x] **Telefon geriye-doldurma ayrıldı** — `POST /api/raw-posts/telefon-doldur`. İçe aktarmanın doğruluğunu etkilemiyordu ama satır başına 2 UPDATE ile bütçeyi yiyordu. Telefon regex'i `lib/whatsapp/telefon.ts`'e alındı.
 - [x] **Gatekeeper substring eşleşmesi düzeltildi** (28 Tem 2026) — `norm.includes(alias)` yerine token eşitliği + ek soyma. `"lojistik"→İstanbul`, `"getirin"→TIR`, `"balyası"→Balıkesir` gibi sahte eşleşmeler bitti.
 - [ ] **Alias tablosunda KOPYA kayıtlar — ÖLÇÜLDÜ, yüzlerce grup** (28 Tem 2026). İki ayrı zarar: (a) `avcilar` ve `hadimkoy` alias'larında `normalized` çelişiyor — `Istanbul` vs `İstanbul`. Şehir doğru ama yazım tutarsız; `normalized` ilana yazılan değer olduğu için şehir filtresi bunları iki ayrı şehir sayıyor. (b) `district` çelişkisi çok daha yaygın: onlarca grupta kopyaların biri dolu diğeri NULL (`gebze`, `çorlu`, `torbalı`, `alanya`, `çiğli`, `sincan`...), ayrıca yazım farkları (`Avcilar`/`Avcılar`, `Kirkağaç`/`Kırkağaç`, `Kazan`/`Kahramankazan`). `findPlaces` ilk eşleşmeyi aldığı için **ilçe bilgisi sıraya bağlı olarak kayboluyor**. Çözüm: kopya SİLİNMEYECEK — `docs/20260728_alias_homonim_temizligi.sql` ADIM 5 ile her gruptaki tüm satırlara aynı doğru `normalized`+`district` yazılacak (5.1 önizleme → 5.2 UPDATE → 5.3 doğrulama). Sonra ADIM 6: geçmiş `listings` satırlarındaki `Istanbul`/`İstanbul` karışıklığı ölçülüp düzeltilmeli. Kalıcı çözüm: `aliases` üzerine normalize trigger + normalize forma UNIQUE indeks, yoksa kopyalar yeniden oluşur.
-- [ ] **SAHTE GÜZERGÂH — `Istanbul` vs `İstanbul`** (28 Tem 2026, YENİ BULGU). `findPlaces` içindeki `seen` kümesi `normalized` DEĞERİYLE tutuluyor. `aliases` tablosunda 13 satır `Istanbul` (Türkçe karakteri düşmüş), 154 satır `İstanbul` yazıyor — bunlar AYRI iki değer. İçinde hem `avcilar` (→`Istanbul`) hem `kadıköy` (→`İstanbul`) geçen mesaj İKİ ŞEHİR bulmuş sayılıp **İstanbul→İstanbul güzergâhı** üretiyor. Aynı sorun `Izmir`/`İzmir`, `Mugla`/`Muğla`, `Bingol`/`Bingöl`'de de var. Düzeltme: `docs/20260728_alias_kopya_temizligi.sql` BÖLÜM 1. Sonrasında geçmiş `listings` için BÖLÜM 6 (`origin_city = destination_city` olanları da say).
+- [ ] **SAHTE GÜZERGÂH — `Istanbul` vs `İstanbul`** (28 Tem 2026, YENİ BULGU). `findPlaces` içindeki `seen` kümesi `normalized` DEĞERİYLE tutuluyor. `aliases` tablosunda 13 satır `Istanbul` (Türkçe karakteri düşmüş), 154 satır `İstanbul` yazıyor — bunlar AYRI iki değer. İçinde hem `avcilar` (→`Istanbul`) hem `kadıköy` (→`İstanbul`) geçen mesaj İKİ ŞEHİR bulmuş sayılıp **İstanbul→İstanbul güzergâhı** üretiyor. Aynı sorun `Izmir`/`İzmir`, `Mugla`/`Muğla`, `Bingol`/`Bingöl`'de de var. Düzeltme: `docs/20260728_alias_kopya_temizligi.sql` BÖLÜM 1. Sonrasında geçmiş `listings` için ~~BÖLÜM 6 (`origin_city = destination_city` olanları da say)~~ → 🚫 **BÖLÜM 6 KULLANILMAYACAK**: `destination_city` diye bir kolon yok (#28, 42703) ve "aynı şehir" sahtelik sinyali değil. Yerine `20260729_alias_runbook.md` Adım 8 (dört konum kolonunu birlikte onarır).
 - [ ] **`payas` yanlış ile yazılıyor** (28 Tem 2026). `aliases` id=1003 `Payas → Adana` diyor; Payas 2008'den beri **Hatay** ilçesi. Doğru satır (id=1844, Hatay) da var ama `findPlaces` küçük id'yi seçtiği için bugün her "payas" ilanı Adana'ya yazılıyor. Düzeltme: aynı dosya BÖLÜM 4.1.
 - [ ] **Belirsiz alias'lar: `gölbaşı`, `kemalpaşa`** (28 Tem 2026). İkisi de iki farklı ile ait gerçek yer adı; tek kelimeyle ayırt edilemiyor. `araç` ile aynı mantıkla baskın olmayanı pasifleştirilmeli. Düzeltme: aynı dosya BÖLÜM 4.5 / 4.6.
 - [ ] **Alias homonim temizliği — ölçüldü, tek suçlu `araç`** (28 Tem 2026). 3000 mesajın 580'inde (%19) geçiyor, sıralamada Bursa'nın üstünde; `Kastamonu/Araç` ilçesi ama metinde "vasıta" anlamında. `olur`/`merkez`/`pazar` ilk 40'a girmedi. Kalan: `docs/20260728_alias_homonim_temizligi.sql` ADIM 3 ile `is_active = false`.
@@ -1188,6 +1326,22 @@ değişikliği içermiyor — yalnızca statik okuma. Canlı DB/RLS doğrulamas�
       geriye dönük onarım değil. Kalan 6.173 "aynı şehir" satırı meşru şehir içi taşıma —
       dokunulmayacak. Asıl hasar başka yerde çıktı: **~88 satırda yazım çeşitliliği**
       (~12 ASCII bozulması + ~76 tamamı büyük harf), onarımı runbook Adım 8. *(W5/D5)*
+- [x] **#32 — `destination_city` "ölü kolon" miti belgelerden temizlendi** (3 Ağu 2026).
+      Dokuz belge düzeltildi: `20260728_alias_kopya_temizligi.sql` (BÖLÜM 6 gerekçesi +
+      yorumdaki UPDATE satırlarına `← 42703` işareti), `20260728_alias_homonim_temizligi.sql`
+      (ADIM 6'daki "aynısını destination_city için de çalıştır" → ÇALIŞTIRMA uyarısı +
+      doğru `listing_stops.city` sorgusu), `COGRAFI_GECIS.md` (Dalga 5 drop maddesi
+      üstü çizildi), `20260729_alias_runbook.md` (7 yer: Adım 0.4 sorgusu yoruma alındı,
+      sonuç tablosu, "sırada" satırı, şema düzeltmesi başlığı, Adım 8 gerekçesi, Adım 8.3
+      tamamen düştü, Dalga 5 etkileşim bölümü), `W5_DEVIR.md` (2), `SPRINT_01.md`,
+      `YAPILACAKLAR.md` (3), `PROJE_HARITASI.md` (2).
+      🧭 `20260731_index_temizligi.sql`'deki 8 regex deseni **bilerek duruyor**: arama
+      deseni olarak zararsız, var olmayan kolon hiçbir indeks/view/policy tanımında
+      eşleşmez. Başına "bu desenin varlığı kolonun var olduğu anlamına gelmez" notu düştü.
+      📌 **Yöntem notu:** yanlış cümleler silinmedi, üstü çizilip düzeltmesiyle birlikte
+      bırakıldı. Mitin nasıl yayıldığı mitin kendisi kadar öğretici: her belge bir
+      öncekinden alıntıladı ve hiçbiri kolonun **varlığını** sormadı. "Kodda geçmiyor"
+      gözlemi doğruydu; ondan çıkarılan "demek ki terk edilmiş kolon" sonucu yanlıştı.
 - [x] ~~**`listings.destination_city` ölü kolon — düşürülmeli**~~ — 🚨 **SORU DÜŞTÜ:
       KOLON HİÇ YOKMUŞ** (31 Tem 2026, #28). Sayım denendi, `ERROR: 42703: column
       "destination_city" does not exist` döndü. `information_schema.columns` teyit etti:

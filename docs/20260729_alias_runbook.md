@@ -30,9 +30,16 @@ Bu sayılar düzeltmeden **önce** alınmazsa yapılan işin etkisi bir daha öl
 > 1. **Varış o kolonda değil.** Kalkış tek (`listings.origin_city`) ama uğramalar çok, o
 >    yüzden varışlar `public.listing_stops` satırlarında duruyor (`listing_id`, `stop_order`,
 >    `city`, `district`, …). `parse-listing` ilanı `origin_city` ile açıp her varışı
->    `listing_stops`'a yazıyor (satır ~825); `destination_city`'yi **hiçbir uygulama kodu
->    yazmıyor ve okumuyor** — tüm repoda yalnız bu SQL/doc dosyalarında geçiyor, yani eski
->    ölü kolon. Varış filtresi de `listing_stops.city`'ye bakıyor (`HomeClient.tsx:696`).
+>    `listing_stops`'a yazıyor (satır ~825). Varış filtresi de `listing_stops.city`'ye
+>    bakıyor (`HomeClient.tsx:696`).
+>    🚨🚨 **İKİNCİ DÜZELTME (31 Tem 2026, #28).** Buraya "`destination_city`'yi hiçbir
+>    uygulama kodu yazmıyor ve okumuyor, yani eski **ölü kolon**" yazılmıştı. O da
+>    yanlıştı. Doğru gözlem ("tüm repoda yalnız SQL/doc dosyalarında geçiyor") doğru
+>    olmayan sonuca bağlanmış: kodda geçmemesinin sebebi kolonun terk edilmiş olması
+>    değil, **hiç var olmaması**. `information_schema.columns` boş döndü, sorgu 42703
+>    verdi. "Ölü" nitelemesi zararsız görünüyordu ama bir iş kalemi doğurdu — madde
+>    Dalga 5 drop listesine, W5 devrine ve iki SQL dosyasına "sonra düşürülecek" diye
+>    yazıldı; hepsi 42703 verecekti.
 > 2. **Aynı şehirde taşıma MEŞRU.** Şehir içi nakliye gerçek bir iş; `kalkış = varış`
 >    olması tek başına sahte güzergâh demek değil. Eşitliği "sahte" saymak gerçek ilanları
 >    suçlar.
@@ -101,9 +108,11 @@ GROUP BY kolon, anahtar
 HAVING count(*) > 1
 ORDER BY 3 DESC, 2;
 
--- 0.4 `destination_city` gerçekten ölü mü? 0 dönerse kolon boş demektir; Adım 8'de
--- ona dokunmaya gerek yok, ayrı bir "ölü kolonu düşür" bileti açılır.
-SELECT count(*) AS dolu_destination_city FROM public.listings WHERE destination_city IS NOT NULL;
+-- 🚫 0.4 SORU DÜŞTÜ — ÇALIŞTIRMA (31 Tem 2026, #28). Aşağıdaki sorgu
+--    `ERROR: 42703: column "destination_city" does not exist` verir.
+--    Soru "kolon ölü mü?" diye sorulmuştu; doğru cevap **kolon hiç yok**.
+--    Dolayısıyla "ölü kolonu düşür" bileti de açılmaz — düşürülecek şey yok.
+-- SELECT count(*) AS dolu_destination_city FROM public.listings WHERE destination_city IS NOT NULL;
 ```
 
 Çıktıların hepsini bir yere kaydet (tarih + sayı yeter). **0.1 ile 0.2'yi karıştırma:**
@@ -118,7 +127,7 @@ SELECT count(*) AS dolu_destination_city FROM public.listings WHERE destination_
 | **0.1 sahte güzergâh adayı** | **0 satır / 0 ilan** |
 | **0.2 meşru şehir içi taşıma** | 6.173 satır / 6.122 ilan; 1.465'i farklı ilçe |
 | **0.3 katlanmış anahtar çakışması** | **16 grup / ~88 satır** (4 kolonun tamamında) |
-| **0.4 ölü `destination_city`** | ⚠️ **HÂLÂ ÖLÇÜLMEDİ** — yanlışlıkla `listing_stops.city` sorgulandı (244.379 = toplam durak satırı) |
+| **0.4 `destination_city`** | 🚫 **SORU DÜŞTÜ (31 Tem 2026) — KOLON YOK.** Sorgu `42703: column "destination_city" does not exist` verdi, `information_schema.columns` teyit etti. Önceki not "hâlâ ölçülmedi, yanlışlıkla `listing_stops.city` sorgulandı" diyordu; asıl mesele o karışıklık değil, **ölçülecek kolonun hiç var olmaması**. Ölçüm de, "düşür" bileti de düştü. |
 
 **0.1 = 0 → geçmişte sahte güzergâh HASARI YOK.** Yazım farkından doğmuş tek bir
 bozuk güzergâh bile bulunamadı. D4'ün değeri geriye dönük onarım değil,
@@ -160,8 +169,12 @@ yaklaşımının somut gerekçesi bu.
 1, `listings.origin_city` 1 (22.471 `İstanbul`'a karşı 3 `Istanbul`). Çıkış şehri
 pratikte temiz.
 
-**Sırada:** 0.4'ü doğru sorguyla tekrarla (`FROM public.listings WHERE
-destination_city IS NOT NULL`) — ölü kolonu düşürme bileti buna bağlı.
+~~**Sırada:** 0.4'ü doğru sorguyla tekrarla (`FROM public.listings WHERE
+destination_city IS NOT NULL`) — ölü kolonu düşürme bileti buna bağlı.~~
+🚫 **31 Tem 2026 (#28): tekrarlandı ve `42703` döndü — KOLON YOK.** "Ölü kolonu
+düşürme bileti" diye bir iş de yok. Bu satır, yanlış bir varsayımın kendini nasıl
+sürdürdüğünün örneği: ilk ölçüm yanlış tabloya gitti, sonuç "ölçülmedi" diye
+işaretlendi, ve kolonun VARLIĞI hiç sorgulanmadan "ölü" kabul edildi.
 
 ---
 
@@ -268,8 +281,9 @@ sonraki adımlara geçme.
 > 🚨 **K / BÖLÜM 6'yı olduğu gibi çalıştırmak işi bitirmez.** O bölüm yalnız
 > `listings.origin_city` ve `listings.destination_city`'yi onarıyor. Oysa:
 >
-> - **`listings.destination_city` ölü bir kolon.** Uygulama kodunda tek bir
->   yazma/okuma yok (Adım 0.4 ile teyit et). Onarmak boşa iş.
+> - **`listings.destination_city` diye bir kolon YOK** (31 Tem 2026, #28 — 42703).
+>   Buraya önce "ölü bir kolon" yazılmıştı; yanlıştı. Onarmak boşa iş DEĞİL,
+>   doğrudan hata: BÖLÜM 6'nın o UPDATE'i ilk satırda patlar.
 > - **Varış verisi `public.listing_stops` içinde.** Ana sayfa varış filtresi
 >   (`app/_components/HomeClient.tsx:696`) tam olarak `listing_stops.city`'yi
 >   okuyor. Yani kullanıcının "İstanbul'a yük" aramasını bozan kolon burada ve
@@ -396,9 +410,11 @@ WHERE s.district IS NOT NULL AND s.district <> z.dogru;
 
 `UPDATE` karşılıkları 8.1 ile birebir aynı kalıp — kolon adlarını değiştir.
 
-**8.3 — `destination_city`.** Adım 0.4 sıfır döndüyse dokunma. Sıfırdan farklı
-döndüyse de onarma: kolonu kimse okumadığı için onarım kullanıcıya hiçbir şey
-kazandırmaz. Doğru iş, kolonu düşürmek için ayrı bilet açmak.
+**8.3 — `destination_city`.** 🚫 **ADIM DÜŞTÜ (31 Tem 2026, #28): KOLON YOK.**
+Eski metin "0.4 sıfır döndüyse dokunma, düşürmek için ayrı bilet aç" diyordu —
+her iki dal da kolonun var olduğunu varsayıyordu. `information_schema.columns`
+teyit etti: `public.listings` içinde böyle bir kolon hiç yok. Ne onarım var,
+ne düşürme bileti. Varış verisinin tamamı `listing_stops.city`'de (8.2).
 
 **8.4 — Tekrar ölç.** Adım 0.1'i **aynen** tekrar çalıştır:
 
@@ -501,7 +517,10 @@ anahtar değeri ile yukarıdaki ölçüm sorgusuna bak.
 ## 🚨 DALGA 5 ETKİLEŞİMİ — bu runbook'un son kullanma tarihi var (31 Tem 2026)
 
 Dalga 5 (`docs/20260731_dalga5_metin_kolon_drop.sql`, en erken 7 Ağu) şu kolonları
-**düşürüyor**: `listings.origin_city`, `listings.destination_city`, `listing_stops.city`.
+**düşürüyor**: `listings.origin_city`, `listing_stops.city`.
+(🚫 Bu satır önce `listings.destination_city`'yi de sayıyordu — **öyle bir kolon
+yok**, 31 Tem 2026 / #28. Drop listesinden çıkarıldı; kalsaydı migration 42703
+ile yarıda kesilirdi.)
 Bu runbook'un bazı adımları tam olarak o kolonlara dokunuyor. Sıra artık serbest değil.
 
 **Dalga 5'ten SONRA çalıştırılamaz hâle gelenler:**
@@ -509,7 +528,7 @@ Bu runbook'un bazı adımları tam olarak o kolonlara dokunuyor. Sıra artık se
 | Adım | Neden |
 |---|---|
 | **8.1** şehir kolonu onarımı | Onardığı iki kolon da düşüyor. Drop'tan sonra çalıştırmak 42703 verir. |
-| **8.3** `destination_city` | Kolon düşüyor. Zaten "dokunma" diyordu. |
+| **8.3** `destination_city` | 🚫 Adım zaten düştü — kolon Dalga 5'te düşmüyor, **hiç yok** (#28). |
 | **8.4** doğrulama (`l.origin_city <> s.city`) | Her iki taraf da düşüyor; sorgu yazılamaz. |
 | **0.1 / 0.1b / 0.2 / 0.3** ölçümleri | Aynı kolonlara dayanıyor; "önce/sonra" karşılaştırması bir daha kurulamaz. |
 

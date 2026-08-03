@@ -3,10 +3,13 @@ import { useState, useEffect } from 'react';
 import { createClient } from '../../../lib/supabase';
 import { useParams } from 'next/navigation';
 import { girisAdresi } from '../../../lib/redirect';
+// ⚠️ `ILLER` artık türetilmiş (Görev #36) — bu dosya zaten `ilAdi()` ile
+//    ekrana il adı basıyordu; dropdown'ın ayrı bir kopyadan beslenmesi
+//    ikisinin sessizce ayrışmasına açık kapı bırakıyordu.
+import { ilAdi, IL_ADLARI as ILLER } from '../../../lib/lokasyon';
 
 const supabase = createClient();
 
-const ILLER = ['Adana','Adıyaman','Afyonkarahisar','Ağrı','Amasya','Ankara','Antalya','Artvin','Aydın','Balıkesir','Bilecik','Bingöl','Bitlis','Bolu','Burdur','Bursa','Çanakkale','Çankırı','Çorum','Denizli','Diyarbakır','Edirne','Elazığ','Erzincan','Erzurum','Eskişehir','Gaziantep','Giresun','Gümüşhane','Hakkari','Hatay','Isparta','Mersin','İstanbul','İzmir','Kars','Kastamonu','Kayseri','Kırklareli','Kırşehir','Kocaeli','Konya','Kütahya','Malatya','Manisa','Kahramanmaraş','Mardin','Muğla','Muş','Nevşehir','Niğde','Ordu','Rize','Sakarya','Samsun','Siirt','Sinop','Sivas','Tekirdağ','Tokat','Trabzon','Tunceli','Şanlıurfa','Uşak','Van','Yozgat','Zonguldak','Aksaray','Bayburt','Karaman','Kırıkkale','Batman','Şırnak','Bartın','Ardahan','Iğdır','Yalova','Karabük','Kilis','Osmaniye','Düzce'];
 const ARAC_TIPLERI = ['Minivan', 'Panelvan', 'Kamyonet', 'Kamyon', 'Kırkayak', 'TIR'];
 const UST_YAPI = ['Açık Kasa', 'Kapalı Kasa', 'Tenteli', 'Damperli', 'Frigolu', 'Liftli', 'Sal Kasa', 'Lowbed'];
 
@@ -79,12 +82,12 @@ export default function PublicIlanListesi() {
         .from('listings')
         // ⚠️ SPRINT_01 L1f — `contact_phone` BURADA ÇEKİLMEZ (anon key + herkese açık sayfa).
         .select(`
-          id, listing_type, origin_city, origin_district,
+          id, listing_type, origin_province_id, origin_district,
           price_offer, source, created_at,
           vehicle_type, body_type, notes, carrier_note,
           available_date, date_flexible, completed_at,
           listing_stops (
-            stop_order, city, district,
+            stop_order, province_id, district,
             vehicle_count, cargo_type, weight_ton, pallet_count
           )
         `)
@@ -99,11 +102,11 @@ export default function PublicIlanListesi() {
       const donusturulmus = (data || []).map((ilan: any) => ({
         id: ilan.id,
         tip: ilan.listing_type,
-        kalkis: ilan.origin_city,
+        kalkis: ilAdi(ilan.origin_province_id) ?? '',
         kalkis_ilce: ilan.origin_district || '',
         duraklar: (ilan.listing_stops || [])
           .sort((a: any, b: any) => a.stop_order - b.stop_order)
-          .map((s: any) => ({ sehir: s.city, ilce: s.district || '', ton: s.weight_ton, palet: s.pallet_count, arac_adet: s.vehicle_count })),
+          .map((s: any) => ({ sehir: ilAdi(s.province_id) ?? '', ilce: s.district || '', ton: s.weight_ton, palet: s.pallet_count, arac_adet: s.vehicle_count })),
         sure: new Date(ilan.created_at).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }),
         // tel alanı bilinçli olarak yok — bkz. yukarıdaki L1f notu.
         fiyat: ilan.price_offer,

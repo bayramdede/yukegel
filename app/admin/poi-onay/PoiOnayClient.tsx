@@ -9,6 +9,9 @@ import {
   POI_ALT_ETIKETLER,
   POI_GENEL_ETIKETLER,
 } from '../../../lib/poi-constants';
+// ⚠️ 81 il listesi burada ELLE yazılıydı ve hiçbir test onu `locations.json`
+//    ile karşılaştırmıyordu. Tek kaynağa indirildi (Görev #36).
+import { IL_ADLARI as ILLER } from '../../../lib/lokasyon';
 
 const PinHarita = dynamic(() => import('./PinHarita'), {
   ssr: false,
@@ -59,19 +62,6 @@ const SORT_OPTIONS = [
   { value: 'city',        label: 'Şehir' },
 ];
 
-// TÜRKİYE İLLERİ (81 il)
-const ILLER = [
-  'Adana','Adıyaman','Afyonkarahisar','Ağrı','Amasya','Ankara','Antalya','Artvin',
-  'Aydın','Balıkesir','Bilecik','Bingöl','Bitlis','Bolu','Burdur','Bursa','Çanakkale',
-  'Çankırı','Çorum','Denizli','Diyarbakır','Edirne','Elazığ','Erzincan','Erzurum',
-  'Eskişehir','Gaziantep','Giresun','Gümüşhane','Hakkari','Hatay','Isparta','Mersin',
-  'İstanbul','İzmir','Kars','Kastamonu','Kayseri','Kırklareli','Kırşehir','Kocaeli',
-  'Konya','Kütahya','Malatya','Manisa','Kahramanmaraş','Mardin','Muğla','Muş',
-  'Nevşehir','Niğde','Ordu','Rize','Sakarya','Samsun','Siirt','Sinop','Sivas',
-  'Tekirdağ','Tokat','Trabzon','Tunceli','Şanlıurfa','Uşak','Van','Yozgat','Zonguldak',
-  'Aksaray','Bayburt','Karaman','Kırıkkale','Batman','Şırnak','Bartın','Ardahan',
-  'Iğdır','Yalova','Karabük','Kilis','Osmaniye','Düzce',
-];
 
 // Excel kategori normalize — poi-constants.ts'den alınıyor
 const KAT_NORM: Record<string, string> = POI_KAT_NORM;

@@ -219,7 +219,11 @@ sıfır satır dönüyor.
 
 - `alter table public.listings drop column origin_city;`
 - `alter table public.listing_stops drop column city;`
-- `listings.destination_city` — uygulamada tek okuma/yazma yok, aynı migration'da düşür.
+- ~~`listings.destination_city` — uygulamada tek okuma/yazma yok, aynı migration'da düşür.~~
+  🚫 **MADDE DÜŞTÜ (31 Tem 2026, #28): ÖYLE BİR KOLON YOK.** `drop column` denemesi
+  `42703: column "destination_city" does not exist` verir; `information_schema.columns`
+  teyit etti. Bu madde "ölü kolon" varsayımıyla yazılmıştı — kolon ölü değil, hiç
+  var olmadı. Varış verisi tek yerde: `listing_stops.city` (yukarıdaki madde).
 - Eski metin index'lerini (`idx_listings_origin_city*`, `listing_stops_city_trgm_idx` vb.) düşür.
 
 > 🚨 **YUKARIDAKİ LİSTE EKSİKTİ.** Migration yazılırken iki bağımlılık çıktı; ikisi de bu

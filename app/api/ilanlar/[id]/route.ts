@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { ilAdi } from '@/lib/lokasyon';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -23,7 +24,7 @@ export async function GET(
     .from('listings')
     .select(`
       id, listing_type, source,
-      origin_city, origin_district,
+      origin_province_id, origin_district,
       vehicle_type, body_type,
       price_offer, price_negotiable,
       available_date, date_flexible,
@@ -32,7 +33,7 @@ export async function GET(
       is_shadow_banned, trust_level,
       created_at,
       listing_stops (
-        stop_order, city, district,
+        stop_order, province_id, district,
         vehicle_count, cargo_type,
         weight_ton, pallet_count, notes
       )
@@ -57,7 +58,10 @@ export async function GET(
     .sort((a: any, b: any) => a.stop_order - b.stop_order)
     .map((s: any) => ({
       sira: s.stop_order,
-      sehir: s.city,
+      // 🚨 PUBLIC API SÖZLEŞMESİ. Dalga 5'te kaynak `city` metninden
+      //    `ilAdi(province_id)`'ye geçti; ALAN ADI ve DEĞER TİPİ (il adı metni)
+      //    bilerek AYNI kaldı. Dış tüketici bu geçişi görmemeli.
+      sehir: ilAdi(s.province_id) ?? null,
       ilce: s.district ?? null,
       arac_sayisi: s.vehicle_count ?? null,
       kargo_tipi: s.cargo_type ?? null,
@@ -74,7 +78,7 @@ export async function GET(
     kaynak: ilan.source,
     rota: {
       kalkis: {
-        sehir: ilan.origin_city,
+        sehir: ilAdi(ilan.origin_province_id) ?? null,
         ilce: ilan.origin_district ?? null,
       },
       duraklar: stops,
@@ -103,7 +107,7 @@ export async function GET(
     },
     // AI arama için hazır özet string
     ozet: [
-      ilan.origin_city,
+      ilAdi(ilan.origin_province_id),
       son_durak?.sehir,
       ilan.listing_type === 'yuk' ? 'yük ilanı' : 'araç ilanı',
       ...(ilan.vehicle_type ?? []),

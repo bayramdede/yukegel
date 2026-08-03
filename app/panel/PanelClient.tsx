@@ -1,6 +1,7 @@
 'use client';
 import React, { useState, useMemo, useEffect } from 'react';
 import { createClient } from '../../lib/supabase';
+import { ilAdi } from '../../lib/lokasyon';
 
 const supabase = createClient();
 
@@ -255,8 +256,12 @@ function IlanlarSekmesi({ ilanlar: ilk, userId }: { ilanlar: any[]; userId: stri
 
       const stops = (i.listing_stops || []).sort((a: any, b: any) => a.stop_order - b.stop_order);
 
-      if (aramaKalkis && !i.origin_city?.toLowerCase().includes(aramaKalkis.toLowerCase())) return false;
-      if (aramaVaris && !stops.some((s: any) => s.city?.toLowerCase().includes(aramaVaris.toLowerCase()))) return false;
+      // Dalga 5: arama kutusu SERBEST METİN (dropdown değil), o yüzden filtre
+      // id ile değil, id'den türeyen İL ADIYLA eşleşiyor — kullanıcı "ista"
+      // yazıp "İstanbul"u bulabilsin diye `includes` davranışı korunuyor.
+      // Doğrudan `il_id === ...` karşılaştırması bu kısmi eşleşmeyi öldürürdü.
+      if (aramaKalkis && !ilAdi(i.origin_province_id)?.toLowerCase().includes(aramaKalkis.toLowerCase())) return false;
+      if (aramaVaris && !stops.some((s: any) => ilAdi(s.province_id)?.toLowerCase().includes(aramaVaris.toLowerCase()))) return false;
       if (aramaAracTipi && !(i.vehicle_type || []).includes(aramaAracTipi)) return false;
       if (aramaTarihten && i.available_date && i.available_date < aramaTarihten) return false;
       if (aramaTarihe && i.available_date && i.available_date > aramaTarihe) return false;
@@ -378,7 +383,8 @@ function IlanlarSekmesi({ ilanlar: ilk, userId }: { ilanlar: any[]; userId: stri
                 {filtreli.map(ilan => {
                   const stops = [...(ilan.listing_stops || [])].sort((a: any, b: any) => a.stop_order - b.stop_order);
                   const sonDurak = stops[stops.length - 1];
-                  const baslik = `${ilan.origin_city}${sonDurak ? ` → ${sonDurak.city}` : ''}`;
+                  const kalkisAd = ilAdi(ilan.origin_province_id) ?? '';
+                  const baslik = `${kalkisAd}${sonDurak ? ` → ${ilAdi(sonDurak.province_id) ?? ''}` : ''}`;
                   const isYuk = ilan.listing_type === 'yuk';
                   const durum = durumHesapla(ilan);
                   const tamamlandi = durum === 'completed';
@@ -407,7 +413,7 @@ function IlanlarSekmesi({ ilanlar: ilk, userId }: { ilanlar: any[]; userId: stri
                           : <span style={{ color: C.dim }}>—</span>}
                       </td>
                       <td style={td}>
-                        <div style={{ color: C.text }}>{ilan.origin_city}</div>
+                        <div style={{ color: C.text }}>{kalkisAd}</div>
                         {ilan.origin_district && <div style={{ color: C.muted, fontSize: '0.78rem' }}>{ilan.origin_district}</div>}
                       </td>
                       <td style={td}>
@@ -496,7 +502,7 @@ function IlanlarSekmesi({ ilanlar: ilk, userId }: { ilanlar: any[]; userId: stri
                         <td colSpan={6} style={{ padding: '0 12px 16px', background: '#0a0d11' }}>
                           <div style={{ border: '1px solid #854d0e', borderRadius: 8, padding: 16, background: '#12100a' }}>
                             <div style={{ color: '#fbbf24', fontWeight: 700, fontSize: '0.85rem', marginBottom: 12 }}>
-                              ✏️ İlanı Düzelt — {ilan.origin_city} → {(ilan.listing_stops||[])[0]?.city}
+                              ✏️ İlanı Düzelt — {kalkisAd} → {ilAdi((ilan.listing_stops||[])[0]?.province_id) ?? ''}
                             </div>
                             {/* Modératör mesajı */}
                             {(() => {

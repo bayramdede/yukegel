@@ -881,7 +881,38 @@ Deno.serve(async (req) => {
       created++
     }
 
-    await supabase.from('raw_posts').update({ processing_status: 'processed' }).eq('id', raw_post_id)
+    // 🚨 DURUM, SONUCA GÖRE YAZILIR — "denedim" ile "oldu" aynı şey değil.
+    //
+    // Burada koşulsuz `processed` yazılıyordu. Yukarıdaki döngü RPC hatasında
+    // `continue` ediyor, yani HİÇ ilan oluşmasa bile raw_post `processed`
+    // işaretleniyordu → mesaj `no_lane` kuyruğundan DÜŞÜYOR ve moderatör onu bir
+    // daha görmüyordu. Sessiz kayıp; üstelik en kolay kurtarılabilir yerde
+    // (`reprocess-no-lane` alias öğretildikten sonra yeniden deneyebilirdi).
+    //
+    // ⚠️ Bu, `ilan_olustur` v4'ün ÖN KOŞULU. v4 çözülemeyen ili artık 22023 ile
+    //    REDDEDİYOR (v3 ham metni kolona yazıp geçiyordu). Yani v4 bu satırı
+    //    nadir bir kenar durumdan BEKLENEN AKIŞA çeviriyor. Sırayla:
+    //      1) bu düzeltme deploy edilir,
+    //      2) sonra v4 canlıya çıkar.
+    //    Ters sırada, Deno'dan gelen her çözümsüz il kalıcı olarak kaybolur.
+    //
+    // `no_lane` bilinçli tercih ('error' değil): kuyruğun okuyucuları zaten o
+    // değere bakıyor (`learn-aliases`:80,190,458 · `moderator/page.tsx`:221,233 ·
+    // `reprocess-no-lane`:19). Yeni bir durum değeri eklemek beş okuyucuyu
+    // birden güncellemeyi gerektirirdi ve anlam da doğru: "bu mesajdan lane
+    // çıkarılamadı" — ister parser bulamadığı için, ister ili çözülemediği için.
+    await supabase
+      .from('raw_posts')
+      .update({ processing_status: created > 0 ? 'processed' : 'no_lane' })
+      .eq('id', raw_post_id)
+
+    if (created === 0) {
+      edgeLog('WARN', 'Lane bulundu ama hiç ilan oluşmadı — no_lane kuyruğunda bırakıldı', {
+        raw_post_id,
+        output_status: 'no_listing_created',
+        lanes_found: result.lanes.length,
+      })
+    }
 
     return new Response(JSON.stringify({ success: true, lanes: result.lanes.length, created }))
 

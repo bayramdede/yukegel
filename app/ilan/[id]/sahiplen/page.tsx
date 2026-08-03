@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { createClient } from '../../../../lib/supabase';
+import { ilAdi } from '../../../../lib/lokasyon';
 
 const supabase = createClient();
 
@@ -12,11 +13,11 @@ const supabase = createClient();
 interface IlanBilgi {
   id: string;
   listing_type: string;
-  origin_city: string;
+  origin_province_id: number | null;
   origin_district: string | null;
   user_id: string | null;
   trust_level: string | null;
-  listing_stops: Array<{ city: string; district: string | null; stop_order: number }>;
+  listing_stops: Array<{ province_id: number | null; district: string | null; stop_order: number }>;
 }
 
 const FAYDALAR = [
@@ -54,9 +55,9 @@ export default function SahiplenPage({ params }: { params: Promise<{ id: string 
       const { data } = await supabase
         .from('listings')
         .select(`
-          id, listing_type, origin_city, origin_district,
+          id, listing_type, origin_province_id, origin_district,
           user_id, trust_level,
-          listing_stops ( stop_order, city, district )
+          listing_stops ( stop_order, province_id, district )
         `)
         .eq('id', resolved.id)
         .maybeSingle();
@@ -207,13 +208,13 @@ export default function SahiplenPage({ params }: { params: Promise<{ id: string 
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
             <span style={{ color: '#22c55e', fontSize: '0.72rem', fontWeight: 700 }}>K</span>
-            <span style={{ color: '#e2e8f0', fontWeight: 700 }}>{ilan?.origin_city}</span>
+            <span style={{ color: '#e2e8f0', fontWeight: 700 }}>{ilAdi(ilan?.origin_province_id) ?? ''}</span>
             {ilan?.origin_district && <span style={{ color: '#8b949e', fontSize: '0.85rem' }}>/ {ilan.origin_district}</span>}
           </div>
           {stops.map((s, i) => (
             <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
               <span style={{ color: '#f97316', fontSize: '0.72rem', fontWeight: 700 }}>V</span>
-              <span style={{ color: '#e2e8f0', fontWeight: 700 }}>{s.city}</span>
+              <span style={{ color: '#e2e8f0', fontWeight: 700 }}>{ilAdi(s.province_id) ?? ''}</span>
               {s.district && <span style={{ color: '#8b949e', fontSize: '0.85rem' }}>/ {s.district}</span>}
             </div>
           ))}

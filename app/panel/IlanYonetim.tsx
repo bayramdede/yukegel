@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { ilanGuncelle, ilanTamamlandiToggle } from './actions';
 import { durakToplami } from '../../lib/ilan-liste';
+import { ilAdi, ilId } from '../../lib/lokasyon';
 
 // SPRINT_01 L1e — anon supabase istemcisi bu dosyadan KALDIRILDI.
 // Tüm `listings` yazmaları `./actions.ts` üzerinden sunucuda, sahiplik kontrolü
@@ -128,13 +129,13 @@ function IlanKart({ ilan, onGuncelle }: { ilan: any; onGuncelle: (id: string, pa
             {/* Güzergah */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4 }}>
               <span style={{ color: '#22c55e', fontSize: '0.7rem', fontWeight: 700, minWidth: 16 }}>K</span>
-              <span style={{ color: '#e2e8f0', fontWeight: 700, fontSize: '0.95rem' }}>{ilan.origin_city}</span>
+              <span style={{ color: '#e2e8f0', fontWeight: 700, fontSize: '0.95rem' }}>{ilAdi(ilan.origin_province_id) ?? ''}</span>
               {ilan.origin_district && <span style={{ color: '#8b949e', fontSize: '0.82rem' }}>/ {ilan.origin_district}</span>}
             </div>
             {stops.map((s: any, i: number) => (
               <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4 }}>
                 <span style={{ color: '#f97316', fontSize: '0.7rem', fontWeight: 700, minWidth: 16 }}>V</span>
-                <span style={{ color: '#e2e8f0', fontWeight: 700, fontSize: '0.95rem' }}>{s.city}</span>
+                <span style={{ color: '#e2e8f0', fontWeight: 700, fontSize: '0.95rem' }}>{ilAdi(s.province_id) ?? ''}</span>
                 {s.district && <span style={{ color: '#8b949e', fontSize: '0.82rem' }}>/ {s.district}</span>}
                 {s.vehicle_count > 1 && <span style={{ color: '#60a5fa', fontSize: '0.78rem', marginLeft: 4 }}>{s.vehicle_count} araç</span>}
               </div>
@@ -205,11 +206,15 @@ function DuzenleFormu({ ilan, stops, onKaydet, onIptal }: {
   onKaydet: (patch: any, yeniStops: any[]) => void;
   onIptal: () => void;
 }) {
-  const [kalkisSehir, setKalkisSehir] = useState(ilan.origin_city || '');
+  // Dalga 5: form METİN kutularıyla çalışmaya devam ediyor (serbest giriş),
+  // ama başlangıç değeri artık id'den türüyor. Sunucu eylemi `ilanGuncelle`
+  // hâlâ `origin_city: string` ALIYOR — o bir GİRDİ SÖZLEŞMESİ, kolon değil;
+  // çözümlemeyi `ilCiftYazim()` ile sunucuda yapıyor (bkz. actions.ts:114).
+  const [kalkisSehir, setKalkisSehir] = useState(ilAdi(ilan.origin_province_id) ?? '');
   const [kalkisIlce, setKalkisIlce] = useState(ilan.origin_district || '');
   const [duraklar, setDuraklar] = useState<Stop[]>(
     stops.length > 0
-      ? stops.map(s => ({ id: s.id, stop_order: s.stop_order, city: s.city || '', district: s.district || '', cargo_type: s.cargo_type || '', weight_ton: s.weight_ton?.toString() || '', pallet_count: s.pallet_count?.toString() || '', vehicle_count: s.vehicle_count?.toString() || '' }))
+      ? stops.map(s => ({ id: s.id, stop_order: s.stop_order, city: ilAdi(s.province_id) ?? '', district: s.district || '', cargo_type: s.cargo_type || '', weight_ton: s.weight_ton?.toString() || '', pallet_count: s.pallet_count?.toString() || '', vehicle_count: s.vehicle_count?.toString() || '' }))
       : [{ stop_order: 1, city: '', district: '', cargo_type: '', weight_ton: '', pallet_count: '', vehicle_count: '' }]
   );
   const [aracTipleri, setAracTipleri] = useState<string[]>(ilan.vehicle_type || []);
@@ -276,7 +281,17 @@ function DuzenleFormu({ ilan, stops, onKaydet, onIptal }: {
     if (!sonuc.ok) { setHata(sonuc.hata); setYukleniyor(false); return; }
 
     const patch = {
-      origin_city: kalkisSehir.trim(),
+      // ⚠️ İYİMSER GÜNCELLEME — ekrandaki satırı sunucudan yeniden çekmeden
+      //    tazeliyor. Dalga 5'te bu satır `origin_city` yazıyordu; artık liste
+      //    `origin_province_id` okuduğu için AYNI ALANI yazmak ZORUNDA.
+      //    Eskisi bırakılsaydı kaydetme "başarılı" görünür, kart ise ESKİ ili
+      //    göstermeye devam ederdi — sayfa yenilenene kadar sessiz bir yalan.
+      //
+      //    `ilId()` sunucudaki `ilCiftYazim()` ile AYNI katlama tablosunu
+      //    kullanıyor, yani çözüm sonucu birebir aynı. Çözülemezse `null`:
+      //    kart boş il gösterir, bu da sunucudaki `origin_province_id: null`
+      //    sonucunun dürüst yansımasıdır.
+      origin_province_id: ilId(kalkisSehir.trim()),
       origin_district: kalkisIlce.trim() || null,
       vehicle_type: aracTipleri,
       body_type: ustyapi,

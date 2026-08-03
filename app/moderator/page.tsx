@@ -4,26 +4,18 @@ import { createClient } from '../../lib/supabase';
 import { useRouter } from 'next/navigation';
 import WhatsappYukle from './WhatsappYukle';
 import { ilanTelefonlariGetir, ilanTelefonGuncelle, moderatorIlanOlustur } from './actions';
-import { ilCiftYazim, ilceNormalize } from '../../lib/lokasyon';
+// ⚠️ `ILLER` = `IL_ADLARI`. Buradaki il filtresi Dalga 5'ten sonra
+//    `ilAdi(id) === filtreKalkis` diye TAM EŞİTLİK karşılaştırıyor; `ilAdi()`
+//    `locations.json`'dan okuyor. Dropdown eskiden AYRI bir elle yazılmış
+//    kopyadan besleniyordu — tek harflik sapma filtreyi sessizce boşa
+//    düşürürdü. Aynı kaynaktan türetmek o hata sınıfını imkânsız kılıyor.
+import { ilAdi, ilCiftYazim, ilceNormalize, IL_ADLARI as ILLER } from '../../lib/lokasyon';
 import { ilKey } from '../../lib/ilan-sabitler';
 
 const supabase = createClient();
 
 const ARAC_TIPLERI = ['Minivan', 'Panelvan', 'Kamyonet', 'Kamyon', 'Kırkayak', 'TIR'];
 const UST_YAPI = ['Açık Kasa', 'Kapalı Kasa', 'Tenteli', 'Damperli', 'Frigolu', 'Liftli', 'Sal Kasa', 'Lowbed'];
-const ILLER = [
-  'Adana','Adıyaman','Afyonkarahisar','Ağrı','Amasya','Ankara','Antalya','Artvin',
-  'Aydın','Balıkesir','Bilecik','Bingöl','Bitlis','Bolu','Burdur','Bursa','Çanakkale',
-  'Çankırı','Çorum','Denizli','Diyarbakır','Edirne','Elazığ','Erzincan','Erzurum',
-  'Eskişehir','Gaziantep','Giresun','Gümüşhane','Hakkari','Hatay','Isparta','Mersin',
-  'İstanbul','İzmir','Kars','Kastamonu','Kayseri','Kırklareli','Kırşehir','Kocaeli',
-  'Konya','Kütahya','Malatya','Manisa','Kahramanmaraş','Mardin','Muğla','Muş',
-  'Nevşehir','Niğde','Ordu','Rize','Sakarya','Samsun','Siirt','Sinop','Sivas',
-  'Tekirdağ','Tokat','Trabzon','Tunceli','Şanlıurfa','Uşak','Van','Yozgat',
-  'Zonguldak','Aksaray','Bayburt','Karaman','Kırıkkale','Batman','Şırnak','Bartın',
-  'Ardahan','Iğdır','Yalova','Karabük','Kilis','Osmaniye','Düzce',
-];
-
 const DURUM_RENK: Record<string, { bg: string; color: string }> = {
   pending:        { bg: '#451a03', color: '#fb923c' },
   approved:       { bg: '#14532d', color: '#22c55e' },
@@ -46,7 +38,10 @@ function skorRenk(ilan: any): { border: string; badge: string; label: string; pu
   const stops = ilan.listing_stops || [];
   let skor = 0;
   if (ilan.contact_phone) skor += 30;
-  if (ilan.origin_city) skor += 15;
+  // Dalga 5: metin kolonu düştü. Soru zaten "kalkış ili belli mi?" idi;
+  // `origin_province_id` bunu daha dürüst sorar (metin doluyken id NULL
+  // olabiliyordu — o satır 15 puanı hak etmiyordu).
+  if (ilan.origin_province_id) skor += 15;
   if (stops.length > 0) skor += 15;
   if (ilan.vehicle_type?.length > 0) skor += 20;
   if (ilan.body_type?.length > 0) skor += 10;
@@ -239,12 +234,15 @@ export default function Moderator() {
     // Bu istemci anon key kullanıyor ve o kolonun yetkisi anon/authenticated'dan
     // revoke edildi. Numaralar aşağıda `ilanTelefonlariGetir()` ile, rolü sunucuda
     // doğrulandıktan sonra ayrıca çekilip listeye birleştiriliyor.
+    // Dalga 5 (3 Ağu 2026): metin kolonları düştü. Satırlar `ilanlar` state'ine
+    // HAM giriyor, yani `origin_province_id` / `stops[].province_id` adları
+    // bileşenin her yerinde aynen görünür; çeviri gösterim anında `ilAdi()` ile.
     let query = supabase.from('listings').select(`
-      id, listing_type, origin_city, origin_district, price_offer,
+      id, listing_type, origin_province_id, origin_district, price_offer,
       source, created_at, moderation_status, status, notes, trust_level,
       raw_text, raw_post_id, vehicle_type, body_type,
       audit_score, is_shadow_banned, internal_audit_logs,
-      listing_stops ( id, stop_order, city, district, vehicle_count, cargo_type, weight_ton, pallet_count, notes )
+      listing_stops ( id, stop_order, province_id, district, vehicle_count, cargo_type, weight_ton, pallet_count, notes )
     `).order('created_at', { ascending: false }).limit(200);
 
     // Tab filtresi
@@ -294,12 +292,18 @@ export default function Moderator() {
     if (!sonraBakGoster && sonraBak.has(ilan.id)) return false;
     if (aramaMetni) {
       const norm = aramaMetni.toLowerCase();
-      const haystack = `${ilan.raw_text || ''} ${ilan.notes || ''} ${ilan.origin_city || ''} ${stops.map((s: any) => s.city).join(' ')}`.toLowerCase();
+      // Dalga 5: il adları artık id'den türüyor. Serbest metin araması olduğu
+      // için samanlığa ADI giriyor — moderatör "ankara" yazıp bulabilsin diye.
+      const haystack = `${ilan.raw_text || ''} ${ilan.notes || ''} ${ilAdi(ilan.origin_province_id) || ''} ${stops.map((s: any) => ilAdi(s.province_id) || '').join(' ')}`.toLowerCase();
       if (!haystack.includes(norm)) return false;
     }
     if (filtreTelefon) { const tel = filtreTelefon.replace(/\D/g, ''); if (!(ilan.contact_phone || '').replace(/\D/g, '').includes(tel)) return false; }
-    if (filtreKalkis && ilan.origin_city !== filtreKalkis) return false;
-    if (filtreVaris && !stops.some((s: any) => s.city === filtreVaris)) return false;
+    // Dalga 5: `filtreKalkis`/`filtreVaris` `ILLER` DROPDOWN'undan geliyor, yani
+    // değerleri zaten kanonik il adları. `ilAdi()` de `locations.json`'daki aynı
+    // kanonik adı döndürüyor → tam eşitlik karşılaştırması korunabiliyor.
+    // (Panel'deki serbest metin kutusundan farklı; orada `includes` gerekmişti.)
+    if (filtreKalkis && ilAdi(ilan.origin_province_id) !== filtreKalkis) return false;
+    if (filtreVaris && !stops.some((s: any) => ilAdi(s.province_id) === filtreVaris)) return false;
     if (filtreAracTipi && !(ilan.vehicle_type || []).includes(filtreAracTipi)) return false;
     if (filtreIlanTipi !== 'hepsi' && ilan.listing_type !== filtreIlanTipi) return false;
     if (filtreSkor !== 'hepsi') {
@@ -505,7 +509,10 @@ export default function Moderator() {
     setDuzenleId(ilan.id);
     setDuzenleData({
       listing_type: ilan.listing_type,
-      origin_city: ilan.origin_city,
+      // Dalga 5: form METİN ile çalışmaya devam ediyor (`<select>` değerleri il
+      // adı, `aliasOgren` da adı yazıyor) — yalnız BAŞLANGIÇ DEĞERİ id'den
+      // türüyor. `duzenleKaydet` bu metni `ilCiftYazim()` ile geri çözüyor.
+      origin_city: ilAdi(ilan.origin_province_id) ?? '',
       origin_district: ilan.origin_district || '',
       contact_phone: ilan.contact_phone || '',
       price_offer: ilan.price_offer || '',
@@ -514,7 +521,7 @@ export default function Moderator() {
       body_type: ilan.body_type || [],
       raw_text: ilan.raw_text || '',
       stops: (ilan.listing_stops || []).sort((a: any, b: any) => a.stop_order - b.stop_order).map((s: any) => ({
-        id: s.id, city: s.city, district: s.district || '',
+        id: s.id, city: ilAdi(s.province_id) ?? '', district: s.district || '',
         weight_ton: s.weight_ton || '', pallet_count: s.pallet_count || '',
         vehicle_count: s.vehicle_count || 1, cargo_type: s.cargo_type || '', notes: s.notes || '',
       }))
@@ -575,9 +582,12 @@ export default function Moderator() {
     // ilanTelefonGuncelle() server action'ıyla ayrıca yazılıyor.
     const updateData: any = {
       listing_type: duzenleData.listing_type,
-      // Kanonik ad yazılıyor ("istanbul" → "İstanbul"); metin ve ID aynı
-      // kaynaktan türüyor, aralarında sapma doğamaz.
-      origin_city: kalkisIl.ad,
+      // 🚨 DALGA 5 / KOVA D — `origin_city: kalkisIl.ad` BURADAN SİLİNDİ.
+      //    Bu yol RPC'den GEÇMEZ, doğrudan tarayıcıdan UPDATE atar; yani v4
+      //    (`ilan_olustur` artık metne yazmıyor) bu satırı kapsamıyordu. BÖLÜM
+      //    5 kolonu düşürdüğü an PostgREST 42703 ile REDDEDER ve moderatörün
+      //    "Kaydet"i tamamen çalışmaz hale gelirdi — kısmi kayıp değil, tam
+      //    blokaj. `kalkisIl` çözümü DURUYOR; yalnız yazılan alan `.id`.
       origin_province_id: kalkisIl.id,
       origin_district: kalkisIlce?.ad ?? null,
       origin_district_official: kalkisIlce?.resmi ?? null,
@@ -601,10 +611,12 @@ export default function Moderator() {
     for (let i = 0; i < cozulmusDuraklar.length; i++) {
       const d = cozulmusDuraklar[i];
       const stop = d.kaynak;
-      // `city` + `province_id` yan yana yazılıyor (çift yazım) — Dalga 5 metin
-      // kolonunu düşürene kadar ikisi de gerekli.
+      // 🚨 DALGA 5 / KOVA D — çift yazım BİTTİ, `city: d.ad` silindi.
+      //    `konum` hem UPDATE hem INSERT dalında kullanılıyor (aşağıda), yani
+      //    tek satırlık bu silme iki yazma yolunu birden kapatıyor.
+      //    `d.ad` artık yalnız hata mesajlarında/alias öğrenmede yaşıyor.
       const konum = {
-        city: d.ad, province_id: d.ilId,
+        province_id: d.ilId,
         district: d.ilceAd, district_official: d.ilceResmi,
       };
       if (d.id) {
@@ -1147,13 +1159,13 @@ export default function Moderator() {
                           <div style={{ marginBottom: 10 }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 6 }}>
                               <span style={{ color: '#22c55e', fontSize: '0.7rem', fontWeight: 700, minWidth: 14 }}>K</span>
-                              <span style={{ color: '#e2e8f0', fontWeight: 700, fontSize: '0.95rem' }}>{ilan.origin_city}</span>
+                              <span style={{ color: '#e2e8f0', fontWeight: 700, fontSize: '0.95rem' }}>{ilAdi(ilan.origin_province_id) ?? '—'}</span>
                               {ilan.origin_district && <span style={{ color: '#8b949e', fontSize: '0.85rem' }}>/ {ilan.origin_district}</span>}
                             </div>
                             {stops.map((s: any, i: number) => (
                               <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 6, flexWrap: 'wrap' }}>
                                 <span style={{ color: '#f97316', fontSize: '0.7rem', fontWeight: 700, minWidth: 14 }}>V</span>
-                                <span style={{ color: '#e2e8f0', fontWeight: 700, fontSize: '0.95rem' }}>{s.city}</span>
+                                <span style={{ color: '#e2e8f0', fontWeight: 700, fontSize: '0.95rem' }}>{ilAdi(s.province_id) ?? '—'}</span>
                                 {s.district && <span style={{ color: '#8b949e', fontSize: '0.85rem' }}>/ {s.district}</span>}
                                 {s.weight_ton && <span style={{ color: '#94a3b8', fontSize: '0.78rem', marginLeft: 4 }}>⚖ {s.weight_ton}t</span>}
                                 {s.pallet_count && <span style={{ color: '#94a3b8', fontSize: '0.78rem', marginLeft: 4 }}>📦 {s.pallet_count}p</span>}

@@ -82,11 +82,28 @@ export async function GET(req: NextRequest) {
       .order('created_at', { ascending: false })
       .limit(Math.floor(limit * 0.7));
 
-    // 2. Form ilanları — origin_city boş + SLH taranmamış
+    // 2. Form ilanları — kalkış ili ÇÖZÜLEMEMİŞ + SLH taranmamış
+    //
+    // 🚨 DALGA 5 / BÖLÜM 2.2 — BU PREDİKAT ZORUNLU DEĞİŞİKLİKTİ, kozmetik değil.
+    //    Eski hali `.is('origin_city', null)` idi. `ilan_olustur` v4 metin
+    //    kolonuna YAZMAYI BIRAKIYOR; o an itibarıyla `origin_city` her YENİ
+    //    satırda NULL olur. Yani bu kuyruk, ili gayet güzel çözülmüş ilanlarla
+    //    dolardı — ölçüm anındaki tabloda ~234 bin satır. "Öğrenme merkezi"
+    //    ekranı kullanılamaz hale gelir, gerçek çözülemeyenler gürültüde kaybolur.
+    //    Kolon BÖLÜM 5'te düştüğünde ise aynı satır 42703 atardı.
+    //
+    //    `origin_province_id IS NULL` hem bugün hem v4'ten sonra AYNI şeyi
+    //    sorar: "bu ilanın kalkış ili çözülemedi". Zaten kastedilen buydu;
+    //    metin kolonu yalnızca o dönemki taşıyıcıydı.
+    //
+    //    ⚠️ `origin_city` select listesinden de ÇIKARILDI — id'ye çevrilmedi.
+    //    Tüketici `OgrenmeMerkeziClient.tsx` bu alanı hiç basmıyor (yalnız
+    //    `source`, `created_at`, `raw_text` gösteriliyor). Predikatın tanımı
+    //    gereği de değeri her zaman NULL; taşımanın bir anlamı yok.
     const { data: noOrigin, error: noOrgErr } = await svc
       .from('listings')
-      .select('id, raw_text, source, origin_city, notes, created_at, moderation_status')
-      .is('origin_city', null)
+      .select('id, raw_text, source, notes, created_at, moderation_status')
+      .is('origin_province_id', null)
       .not('raw_text', 'is', null)
       .is('slh_scanned_at', null)        // sadece hiç taranmamışlar
       .order('created_at', { ascending: false })

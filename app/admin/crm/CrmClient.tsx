@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { ilAdi } from '@/lib/lokasyon';
 
 // ── Tipler ────────────────────────────────────────────────────────────────────
 type Etiket = 'vip' | 'guvenilir' | 'normal' | 'suphelı' | 'spam' | null;
@@ -35,7 +36,8 @@ interface ShadowProfile {
 
 interface Listing {
   id: string;
-  origin_city: string | null;
+  // Dalga 5: `/api/admin/crm/[id]` artık metin değil plaka id döndürüyor.
+  origin_province_id: number | null;
   listing_type: string;
   moderation_status: string;
   status: string;
@@ -492,7 +494,7 @@ export default function CrmClient() {
                           >
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
                               <span style={{ color: '#e2e8f0', fontWeight: 600, fontSize: '0.85rem' }}>
-                                {l.origin_city ?? '—'} · {l.listing_type === 'yuk' ? '📦 Yük' : '🚛 Araç'}
+                                {ilAdi(l.origin_province_id) ?? '—'} · {l.listing_type === 'yuk' ? '📦 Yük' : '🚛 Araç'}
                               </span>
                               <span style={{ color: '#8b949e', fontSize: '0.75rem' }}>{tarih(l.created_at)}</span>
                             </div>

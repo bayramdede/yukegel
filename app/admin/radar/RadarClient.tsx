@@ -1,6 +1,13 @@
 'use client';
 
 import { useState, useCallback, useEffect } from 'react';
+// 🚨 `SEHIRLER` = `IL_ADLARI_ALFABETIK` (Görev #36). Buradaki liste ELLE
+//    yazılmıştı ve Türkçe sıralaması YANLIŞTI: `Şanlıurfa` Siirt'ten ÖNCE,
+//    `Kilis` `Kırıkkale`'den önce geliyordu (`Ş`/`S` ve `ı`/`i` katlaması).
+//    Tek kaynağa geçiş bu sırayı DÜZELTİR — dokuz konum yer değiştirir.
+//    Seçilen DEĞER (il adı) aynı kaldığı için filtre davranışı değişmez;
+//    yalnız açılır liste doğru Türkçe sırada görünür.
+import { ilAdi, IL_ADLARI_ALFABETIK as SEHIRLER } from '@/lib/lokasyon';
 
 // ── Tipler ─────────────────────────────────────────────────────────────────
 type Classification = 'SPOT' | 'CONTRACT_POTENTIAL';
@@ -34,13 +41,14 @@ interface RouteStats {
 interface HistoryListing {
   id: string;
   created_at: string;
-  origin_city: string | null;
+  // Dalga 5: `/api/admin/radar?phone=` artık metin değil plaka id döndürüyor.
+  origin_province_id: number | null;
   raw_text: string | null;
   listing_type: string;
   moderation_status: string;
   status: string;
   vehicle_type: string[] | null;
-  listing_stops: { city: string; stop_order: number }[];
+  listing_stops: { province_id: number | null; stop_order: number }[];
 }
 
 // ── WhatsApp link ──────────────────────────────────────────────────────────
@@ -110,21 +118,6 @@ function etiketBadge(e: string | null) {
   );
 }
 
-// ── Şehir listesi ──────────────────────────────────────────────────────────
-const SEHIRLER = [
-  'Adana','Adıyaman','Afyonkarahisar','Ağrı','Aksaray','Amasya','Ankara',
-  'Antalya','Ardahan','Artvin','Aydın','Balıkesir','Bartın','Batman',
-  'Bayburt','Bilecik','Bingöl','Bitlis','Bolu','Burdur','Bursa','Çanakkale',
-  'Çankırı','Çorum','Denizli','Diyarbakır','Düzce','Edirne','Elazığ',
-  'Erzincan','Erzurum','Eskişehir','Gaziantep','Giresun','Gümüşhane',
-  'Hakkari','Hatay','Iğdır','Isparta','İstanbul','İzmir','Kahramanmaraş',
-  'Karabük','Karaman','Kars','Kastamonu','Kayseri','Kilis','Kırıkkale',
-  'Kırklareli','Kırşehir','Kocaeli','Konya','Kütahya','Malatya','Manisa',
-  'Mardin','Mersin','Muğla','Muş','Nevşehir','Niğde','Ordu','Osmaniye',
-  'Rize','Sakarya','Samsun','Şanlıurfa','Siirt','Sinop','Şırnak','Sivas',
-  'Tekirdağ','Tokat','Trabzon','Tunceli','Uşak','Van','Yalova','Yozgat',
-  'Zonguldak',
-];
 
 // ── Ana Bileşen ────────────────────────────────────────────────────────────
 interface Props {
@@ -862,9 +855,10 @@ export default function RadarClient({
                   </div>
                   {historyData.map(l => {
                     const stops = [...(l.listing_stops || [])].sort((a, b) => a.stop_order - b.stop_order);
+                    const kalkis = ilAdi(l.origin_province_id);
                     const rota = stops.length > 0
-                      ? `${l.origin_city ?? '?'} → ${stops.map(s => s.city).join(' → ')}`
-                      : (l.origin_city ?? '—');
+                      ? `${kalkis ?? '?'} → ${stops.map(s => ilAdi(s.province_id) ?? '?').join(' → ')}`
+                      : (kalkis ?? '—');
                     return (
                       <div key={l.id} style={{
                         background: '#161b22', border: '1px solid #21262d',
