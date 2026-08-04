@@ -1,5 +1,114 @@
 # Yükegel — Yapılacaklar Listesi
 
+> 🟢 **4 AĞU 2026 — #31 KAPANDI: İŞ ZATEN YAPILMIŞ. HAYALET ENGELMİŞ.**
+> Ön kontrol (`docs/20260804_adim3_4_6_on_kontrol.sql`) alias runbook'unun
+> **Adım 1–7 ve 9'unun tamamının çalıştırılmış** olduğunu gösterdi:
+> Adım 3 → 0 satır · Adım 7 → 0 satır · homonim üçü de pasif · `payas` düzeltilmiş
+> (1003 → Hatay/Payas aktif, 1844 pasif) · Adım 6'nın beş kararı da uygulanmış.
+> **Adım 4'ün 92 satırının 92'si `⏭️ ZATEN_DOLU_AYNI`, sıfır id kayması.**
+> Adım 9'un ayrı kanıtına gerek yok: `aliases_katlanmis_anahtar_uniq` indeksi
+> canlı ve katlanmış kopya kalsaydı o indeks 23505 ile **kurulamazdı**.
+>
+> 🔁 **Kalıbın BEŞİNCİ örneği — ama TERS YÖNDE.** Önceki dördü "kayıt var diyordu,
+> gerçekte yoktu" idi (`destination_city`, `get_nearby_…_parked_driver`,
+> `processed_at`, `_aksiyonlar_props.txt`). Bu sefer **kayıt "yapılmadı" diyordu,
+> gerçekte yapılmıştı.** Kök aynı: kaydı kimse doğrulamıyordu. Bedeli farklı —
+> yanlış bir eylem değil, **hayalet bir engel**: #31 bir haftadır "Dalga 5'ten
+> önce bitmeli" diye duruyordu ve yolu aslında kimse kapatmıyordu.
+> ⚠️ **"Yapıldı mı?" sorusunun cevabı görev listesinde değil, VERİDE.**
+> 📌 Bu yüzden donmuş script'i kör çalıştırmadım: `20260728_alias_kopya_temizligi.sql`
+> 28 Tem'in fotoğrafıydı ve BÖLÜM 3'ün `VALUES` listesi bir **id → ilçe haritası**.
+> Bir id başka alias'a kaymış olsaydı UPDATE sessizce yanlış ilçe yazacaktı.
+> Kontrol id + alias + district üçlüsünü karşılaştırdı; kayma çıkmadı ama
+> **çıkmadığını ancak ölçünce bildik.**
+>
+> 🚨 **ASIL BULGU — ADIM 10 YARIM UYGULANMIŞ (#43).**
+> `docs/20260729_alias_normalize_trigger.sql` iki bölüm; canlıda **BÖLÜM 2 var,
+> BÖLÜM 1 YOK** — `pg_trigger` 0 satır döndü, `aliases_normalize_trg` kurulu değil.
+> ✅ Tekillik korunuyor (indeks duruyor, D3'ün asıl amacı tutuyor).
+> ❌ Normalizasyon korunmuyor: lowercase / `\s+` sıkıştırma / `''`→NULL yalnız
+>    `lib/alias-normalize.ts`'te ve **tek çağıranı** `learn-aliases` route'u.
+>    O route'tan geçmeyen yazma ham değer yazar (`W5_DEVIR.md`:79 zaten "manuel
+>    `create` lowercase YAPMIYOR" diyordu).
+> ⚠️ Trigger'sız indeks güvenlik ağı değil **mayın**: normalize edilmemiş yazma
+>    sessizce düzelmez, 23505 ile patlar. Gürültülü hata sessiz bozulmadan iyidir
+>    ama bu tasarlanmış bir tercih değil, **kaza**.
+> ✅ Cevap geldi: `pg_proc` **`aliases_normalize` döndürdü.** Fonksiyon var, trigger yok.
+>    Yani BÖLÜM 1 yarım çalışmış — trigger sonradan düşürülmedi, **hiç kurulmadı.**
+>    En olası sebep kopyala-yapıştır sınırı: fonksiyon gövdesi :104'te biter,
+>    :106-111 yorum bloğu gelir, DROP/CREATE TRIGGER :113 ve :115'tedir. Gizli sebep yok.
+>
+> 🚨 **TRIGGER'I DOSYADAKİ HÂLİYLE KURMA — üç ölçüm üç ayrı şey çıkardı (#43, #45, #46).**
+> Q1 `lower('İSTANBUL')` → `i̇stanbul` / **9** / `='istanbul'` **false**.
+> Postgres `lower()` = JS `.toLowerCase()`; ikisi de `i`+U+0307 üretiyor. Trigger ile
+> `normalizeAliasFields` ayrışmıyor — ama **ikisi birden `aliasKey()` ve indeks
+> ifadesinden ayrışıyor.** Q3 (çakışma) 0 satır → kurulum 23505 riski taşımıyor.
+> Q2 (yeniden yazılacak satır) **boş değil, ~100 satır** — ve sebebi asıl bulgu:
+>
+> 🚨 **BULGU A (#45) — `normalizeAliasFields`:82 ile `aliasKey`:38 AYRIŞIYOR. Canlı hata.**
+> `aliasKey` `İ`→`i` replace'ini `toLowerCase()`'den **önce** yapar; `normalizeAliasFields`
+> düz `.toLowerCase()` kullanır. Aynı dosyanın :30-35 yorumu "birini değiştiren diğerini
+> de değiştirmek zorunda" diyor ve **:82 o kurala uymuyor.** Zincir: `İ` içeren alias
+> learn-aliases'tan geçince DB'ye `i`+U+0307 olarak yazılır → indeks anahtarı 9 karakter,
+> uygulamanın çakışma kontrolü 8 karakter (**uygulama "çakışma yok" derken DB başka
+> anahtar görür**) → eşleşmede `trNorm`'un `[^a-z0-9\s]`→`' '` kuralı U+0307'yi
+> **boşluğa** çevirir (`i kitelli`), mesaj metni `ikitelli` kalır → **hiçbir zaman tutmaz.**
+> ⇒ `İ` içeren her yeni alias **sessizce ölü kayıt**. Düzeltme: :82'ye `.replace(/İ/g,'i')`
+> ekle; trigger kurulacaksa `lower(replace(NEW.alias,'İ','i'))`.
+>
+> 🚨 **BULGU B — LOWERCASE GEREKÇESİNİN KENDİSİ YANLIŞ. Kalıbın ALTINCI örneği.**
+> İddia iki dosyada yazılıydı (`alias-normalize.ts`:80-81 ve trigger script'i :64-66):
+> *"büyük harfli alias hiç tutmaz, sessizce ölü kayıt olur."* Ölçüm bunu çürüttü:
+> `parse-listing`:323/337 `trNorm(a.alias)` ile, `whatsapp-parse`:224/232 `trNorm`/
+> `aliasAnahtari` ile karşılaştırıyor — **alias okuma anında katlanıyor.** Büyük harfli
+> alias pekâlâ tutuyor. ⇒ Q2'deki ~100 satır (Söke, Bergama, Kemalpaşa, TIR Açık,
+> DANPERLİ…) ölü kayıt değil, **bugün çalışan kayıtlar**. Trigger'ın alias-lowercase
+> kısmı var olmayan bir sorunu çözüp 100 satırı bedavaya yeniden yazacaktı.
+> ✅ Değerli olan kısımlar: `\s+` sıkıştırma ve `district=''`→NULL. Asıl koruma bunlar.
+>
+> 📏 **BULGU A ÖLÇÜLDÜ — 34 SATIR, VE İNDEKSİN NASIL BAYPAS EDİLDİĞİ ORTAYA ÇIKTI.**
+> `alias like '%'||U&'\0307'||'%'` → **34 satır** (33 aktif + 1 pasif), hepsi `type='city'`,
+> hepsi büyük harfli metinden gelmiş (`SİVRİHİSAR` → `si̇vri̇hi̇sar`, 13 karakter).
+> Çakışma kontrolü ikiye ayırdı — **tek küme sanmak yanlış okumaydı**:
+> • **24'ü gölge kopya** — katlanmış anahtarı aktif bir alias'la çakışıyor. `izmit`
+>   zaten id 48'de canlı; 2875 onun ölü ikizi. **Kapsama kaybı YOK.**
+> • **10'u gerçek kayıp** (9 aktif): `kdz ereğli` · `i̇stoç` · `i̇vedik` · `ni̇zi̇p` ·
+>   `deli̇ce` · `ş.kochi̇sar` · `yeni̇ mahalle` · `i̇skendurun` · `i̇scehisardan`
+>   (+ pasif `i̇stoc`). İstoç, İvedik, Kdz Ereğli yüksek hacimli noktalar → **#42'nin
+>   (`no_lane` taban çizgisi) cevabının bir parçası burada.**
+> ⚠️ Kendi hatam: önce "34'ü de kayıp, Sabiha Gökçen dahil" dedim. Yanlıştı —
+>   Sabiha Gökçen 2863'te canlı. **Kümeyi ölçmeden bölmedim.**
+> ✅ Merge kontrolü: 24 çiftin 24'ünde `normalized` aynı; `district` yalnız 2650'de
+>   ayrışıyor ve ölü tarafta NULL (canlıda `Aliağa`) → **pasifleştirme kayıpsız,
+>   sıfır veri taşıma.** Her ölü ikizin alanları canlı ikiziyle birebir aynı —
+>   bunlar ayrı beslenmiş kayıtlar değil, aynı kümenin büyük harfli yeniden yüklemesi.
+>
+> 🔗 **NEDENSEL ZİNCİR KAPANDI.** `aliases_katlanmis_anahtar_uniq` bu 24 kopyayı
+> reddetmeliydi. Reddetmedi çünkü indeks ifadesi `replace(alias,'İ','i')` ile başlıyor
+> ve saklanan `i̇zmit`te büyük `İ` yok — U+0307 hayatta kalıyor, anahtar `izmit`ten
+> ayrışıyor. **İndeks görevini yapıyordu; :82 ona ayrışan bir anahtar verdi.**
+> ⇒ :82 düzeltmesi sadece tekrarı önlemiyor, indeksin baypas edilen kapısını kapatıyor.
+>
+> ✅ **KOD DÜZELTİLDİ (4 Ağu).** `lib/alias-normalize.ts`:82 →
+> `trTemizle(...).replace(/İ/g,'i').toLowerCase()`. Doğrulandı: `İZMİT` artık
+> `izmit` (5 karakter), eskiden `i̇zmi̇t` (7). `aliasKey(yeni) === aliasKey(ham)`
+> altı örnekte de `true`. `tsc --noEmit` temiz. **Deploy bekliyor.**
+> 📄 Veri onarımı: `docs/20260804_u0307_alias_onarimi.sql` (yedek → 24 pasifleştir
+> → 10 onar → homoglif → 5 doğrulama sorgusu + geri alma). **Çalıştırılmadı.**
+>
+> ⚠️ **BULGU C (#46) — id 1023 `Torbалı` Kiril homoglif.** `а` (U+0430) ve `л` (U+043B)
+> Kiril; `trNorm` ikisini de boşluğa çevirir → bu alias hiçbir Türkçe metinle eşleşemez.
+> Ölü kayıt. Başkaları var mı, taranmadı.
+>
+> 📌 **KEMALPAŞA 28 DEĞİL 54 — ve bu iyi haber (#44).**
+> `listing_stops.district`: `Kemalpaşa` **36** + `KEMALPAŞA` **17**;
+> `listings.origin_district`: `Kemalpaşa` 1. Doküman 28 diyordu (17 + 11).
+> Kırılıma dikkat: **`KEMALPAŞA` 17'de SABİT kalmış, `Kemalpaşa` 11 → 36 çıkmış.**
+> Yani yeni trafik doğru yazımı yazıyor; 17 satır eski kalıntı. Alias
+> düzeltmesinin işe yaradığının ölçülmüş kanıtı bu — ve kalan iş Adım **8.2**.
+> ✅ 6.b temiz: `kemalpasa` anahtarında aktif satır 1, farklı `normalized` 1 →
+>    Adım 8'in sözlüğünü **bloke etmiyor**. Korkulan engel de gerçekleşmemiş.
+>
 > ✅✅ **3 AĞU 2026 — #39 DUMAN TESTİ GEÇTİ. v4 BEŞ YAZMA YOLUNDA DA DOĞRULANDI.**
 > Gerçek trafik altında, tek günde: **149 ilan · 176 durak · hepsinde `il_bos 0`,
 > `metin_yazilmis 0`.** Kanallar: whatsapp 135 · excel 13 · form 1;

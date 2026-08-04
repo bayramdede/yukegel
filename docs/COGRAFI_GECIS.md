@@ -282,14 +282,23 @@ yazım döneminde metin kolonu **birinci sınıf veri olarak kalır** — Dalga 
   **2.4 = 0**. Blok 2'nin güvenliği migration'ın 8.2 çapraz kontrolüne dayanıyordu: id ile metin
   hiçbir yerde çelişmediği için id, metni onaracak **otorite** olarak kullanılabildi. Bu,
   `province_id` migration'ının ilk somut getirisi.
-- ✅ **Kalıcı koruma kuruldu (30 Tem 2026).** Sıra: `docs/20260730_alias_adim9_kopya_pasiflestir.sql`
-  (612 katlanmış kopya `is_active=false`, kayıpsız, yedek `public.aliases_adim9_yedek`) →
-  `docs/20260729_alias_normalize_trigger.sql` BÖLÜM 1 (`aliases_normalize_trg`) + BÖLÜM 2
-  (kısmi UNIQUE `aliases_katlanmis_anahtar_uniq`) → BÖLÜM 3 doğrulamaları (üçü de geçti).
-  `learn-aliases` artık DB seviyesinde katlanmış kopya üretemiyor; kanonikleştirme tek seferlik
-  bir temizlikti, tekilliği bundan sonra indeks garanti ediyor.
-- **İlçe adımları hâlâ açık.** `aliases.district` metin kalmaya devam ediyor; runbook'un Adım 3
-  (ilçe yazımı), Adım 4 (NULL ilçe doldurma) ve Adım 6 (elle kararlar) **bekliyor**.
+- ⚠️ **Kalıcı koruma YARIM kuruldu (30 Tem 2026 · 🚫 4 Ağu 2026'da düzeltildi).**
+  `docs/20260730_alias_adim9_kopya_pasiflestir.sql` çalıştı (612 katlanmış kopya
+  `is_active=false`, kayıpsız, yedek `public.aliases_adim9_yedek`) ve
+  `docs/20260729_alias_normalize_trigger.sql`'in **BÖLÜM 2'si** çalıştı (kısmi UNIQUE
+  `aliases_katlanmis_anahtar_uniq`). 🚫 Burada **BÖLÜM 1'in de** çalıştığı yazıyordu —
+  `aliases_normalize_trg` **canlıda yok**, 4 Ağu ön kontrolünde `pg_trigger` 0 satır döndü.
+  ✅ Tekillik garantisi ayakta: `learn-aliases` DB seviyesinde katlanmış kopya üretemiyor.
+  ❌ Normalizasyon garantisi yok: yalnız `lib/alias-normalize.ts` + `learn-aliases` route'u.
+  → görev #43.
+- ✅ **İlçe adımları KAPANDI (4 Ağu 2026, #31).** Burada "Adım 3/4/6 **bekliyor**" yazıyordu;
+  ölçüm aksini gösterdi — üçü de çalıştırılmış (Adım 3 → 0 satır, Adım 4'ün 92 satırının
+  92'si dolu ve **sıfır id kayması**, Adım 6'nın beş kararı uygulanmış), Adım 7 doğrulaması
+  boş dönüyor. Kanıt: `docs/20260804_adim3_4_6_on_kontrol.sql`.
+  ⏳ Kalan: **Adım 8.2** — `listing_stops.district`'te `KEMALPAŞA` 17 satır sözlük yazımına
+  çekilecek (#44). `Kemalpaşa` 11 → 36 çıkarken `KEMALPAŞA` 17'de sabit kalmış: yeni trafik
+  doğru yazıyor, kalan 17 satır **eski kalıntı**. `aliases.district` metin kalmaya devam
+  ediyor — Dalga 5 sonrası sistemdeki tek metin konum alanı bu olacak.
 
 ## Bilinen tuzaklar
 

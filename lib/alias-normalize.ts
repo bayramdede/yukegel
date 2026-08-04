@@ -77,9 +77,30 @@ export type AliasYazmaAlanlari = {
  */
 export function normalizeAliasFields(girdi: AliasYazmaGirdi): AliasYazmaAlanlari {
   const cikti: AliasYazmaAlanlari = {};
-  // alias DAİMA lowercase: eşleşme tarafı (`findPlaces`, `whatsapp-parse`)
-  // trNorm'lanmış metinle karşılaştırıyor, yani büyük harfli alias hiç tutmaz.
-  if (girdi.alias !== undefined) cikti.alias = trTemizle(String(girdi.alias)).toLowerCase();
+  // alias lowercase saklanır (görsel tutarlılık). `İ` → `i` dönüşümü
+  // `.toLowerCase()`ten ÖNCE yapılmak ZORUNDA — `aliasKey()`:38 ile aynı sıra.
+  //
+  // 🚨 4 AĞU 2026'ya kadar burada düz `.toLowerCase()` vardı ve iki hasar üretti:
+  //   1. `.toLowerCase('İ')` = `i` + U+0307 (birleşen nokta, İKİ karakter).
+  //      `trNorm`in son adımı `[^a-z0-9\s]` → `' '` olduğu için U+0307 BOŞLUĞA
+  //      dönüyordu: saklanan `i̇zmit` → `i zmit`, mesaj `izmit` → `izmit`.
+  //      Asla eşleşmiyordu → sessiz ölü kayıt.
+  //   2. `aliases_katlanmis_anahtar_uniq` ifadesi `replace(alias,'İ','i')` ile
+  //      başlıyor; saklanan değerde büyük `İ` kalmadığı için U+0307 hayatta
+  //      kalıyor ve katlanmış anahtar `izmit`ten AYRIŞIYORDU → tekillik indeksi
+  //      baypas edildi, 24 gölge kopya birikti.
+  //   Ölçüm ve onarım: `docs/20260804_u0307_alias_onarimi.sql`
+  //
+  // ⚠️ Bu satırın sırası `aliasKey()`:38 ve D3 indeks ifadesiyle bağlı.
+  //    Birini değiştiren üçünü birden değiştirmek zorunda.
+  //
+  // ℹ️ NOT: lowercase'in kendisi EŞLEŞME için gerekli değil — `parse-listing`
+  //    :323/337 ve `whatsapp-parse`:224/232 alias'ı OKUMA ANINDA `trNorm` ile
+  //    katlıyor, yani büyük harfli alias da tutuyor. Burada yalnız saklama
+  //    tutarlılığı için yapılıyor.
+  if (girdi.alias !== undefined) {
+    cikti.alias = trTemizle(String(girdi.alias)).replace(/İ/g, 'i').toLowerCase();
+  }
   if (girdi.normalized !== undefined) cikti.normalized = trTemizle(String(girdi.normalized));
   if ('district' in girdi) {
     const d = girdi.district === null || girdi.district === undefined ? '' : trTemizle(String(girdi.district));

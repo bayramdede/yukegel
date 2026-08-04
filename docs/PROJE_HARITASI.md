@@ -218,11 +218,22 @@
 > sorgu şart (kolon-öneki karşılaştırması) — `20260731_index_temizligi.sql` BÖLÜM 7.E.
 > 🚨 `raw_posts_dedup_idx` kararı tersine döndü — kısıt olarak gereksiz ama **86k tarama** ile
 > aktif sorgu indeksi; düşürülmeyecek. Bugün düşürülebilir ≈ **127 MB**.
-> ✅ **KALICI KORUMA KURULDU (30 Tem 2026).** `20260730_alias_adim9_kopya_pasiflestir.sql`
-> (612 satır pasif, kayıpsız) → `20260729_alias_normalize_trigger.sql` BÖLÜM 1+2 → doğrulama.
-> `aliases_normalize_trg` ve **kısmi** `aliases_katlanmis_anahtar_uniq` canlıda; katlanmış alias
-> kopyası bundan sonra DB seviyesinde DOĞAMAZ. Ayrıntı: "`aliases` kolon özeti" bölümü.
-> ⏳ Runbook'un ilçe adımları (3, 4, 6) hâlâ bekliyor.
+> ⚠️ **KALICI KORUMA — YARIM KURULMUŞ (30 Tem 2026 · 🚫 4 Ağu 2026'da düzeltildi).**
+> `20260730_alias_adim9_kopya_pasiflestir.sql` (612 satır pasif, kayıpsız) çalıştı →
+> `20260729_alias_normalize_trigger.sql`'in **yalnız BÖLÜM 2'si** çalıştı.
+> 🚫 Bu satır önce "`aliases_normalize_trg` ve kısmi `aliases_katlanmis_anahtar_uniq` canlıda"
+> diyordu — **trigger canlıda DEĞİL.** 4 Ağu ön kontrolünde `pg_trigger` `aliases` için
+> **0 satır** döndü (`docs/20260804_adim3_4_6_on_kontrol.sql` BÖLÜM 0).
+> ✅ Canlı olan: `aliases_katlanmis_anahtar_uniq` (kısmi UNIQUE) — katlanmış kopya DB
+>    seviyesinde doğamaz, D3'ün asıl amacı tutuyor.
+> ❌ Canlı olmayan: `aliases_normalize_trg` — lowercase / `\s+` sıkıştırma / `''`→NULL
+>    yalnız `lib/alias-normalize.ts`'te ve tek çağıranı `learn-aliases` route'u.
+>    Trigger'sız indeks güvenlik ağı değil **mayın**: normalize edilmemiş yazma sessizce
+>    düzelmez, **23505 ile patlar**. → görev #43. Ayrıntı: "`aliases` kolon özeti".
+> ✅ **Runbook Adım 1–7 ve 9 ZATEN TAMAM (4 Ağu 2026, #31).** Bu satır önce "ilçe adımları
+> (3, 4, 6) hâlâ bekliyor" diyordu; ölçüm aksini gösterdi — Adım 3 ve 7 boş döndü, Adım 4'ün
+> 92 satırının 92'si dolu ve **sıfır id kayması**, `payas` ve Adım 6'nın beş kararı uygulanmış.
+> Kalan gerçek iş: **Adım 8.2** (`listing_stops.district` 'KEMALPAŞA' 17 satır → #44).
 >
 > Önceki: 29 Temmuz 2026 — **SPRINT_01 W5 (alias veri bütünlüğü) kod tarafı tamamlandı.**
 > **W5:** Bozuk `aliases.normalized` yazımı (`Istanbul` 13 satır / `İstanbul` 154 satır) sahte
@@ -575,6 +586,10 @@ yukegel/
 │                                         #    bayrak filtresi YOK) · aliasCakismaBul() → 409 ·
 │                                         #    baskinYazimaHizala() (yalnız AI keşif yolu).
 │                                         #    ⚠️ aliasKey() ile D3 indeks ifadesi BİREBİR aynı olmalı ✅
+│                                         #    🚨 4 AĞU: :82 normalizeAliasFields DÜZ .toLowerCase() —
+│                                         #    :38 aliasKey'in .replace(/İ/g,'i') adımı YOK. İ içeren
+│                                         #    alias i+U+0307 yazılıyor → trNorm onu BOŞLUĞA çeviriyor
+│                                         #    → sessiz ölü kayıt + uygulama/DB anahtar ayrışması (#45)
 ├── lib/whatsapp/chatParser.ts            # 📱 TEK KAYNAK sohbet parser (server + client ortak) ✅
 ├── lib/whatsapp/__tests__/chatParser.test.ts  # 29 assertion — `npm run test:parser` ✅
 ├── lib/whatsapp/telefon.ts               # 📱 TEK KAYNAK telefon regex (05XXXXXXXXX) ✅
@@ -837,11 +852,31 @@ created_by_ai / is_approved / llm_confidence / source_listing_ids  (SLH kolonlar
 (`Istanbul`/`İstanbul`, `Izmir`/`İzmir`, `Mugla`/`Muğla`, `Bingol`/`Bingöl`). Yazma yolu
 `lib/alias-normalize.ts` üzerinden geçiyor.
 
-✅ **DB TARAFI KAPANDI (30 Tem 2026).** Artık tekillik uygulama disiplinine değil DB'ye bağlı:
-- `aliases_normalize_trg` **canlıda** — `BEFORE INSERT OR UPDATE OF alias, normalized, district`;
+⚠️ **DB TARAFI YARIM (30 Tem 2026 · 🚫 4 Ağu 2026'da düzeltildi).** Bu blok önce
+"DB TARAFI KAPANDI" diyordu; **tekillik** DB'ye bağlandı ama **normalizasyon** bağlanmadı:
+- 🚫 `aliases_normalize_trg` **CANLIDA DEĞİL.** Burada "canlıda" yazıyordu — 4 Ağu ön
+  kontrolünde `pg_trigger` `aliases` için 0 satır döndü
+  (`docs/20260804_adim3_4_6_on_kontrol.sql` BÖLÜM 0). ✅ Ayrım yapıldı: `pg_proc`
+  **`aliases_normalize` döndürdü** → fonksiyon var, trigger yok. BÖLÜM 1 **yarım
+  çalışmış**; trigger sonradan düşürülmedi, hiç kurulmadı (kopyala-yapıştır sınırı:
+  gövde :104'te biter, :106-111 yorum bloğu, DROP/CREATE TRIGGER :113/:115).
+  Tasarımı: `BEFORE INSERT OR UPDATE OF alias, normalized, district`;
   `alias` lowercase+boşluk sadeleştirme, `normalized`/`district` trim, boş `district` → NULL.
-  ⚠️ Yalnız bu üç kolon listelendiği için `is_active`-only UPDATE trigger'ı TETİKLEMEZ (Adım 9
-  toplu pasifleştirmesi bu sayede güvenliydi).
+  ℹ️ Yalnız bu üç kolon listelendiği için `is_active`-only UPDATE trigger'ı TETİKLEMEZDİ —
+  Adım 9 toplu pasifleştirmesi zaten bu yüzden güvenliydi, trigger'ın yokluğundan değil.
+  🚨 **Sonuç:** normalizasyon tek bacaklı — `lib/alias-normalize.ts` ve tek çağıranı
+  `learn-aliases` route'u. O route'tan geçmeyen yazma ham değer yazar ve aşağıdaki indekse
+  **23505** ile takılır. Trigger'sız indeks güvenlik ağı değil **mayın**. → görev #43.
+  🚨 **AMA DOSYADAKİ HÂLİYLE KURULMAMALI (4 Ağu ölçümü).** Trigger'ın `alias` satırındaki
+  `lower()` var olmayan bir sorunu çözüyor. Hem bu dosyanın :64-66'sı hem
+  `lib/alias-normalize.ts`:80-81 *"büyük harfli alias hiç tutmaz, sessizce ölü kayıt olur"*
+  diyordu — **yanlış.** `parse-listing`:323/337 `trNorm(a.alias)` ile, `whatsapp-parse`:224/232
+  `trNorm`/`aliasAnahtari` ile karşılaştırıyor: alias **okuma anında** katlanıyor, büyük
+  harfli alias pekâlâ tutuyor. Ölçüm: trigger'ın yeniden yazacağı **~100 aktif satır**
+  (Söke, Bergama, Kemalpaşa, TIR Açık, DANPERLİ…) ölü kayıt değil, bugün çalışan kayıtlar.
+  ⚠️ **Kalıbın ALTINCI örneği** — iddia iki ayrı dosyada yazılıydı, hiç ölçülmemişti.
+  ✅ Değerli olan kısımlar `\s+` sıkıştırma ve `district=''`→NULL; asıl koruma bunlar.
+  ✅ Çakışma ölçümü 0 satır → kurulum 23505 riski taşımıyor, tek risk gereksiz yeniden yazma.
 - `aliases_katlanmis_anahtar_uniq` **canlıda** — **KISMİ** UNIQUE indeks
   `(type, translate(lower(replace(alias,'İ','i')),'ıçğöşü','icgosu')) WHERE is_active = true`
   ⚠️ İndeks ifadesi `lib/alias-normalize.ts::aliasKey()` ile birebir aynı olmak zorunda.
@@ -1076,7 +1111,7 @@ Açık rotalar: /giris, /auth/, /profil-tamamla, /nasil-calisir, /hakkimizda,
 - **Alias eşleşmesi SUBSTRING ile yapılmamalı** (28 Tem 2026). `gatekeeper_sync` `norm.includes(aliasNorm)` kullanıyordu: `"lojistik"` içindeki `"ist"` → İstanbul, `"getirin"` içindeki `"tir"` → TIR, `"balyası"` içindeki `"balya"` → Balıkesir. Neredeyse her mesaj 2+ şehir bulmuş sayılıyor, `isAd` kuralı (`telefon && (araç || şehir>=2)`) fiilen **"telefon var mı"**ya iniyordu — gatekeeper devre dışıydı. Düzeltme: token eşitliği + Türkçe hal eki soyma (`ekSoy`), tokenlar `[\s.>-]` sınırlarından ayrılır, 3 harften kısa alias yok sayılır. `parse-listing/findPlaces` zaten token bazlıydı; iki taraf hizalandı.
 - **İlçe adları günlük Türkçe kelimelerle çakışıyor (homonim)** — `araç`→Kastamonu, `olur`→Erzurum, `pazar`→Rize, `perşembe`→Ordu, `merkez`→onlarca il. Token eşleşmesi bunları TEMİZLEMEZ, veri tarafında pasifleştirmek gerekir: `docs/20260728_alias_homonim_temizligi.sql`. Hem gatekeeper'ı hem `parse-listing`'in gerçek güzergâh çıkarımını bozar.
 - 🚨 **LLM prompt'unun ÖRNEKLERİ kuraldan güçlüdür — bozuk örnek bozuk veri üretir** (29 Tem 2026, `SPRINT_01` W5/D1). `learn-aliases` prompt'unda kurallar Türkçe doğru yazımı istiyordu ama JSON **örnekleri** ASCII'ye indirgenmişti (`"Eskisehir"`, `"Istanbul"`, `"Tekirdag"`). Model kuralı değil örneği taklit etti; `aliases.normalized` aylarca iki yazımla doldu (`Istanbul` 13 satır / `İstanbul` 154 satır). **Kural:** prompt'a örnek yazarken örneğin kendisi üretmek istediğin çıktının birebir doğru hali olmalı. Ayrıca prompt'a mevcut kayıtlar bağlam olarak veriliyorsa "listede eski/bozuk kayıtlar olabilir, onları örnek alma" satırı şart — yoksa bozulma kendi kendini besler.
-- 🚨 **Karşılaştırma anahtarı ile SAKLANAN değer aynı şey değildir** (29 Tem 2026, `SPRINT_01` W5/D2+D4). `Istanbul` ve `İstanbul` **aynı şehir** ama string eşitliği bunu göremez. `parse-listing/findPlaces`'teki `seen` seti ham `normalized` üzerinde çalıştığı için iki yazım İKİ AYRI ŞEHİR sayılıyordu; `sameCity` koruması devreye girmiyor ve **sahte `İstanbul→İstanbul` ilanı** kaydediliyordu (aynı sebeple şehir filtresi de ilanların bir kısmını hiç göstermiyordu). Düzeltme: her karşılaştırma/dedup anahtarı katlanmış formdan geçer (`aliasKey` / `yerKey`), **saklanan değer Türkçe kalır**. ⚠️ Katlama fonksiyonu (`lib/alias-normalize.ts::aliasKey`) ile DB indeks ifadesi (`docs/20260729_alias_normalize_trigger.sql`) BİREBİR aynı olmalı: `translate(lower(replace(alias,'İ','i')),'ıçğöşü','icgosu')`. Sıra kritik — `İ` (U+0130) **önce** düz `i`ye çevrilmeli, yoksa Postgres `lower()` onu `i` + U+0307 olarak iki karaktere açar ve JS `toLowerCase()` ile ayrışır → uygulama "çakışma yok" derken DB 23505 atar.
+- 🚨 **Karşılaştırma anahtarı ile SAKLANAN değer aynı şey değildir** (29 Tem 2026, `SPRINT_01` W5/D2+D4). `Istanbul` ve `İstanbul` **aynı şehir** ama string eşitliği bunu göremez. `parse-listing/findPlaces`'teki `seen` seti ham `normalized` üzerinde çalıştığı için iki yazım İKİ AYRI ŞEHİR sayılıyordu; `sameCity` koruması devreye girmiyor ve **sahte `İstanbul→İstanbul` ilanı** kaydediliyordu (aynı sebeple şehir filtresi de ilanların bir kısmını hiç göstermiyordu). Düzeltme: her karşılaştırma/dedup anahtarı katlanmış formdan geçer (`aliasKey` / `yerKey`), **saklanan değer Türkçe kalır**. ⚠️ Katlama fonksiyonu (`lib/alias-normalize.ts::aliasKey`) ile DB indeks ifadesi (`docs/20260729_alias_normalize_trigger.sql`) BİREBİR aynı olmalı: `translate(lower(replace(alias,'İ','i')),'ıçğöşü','icgosu')`. Sıra kritik — `İ` (U+0130) **önce** düz `i`ye çevrilmeli, yoksa Postgres `lower()` onu `i` + U+0307 olarak iki karaktere açar ve JS `toLowerCase()` ile ayrışır → uygulama "çakışma yok" derken DB 23505 atar. 📏 **Ölçüldü (4 Ağu 2026):** `lower('İSTANBUL')` = `i̇stanbul`, **length 9**, `='istanbul'` **false**. Yani Postgres `lower()` ile JS `.toLowerCase()` **aynı** davranıyor; ayrışan taraf `replace`'i öne alan `aliasKey`/indeks ifadesi. 🚨 **Ve `lib/alias-normalize.ts`:82 `normalizeAliasFields` bu kurala UYMUYOR** — düz `.toLowerCase()` kullanıyor. `İ` içeren alias DB'ye `i`+U+0307 olarak yazılıyor; dahası `trNorm`'un `[^a-z0-9\s]`→`' '` kuralı U+0307'yi **boşluğa** çevirdiği için (`i kitelli` ≠ `ikitelli`) o alias hiçbir mesajla eşleşemiyor → **sessiz ölü kayıt**. Görev #45.
 - ⚠️ **`normalized` her zaman şehir DEĞİL — otomatik yazım düzeltmesi yapma** (29 Tem 2026, W5/D2). `type='vehicle'` satırlarında `normalized` doğrudan `vehicle_type` olarak ilana yazılıyor; "tir" → "Tir" yapmak eşleşmeyi bozar. Bu yüzden ne `normalizeAliasFields` ne de DB trigger'ı `normalized`/`district` üzerinde büyük harfe çevirme / ASCII katlama yapıyor — yalnız boşluk temizliği. Yanlış yazım sessizce düzeltilmez, `aliasCakismaBul` **409 ile admine sorar** (öneri: çoğunluk yazımı — 154 satır `İstanbul` varken 13 satırlık `Istanbul` kazanmasın).
 - 🚨 **`alias` kolonundaki UNIQUE kısıtı HAM string üzerinde — katlanmış kopyaları engellemez** (29 Tem 2026, W5/D3). `Gebze`/`GEBZE`/`gebze`, `Çorlu`/`çorlu`/`corlu`, `Torbali`/`torbali`/`torbalı` üç ayrı satır olarak duruyor ve hepsi tek katlanmış anahtara düşüyor. Sonucu: planlanan tam UNIQUE indeks **kurulamaz** (23505). Ayrıca temizlik script'i bu satırları silmiyor, yalnız `normalized`/`district`'i tutarlı yapıyor — yani veri temizliği tamamlansa bile önkoşul karşılanmıyor. Çözüm iki parçalı: önce fazlalıkları `is_active = false` yap (runbook Adım 9; `row_number() OVER (PARTITION BY type, katlanmış ORDER BY id) > 1` — **silme yok**, `findPlaces` zaten `.order('id')` ile küçük id'yi seçtiği için bugünkü davranış değişmez), sonra indeksi **kısmi** kur (`WHERE is_active = true`) — pasifleştirilmiş kopyalar tabloda durduğu için tam indeks onları da ihlal sayardı.
 - **PostgREST tek sorguda EN FAZLA 1000 satır döndürür — ve bunu SÖYLEMEZ** (28 Tem 2026). Supabase'in `db.max-rows` ayarı. Sınırı aşan `select()` hata vermez, sessizce kesilir. `aliases` tablosu 1887 aktif satıra çıkmıştı; hem `app/api/whatsapp-parse` gatekeeper'ı hem `supabase/functions/parse-listing` şehir/araç tespitini alias'ların **%47'sini hiç görmeden** yapıyordu. Üstelik `ORDER BY` olmadığı için hangi 887 satırın düştüğü belirsizdi → aynı mesaj farklı zamanlarda farklı ayrıştırılabiliyordu. Düzeltme: `.range()` ile sayfalama + `.order('id')` (sıralama olmadan sayfalar çakışır/atlar). **Kural: bir tabloyu "hepsini çek" niyetiyle okuyan her sorgu sayfalanmalı.**

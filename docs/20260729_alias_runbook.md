@@ -2,7 +2,34 @@
 
 > 29 Temmuz 2026 · W5/D5 · **Bayram çalıştıracak**
 > Kod tarafı (W5/D1, D2, D4) bu runbook'tan ÖNCE deploy edilmiş olmalı.
-> Durum: Bayram'ın 29 Tem beyanı — **iki script'ten hiçbir bölüm çalıştırılmadı.**
+> ~~Durum: Bayram'ın 29 Tem beyanı — iki script'ten hiçbir bölüm çalıştırılmadı.~~
+> ⬆️ **Bu satır 4 Ağu 2026'da geçersizleşti.** Güncel durum tablosu hemen aşağıda.
+
+## 🟢 DURUM (4 Ağustos 2026 — beyanla değil, ÖLÇÜLEREK)
+
+Kanıt: `docs/20260804_adim3_4_6_on_kontrol.sql` (yalnız SELECT; çıktısı o dosyanın
+SONUÇ KAYDI bölümünde duruyor).
+
+| Adım | Durum | Kanıt |
+|---|---|---|
+| 1 homonim | ✅ | `araç`/`arac`/`olur` üçü de `is_active = false` |
+| 2 `normalized` ASCII | ✅ | sorgu 0 satır |
+| 3 `district` yazımı | ✅ | sorgu 0 satır; **liste dışı** bozulma da yok |
+| 4 NULL `district` (92) | ✅ | 92/92 dolu, **id–alias eşleşmesi bozulmamış** |
+| 5 `payas` | ✅ | 1003 → Hatay/Payas aktif, 1844 pasif |
+| 6 elle kararlar | ✅ | beşi de uygulanmış (Kahramankazan ×2, Çekmeköy, Esenyurt, Adıyaman pasif, Artvin pasif) |
+| 7 doğrulama | ✅ | iki sorgu da boş |
+| 9 katlanmış kopyalar | ✅ | dolaylı ama kesin: `aliases_katlanmis_anahtar_uniq` **canlı**, kopya kalsaydı 23505 ile kurulamazdı |
+| **8.2 ilçe onarımı** | ⏳ | `listing_stops.district` `KEMALPAŞA` **17 satır** → görev #44 |
+| 8.1 / 8.4 şehir kolonları | ⏭️ | bilinçli atlanıyor — Dalga 5'te düşecek kolonlar |
+| **10 trigger** | 🚨 | BÖLÜM 2 (indeks) canlı, **BÖLÜM 1 (`aliases_normalize_trg`) YOK** → görev #43 |
+
+📌 **Bu tablo neden var:** 4 Ağu'ya kadar `PROJE_HARITASI.md`, `COGRAFI_GECIS.md` ve
+görev listesi "Adım 3/4/6 bekliyor" diyordu — **üçü de yanlıştı**. Aynı belgeler
+trigger'ın canlı olduğunu söylüyordu — **o da yanlıştı**. Kayıt iki yönde birden
+kaymıştı, çünkü kimse veriye sormamıştı.
+⚠️ Bu tabloyu güncellerken **kanıt sütununu doldur**. "Hatırlıyorum" bir kanıt değil;
+bu runbook'un 29 Tem'deki "hiçbir bölüm çalıştırılmadı" satırı da bir beyandı.
 
 İki hazır script var ama **aralarındaki sıra hiçbir yerde yazılı değildi**. Yanlış
 sıra sessizce zarar verir: `kopya BÖLÜM 3` (NULL ilçeleri doldurma) kaynak olarak
