@@ -1,6 +1,0 @@
-        <Aksiyonlar
-          ilanId={ilan.id}
-          dogrulanmamis={dogrulanmamis}
-          contactPhone={ilan.contact_phone}
-          uyeGiris={!!user}
-        />

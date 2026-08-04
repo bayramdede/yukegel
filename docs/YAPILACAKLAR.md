@@ -68,7 +68,11 @@
 > tüm repoda (.ts/.tsx/.sql) **0 eşleşme** verdi. Yani kolon şemada var,
 > **hiçbir satırda dolu değil** — başarılıda da, başarısızda da. Eksik bir dal
 > değil, hiç kullanılmayan bir kolon.
-> → `parse-listing/index.ts`:924 artık iki dalda da damgalıyor. **Bayram deploy etmeli.**
+> → `parse-listing/index.ts`:924 artık iki dalda da damgalıyor.
+> ✅ **DEPLOY EDİLDİ VE DOĞRULANDI 4 Ağu 2026:** damgalı satırlar `processed` 13
+> · **`no_lane` 4**. Kritik olan ikincisi — başarısızlık dalının da damgalandığını
+> kanıtlıyor, ki bu düzeltmenin bütün sebebi oydu. `pending` 373'te 0 damga,
+> beklenen (henüz işlenmediler).
 > 📌 Aynı sınıftan üçüncü vaka: `destination_city` (#28 — kolon hiç yokmuş),
 > `get_nearby_listings_for_parked_driver` (#40 — fonksiyon canlıda hiç yokmuş),
 > şimdi `processed_at` (kolon var, hiç yazılmamış). **Şemada bir şeyin bulunması
@@ -140,10 +144,16 @@
 > dördünün fonksiyonu da 1. sorguda çıkmadı → temiz. (Trigger *adı* gövde
 > hakkında bir şey söylemez; hüküm iki sorgunun **kesişiminden** geliyor.)
 >
-> ❗ **2 (view/matview), 5 (RLS), 6 (varsayılan) çıktıları yapıştırılmadı** —
-> boş döndüyse bile yazılmalı, şu an "boş" ile "bakılmadı" ayırt edilemiyor.
-> En kritiği **BÖLÜM 2: view/matview `drop column`'u fiilen ENGELLER.**
-> → Dalga 5 öncesi teyit şart.
+> ✅ **4 AĞU: EKSİK ÜÇ BÖLÜM DE KAPANDI — ÜÇÜ DE BOŞ.** View/matview **yok**,
+> metin kolonuna bakan RLS politikası **yok**, default/generated ifade **yok**.
+> Dosyanın tamamı yeniden koşuldu; 1/3/4/4.b/7 çıktıları 3 Ağu'dakiyle birebir
+> aynı, yani sürüklenme de yok.
+> 🟢 **DALGA 5 DROP'UNUN DB TARAFINDA ENGELİ KALMADI.** Üç engel sınıfının üçü
+> de boş: view (asıl engelleyici olan), kısıt, default. Yedi indeks
+> `drop column` ile kendiliğinden düşer.
+> ⚠️ Bu hüküm **yalnız şema tarafı**. Uygulama tarafında **#24**
+> (`learn-aliases`:437) hâlâ metin kolonuna yazıyor — çevrilmeden drop edilirse
+> `42703`. Sıra değişmedi: #21 (7 Ağu) → #24 → drop.
 >
 > 🔑 **#21'İN ANLAMI DEĞİŞTİ (aşağıdaki kayda ek).** Fark penceresi artık
 > homojen değil: 31 Tem→7 Ağu'nun 3 günü v4 öncesi, 4 günü sonrası. "Silinebilir
@@ -549,6 +559,25 @@
 > 🧹 Kalan tek scratch: `app/ilan/[id]/_aksiyonlar_props.txt` (izleniyor, altı
 > satırlık JSX parçası, hiçbir yerden referans yok) — bu turda listede olmadığı
 > için dokunulmadı, bir sonraki temizlikte silinebilir.
+>
+> ✅ **4 AĞU 2026 — `_aksiyonlar_props.txt` SİLİNDİ. Sebep düzen değil, GÜVENLİK.**
+> Dosya 28 Nis'te (`9e9eac5`) donmuş 169 baytlık bir `<Aksiyonlar …>` çağrısıydı
+> ve içinde **`contactPhone={ilan.contact_phone}`** yazıyordu. Canlı çağrı ise
+> `app/ilan/[id]/page.tsx`:472-479'da `contactPhone={user && profilTamamlandi ?
+> ilan.contact_phone : null}` — SPRINT_01 L1c güvenlik düzeltmesi. Yani `.txt`
+> düzeltme ÖNCESİ hâli saklıyordu: kopyala-yapıştırılsa misafir kullanıcının
+> Flight payload'ına telefon numarası **geri sızardı**.
+> → Adı (`_aksiyonlar_props`) ve konumu (bileşenin yanı) "Aksiyonlar'ı böyle
+> çağır" diye okunuyordu; taşıdığı bilgi zaten iki **derleyici denetimli** yerde
+> doğru duruyor: `page.tsx`:472 (fiilî çağrı) ve `Aksiyonlar.tsx`:25 (`Props`).
+>
+> 🔁 **Bu, aynı kalıbın DÖRDÜNCÜ örneği: "kayıt gerçeklikten ayrıldı, çünkü onu
+> kimse doğrulamıyordu."** Öncekiler: `destination_city` (kolon hiç yoktu),
+> `get_nearby_listings_for_parked_driver` (fonksiyon hiç deploy edilmemişti),
+> `processed_at` (kolon vardı, hiçbir şey yazmıyordu). Ortak yan: dördü de
+> derleyicinin/veritabanının denetlemediği bir yerde yaşıyordu. Denetlenmeyen
+> kayıt yanlış olduğunda susar; en tehlikelisi de **eskiyen bir güvenlik
+> düzeltmesinin öncesini** donduran kayıttır.
 >
 > ✅ **3 AĞU 2026 — #36 BİTTİ: 81 il listesi beş kopyadan ikiye indi.**
 > Aynı dizi `moderator/page.tsx`:14, `admin/poi-onay/PoiOnayClient.tsx`:63,

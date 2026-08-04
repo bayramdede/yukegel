@@ -196,21 +196,28 @@ select c.relname as tablo, t.tgname as trigger_adi,
 -- ✅ ÇALIŞTIRILDI 3 Ağu 2026 — Bayram, canlı (gobepcswwsoswodhaufy).
 --
 --   1. Fonksiyonlar   → [x] 4 satır — HİÇBİRİ GERÇEK TÜKETİCİ DEĞİL (aşağıda)
---   2. View'lar       → [ ] ❗ çıktı yapıştırılmadı — TEYİT BEKLİYOR
+--   2. View'lar       → [x] **BOŞ** — view/matview YOK (4 Ağu teyidi)
 --   3. İndeksler      → [x] 7 indeks — hepsi drop'ta otomatik düşer, #21 etkilendi
 --   4. Kısıtlar       → [x] 1 satır, alakasız (`aliases_type_check`) = temiz
 --   4.b NOT NULL      → [x] ikisi de false — bugünkü düzeltme tuttu
---   5. Politikalar    → [ ] ❗ çıktı yapıştırılmadı — TEYİT BEKLİYOR
---   6. Varsayılanlar  → [ ] ❗ çıktı yapıştırılmadı — TEYİT BEKLİYOR
+--   5. Politikalar    → [x] **BOŞ** — metin kolonuna bakan RLS politikası YOK
+--   6. Varsayılanlar  → [x] **BOŞ** — default/generated ifade YOK
 --   7. Trigger'lar    → [x] 4 trigger, hepsi 1. sorguda YOK = temiz
 --
--- ⚠️ 2/5/6 boş döndüyse bile yazılmalı; şu an "boş" ile "bakılmadı" ayırt
---    edilemiyor ve bu dosyanın varlık sebebi tam olarak bu ayrımdı.
---    En kritiği BÖLÜM 2: view/matview `drop column`'u fiilen ENGELLER.
+-- ✅ 4 Ağu 2026'da dosyanın TAMAMI yeniden koşuldu; 1/3/4/4.b/7 çıktıları
+--    3 Ağu'dakiyle BİREBİR aynı (sürüklenme yok) ve eksik 2/5/6 kapandı.
 --
--- ── GENEL HÜKÜM ──────────────────────────────────────────────────────────────
+-- ── GENEL HÜKÜM — TARAMA TAMAMLANDI, SONUÇ TEMİZ ────────────────────────────
 -- Postgres tarafında metin kolonlarının GERÇEK tüketicisi KALMADI. #37 son
 -- taneymiş. Tesadüfle bulunan bulgu, katalogla teyit edildi.
+--
+-- 🟢 **DALGA 5 DROP'UNUN DB TARAFINDA ENGELİ YOK.** Üç ayrı engel sınıfının
+--    üçü de boş döndü: view/matview yok (bunlar `drop column`u fiilen
+--    engeller), kısıt yok, default/generated yok. Kalan yedi indeks
+--    `drop column` ile kendiliğinden düşer.
+--    ⚠️ Bu hüküm YALNIZCA şema tarafı içindir. Uygulama tarafında #24
+--       (`learn-aliases`:437) hâlâ metin kolonuna yazıyor ve drop'tan önce
+--       çevrilmezse `42703` atar.
 --
 -- ── 1. FONKSİYONLAR — 4 eşleşmenin dördü de yanlış pozitif ───────────────────
 -- Üç ayrı zararsız sınıf çıktı; üçü de kolon okuması DEĞİL:

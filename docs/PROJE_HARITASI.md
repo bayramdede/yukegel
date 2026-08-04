@@ -163,6 +163,12 @@
 > `npx tsc --noEmit` temiz — ölü olduklarının kanıtı grep değil derleyici.
 > ⚠️ `app/panel/` KARMA dizindi: `page.tsx` + `PanelClient.tsx` CANLI (KOVA B'de çevrildi),
 > `app/moderator/actions.ts` de canlı (`moderator/page.tsx`:6). Silme dizin değil dosya bazlı.
+> ✅ **4 Ağu 2026 — `app/ilan/[id]/_aksiyonlar_props.txt` de SİLİNDİ (12. dosya).** #38'den
+> kalan tek scratch'ti. Düzen için değil **güvenlik için**: 28 Nis'ten (`9e9eac5`) donmuş
+> parça `contactPhone={ilan.contact_phone}` diyordu; canlı çağrı `page.tsx`:472-479'da
+> SPRINT_01 L1c ile `contactPhone={user && profilTamamlandi ? ilan.contact_phone : null}`.
+> Kopyalansaydı misafirin Flight payload'ına telefon geri sızardı. Doğru bilgi zaten
+> derleyici denetimli iki yerde: `page.tsx`:472 ve `Aksiyonlar.tsx`:25 (`Props`).
 > ✅ **3 Ağu 2026 — BÖLÜM 2 KOD TEMİZLİĞİ BİTTİ (#34 + #35), v4 (#26) artık çıkabilir.**
 > Çevrilen dosyalar: `api/admin/radar/route.ts` + `admin/radar/RadarClient.tsx`,
 > `api/admin/crm/[id]/route.ts` + `admin/crm/CrmClient.tsx`, `api/admin/learn-aliases/route.ts`
