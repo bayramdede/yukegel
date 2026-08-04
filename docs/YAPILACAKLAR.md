@@ -93,8 +93,31 @@
 > `trTemizle(...).replace(/İ/g,'i').toLowerCase()`. Doğrulandı: `İZMİT` artık
 > `izmit` (5 karakter), eskiden `i̇zmi̇t` (7). `aliasKey(yeni) === aliasKey(ham)`
 > altı örnekte de `true`. `tsc --noEmit` temiz. **Deploy bekliyor.**
-> 📄 Veri onarımı: `docs/20260804_u0307_alias_onarimi.sql` (yedek → 24 pasifleştir
-> → 10 onar → homoglif → 5 doğrulama sorgusu + geri alma). **Çalıştırılmadı.**
+> ✅ **VERİ ONARIMI DA TAMAMLANDI** — `docs/20260804_u0307_alias_onarimi.sql`:
+> yedek 34 → **UPDATE 24** (gölge kopya pasif) → **UPDATE 9** (gerçek kayıp onarıldı)
+> → **UPDATE 1** (homoglif 1023 pasif). Doğrulama: `aktif_u0307 0` · `pasif_u0307 25` ·
+> Latin-dışı aktif **0** · katlanmış çakışma **0** · `pasiflestirilen 24`.
+> 🧪 `trNorm` eşleşme testi **9/9**: `nizip`·`istoç`·`ivedik`·`kdz ereğli`·`delice`·
+> `iskendurun`·`iscehisardan`·`ş.kochisar`·`yeni mahalle` artık mesaj metniyle tutuyor.
+> Onarım öncesi kıyas: `ni̇zi̇p` → `ni zi p` ≠ `nizip`. Fark tam olarak buydu.
+> ⏳ **TEK KALAN: kodu DEPLOY et.** Edilmezse learn-aliases yeni U+0307 satırları
+> üretmeye devam eder ve bu onarım aşınır.
+>
+> 📚 **SÜREÇ DERSİ — ÇAKIŞMA KONTROLÜ TEK İNDEKSE BAKMAZ.**
+> BÖLÜM 3'ün ilk denemesi **23505** ile patladı (`idx_aliases_type_alias`) ve atomik
+> olduğu için tamamen geri sarıldı — kısmi uygulama olmadı. Sebep: çakışmayı yalnız
+> `aliases_katlanmis_anahtar_uniq`e karşı ölçmüştüm. `aliases` üzerinde **üç** unique
+> indeks var ve ikisi **kısmi değil**: `aliases_alias_unique (alias)` ve
+> `idx_aliases_type_alias (type, alias)`. Kısmi indeks Adım 9'da pasifleştirilen
+> **612 satırı** görmüyor; diğer ikisi görüyor. Çarpışma oradan geldi.
+> ⚠️ Kural: veri onarımından önce `select indexname, indexdef from pg_indexes
+> where tablename='X'` çalıştır, HER unique indeksi ayrı kontrol et.
+> 🔁 Ve bu sefer kaydı **ben** ıskaladım — beş indeksin listesi 4 Ağu ön kontrolünün
+> §0 çıktısında zaten elimdeydi. "Elimde var" ile "kontrole kattım" aynı şey değil.
+> ℹ️ Yan bulgu: `aliases_alias_unique` global olduğu için `idx_aliases_type_alias`
+> fiilen gereksiz — ayrıca aynı alias metni iki `type`ta var olamıyor. Dokunulmadı.
+> ℹ️ 25 pasif satırda U+0307 bilerek bırakıldı (yazımları okunmuyor, onarmak
+> `aliases_alias_unique` ile çakışırdı). Yedek: `public.aliases_20260804_u0307_yedek`.
 >
 > ⚠️ **BULGU C (#46) — id 1023 `Torbалı` Kiril homoglif.** `а` (U+0430) ve `л` (U+043B)
 > Kiril; `trNorm` ikisini de boşluğa çevirir → bu alias hiçbir Türkçe metinle eşleşemez.
