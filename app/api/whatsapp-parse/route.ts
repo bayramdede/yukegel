@@ -4,7 +4,10 @@ import { requireStaff } from '../../../lib/auth';
 import { structuredLog } from '../../../lib/logger';
 // Sohbet ayrıştırma TEK KAYNAKTAN gelir — tarayıcı tarafı (WhatsappYukle.tsx) da
 // aynı modülü kullanır. İkisi ayrışırsa mesajlar sessizce kaybolur.
-import { parseChatTxt, grupAdiTuret, sohbetTxtSec } from '../../../lib/whatsapp/chatParser';
+// `gorunmezleriSil` YALNIZ `Cf` siler (U+FE0F hariç) — `cleanHash` girdisi olduğu
+// için buradaki yerel `gorunmezleriSil` (Cf + U+FE0F) ile KARIŞTIRILMASIN, ad
+// çakışmasını görünür kılmak için `cfKarakterleriSil` olarak alınıyor.
+import { parseChatTxt, grupAdiTuret, sohbetTxtSec, gorunmezleriSil as cfKarakterleriSil } from '../../../lib/whatsapp/chatParser';
 import { telefonlariCikar } from '../../../lib/whatsapp/telefon';
 
 export const runtime = 'nodejs';
@@ -109,8 +112,30 @@ async function sirayla<T, R>(
   return sonuclar;
 }
 
+/**
+ * Tekilleştirme anahtarı — `idx_raw_posts_hash_msgdate UNIQUE (clean_hash, message_date)`
+ * indeksinin girdisi.
+ *
+ * 🚨 4 AĞU 2026 — GÖRÜNMEZ KARAKTER SİLME BURAYA SONRADAN EKLENDİ. Eksikliği bir
+ * saldırı yüzeyiydi: bir gönderici metne `S<U+200C>apanca` gibi sıfır genişlikli
+ * karakter serpip aynı ilanı tekrar tekrar yazdırıyordu — gözle birebir aynı mesaj,
+ * her seferinde farklı hash. Aynı gün `trNorm`'a eklenen `gorunmezleriSil()` yalnız
+ * YER EŞLEŞTİRMESİNİ onarmıştı; tekilleştirme deliği bu satır yazılana kadar açık
+ * kaldı. İki ayrı yerde iki ayrı zarar — biri düzeltilince öteki düzelmiş SANILDI.
+ *
+ * ⚠️ Bu fonksiyona eklenen her normalizasyon adımı GEÇMİŞİ etkiler: eski satırların
+ * hash'i eski kuralla hesaplandı, kural değişince aynı mesaj yeni hash üretir ve
+ * yeniden içe aktarımda KOPYA yazılır. Burada etki sıfıra yakın — `text` zaten
+ * `chatParser::satiriTemizle`'den geçmiş, yani Cf karakterleri temizlenmiş geliyor;
+ * bu çağrı ikinci savunma hattı. Yine de yeni bir adım eklemeden önce aynı hesabı yap.
+ *
+ * ⚠️ Bilerek `chatParser::gorunmezleriSil` (yalnız `Cf`) kullanılıyor, aşağıdaki
+ * yerel `gorunmezleriSil` (Cf + U+FE0F) DEĞİL. `➡️ ⚠️ ✅` gibi emojilerin parçası olan
+ * U+FE0F hash'ten silinirse binlerce eski mesajın anahtarı değişir. Eşleştirme
+ * tarafında saklanan değer yok, orada silmek serbest — listelerin farkı kasıtlı.
+ */
 async function cleanHash(text: string): Promise<string> {
-  const normalized = text.toLowerCase().replace(/\s+/g, ' ').trim();
+  const normalized = cfKarakterleriSil(text).toLowerCase().replace(/\s+/g, ' ').trim();
   const encoder = new TextEncoder();
   const data = encoder.encode(normalized);
   const hashBuffer = await crypto.subtle.digest('SHA-256', data);
@@ -125,8 +150,46 @@ function normalizeArrows(s: string): string {
     .replace(/\s+/g, ' ').trim();
 }
 
+/**
+ * Sıfır genişlikli / yön kontrol karakterlerini SİLER (boşluğa çevirmez).
+ *
+ * 🚨 4 AĞU 2026 — CANLI VERİDE BULUNDU, VARSAYIM DEĞİL. Bir gönderici WhatsApp'ın
+ * kopya tespitini kırmak için mesajlarına görünmez karakter serpiyor:
+ * `S<U+200C>apanca` (S ile a arasında ZWNJ), `<U+2060>Sarar` (başında word-joiner).
+ * Ekranda fark edilmiyor.
+ *
+ * ⚠️ Bu örnekler BİLEREK `<U+200C>` gösterimiyle yazıldı, ham karakterle DEĞİL —
+ *    ham yazılsaydı yorumun kendisi de görünmez olur, bir formatter sessizce
+ *    silince örnek anlamsızlaşırdı.
+ *
+ * Zararı, silinmediğinde `trNorm`un son adımından geliyor: `[^a-z0-9\s\.>-]`
+ * bilinmeyen her karakteri BOŞLUĞA çevirir, yani `s<U+200C>apanca` → `s apanca`.
+ * Sonra `:180` token'ları ayırır ve `t.length < 2` ile `s`yi atar; geriye
+ * `apanca` kalır, hiçbir alias'la eşleşmez. Sonuç sessiz: hata yok, uyarı yok,
+ * ilanın ili yok. (`normalizeAliasFields`'teki U+0307 hatasıyla AYNI mekanizma —
+ * görünmez bir karakter boşluğa dönüşüp kelimeyi ikiye bölüyor.)
+ *
+ * ⚠️ Silme sırası önemli: `trNorm`un EN BAŞINDA olmalı. Sona koyulursa
+ *    `[^a-z0-9…]` adımı karakteri zaten boşluğa çevirmiş olur, iş işten geçer.
+ *
+ * ℹ️ `supabase/functions/parse-listing/index.ts`:74 aynı işi zaten yapıyor (aynı
+ *    karakter kümesi). Bu route o korumanın DIŞINDA kalmıştı; ikisi artık eş.
+ *    Birini değiştiren diğerine de bakmalı.
+ *
+ * 🚨 BU LİSTE `chatParser::GORUNMEZ_CF` İLE AYNI DEĞİL — U+FE0F fazladan var, ve
+ *    bu KASITLI. Buradaki çıktı yalnız EŞLEŞTİRMEDE kullanılır (`trNorm`), hiçbir
+ *    yerde saklanmaz ve hash'e girmez; emoji varyasyon seçicisini atmak serbest.
+ *    `cleanHash` ve `raw_posts.message` tarafında FE0F silinemez (bkz. `cleanHash`).
+ */
+// ⚠️ Karakterler `\u` KAÇIŞIYLA yazıldı, ham hâlleriyle DEĞİL. Ham yazılırsa
+//    kaynak dosyada görünmezler; bir editör/format aracı sessizce siler ya da
+//    kopyala-yapıştır sırasında kaybolur ve koruma fark edilmeden ölür.
+function gorunmezleriSil(s: string): string {
+  return (s || '').replace(/[\u200e\u202a\u202c\u200f\u200b\u200c\u200d\u2060\ufeff\u{FE0F}]/gu, '');
+}
+
 function trNorm(s: string): string {
-  return normalizeArrows(s || '')
+  return normalizeArrows(gorunmezleriSil(s || ''))
     .replace(/İ/g, 'i').replace(/I/g, 'i')
     .toLowerCase()
     .replace(/ç/g, 'c').replace(/ğ/g, 'g').replace(/ı/g, 'i')

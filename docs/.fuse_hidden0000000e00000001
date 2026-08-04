@@ -12,7 +12,7 @@
 --           cevaplıyor; tasarım canlıda doğrulandı.
 --    Ayrıca çalıştırmadan önce BÖLÜM 2'nin 973 satırı `lib/constants/locations.json`
 --    ile programatik karşılaştırıldı: 973/973 birebir, tekrar yok, tek yönlü fark yok.
---    ✅ Bu karşılaştırma artık OTOMATİK: `npm run test:districts` (bkz. 4.3).
+--    ⚠️ Bu karşılaştırma ELLE yapıldı, otomatik test hâlâ yok (bkz. 4.3).
 --
 -- ✅ FONKSİYON CANLI VERİYE KARŞI ÇAPRAZ DOĞRULANDI (4 Ağu).
 --    `district_official` dolu olan 62 durakta kolon ile `ilce_resmi()` yan yana
@@ -1167,21 +1167,12 @@ grant execute on function public.ilce_resmi(smallint, text) to anon, authenticat
 --  where not exists (select 1 from public.districts d where d.province_id = p.id);
 -- Beklenen: 0 satır.
 
--- 4.3 ✅ TEK KAYNAK KONTROLÜ — YAZILDI (4 Ağu 2026)
---     `npm run test:districts` → `scripts/test-districts.mts`
---     Bu dosyanın 125-1099 satırlarındaki INSERT bloğunu ayrıştırıp
---     `lib/constants/locations.json` ile ÇİFT YÖNLÜ karşılaştırır: 973/973,
---     81 il, kopya yok, `il_key()` katlaması altında il içi çakışma yok, artı
---     8 çapa kontrol (Ömerli mahalle, Gölbaşı iki ilde, Havza/Orhaneli — 4 Ağu
---     alias hatalarının doğru cevapları, Marmaraereğlisi bitişik, 51 Merkez).
---     Kimlik bilgisi istemez, `test-lokasyon.mts` gibi saf Node.
---
---     ⚠️ KAPSAM SINIRI: JSON ile BU DOSYAYI karşılaştırır, CANLI TABLOYU DEĞİL.
---        Tabloya elle satır eklenirse test görmez. `provinces` ile aynı kural:
---        elle satır ekleme YAPMA, JSON'u düzenle ve bloğu yeniden üret.
---        Canlı sayı kontrolü elle: 4.1.
---     ✔️ Negatif doğrulama yapıldı: bir satırın province_id'si bozulunca test
---        3 kontrolde kırıldı ve farkı isim isim yazdırdı.
+-- 4.3 🚨 TEK KAYNAK KONTROLÜ — locations.json ile tablo aynı mı
+--     Bu sorgu SQL'den çalışmaz; `npm run` tarafında bir test olarak yazılmalı.
+--     JSON'daki (il, ilçe) çiftlerini tablodakiyle karşılaştırır, fark varsa
+--     kırılır. BÖLÜM 2'deki uyarının otomatik hâli — yoksa ayrışma canlıda
+--     `district_official` yanlış cevap verene kadar fark edilmez.
+--     ⚠️ Bu test HENÜZ YAZILMADI.
 
 -- 4.4 Fonksiyon doğru çalışıyor mu
 -- select public.ilce_resmi(34::smallint, 'Çekmeköy')  as t1,   -- true  (İstanbul ilçesi)

@@ -211,6 +211,28 @@
 > yani engel "kısa pencere" değil **"Dalga 3 daha dün deploy edildi"** — sayacın %99'u eski
 > kodu ölçtü. 🚨 **Yeni kural, asimetrik okuma:** metin indekslerinde `idx_scan = 0` geçerli
 > kanıttır (Dalga 3 metinden uzaklaştırdı, talep artamaz), `> 0` kanıt DEĞİLDİR.
+> 🚨 **`idx_scan` ölçümüne TANIK İNDEKS koy — tek başına `0` okunamaz** (4 Ağu 2026, #21).
+> `0` iki farklı şeyin cevabı olabilir: "tüketici yok" ya da "pencerede hiç trafik olmamış".
+> Ayırt etmenin yolu, aynı fark sorgusuna düşürmeyeceğin indeksleri de koymak. 4 Ağu'da
+> metin indeksleri 0 iken `listing_stops_listing_id_idx` +91.927, `listings_pkey` +14.078,
+> `listings_origin_province_idx` +19 çıktı → pencere dolu, `province_id` yolu çalışıyor,
+> metin yolu ölü. ⚠️ **INSERT `idx_scan` artırmaz** — sayacı besleyen şey okuma trafiği;
+> "ilan girdim, ölçüm hazır" yanlış varsayım.
+> 🚨 **`pg_stat_statements` UTILITY (DDL) İFADELERİNİ NORMALİZE ETMEZ** (4 Ağu 2026 — bir
+> yanlış alarma mal oldu). `create or replace function …` bir utility ifadesidir; gövde
+> dolar-tırnaklı string olarak metnin İÇİNDE, sabitleri `$1`'e çevrilmeden saklanır. Yani
+> **Dalga 3'te DEĞİŞTİRDİĞİMİZ eski fonksiyon gövdeleri, canlı sorguymuş gibi görünür** —
+> `city ILIKE '%'||p_city||'%'` diye onlarca satır döndü, hiçbiri canlı değildi. `calls`
+> da sorgu sayısı değil, migration'ı kaç kez çalıştırdığın. **Ayırt edici işaret:** normal
+> sorguda sabitler `$1`/`$9` diye normalize, DDL fosilinde ham (`'%'`, `'active'`). Canlı
+> tüketici sorusunun tek doğru kaynağı `pg_proc.prosrc`.
+> 🚨 **`prosrc` taraması EŞLEŞME BAŞINA değil FONKSİYON BAŞINA sınıflandırılır** (4 Ağu).
+> 31 Tem'deki tarama `get_radar_city_*`'te `jsonb_build_object('city', …)` görüp "anahtar,
+> zararsız" deyip fonksiyonu aklamıştı. Bir fonksiyonda bir masum eşleşme bulmak, o
+> fonksiyonda BAŞKA eşleşme olmadığını kanıtlamaz. Doğrusu: geçiş sayısı + her geçişin
+> bağlamı çıkarılır, hepsi tek tek sınıflandırılır (JSON anahtarı / çıktı takma adı /
+> yorum / GERÇEK kolon predikatı). Bu şekilde tekrarlandığında dört fonksiyonun dördü de
+> temiz çıktı — hüküm aynıydı ama artık dayanağı var.
 > 🚨 **Kopya indeks avında iki ayrı tarama gerekir:** `pg_get_indexdef` metnini karşılaştırmak
 > yalnız METİNSEL kopyayı bulur. `shadow_profiles`'ta `phone_key` (UNIQUE) + `phone_idx` (düz)
 > aynı kolonda — UNIQUE btree düz btree'nin her sorgusunu karşılar, yani düz olan gereksiz;
@@ -511,6 +533,14 @@ yukegel/
 │   ├── poi/[id]/route.ts                 # GET detay + son yorumlar ✅
 │   ├── poi/[id]/review/route.ts          # POST yorum + geo-fence doğrulama ✅
 │   └── whatsapp-parse/                   # 🔒 requireStaff + rate limit (10/dk) ✅
+│                                         #    :153 gorunmezleriSil() (4 Ağu 2026) — trNorm'un EN BAŞINDA.
+│                                         #      Sıfır genişlikli karakterleri SİLER (boşluğa çevirmez).
+│                                         #      parse-listing:74 ile aynı liste; ikisi birlikte değişir.
+│                                         #    ✅ cleanHash() de artık siliyor (4 Ağu, #61 kapandı) — ama
+│                                         #      BİLEREK chatParser::gorunmezleriSil (yalnız Cf) ile;
+│                                         #      `cfKarakterleriSil` adıyla import edilir. Yerel liste
+│                                         #      (Cf + U+FE0F) hash'e ASLA girmez: FE0F emojinin parçası,
+│                                         #      silinse binlerce eski mesajın hash'i değişirdi.
 │
 ├── lib/auth.ts + supabase.ts             # auth.ts: requireStaff() → API route'lar için (redirect atmaz)
 ├── lib/redirect.ts                       # 🔒 SPRINT_01 A7 — guvenliRedirect(): yalnız `/` ile başlayan,
@@ -557,6 +587,11 @@ yukegel/
 │                                         #      moderatör filtresi tam eşitlik karşılaştırıyor, sapma
 │                                         #      hata değil SESSİZ BOŞ SONUÇ üretir.
 │                                         #    ilceler(ilId) · ilceAra(ilId,q) · ilceResmiMi
+│                                         #    ilceHangiIllerde(ad) → Il[] (4 Ağu 2026, #51) — TERS ARAMA.
+│                                         #      `ilceResmiMi` false'u İKİ ZIT ŞEYİ karıştırır: (a) meşru
+│                                         #      mahalle (Merter) (b) BAŞKA ilin ilçesi (çelişki). Ayıran bu.
+│                                         #      🚨 Dizi ÇOK ELEMANLI olabilir (Merkez 51 il, Gölbaşı 2) —
+│                                         #      "ilçe adı → il" tek değerli DEĞİL; district_id yokluğunun sebebi.
 │                                         #    ilceNormalize(ilId,v) → {ad, resmi} | null — SERBEST GİRİŞE
 │                                         #      İZİN VAR (İkitelli, İSTOÇ) ama `resmi:false` İŞARETLENİR
 │                                         #    ilCiftYazim(v) → {id, ad} — ÇİFT YAZIM dönemi; Dalga 5'te silinecek
@@ -564,6 +599,24 @@ yukegel/
 ├── scripts/test-lokasyon.mts             # `npm run test:lokasyon` — 21 kontrol. locations.json ↔ ILLER ↔
 │                                         #    plaka sözleşmesini doğrular. Sıra bozulursa DB'deki TÜM
 │                                         #    province_id'ler sessizce yanlış ile işaret eder; test o yüzden var.
+├── scripts/test-districts.mts            # `npm run test:districts` (4 Ağu 2026) — 19 kontrol. locations.json ↔
+│                                         #    `docs/20260731_districts_tablosu.sql` INSERT bloğu, ÇİFT YÖNLÜ.
+│                                         #    973/973 · 81 il · kopya yok · il_key katlaması altında çakışma yok
+│                                         #    · 8 çapa (Ömerli mahalle, Gölbaşı 2 ilde, Havza=Samsun,
+│                                         #      Orhaneli=Bursa, Marmaraereğlisi bitişik, 51 Merkez).
+│                                         #    ⚠️ Migration DOSYASINI doğrular, CANLI TABLOYU DEĞİL — elle
+│                                         #      eklenen satırı görmez. Saf Node, kimlik bilgisi istemez.
+├── scripts/test-alias-detektor.mts        # `npm run test:alias` (4 Ağu 2026, #51) — 28 kontrol.
+│                                         #    `alias-normalize.ts::ilceIlUyarisi` koruması.
+│                                         #    🚨 ASIL İŞİ "uyarı çıkıyor mu" DEĞİL, SUSMASI GEREKEN YERDE
+│                                         #      susuyor mu: 21 kontrolün 14'ü "sessiz"/"zayıf" bekliyor.
+│                                         #      Gürültülü detektör okunmaz olur = fiilen sökülmüş kanca.
+│                                         #    📌 DÜRÜST KAPSAM kaydı: 3 canlı hatadan yalnız 1'ini (Bigadiç)
+│                                         #      kesin yakalar; Orhanlı/Selimpaşa yalnız zayıf kodla gelir.
+│                                         #    🟠 Bilinen yanlış pozitif: İzmir/Pınarbaşı (Bornova mahallesi
+│                                         #      ama Kastamonu+Kayseri ilçesi) — testte BİLEREK duruyor.
+│                                         #    Alias TABLOSUNA değil saf fonksiyona bakar; veri düzeltmeleri
+│                                         #      testi kırmaz. Saf Node, kimlik bilgisi istemez.
 ├── lib/ilan-yaz.ts                       # 🚨 ILAN_VER_ANALIZ W0/W1 (29 Tem 2026) — `listings` yazan TEK YOL.
 │                                         #    `server-only`. ilanYaz(userId, girdi, kaynak) → ayrık birlik.
 │                                         #    Doğrulama + beyaz liste + sınırlar (MAX_DURAK=10, MAX_ARAC_ADET=50,
@@ -590,7 +643,24 @@ yukegel/
 │                                         #    :38 aliasKey'in .replace(/İ/g,'i') adımı YOK. İ içeren
 │                                         #    alias i+U+0307 yazılıyor → trNorm onu BOŞLUĞA çeviriyor
 │                                         #    → sessiz ölü kayıt + uygulama/DB anahtar ayrışması (#45)
+│                                         #    ✅ 4 AĞU (#51) ilceIlUyarisi(normalized, district) —
+│                                         #      (il, ilçe) çelişki detektörü. İKİ SEVİYE:
+│                                         #      `guclu` = ad BAŞKA ilin resmî ilçesi (kanıt)
+│                                         #      `zayif` = hiçbir ilin ilçesi değil (bağlam, kanıt DEĞİL)
+│                                         #      🚨 BLOK DEĞİL, UYARI — mahalle/belde yazmak meşru
+│                                         #      (Merter, İkitelli, Işıkkent). Bloklarsak admin
+│                                         #      doğru kaydı ekleyemez.
+│                                         #      YAYGIN_ILCE_ESIGI=5: `Merkez` 51 ilde → zayıfa düşer
+│                                         #      Test: `npm run test:alias`
 ├── lib/whatsapp/chatParser.ts            # 📱 TEK KAYNAK sohbet parser (server + client ortak) ✅
+│                                         #    ✅ GORUNMEZ_CF + gorunmezleriSil() (4 Ağu, #61) — 9 `Cf`
+│                                         #      karakteri, `\u` KAÇIŞIYLA yazılı. 4 Ağu'ya kadar ham
+│                                         #      karakterle yazılıydı ve 200C/200D/2060 EKSİKTİ.
+│                                         #      🚨 Ham karakterle ASLA yazma: bir formatter silerse
+│                                         #        koruma görünmeden ölür, eksiği kimse fark etmez.
+│                                         #      🚨 U+FE0F BİLEREK YOK (Mn, emojinin parçası) — çıktısı
+│                                         #        raw_posts.message'a ve clean_hash'e girer.
+│                                         #      satiriTemizle() = 202f/00a0 → boşluk, sonra Cf sil.
 ├── lib/whatsapp/__tests__/chatParser.test.ts  # 29 assertion — `npm run test:parser` ✅
 ├── lib/whatsapp/telefon.ts               # 📱 TEK KAYNAK telefon regex (05XXXXXXXXX) ✅
 ├── app/api/raw-posts/telefon-doldur/route.ts  # 📱 contact_phone geriye-doldurma (içe aktarmadan AYRI) ✅
@@ -679,6 +749,38 @@ origin_district_official (nullable bool) — true=resmî ilçe, false=serbest gi
 > 🚨 Yeni iki kolona GRANT **elle verildi** (migration Adım 4) — L1e sonrası her yeni kolon
 > `anon`/`authenticated` için yetkisiz doğuyor.
 
+### `districts` — 973 ilçe (4 Ağu 2026, CANLI)
+```
+id smallint identity PK · province_id smallint NOT NULL FK → provinces.id · name text NOT NULL
+districts_il_key_uniq  UNIQUE (province_id, il_key(name))    -- aynı ilde aynı ilçe iki kez yazılamaz
+districts_ad_key_idx   (il_key(name))                        -- ada göre arama
+RLS açık · SELECT herkese (anon, authenticated) · yazma yok
+```
+> 🚨 **TÜRETİLMİŞ VERİ**, kaynağı `provinces` ile aynı: `lib/constants/locations.json`.
+> Elle satır ekleme. Migration: `docs/20260731_districts_tablosu.sql` (bölüm 1-3 çalıştırıldı).
+> ✅ **Ayrışma denetimi otomatik: `npm run test:districts`** (`scripts/test-districts.mts`,
+> 4 Ağu). JSON ile migration dosyasını çift yönlü karşılaştırır. ⚠️ **Canlı tabloyu OKUMAZ** —
+> elle eklenen satırı görmez, o yüzden elle ekleme yasağı hâlâ tek savunma.
+> ⚠️ **`district_id` KOLONU YOK ve eklenmeyecek.** İlçe adı tek başına tekil değil —
+> `Merkez` 51 ilde, 24 ad daha iki-üç ilde. `provinces_il_key_uniq`'in verdiği tek satır
+> garantisi ilçede YOK, dolayısıyla "metinden id çöz" adımı sessizce yanlış il seçer.
+> Tablo bir **doğrulama sözlüğü**: "bu il için bu ilçe var mı?".
+>
+> ⚡ **`public.ilce_resmi(p_province_id smallint, p_district text) → boolean`**
+> `district_official`ın DB tarafındaki türeticisi. `sql stable parallel safe`,
+> `search_path = public`, EXECUTE anon/authenticated/service_role'da.
+> İl NULL ya da ilçe boşsa **`null`** döner — "ilçe girilmemiş" ile "girilen ilçe resmi
+> değil" farklı sorular. Ankara **ve** Adıyaman `Gölbaşı` için ikisi de `true`: fonksiyon
+> "hangi il?" sorusunu cevaplamıyor.
+> ✅ Canlı veriye karşı çapraz doğrulandı: `district_official` dolu 62 durakta kolon ile
+> fonksiyon 58 `(true,true)` + 4 `(false,false)`, çapraz satır yok.
+> 🚫 **`ilan_olustur` HENÜZ ÇAĞIRMIYOR** — entegrasyon Dalga 5'in v4'ü ile aynı anda
+> yapılacak (#50). Yani bugün sadece sorgulanabilir bir sözlük; yazma yolları etkilenmedi.
+> ⚠️ **Tuzak — "resmi değil" ≠ "hata".** `Merter`, `Etlik`, `Işıkkent`, `Hadımköy` mahalle;
+> `Eminönü` 2008'de Fatih'e katıldı. Hepsinde `false` DOĞRU cevap. Ayrıca yazım tek kaynağa
+> bağlı: `Marmara Ereğlisi` `false` döner çünkü JSON'da bitişik — `Marmaraereğlisi`.
+> `false` dönen bir satırı düzeltmeden önce hangi sınıfta olduğuna bak.
+
 ### `provinces` — 81 il (30 Tem 2026)
 ```
 id smallint PK (1-81, plaka kodu) · plate char(2) · name text
@@ -687,8 +789,10 @@ id smallint PK (1-81, plaka kodu) · plate char(2) · name text
 > YAPMA — JSON'u değiştir, migration bloğunu yeniden üret, `npm run test:lokasyon` çalıştır.
 > Sözleşme: `id = locations.json index + 1 = ILLER index + 1`. Biri yeniden sıralanırsa DB'deki
 > TÜM `province_id`'ler sessizce yanlış ile işaret eder — hiçbir yerde patlamaz. Test bunu yakalar.
-> **İlçe için tablo AÇILMADI** (bilerek): her okumaya JOIN ekler, karşılığında yalnızca yazım
-> garantisi verir — onu zaten form tarafındaki Searchable Select veriyor. İlçe metin kalıyor.
+> ~~**İlçe için tablo AÇILMADI** (bilerek)~~ → **4 Ağu 2026'da AÇILDI**, aşağıdaki
+> `districts` bölümüne bak. Eski gerekçe ("her okumaya JOIN ekler") hâlâ geçerli ve bu
+> yüzden `district_id` kolonu YOK; açılan şey okuma yoluna değil **doğrulamaya** hizmet
+> ediyor. İlçe metin olarak kalıyor.
 > `public.il_key(text)` — `lib/ilan-sabitler.ts::ilKey()` ve `lib/alias-normalize.ts::aliasKey()`
 > ile **birebir aynı olmak zorunda**. `İ` (U+0130) ÖNCE düz `i`ye çevrilir.
 > 🚨 **YAZMA YOLU TEK** (29 Tem 2026, `ILAN_VER_ANALIZ` W0/W1). Uygulamada `listings` INSERT'i
@@ -852,9 +956,17 @@ created_by_ai / is_approved / llm_confidence / source_listing_ids  (SLH kolonlar
 (`Istanbul`/`İstanbul`, `Izmir`/`İzmir`, `Mugla`/`Muğla`, `Bingol`/`Bingöl`). Yazma yolu
 `lib/alias-normalize.ts` üzerinden geçiyor.
 
-⚠️ **DB TARAFI YARIM (30 Tem 2026 · 🚫 4 Ağu 2026'da düzeltildi).** Bu blok önce
+✅ **DB TARAFI ARTIK TAM (4 Ağu 2026).** `aliases_normalize_trg` **kuruldu** —
+`docs/20260804_alias_normalize_trg_a.sql`, seçenek (a): alias satırında `lower()` **yok**,
+`\s+` sıkıştırma ve `district=''`→NULL var. `tgenabled='O'`. Canlı test:
+`'  TEST   İĞNE   ALIAS  '` → **`TEST İĞNE ALIAS` / 15 karakter** (büyük harf korundu,
+U+0307 yok), `district='   '` → NULL. Aşağıdaki tarihsel blok teşhis kaydı olarak duruyor.
+⚠️ Yorum satırları `pg_proc.prosrc` içinde yer alır — `position('lower(' in prosrc)`
+testi yorumdaki "lower()" yüzünden **yanlış pozitif** verir; davranışı davranışla doğrula.
+
+⚠️ **DB TARAFI YARIM (30 Tem 2026 · 🚫 4 Ağu 2026'da düzeltildi → sonra KURULDU).** Bu blok önce
 "DB TARAFI KAPANDI" diyordu; **tekillik** DB'ye bağlandı ama **normalizasyon** bağlanmadı:
-- 🚫 `aliases_normalize_trg` **CANLIDA DEĞİL.** Burada "canlıda" yazıyordu — 4 Ağu ön
+- 🚫 `aliases_normalize_trg` **CANLIDA DEĞİLDİ.** Burada "canlıda" yazıyordu — 4 Ağu ön
   kontrolünde `pg_trigger` `aliases` için 0 satır döndü
   (`docs/20260804_adim3_4_6_on_kontrol.sql` BÖLÜM 0). ✅ Ayrım yapıldı: `pg_proc`
   **`aliases_normalize` döndürdü** → fonksiyon var, trigger yok. BÖLÜM 1 **yarım
@@ -947,7 +1059,7 @@ ZIP/TXT → raw_posts → DB trigger → parse-listing Edge Fn → listings → 
 | `/api/moderator/toplu-islem` | Bulk ops |
 | `/api/ilan/duzelt` | Kullanıcı düzeltme + re-scan |
 | `/api/admin/guvenlik` | safety_rules + blacklist CRUD |
-| `/api/excel-import` | Excel toplu yükleme. `POST` JSON, `action: 'preview' \| 'commit'`. Sözleşme: `lib/toplu-yukle-sozlesme.ts`. Kimlik OTURUMDAN (`userId` gövdede YOK). Kayıt `ilanYaz()` üzerinden → V1/V3 aynen geçerli. `MAX_SATIR=300`, `MAX_ILAN=50`, `maxDuration=60` |
+| `/api/excel-import` | Excel toplu yükleme. `POST` JSON, `action: 'preview' \| 'commit'`. Sözleşme: `lib/toplu-yukle-sozlesme.ts`. Kimlik OTURUMDAN (`userId` gövdede YOK). Kayıt `ilanYaz()` üzerinden → V1/V3 aynen geçerli. `MAX_SATIR=300`, `MAX_ILAN=50`, `maxDuration=60`. ✅ **4 Ağu 2026'da doğrulandı: kolon kayması bu koddan çıkamaz** — `TopluYukle.tsx`:62-83 `sheet_to_json({header:1})` ile konumsal okur ve tüm alanlar **aynı `row` dizisinden** gelir; route :180-234 de aynı satır nesnesini taşır. 31 Tem'deki ilçe kayması **dosya kaynaklı** (#47) |
 | `/api/auth/tekil-kontrol` | telefon/tckn/vkn tekillik (service role) |
 | `/api/auth/log` | 🔒 Auth denetim izi → `auth_events` (service role). Fire-and-forget, IP+UA yazar, telefon/şifre yazmaz |
 | `/api/auth/otp` | 🔒 **TEK** SMS OTP gönderim yolu (G2). POST + Origin. 3 kota: numara 1/60sn, IP 5 farklı numara/saat, IP 15 toplam/saat. 429 + `Retry-After` |
@@ -1122,6 +1234,7 @@ Açık rotalar: /giris, /auth/, /profil-tamamla, /nasil-calisir, /hakkimizda,
 - **İlçe adları günlük Türkçe kelimelerle çakışıyor (homonim)** — `araç`→Kastamonu, `olur`→Erzurum, `pazar`→Rize, `perşembe`→Ordu, `merkez`→onlarca il. Token eşleşmesi bunları TEMİZLEMEZ, veri tarafında pasifleştirmek gerekir: `docs/20260728_alias_homonim_temizligi.sql`. Hem gatekeeper'ı hem `parse-listing`'in gerçek güzergâh çıkarımını bozar.
 - 🚨 **LLM prompt'unun ÖRNEKLERİ kuraldan güçlüdür — bozuk örnek bozuk veri üretir** (29 Tem 2026, `SPRINT_01` W5/D1). `learn-aliases` prompt'unda kurallar Türkçe doğru yazımı istiyordu ama JSON **örnekleri** ASCII'ye indirgenmişti (`"Eskisehir"`, `"Istanbul"`, `"Tekirdag"`). Model kuralı değil örneği taklit etti; `aliases.normalized` aylarca iki yazımla doldu (`Istanbul` 13 satır / `İstanbul` 154 satır). **Kural:** prompt'a örnek yazarken örneğin kendisi üretmek istediğin çıktının birebir doğru hali olmalı. Ayrıca prompt'a mevcut kayıtlar bağlam olarak veriliyorsa "listede eski/bozuk kayıtlar olabilir, onları örnek alma" satırı şart — yoksa bozulma kendi kendini besler.
 - 🚨 **Karşılaştırma anahtarı ile SAKLANAN değer aynı şey değildir** (29 Tem 2026, `SPRINT_01` W5/D2+D4). `Istanbul` ve `İstanbul` **aynı şehir** ama string eşitliği bunu göremez. `parse-listing/findPlaces`'teki `seen` seti ham `normalized` üzerinde çalıştığı için iki yazım İKİ AYRI ŞEHİR sayılıyordu; `sameCity` koruması devreye girmiyor ve **sahte `İstanbul→İstanbul` ilanı** kaydediliyordu (aynı sebeple şehir filtresi de ilanların bir kısmını hiç göstermiyordu). Düzeltme: her karşılaştırma/dedup anahtarı katlanmış formdan geçer (`aliasKey` / `yerKey`), **saklanan değer Türkçe kalır**. ⚠️ Katlama fonksiyonu (`lib/alias-normalize.ts::aliasKey`) ile DB indeks ifadesi (`docs/20260729_alias_normalize_trigger.sql`) BİREBİR aynı olmalı: `translate(lower(replace(alias,'İ','i')),'ıçğöşü','icgosu')`. Sıra kritik — `İ` (U+0130) **önce** düz `i`ye çevrilmeli, yoksa Postgres `lower()` onu `i` + U+0307 olarak iki karaktere açar ve JS `toLowerCase()` ile ayrışır → uygulama "çakışma yok" derken DB 23505 atar. 📏 **Ölçüldü (4 Ağu 2026):** `lower('İSTANBUL')` = `i̇stanbul`, **length 9**, `='istanbul'` **false**. Yani Postgres `lower()` ile JS `.toLowerCase()` **aynı** davranıyor; ayrışan taraf `replace`'i öne alan `aliasKey`/indeks ifadesi. 🚨 **Ve `lib/alias-normalize.ts`:82 `normalizeAliasFields` bu kurala UYMUYOR** — düz `.toLowerCase()` kullanıyor. `İ` içeren alias DB'ye `i`+U+0307 olarak yazılıyor; dahası `trNorm`'un `[^a-z0-9\s]`→`' '` kuralı U+0307'yi **boşluğa** çevirdiği için (`i kitelli` ≠ `ikitelli`) o alias hiçbir mesajla eşleşemiyor → **sessiz ölü kayıt**. Görev #45. ✅ **DÜZELTİLDİ + ONARILDI (4 Ağu):** kod :82'ye `.replace(/İ/g,'i')` eklendi (deploy bekliyor); veri tarafında 34 bozuk satır bulundu — **24'ü gölge kopya** (pasifleştirildi, kapsama kaybı yok), **9'u gerçek kayıp** (`nizip` · `istoç` · `ivedik` · `kdz ereğli` · `delice` · `iskendurun` · `iscehisardan` · `ş.kochisar` · `yeni mahalle` — onarıldı, `trNorm` eşleşme testi 9/9). 🚨 İkinci hasar daha sinsiydi: bu satırlar `aliases_katlanmis_anahtar_uniq`i **baypas ediyordu** (indeks `replace(alias,'İ','i')` ile başlıyor, saklanan değerde büyük `İ` yok, U+0307 hayatta kalıyor, anahtar ayrışıyor) — 24 gölge kopya bu delikten girdi. Ayrıntı: `docs/20260804_u0307_alias_onarimi.sql`.
+- 🚨 **SIFIR GENİŞLİKLİ KARAKTER = SESSİZ İL KAYBI. VE BU BİR SALDIRI, KAZA DEĞİL** (4 Ağu 2026, canlı veride bulundu). `raw_posts` içinde `S‌apanca` (U+200C, ZWNJ) ve `⁠Sarar` (U+2060) yazan mesajlar var — bir gönderici aynı ilanı tekrar tekrar atabilmek için metne görünmez karakter serpiyor, `clean_hash` her seferinde değişiyor ve **tekilleştirme delinmiş oluyor**. Yan hasar daha pahalı: `app/api/whatsapp-parse/route.ts::trNorm`'un `[^a-z0-9\s\.>-]` → `' '` kuralı bilinmeyen karakteri **boşluğa** çevirir → `s apanca`; `:180` token'lara ayırır, `t.length < 2` filtresi `s`yi atar, geriye `apanca` kalır. Hiçbir alias'la eşleşmez → ilanın ili **sessizce kaybolur**, hata da log da yok. 🔁 Mekanizma U+0307 hatasıyla **birebir aynı** (bkz. bir alt madde): görünmez karakter → boşluk → kelime bölünmesi. ✅ Düzeltme (4 Ağu): `gorunmezleriSil()` `trNorm`'un **en başına** eklendi (siler, boşluğa çevirmez). Ölçüldü: önce `["apanca"]`, sonra `["sapanca"]`; `Sapanca`/`Sarar`/`Kadıköy` etkilenmedi. ✅ **VE TEKİLLEŞTİRME DELİĞİ DE KAPANDI (4 Ağu, #61) — ama AYRI bir düzeltmeyle.** `trNorm` düzeltmesi yalnız YER EŞLEŞTİRMESİNİ onarmıştı; `cleanHash()` görünmez karakteri hash'e sokmaya devam ediyordu. 🚨 **Ders: aynı kök sebebin İKİ AYRI zararı vardı, birini düzeltince öteki düzelmiş SANILDI.** Kök sebep bulunduğunda "bu karakter başka nereye giriyor" diye ayrıca aranmalı. Düzeltme: `cleanHash` artık `chatParser::gorunmezleriSil`'i (`cfKarakterleriSil` adıyla) çağırıyor. 📏 Ölçüldü: eski hash'te `S`+ZWNJ+`apanca` ≠ `Sapanca` (delik), yenide **eşit**; U+2060 ve U+200B varyantları da eşit; emoji (`➡️ ✅`) içeren mesajın hash'i **değişmedi**. Yedek alınmadı (Bayram kararı) — `text` zaten `satiriTemizle`'den geçtiği için canlı satırların hash'i pratikte değişmiyor, bu çağrı ikinci savunma hattı. ✅ `lib/whatsapp/chatParser.ts` de düzeltildi: liste `GORUNMEZ_CF` sabitine alındı, eksik U+200C/U+200D/U+2060 eklendi, ham karakterler `\u` kaçışına çevrildi. ⚠️ Regex `\u` **kaçışıyla** yazılmalı, ham karakterle değil — editör/formatter ham görünmezleri sessizce silerse koruma da görünmeden ölür. 🚨 **U+FE0F iki listede de aynı DEĞİL, bu KASITLI.** FE0F `Cf` değil `Mn` ve `➡️ ⚠️ ✅` emojilerinin parçası. SAKLANAN metne ve hash'e dokunan yerler (`chatParser`, `cleanHash`) onu **silmez** — silse binlerce eski mesajın hash'i değişir, yeniden içe aktarımda kopya seli olur. Yalnız EŞLEŞTİRME tarafı (`whatsapp-parse`:153, `parse-listing`:74) siler; orada ne saklanan değer ne hash var. **Üç kopya artık iki farklı listeye ayrıldı; hangisinin nerede kullanıldığı kod yorumlarında yazılı.**
 - ⚠️ **`normalized` her zaman şehir DEĞİL — otomatik yazım düzeltmesi yapma** (29 Tem 2026, W5/D2). `type='vehicle'` satırlarında `normalized` doğrudan `vehicle_type` olarak ilana yazılıyor; "tir" → "Tir" yapmak eşleşmeyi bozar. Bu yüzden ne `normalizeAliasFields` ne de DB trigger'ı `normalized`/`district` üzerinde büyük harfe çevirme / ASCII katlama yapıyor — yalnız boşluk temizliği. Yanlış yazım sessizce düzeltilmez, `aliasCakismaBul` **409 ile admine sorar** (öneri: çoğunluk yazımı — 154 satır `İstanbul` varken 13 satırlık `Istanbul` kazanmasın).
 - 🚨 **`alias` kolonundaki UNIQUE kısıtı HAM string üzerinde — katlanmış kopyaları engellemez** (29 Tem 2026, W5/D3). `Gebze`/`GEBZE`/`gebze`, `Çorlu`/`çorlu`/`corlu`, `Torbali`/`torbali`/`torbalı` üç ayrı satır olarak duruyor ve hepsi tek katlanmış anahtara düşüyor. Sonucu: planlanan tam UNIQUE indeks **kurulamaz** (23505). Ayrıca temizlik script'i bu satırları silmiyor, yalnız `normalized`/`district`'i tutarlı yapıyor — yani veri temizliği tamamlansa bile önkoşul karşılanmıyor. Çözüm iki parçalı: önce fazlalıkları `is_active = false` yap (runbook Adım 9; `row_number() OVER (PARTITION BY type, katlanmış ORDER BY id) > 1` — **silme yok**, `findPlaces` zaten `.order('id')` ile küçük id'yi seçtiği için bugünkü davranış değişmez), sonra indeksi **kısmi** kur (`WHERE is_active = true`) — pasifleştirilmiş kopyalar tabloda durduğu için tam indeks onları da ihlal sayardı.
 - **PostgREST tek sorguda EN FAZLA 1000 satır döndürür — ve bunu SÖYLEMEZ** (28 Tem 2026). Supabase'in `db.max-rows` ayarı. Sınırı aşan `select()` hata vermez, sessizce kesilir. `aliases` tablosu 1887 aktif satıra çıkmıştı; hem `app/api/whatsapp-parse` gatekeeper'ı hem `supabase/functions/parse-listing` şehir/araç tespitini alias'ların **%47'sini hiç görmeden** yapıyordu. Üstelik `ORDER BY` olmadığı için hangi 887 satırın düştüğü belirsizdi → aynı mesaj farklı zamanlarda farklı ayrıştırılabiliyordu. Düzeltme: `.range()` ile sayfalama + `.order('id')` (sıralama olmadan sayfalar çakışır/atlar). **Kural: bir tabloyu "hepsini çek" niyetiyle okuyan her sorgu sayfalanmalı.**

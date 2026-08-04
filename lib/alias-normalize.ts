@@ -22,6 +22,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { ilId, ilceResmiMi, ilceHangiIllerde } from './lokasyon';
 
 /**
  * Karşılaştırma anahtarı: Türkçe/ASCII farkını yok sayan katlanmış form.
@@ -107,6 +108,130 @@ export function normalizeAliasFields(girdi: AliasYazmaGirdi): AliasYazmaAlanlari
     cikti.district = d || null;
   }
   return cikti;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// İLÇE ↔ İL TUTARLILIK DETEKTÖRÜ (#51)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type IlceUyarisi = {
+  /**
+   * `ilce_baska_ilde` — ad BAŞKA bir ilin resmî ilçesi. Güçlü kanıt: ya il ya
+   *   ilçe yanlış. Meşru olabildiği tek durum, aynı adı taşıyan bir mahalle.
+   * `ilce_hicbir_ilde` — ad hiçbir ilin resmî ilçesi değil. **Kanıt değil,
+   *   bağlam.** Mahalle/belde/bölge yazmak bilerek serbest (Merter, İkitelli).
+   *   Ama `2777 orhanli→Sakarya` ve `2662 selimpaşa→Tekirdağ` de tam olarak bu
+   *   sınıfta doğdu; ikisi de mahalle adıydı ama İSTANBUL mahallesiydi.
+   */
+  kod: 'ilce_baska_ilde' | 'ilce_hicbir_ilde';
+  /** `ilce_baska_ilde` → güçlü; `ilce_hicbir_ilde` → zayıf. UI ikisini ayrı göstersin. */
+  seviye: 'guclu' | 'zayif';
+  normalized: string;
+  district: string;
+  /** `district`'in GERÇEKTEN ilçesi olduğu illerin resmî adları. Zayıfta boş. */
+  gercekIller: string[];
+  mesaj: string;
+};
+
+/**
+ * Bir ilçe adı kaç ilde birden geçerse "bu ilde yok" bilgisi o kadar değersizleşir.
+ * `Merkez` 51 ilde var ve Konya/İstanbul gibi büyükşehirlerde YOK — yani
+ * `Konya + Merkez` teknik olarak "başka ilin ilçesi" ama kanıt değil, sadece
+ * kullanıcının "şehir merkezi" demesi. Ondan sonraki en yaygın ad 3 ilde.
+ * Eşik 5: `Merkez`i eler, 24 gerçek çok-illi adı (2-3 il) elemez.
+ */
+const YAYGIN_ILCE_ESIGI = 5;
+
+/**
+ * `normalized` (il) ile `district` (ilçe) birbirini tutuyor mu?
+ *
+ * 🚨 NEDEN VAR: 1528 alias'ın 40'ında bu çift tutarsızdı ve **üçü canlı hataydı**
+ * — `2777 orhanli→Sakarya` (Orhanlı Tuzla/İstanbul mahallesi; parser bir harf
+ * ötedeki gerçek ilçe `Orhaneli`ye kaymış, 5 ilan yanlış ile yazıldı),
+ * `2662 selimpaşa→Tekirdağ` (7 ilan + 2 durak), `2831 bigadi→Çanakkale`.
+ * Üçünün de imzası aynı: AI üretimi, güven 75-90 — yani **güven skoru bu hatayı
+ * ayırt ETMİYOR**, model kendinden emin biçimde yanlış il yazıyor. Hatalar 40
+ * satırı ELLE tarayarak bulundu; kanca takılmazsa bir dahakini yine elle
+ * aramak gerekir.
+ *
+ * ✅ ÜÇ SATIRIN ÜÇÜ DE 4 AĞU 2026'DA DÜZELTİLDİ — yani aşağıdaki id'leri canlıda
+ *    ARAMA, tarihsel gerekçe olarak duruyorlar. Son hâl: `2777 orhanli` →
+ *    İstanbul/Orhanlı (`is_active=false`, içeriği doğru ama kapalı),
+ *    `2662 selimpaşa` → İstanbul/Selimpaşa, `2831 bigadi` → **silindi**
+ *    (normalized Balıkesir'e çekilip tutarlı hâle gelmişti, sonra kaldırıldı).
+ *    Geçmiş ilan satırları BİLEREK onarılmadı (#52) — ilan ömrü kısa, etki 5 satır.
+ *
+ * 🚨 BU DETEKTÖR ÜÇÜNDEN YALNIZ BİRİNİ (`bigadi`) KESİN YAKALAR — ölçüldü, 4 Ağu.
+ *    `Orhanlı` ve `Selimpaşa` hiçbir ilin resmî ilçesi DEĞİL, dolayısıyla coğrafya
+ *    tek başına onları `Merter`den ayıramaz: ikisi de mahalle: biri İstanbul'un,
+ *    öbürü de İstanbul'un ama alias Sakarya/Tekirdağ diyor. Bunu `locations.json`
+ *    bilemez. O yüzden ikinci, ZAYIF bir kod var: "hiçbir ilin ilçesi değil".
+ *    Zayıf kod bir hüküm değil, onay anında admine gösterilen bağlam — üç hatanın
+ *    üçü de zayıf ya da güçlü koddan en az biriyle ekrana gelir. Karar insanda.
+ *
+ * 🟠 BİLİNEN YANLIŞ POZİTİF (güçlü kod), ölçüldü 4 Ağu: `3016 pinabaşı →
+ *    İzmir/Pınarbaşı`. `Pınarbaşı` Kastamonu ve Kayseri'nin resmî ilçesi, İzmir'de
+ *    ise Bornova mahallesi — yani satır DOĞRU ama detektör "güçlü" basar.
+ *    Aynı desen her büyükşehir mahallesinde tekrarlanabilir (bir taşra ilçesiyle
+ *    ad çakışması). Güçlü kod "yanlış" demek DEĞİL, "iki kayıt çelişiyor, bak"
+ *    demektir; UI metni bunu ima etmeyecek şekilde yazılmalı.
+ *
+ * ⚠️ BU BİR BLOK DEĞİL, UYARI — hiçbir kodda 409 vermiyoruz. `district` alanına
+ *    mahalle/belde/bölge yazmak bilerek serbest (Merter, Işıkkent, Hadımköy,
+ *    İkitelli — sektörde günlük kullanımda). Bloklarsak admin doğru kaydı
+ *    ekleyemez.
+ *
+ * ⚠️ KAPSAM: yalnız `type='city'` için anlamlı. `type='vehicle'` satırlarında
+ *    `normalized` bir araç tipi; `ilId()` onu çözemez ve fonksiyon `null` döner.
+ *    Yani tip filtresi çağıranda DEĞİL, burada kendiliğinden var.
+ *
+ * ℹ️ `ilceHangiIllerde()` `locations.json`'dan okuyor; `public.districts` tablosu
+ *    aynı JSON'dan üretildi ve ayrışmayı `npm run test:districts` tutuyor.
+ *    Yani bu kontrol `ilce_resmi()` SQL fonksiyonuyla aynı cevabı verir, ama
+ *    DB gidiş-dönüşü olmadan.
+ */
+export function ilceIlUyarisi(
+  normalized: string | null | undefined,
+  district: string | null | undefined,
+): IlceUyarisi | null {
+  const il = trTemizle(normalized);
+  const ilce = trTemizle(district);
+  if (!il || !ilce) return null;
+
+  const id = ilId(il);
+  if (id === null) return null; // il çözülemedi (vehicle vb.) → söyleyecek sözümüz yok
+  if (ilceResmiMi(id, ilce)) return null; // tutarlı
+
+  const baskaIller = ilceHangiIllerde(ilce);
+
+  // `Merkez` gibi yaygın adlar: "bu ilde yok" bilgisi kanıt değeri taşımıyor,
+  // zayıf koda düşürüyoruz. Gerekçe YAYGIN_ILCE_ESIGI'nde.
+  if (baskaIller.length === 0 || baskaIller.length > YAYGIN_ILCE_ESIGI) {
+    return {
+      kod: 'ilce_hicbir_ilde',
+      seviye: 'zayif',
+      normalized: il,
+      district: ilce,
+      gercekIller: [],
+      mesaj:
+        `"${ilce}" hicbir ilin resmi ilcesi degil. Mahalle/belde/bolge ise sorun yok — ` +
+        `ama BASKA bir ilin mahallesi olmadigina emin ol: "${il}" dogru mu? ` +
+        `(orhanli->Sakarya ve selimpasa->Tekirdag tam boyle dogmustu; ikisi de Istanbul mahallesiydi.)`,
+    };
+  }
+
+  const adlar = baskaIller.map(p => p.name);
+  return {
+    kod: 'ilce_baska_ilde',
+    seviye: 'guclu',
+    normalized: il,
+    district: ilce,
+    gercekIller: adlar,
+    mesaj:
+      `"${ilce}" ${il} ilinin ilcesi degil — ${adlar.join(', ')} ilinin/illerinin resmi ilcesi. ` +
+      `Ya il yanlis ya ilce. Bu alias'tan gelen her yeni ilan yanlis ile yazilir. ` +
+      `Mahalle/belde kastediyorsan (ayni adi tasiyan farkli bir yer) oldugu gibi birakabilirsin.`,
+  };
 }
 
 export type AliasSatiri = {

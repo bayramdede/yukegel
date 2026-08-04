@@ -191,6 +191,32 @@ export function ilceResmiMi(ilId: number, v: string): boolean {
   return ilceIndeksi(ilId).has(ilKey(v));
 }
 
+/**
+ * TERS ARAMA: verilen ilçe adı HANGİ illerin resmî ilçesi? Hiçbirinin değilse
+ * boş dizi.
+ *
+ * 🚨 NEDEN VAR (#51, 4 Ağu 2026): `ilceResmiMi()` tek başına "hayır" der ve
+ * susar. O "hayır" İKİ FARKLI ŞEYİ birden kapsıyor ve ikisinin doğru cevabı
+ * zıt:
+ *   a) ad hiçbir ilin ilçesi değil → mahalle/belde/bölge (Merter, Işıkkent,
+ *      Hadımköy, İkitelli). `false` DOĞRU cevap, düzeltilecek bir şey yok.
+ *   b) ad BAŞKA bir ilin ilçesi → ilçe ile il birbirini tutmuyor, biri yanlış.
+ *      Alias tablosunda üç canlı hata tam olarak buydu (`orhanli→Sakarya`,
+ *      `bigadi→Çanakkale`, `selimpaşa→Tekirdağ`) ve üçü de ilanlara yansımıştı.
+ * (a)'yı uyarıya çevirirsek 19 meşru mahalle alias'ı için gürültü üretiriz ve
+ * uyarı okunmaz hale gelir. Ayrımı yapabilmek için ters aramaya ihtiyaç var.
+ *
+ * ⚠️ Dönen dizi BİRDEN FAZLA il içerebilir ve bu normaldir: `Merkez` 51 ilde,
+ *    `Gölbaşı` hem Ankara hem Adıyaman'da, 24 ad iki-üç ile yayılıyor. Yani
+ *    "ilçe adı → il" tek değerli bir fonksiyon DEĞİL; `district_id` kolonunun
+ *    açılmama sebebi de bu.
+ */
+export function ilceHangiIllerde(ad: string): readonly Il[] {
+  const k = ilKey(ad ?? '');
+  if (!k) return [];
+  return ILLER_TAM.filter(il => ilceIndeksi(il.id).has(k));
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // GEÇİŞ DÖNEMİ YARDIMCILARI
 // ─────────────────────────────────────────────────────────────────────────────

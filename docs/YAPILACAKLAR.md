@@ -1,5 +1,119 @@
 # Yükegel — Yapılacaklar Listesi
 
+> ✅ **4 AĞU 2026 — #51 KAPANDI (KOD + VERİ). #52 BİLEREK KAPATILDI, ONARILMADI.**
+> **Kod:** `lib/lokasyon.ts::ilceHangiIllerde()` (ters arama) + `lib/alias-normalize.ts::ilceIlUyarisi()`
+> (iki seviyeli çelişki detektörü) yazıldı, `learn-aliases`'ın **üç yazma yoluna** (manuel
+> create, PATCH approve, PATCH alan güncelleme) `warning` alanı olarak kancalandı.
+> Koruma: `npm run test:alias` — 28 kontrol.
+> ⚠️ **PATCH yollarında mevcut satır önce okunuyor** (`select('type, normalized, district')`,
+> çakışma kontrolünün ÜSTÜNE taşındı): PATCH `normalized`'ı göndermeyebilir; tamamlanmazsa
+> kontrol **sessizce atlanır** ve kanca takılı görünürken çalışmaz.
+>
+> 🚨 **KENDİ İDDİAMI ÖLÇÜNCE YANLIŞ ÇIKTI.** Detektörün ilk hâli için yorum satırına
+> "üç canlı hatayı da yakalar" yazmıştım. Çalıştırınca yalnız `Bigadiç` yakalandı;
+> `Orhanlı` ve `Selimpaşa` **hiçbir ilin resmî ilçesi değil** (ikisi de İstanbul mahallesi)
+> ve coğrafya onları `Merter`den ayıramıyor. İkinci, **zayıf** kod (`ilce_hicbir_ilde`)
+> bu yüzden var — hüküm değil, admine gösterilen bağlam. **Kalıbın yedinci örneği ve
+> ilk kez kayıt benim yazdığım koddu:** iddia doğrulanmadan yazıldı, ölçüm yanlışladı.
+>
+> 🟠 **İlk bilinen YANLIŞ POZİTİF ölçüldü:** `3016 pinabaşı → İzmir/Pınarbaşı` **doğru**
+> bir satır ama detektör "güçlü" basıyor — Pınarbaşı Kastamonu+Kayseri ilçesi, İzmir'de
+> Bornova mahallesi. Testte bilerek duruyor. Güçlü kod "yanlış" değil, "iki kayıt
+> çelişiyor, bak" demektir; UI metni bunu ima etmemeli.
+>
+> 📊 **VERİ TARAFI — 12 satır elden geçti, hepsi guard'lı UPDATE/DELETE ile (`where id = X
+> and district = 'eski değer'` → yanlış satıra çarparsa 0 satır, sessiz hasar yok).**
+> 7 yazım düzeltmesi: `Marmara Ereğlisi→Marmaraereğlisi` · `Selimpasa→Selimpaşa` ·
+> `Turgutle→Turgutlu` · `Kdz. Ereğli→Ereğli` · `Beylükdüzü→Beylikdüzü` ·
+> `Turgutklu→Turgutlu` · `Gocek→Göcek`. Ayrıca `2848 kayabaşi` district'i mahalle adı
+> `Kayabaşı` yerine gerçek ilçe **`Başakşehir`** yapıldı. Silinenler: `1600 khanköy`
+> (Çankırı'da öyle bir yer yok, `ai=false` — elle girilmiş, kaynağı bilinmiyor),
+> `2831 bigadi`. `2777 orhanli` → İstanbul/Orhanlı, `is_active = false` (içerik doğru
+> ama kapalı; açmak tek satırlık iş).
+> 🚨 **Yazım düzeltmesi kozmetik DEĞİL:** `aliases.district` değeri `parse-listing`:851/871
+> tarafından `listings.origin_district` ve `listing_stops.district`'e **birebir kopyalanır**
+> ve `ayniIlce()` ile hat ayrımına girer. `"Kdz. Ereğli"` metni hiçbir zaman `"Ereğli"`
+> ile eşleşmezdi.
+>
+> 🔒 **#52 — 5 Orhanlı ilanının yanlış `origin_province_id = 54`'ü ONARILMADI. Bu bir
+> gözden kaçma değil, KARAR** (Bayram, 4 Ağu): *"geçmiş veriler artık eskidi"*. Gerekçe:
+> ilan ömrü kısa, etki 5 satır, kaynak (alias) zaten kapatıldı → yeni hata üretmiyor.
+> Bu satır burada duruyor ki ileride biri "neden düzeltilmemiş" diye sormasın.
+>
+> 🚨 **YENİ CANLI BULGU — SIFIR GENİŞLİKLİ KARAKTER SALDIRISI (#61 KAPANDI).** `raw_posts`
+> içinde U+200C ve U+2060 serpilmiş mesajlar bulundu: bir gönderici tekilleştirmeyi delmek
+> için metne görünmez karakter koyuyor. **Tek kök sebep, İKİ AYRI zarar:**
+>
+> 1. **Sessiz il kaybı.** `whatsapp-parse::trNorm` bilinmeyen karakteri **boşluğa** çevirip
+>    kelimeyi bölüyordu (`s apanca` → `s` filtrelenir → `apanca` → hiçbir alias'la eşleşmez
+>    → ilin sessizce kaybolması, ne hata ne log). ✅ `gorunmezleriSil()` `trNorm`'un en başına
+>    eklendi. Ölçüldü: `["apanca"]` → `["sapanca"]`.
+> 2. **Tekilleştirme deliği.** `cleanHash()` görünmez karakteri hash'e sokmaya devam
+>    ediyordu → aynı metin her seferinde farklı `clean_hash`. ✅ 4 Ağu'da kapatıldı:
+>    `cleanHash` artık `chatParser::gorunmezleriSil`'i (`cfKarakterleriSil` adıyla) çağırıyor.
+>    Ölçüldü: eski hash'te `S`+ZWNJ+`apanca` ≠ `Sapanca`, yenide **eşit**; U+2060/U+200B
+>    varyantları da eşit. **Yedek alınmadı** (Bayram kararı, 4 Ağu) — `text` zaten
+>    `satiriTemizle`'den geçtiği için canlı satırların hash'i pratikte değişmiyor.
+>
+> 🚨 **ASIL DERS, düzeltmenin kendisinden değerli: 1'i düzeltince 2'nin de düzeldiği
+> SANILDI.** Doküman "çözüldü" yazıyordu; deliği ancak `cleanHash`'i okuyunca gördüm. Bu,
+> projenin ~7 kez tekrarlayan deseninin bir örneği daha: **kayıt gerçeğe uymuyordu ve
+> kimse ölçmüyordu** — bu sefer kayıt benim yazdığım metindi. Kural: kök sebep bulununca
+> "bu karakter/değer BAŞKA nereye giriyor" diye ayrıca aranmalı.
+>
+> ✅ `lib/whatsapp/chatParser.ts` de düzeltildi: liste `GORUNMEZ_CF` sabitine alındı, eksik
+> U+200C/U+200D/U+2060 eklendi, ham karakterler `\u` kaçışına çevrildi. **Ham görünmez
+> karakterle regex yazma** — bir editör/formatter onu sessizce silerse koruma da görünmeden
+> ölür, eksik olduğunu kimse fark edemez (tam olarak bu olmuştu).
+>
+> ⚠️ **U+FE0F iki listede de aynı DEĞİL — KASITLI.** FE0F `Cf` değil `Mn`, `➡️ ⚠️ ✅`
+> emojilerinin parçası. SAKLANAN metne ve hash'e dokunan yerler (`chatParser`, `cleanHash`)
+> onu **silmez**; silse binlerce eski mesajın hash'i değişir → yeniden içe aktarımda kopya
+> seli. Yalnız eşleştirme tarafı (`whatsapp-parse`:153, `parse-listing`:74) siler.
+> Ölçüldü: emoji içeren mesajın hash'i **değişmedi**.
+>
+> 📌 Doğrulama: `tsc --noEmit` 0; `test:parser` 29/29, `test:alias` 28/28, `test:districts`,
+> `test:lokasyon` geçti.
+
+> 🟢 **4 AĞU 2026 — #30 BÖLÜM 1-3 CANLIDA. VE İLK GÜNÜNDE ÜÇ VERİ HATASI BULDU.**
+> `districts` (973/81) + `ilce_resmi()` çalıştırıldı, doğrulamalar tam isabet, fonksiyon
+> mevcut `district_official` ile 62 satırda çapraz doğrulandı (58 `true`/4 `false`, sapma yok).
+> Ayrıntı `docs/20260731_districts_tablosu.sql` başlığında ve aşağıdaki #30 bloğunda.
+>
+> 🔍 **Planlanmamış kazanç: `ilce_resmi()` alias tablosunu denetleyebiliyor.** İlçesi olan
+> 1528 alias'ın 40'ında `(normalized il, district)` çifti tutarsız. Üçe ayrıldı:
+> **19'u yanlış değil** (Merter, Etlik, Işıkkent, Hadımköy… mahalle/belde; `Eminönü` 2008'de
+> Fatih'e katıldı — il doğru, `false` doğru cevap), **8'i yazım hatası** (il doğru),
+> **3'ü gerçek hata**: `2777 orhanli→Sakarya`, `2831 bigadi→Çanakkale`, `2662 selimpaşa→Tekirdağ`.
+> Üçünün de imzası aynı: AI üretimi, öncelik 50, güven 75-90, **normalized il ile district
+> birbirini tutmuyor** — biri diğerinin ilinin ilçesini gösteriyor.
+>
+> 📌 **Bu hatalar ilanlara YANSIMIŞ:** Orhanlı 5 ilan (Sakarya yazıldı, metinde Sakarya YOK —
+> ham metin `Orhanlı`, parser bir harf ötedeki gerçek ilçe `Orhaneli`ye kaymış), Selimpaşa
+> 7 ilan + 2 durak (Tekirdağ yazıldı; Selimpaşa Silivri/İstanbul mahallesi, aynı göndericinin
+> diğer satırları Hadımköy/Tuzla/Beylikdüzü). Bigadiç 0 satır — henüz yalnız potansiyel.
+>
+> 🚨 **VE BU, İL TARAFINDA "VERİ DOĞRU" VARSAYIMINI DELİYOR.** Dalga 5 boyunca ölçtüğümüz
+> şey hep `origin_province_id is null` idi ve 4.5a'da **0** çıktı — %100 dolu. Ama *dolu*
+> ile *doğru* aynı şey değil. Yanlış ama dolu il hiçbir NULL taramasında görünmez; üstelik
+> ilçe temizlenince `ilce_resmi()` de `null` döner ve satır **tüm denetimlerin dışına çıkar**.
+> Şu ana kadar yakalayabildiğimiz tek yol alias tablosundan geriye doğru izlemekti.
+>
+> 🔁 **Kalıbın ALTINCI örneği, yeni bir yüzle.** Önceki beşi "kayıt ile gerçek ayrışmış" idi.
+> Bu sefer ayrışan iki KAYIT: alias `Sakarya` diyor, aynı satırdaki `district` `Orhaneli`
+> diyor, ikisi bir arada imkânsız. Çelişki 21 Mayıs'tan beri satırın İÇİNDE duruyordu;
+> onu okuyabilecek tek şey (`districts`) bugün geldiği için 2,5 ay görünmez kaldı.
+> **Ders: iki alanı olan her kaydın alanları birbirini doğrulayabilir — kimse sormadıysa
+> o kayıt "doğrulanmış" değil, sadece "itiraz edilmemiş"tir.**
+>
+> ⚙️ **Onay anı savunmasız.** `learn-aliases/route.ts:514-526` `PATCH approve` tek `id` alıyor,
+> otomatik eşik YOK — saatte 21 onay, admin'in kuyruğu hızla geçmesi. Ekran `llm_confidence`
+> rozetini gösteriyor (`OgrenmeMerkeziClient.tsx`:905) ama **doğruluk sinyali yok**.
+> `ilce_resmi()` tam buraya takılmalı (#51). Bloklamak DEĞİL — mahalle alias'ları meşru
+> olarak `false` döner — admin'e kırmızı gösterip bilerek onaylatmak.
+> ⚠️ Not: histogramda her satırda `ai_uretimi = adet` çıkması "tüm alias'lar AI" demek değil;
+> insan yapımı alias'lar `is_approved=true` olarak doğrudan yazılıp `approved_at` almıyor.
+
 > 🟢 **4 AĞU 2026 — #31 KAPANDI: İŞ ZATEN YAPILMIŞ. HAYALET ENGELMİŞ.**
 > Ön kontrol (`docs/20260804_adim3_4_6_on_kontrol.sql`) alias runbook'unun
 > **Adım 1–7 ve 9'unun tamamının çalıştırılmış** olduğunu gösterdi:
@@ -22,7 +136,100 @@
 > Kontrol id + alias + district üçlüsünü karşılaştırdı; kayma çıkmadı ama
 > **çıkmadığını ancak ölçünce bildik.**
 >
-> 🚨 **ASIL BULGU — ADIM 10 YARIM UYGULANMIŞ (#43).**
+> ✅ **#43 KAPANDI — 4 AĞU. Trigger seçenek (a) ile kuruldu.**
+> Dosya: `docs/20260804_alias_normalize_trg_a.sql`. 29 Tem'deki dosyanın trigger
+> bölümü **geçersiz** (başına uyarı konuldu); indeks bölümü geçerli.
+> Tek fark: alias satırından `lower()` **çıkarıldı** — Bulgu B'nin gerekçesi
+> çürüdüğü ve `lower('İ')` U+0307 ürettiği için. `\s+` sıkıştırma ve
+> `district=''`→NULL aynen korundu; asıl koruma bunlar.
+> Doğrulama: ön kontrol `fonksiyon_var=true / trigger_var=false` (fonksiyon
+> vardı, trigger hiç kurulmamıştı — teşhis doğrulandı) → kurulum sonrası
+> `aliases_normalize_trg` / `tgenabled='O'` → canlı test `'  TEST   İĞNE   ALIAS  '`
+> girdisi **`TEST İĞNE ALIAS` / uzunluk 15** olarak döndü (büyük harf korundu,
+> çift boşluk teke indi, U+0307 yok), `district='   '` → **NULL**. Test rollback'li.
+> ⚠️ 4.b kontrolü (`position('lower(' in prosrc)`) **`true`** döndü ama bu **yanlış
+> pozitif**: fonksiyon gövdesindeki *yorum satırları* "lower()" kelimesini içeriyor
+> ve `prosrc` yorumları da kapsıyor. Davranış kanıtı 4.c'dir. Ders: metin araması
+> koda değil kaynak metnine bakar; davranışı davranışla doğrula.
+>
+> ✅ **#24 KAPANDI — 4 AĞU. Dalga 5'in SON kod engeli kalktı.**
+> `app/api/admin/learn-aliases/route.ts` — `.in('origin_city', kesfedilenNorm)`
+> → `.in('origin_province_id', kesfedilenIlIds)`. Çeviri güvenli: bu route'ta
+> `type: 'city'` sabit yazılı (:380/:396), yani `normalized` her zaman bir il
+> adı; `ilId()` ile plakaya birebir gider. Çözülemeyen değer **sessizce
+> atılmıyor**, `console.warn` ile raporlanıyor — LLM'in il olmayan bir
+> `normalized` üretmesi başlı başına sinyal. tsc temiz · 29/29 · lokasyon testi geçti.
+> 🔍 **Kalan `origin_city` geçişlerinin hepsi taranıp aklandı** (gerçek kolon
+> tüketicisi SIFIR): `YolRehberiClient.tsx`:64/723 RPC'nin **çıktı takma adı**
+> (`provinces.name`, bkz. `20260803_get_nearby_cte_temizligi.sql`:68-72) ·
+> `moderator/page.tsx`:511 `ilAdi(ilan.origin_province_id)` ile **form state**,
+> :647 `aliasOgren` o state'i yazıyor · `parse-text`/`whatsapp`/`llm-parse`
+> geçişleri **LLM prompt metni** · `ilan-ver/page.tsx`:255 parse **sonucu**.
+> ⚠️ Not (kapsam dışı, davranış korundu): bu UPDATE zaten no_lane kuyruğuna
+> dokunmuyor — kuyruk `origin_province_id IS NULL` süzüyor, UPDATE ise
+> NOT NULL satırları işaretliyor. Eski `origin_city` hâli de aynı şeyi
+> yapıyordu (çift yazım nedeniyle küme aynı). Değiştirmedim; ölçmeden
+> "ölü kod" demek de bu haftanın hatası olurdu.
+>
+> ✅ **#44 KAPANDI — 4 AĞU.** Kemalpaşa UPDATE'i zaten çalıştırılmıştı:
+> 53 satırın 53'ü kanonik yazım + `district_official=true`. Kalan büyük harfli
+> ilçe artığı #44'e değil #47/#30'a ait.
+>
+> 🟠 **#47 — EXCEL İLÇE KAYMASI: SEBEP DOSYA, KOD DEĞİL (4 Ağu 2026).**
+> 🔁 **Kalıbın YEDİNCİ örneği ve bu sefer ben de düştüm — SEÇİM YANLILIĞI.**
+> İlk kanıtım "8/8 kaydırılmış hâli doğru" idi; oysa yalnızca
+> `district_official=false` **içerdiği için seçtiğim** ilanları puanlamıştım —
+> yani ölçtüğüm sonucun üzerinden örneklem seçmiştim. Yansız 100 satırda
+> aynı test **olduğu gibi %95 / kaydırılmış %56** verdi. Hipotez ancak
+> yansız alt kümede tekrar ölçülünce ayakta kaldı.
+> **Ölçüm (200 satır / 114 ilan, iki CSV; `ilKey` katlamasıyla
+> `lib/constants/locations.json`'a karşı puanlama):**
+> | parti | satır | olduğu gibi | kaydırılmış | karar |
+> |---|---|---|---|---|
+> | 29 Tem | 84 | %94 | %50 | temiz |
+> | 31 Tem 07:54:32-38 | 16 | ~%96 | — | temiz (tek duraklı) |
+> | 31 Tem 07:54:40-43 (çok duraklı) | 31 | **%48 (10/21)** | **%95 (19/20)** | **BOZUK** |
+> | 4 Ağu | 24 | %88 | %35 | temiz |
+> ⇒ Import kodu sağlam: 4 Ağu dosyası (`yukegel-ilan-sablonu (3).xlsx`, 31 satır)
+> byte düzeyinde doğru içeri alındı; `TopluYukle.tsx`:62-83 ve
+> `app/api/excel-import/route.ts`:180-234 konumsal eşleme yapıyor ve tüm alanlar
+> **aynı `row` dizisinden** okunuyor — tek kolonluk kayma orada oluşamaz.
+> ⇒ Sebep: 31 Tem'de yüklenen **tek bir Excel dosyasında** ilçe kolonu ~19. satırdan
+> itibaren bir satır aşağı kaymış ("hücre ekle, aşağı kaydır" kazası). Kayma
+> **ilan sınırlarını geçiyor** — bu da onu dosya düzeyinde bir bozulma yapıyor.
+> Örnek: `4d4fec4f` Bursa/Gaziosmanpaşa·Kestel·İnegöl → olduğu gibi ✗✓✓ /
+> kaydırılmış ✓✓· · `4e11b1e3` Kayseri/Midyat… → ✗✓✗✓ / ✓✓✓·
+> ✅ **SİLİNDİ — 4 Ağu.** `docs/20260804_31tem_excel_silme.sql` BÖLÜM 6.
+> Bayram'ın kararı: *"Tamamen silelim, bunları test datası gibi görebiliriz."*
+> Kapsam BLOK 2 değil **31 Tem'in tamamı: 45 ilan + 66 durak** (cascade).
+> BLOK 1'in 23 ilanı bozuk DEĞİLDİ (23/23 `district_official=true`) — silinme
+> sebebi bozukluk değil, partinin bütünüyle test verisi sayılması.
+> Yedek alındı (`listings_20260804_31tem_yedek` 45 · `listing_stops_…` 66),
+> FK tek ve `ON DELETE CASCADE`. Sonrası: 29 Tem 55 · 3 Ağu 13 · 4 Ağu 10 ilan,
+> **31 Tem satırı yok.**
+> ⚠️ **CSV kapsamı ölçüyü İKİ KEZ yanılttı.** (1) BLOK 1'i 16 ilan sandım,
+> gerçekte 23'tü — Supabase export'u 100 satırda kesiyor ve o "16" blok
+> büyüklüğü değil **kesme sınırıydı** (84+16=100). (2) Silme sonrası
+> doğrulama hiç ölçmediğim bir parti gösterdi: **3 Ağu / 13 ilan / 33 durak**.
+> Ders: örneklemin sınırını her adımda yeniden sor — bir kez yakalanan
+> truncation bir sonraki adımda unutuluyor.
+> 📊 **Silme sonrası `district_official` dağılımı (147 durak):**
+> 29 Tem true 17 / NULL 67 · 3 Ağu **NULL 33 (tamamı)** · 4 Ağu true 26 / false 4.
+> 4 Ağu'nun 4 `false`'ı bilinen serbest metinler (Depo, Merkez vb.), dosya
+> zaten kusursuz doğrulanmıştı.
+> ✅ **3 Ağu doğrulandı: 33 durağın 33'ünde `district IS NULL`** (boş string
+> bile değil, `ilce_dolu = 0`). Parti ilçesiz yüklenmiş — denetlenmemiş veri
+> değil, OLMAYAN veri. Bayrağı atlayan gizli bir yazma yolu YOK.
+> ⇒ **#47 KAPANDI.** Kaydırma ikinci bir dosyada tekrarlanmadı; kalan tek
+> `false` kümesi 4 Ağu'nun dört serbest metni ve o kaza değil, sektörün
+> gerçek kullanımı. Excel yolu için açık iş kalmadı.
+> ⚠️ Kaymayla İLGİSİZ ama duruyor: 29 Tem partisinde `Tekirdağ/LÜLEBURGAZ` ×2 ve
+> `Tekirdağ/VİZE` — ikisi de Kırklareli ilçesi. Gerçek ama zararsız müşteri hatası.
+> `ÇANAKKALE` ilçe kolonunda il adı olarak geçiyor.
+> ℹ️ 58 `district_official=NULL` durak ayrı bir arıza değil: hepsi 29 Tem
+> 15:45–16:02 arasında; `true` grubu 16:02:02'de başlıyor. Deploy kesişimi.
+>
+> 🚨 **ASIL BULGU — ADIM 10 YARIM UYGULANMIŞ (#43) — [ÇÖZÜLDÜ, yukarı bak].**
 > `docs/20260729_alias_normalize_trigger.sql` iki bölüm; canlıda **BÖLÜM 2 var,
 > BÖLÜM 1 YOK** — `pg_trigger` 0 satır döndü, `aliases_normalize_trg` kurulu değil.
 > ✅ Tekillik korunuyor (indeks duruyor, D3'ün asıl amacı tutuyor).
@@ -295,6 +502,62 @@
 > >0 çıkan her indeks, onu kullanan sorgunun **bugün sessizce eksik sonuç
 > döndürdüğü** anlamına gelir — #37'nin okuma tarafındaki aynısı. 7 Ağu'da
 > beklenen "dördü de 0"; 0 değilse bu bir temizlik değil **arıza** bulgusudur.
+>
+> 🟡 **4 AĞU 2026 — #21 ERKEN OKUNDU (7 Ağu beklenmedi, gerek kalmadı). SONUÇ: 5/7 TEMİZ, 2 AÇIK.**
+> Bayram üç kanaldan da ilan girdi; ama asıl mesele o değildi — `idx_scan` bir OKUMA
+> sayacı, INSERT onu artırmaz (8.F'de kendimiz tespit etmiştik). Ölçümü mümkün kılan
+> şey **tanık sütunu**: fark sorgusuna metin indeksleriyle birlikte `province_id` ve
+> pkey indeksleri de kondu.
+> 📊 **Tanıklar (4,2 gün):** `listing_stops_listing_id_idx` +91.927 · `listings_pkey`
+> +14.078 · `idx_listings_shadow_ban` +3.756 · `listings_province_durum_idx` +27 ·
+> `listings_origin_province_idx` +19 · `listing_stops_province_idx` +4.
+> **Pencere dolu ve `province_id` yolu çalışıyor.**
+> 📊 **Metin indeksleri:** `idx_listings_origin` 110→110 · `idx_listings_origin_city_lower`
+> 44→44 · `listings_origin_city_trgm_idx` 29→29 · `idx_listings_origin_city` 11→11 —
+> **listings tarafının dördü de tam sıfır.** `listing_stops` tarafında ikisi kıpırdadı:
+> `listing_stops_city_trgm_idx` 25→26 · `listing_stops_city_idx` 2→3, ikisi de **+1**.
+>
+> 🔑 **Kaybedilen pozitif kontrol yerine TANIK yöntemi.** Plan "8.B oku → sonra kodu
+> çevir" idi; #24 bugün önce yapıldı, yani `learn-aliases`:454 artık `origin_province_id`
+> kullanıyor ve yedi indeksin tek bilinen tüketicisi kalmadı. Bu, "0 = tüketici yok" ile
+> "0 = trafik yok" ayrımını imkânsızlaştıracaktı. **Tanık sütunu bunu telafi etti ve
+> daha iyisini yaptı:** seyrek bir kod yoluna değil normal trafiğe dayanıyor. Aynı
+> pencerede 92 bin tarama akarken metin indekslerinin sıfır kalması güçlü kanıt.
+> 📌 Bundan sonraki her `idx_scan` ölçümüne tanık indeks koy — tek başına 0 okunamaz.
+>
+> 🔬 **`+1`'ler kovalandı, iki yanlış teşhisten sonra kapandı.** `pg_stat_statements`
+> `city ILIKE '%'||p_city||'%'` içeren onlarca kayıt döndürdü; bunları canlı fonksiyon
+> sanıp "Dalga 5 güvenli değil" alarmı verdim. **Yanlıştı.** `pg_proc` taraması o
+> fonksiyonlardan hiçbirini bulamadı.
+> 🚨 **SEBEP — `pg_stat_statements` UTILITY (DDL) İFADELERİNİ NORMALİZE ETMEZ.**
+> `create or replace function …` bir utility ifadesi; gövde dolar-tırnaklı string olarak
+> METNİN İÇİNDE, sabitleri `$1`'e çevrilmeden duruyor. Yani Dalga 3'te DEĞİŞTİRDİĞİMİZ
+> eski fonksiyon gövdeleri, sorgu gibi görünen fosiller olarak tabloda kalmış.
+> **Ayırt edici işaret çıktıda vardı:** `<>` satırlarında sabitler `$1`/`$9` diye
+> normalize, `ILIKE` satırlarında `'%'` ham. Normalize edilmemiş metin = DDL fosili,
+> canlı sorgu değil. `calls` da sorgu sayısı değil, migration'ı kaç kez koşturduğumuz.
+>
+> ✅ **FONKSİYON TARAMASI YENİDEN, BU SEFER FONKSİYON BAŞINA.** 8.F 31 Tem'de eşleşme
+> başına sınıflandırmıştı — bir fonksiyonda bir masum eşleşme görüp fonksiyonun
+> tamamını aklamak, o fonksiyonda başka eşleşme olmadığını kanıtlamaz. Bu yüzden
+> `\m(origin_)?city\M` geçen HER public fonksiyon, geçiş sayısı ve 45 karakterlik
+> bağlamıyla listelendi. **Dört fonksiyon çıktı, dördü de temiz:**
+> · `ilan_olustur` (4+5) — `p_listing->>'origin_city'`, `t.s->>'city'` = JSON **girdi
+>   anahtarı**; ayrıca hata mesajı metni ve `-- ⬅️ origin_city çıkarıldı` yorumu. Kolon
+>   referansı YOK, v4 INSERT listesinde kolon yok.
+> · `get_nearby_listings_by_province` (1+1) — `po.name as origin_city` = **çıktı kolonu
+>   adı** + KOVA E yorumu.
+> · `get_radar_city_detail` (0+4) ve `get_radar_city_overview` (0+3) — hepsi
+>   `jsonb_build_object('city', …)` **anahtarı** ya da `p.name as city` takma adı.
+> 🟢 **Yani 8.F'nin hükmü doğruymuş: canlı DB tarafında metin kolonlarının tüketicisi
+> YOK.** Bu kez fonksiyon başına doğrulandı, eşleşme başına değil.
+>
+> ⏭️ **AÇIK KALAN TEK ŞEY: `+1` × 2.** En olası açıklama Selimpaşa düzeltmesinde
+> `city` üzerinden attığımız elle filtre — yani ölçümü biz kirlettik. Ama bu hipotez
+> bir kez zaten değiştirildi, hikâyeyle kapatılmıyor. **`public.idx_taban_20260804`
+> alındı (4 Ağu).** Kural: bundan sonra `origin_city` / `listing_stops.city` üzerinde
+> ELLE SORGU YOK. ~5 Ağu'da aynı fark sorgusu yeni tabana karşı okunur; iki indeks de
+> 0 gelirse #21 kapanır. 4 günde 92 bin tarama geldiği için bir gün fazlasıyla yeter.
 >
 > ✅✅ **3 AĞU 2026 — `ilan_olustur` v4 CANLIDA (#26).** RPC artık
 > `listings.origin_city` ve `listing_stops.city` metin kolonlarına **yazmıyor**;
@@ -783,7 +1046,36 @@
 > dönmedi çünkü filtre `%origin_city%` idi — **yokluk kanıtı DEĞİL**, tanımları
 > `20260731_index_temizligi.sql`:279'da.
 >
-> ⏳ **`docs/20260731_districts_tablosu.sql` YAZILDI (31 Tem 2026) — ÇALIŞTIRILMADI.**
+> ✅ **BÖLÜM 1-3 ÇALIŞTIRILDI — 4 Ağu 2026.** `districts` (973/81) ve `ilce_resmi()` canlıda.
+> Doğrulama: 4.1 `973/81` · 4.2 `0 satır` · 4.4 `t1..t9` tam isabet (Ankara **ve** Adıyaman
+> Gölbaşı ikisi de `true`). Çalıştırmadan önce 973 satır `locations.json` ile programatik
+> karşılaştırıldı: birebir, tekrar yok, çift yönlü fark yok.
+> ✅ **Fonksiyon canlı veriye karşı çapraz doğrulandı:** `district_official` dolu 62 durakta
+> kolon ile fonksiyon yan yana → 58 `(true,true)` + 4 `(false,false)`, **çapraz satır yok**.
+> Bu kontrol yalnız entegrasyondan ÖNCE anlamlıydı; sonra ikisi aynı kaynağa döner.
+> ✅ **4.3 tek-kaynak testi YAZILDI (#49, 4 Ağu):** `npm run test:districts` →
+> `scripts/test-districts.mts`. Migration dosyasının INSERT bloğunu ayrıştırıp
+> `locations.json` ile çift yönlü karşılaştırıyor + 8 çapa kontrol. Kimlik bilgisi
+> istemez. Negatif doğrulaması yapıldı (bir `province_id` bozuldu → 3 kontrol kırıldı).
+> ⚠️ **Sınırı bil:** JSON ↔ **migration dosyası**nı karşılaştırıyor, canlı tabloyu değil.
+> Tabloya elle satır eklenirse görmez — `provinces` ile aynı kural: elle EKLEME YAPMA.
+> 🚫 **Kalan tek parça:** `ilan_olustur` v4 entegrasyonu (#50, Dalga 5 ile aynı anda).
+> Yani fonksiyon canlıda DURUYOR ama **hiçbir yazma yolu onu çağırmıyor**.
+>
+> 📊 **İlk denetim (4.5):** listings 12.377 resmi · 82 değil (%0,66) · 222.855 belirsiz —
+> belirsizin tamamı ilçesi boş, **`origin_province_id is null` tek ilan yok**.
+> stops 15.583 · 170 (%1,08) · 229.882. Resmi olmayanların çoğu mahalle/bölge adı
+> (Avrupa 31 · Hadımköy 26 · Işıkkent 8 · Selimpasa 7) — orada `false` DOĞRU cevap.
+> 🔍 **"Gerçek ilçe ama bu ilin değil" elemesi iki gerçek hata buldu:**
+> · `whatsapp` × 5 (29 Tem): Sakarya + **Orhaneli** (Bursa ilçesi). `origin_city`='Sakarya'
+>   ve `province_id`=54 uyuşuyor → **il doğru, parser ilçeyi uydurmuş**. Varış durakları
+>   İzmir/Balıkesir/Antalya, hiçbirinde Bursa yok → "varıştan bulaştı" hipotezi ÇÜRÜDÜ.
+> · `excel` × 3 (29 Tem 16:02): Tekirdağ + **LÜLEBURGAZ/VİZE** (ikisi de Kırklareli).
+>   `city`='Tekirdağ' ile `province_id`=59 uyuşuyor → kod değil, **dosyadaki insan hatası**.
+> ⇒ İkisi de #30'un varlık sebebinin kanıtı: bu 8 satır bir haftadır kimsenin gözüne
+> çarpmadan canlıda duruyordu. #50'den sonra yazma anında `false` bayrağı alırlardı.
+>
+> ⏳ *(31 Tem 2026'da yazıldığındaki hâli:)*
 > 973 ilçe + `il_key()` katlamalı `(province_id, ad)` UNIQUE + `public.ilce_resmi()` fonksiyonu.
 > `COGRAFI_GECIS.md:205-212`'deki "kapatılmayan tek boşluk" (Deno'da `district_official` NULL)
 > buradan kapanıyor — **Deno'ya liste vererek değil, kararı DB'ye taşıyarak**, böylece dört

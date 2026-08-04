@@ -7,7 +7,10 @@ import {
   aliasCakismaBul,
   baskinYazimaHizala,
   aliasSatirlariniYukle,
+  ilceIlUyarisi,
 } from '../../../../lib/alias-normalize';
+// Dalga 5 — :454'teki `origin_city` predikatı `origin_province_id`'ye çevrildi.
+import { ilId } from '../../../../lib/lokasyon';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60; // LLM keşif çağrısı için
@@ -193,7 +196,13 @@ export async function POST(req: NextRequest) {
       .select()
       .single();
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    return NextResponse.json({ success: true, data });
+    // #51 — ilçe/il tutarsızlığı UYARI olarak döner, yazmayı engellemez. Gerekçe
+    // `lib/alias-normalize.ts::ilceIlUyarisi` başlığında.
+    return NextResponse.json({
+      success: true,
+      data,
+      warning: ilceIlUyarisi(alanlar.normalized, alanlar.district) ?? undefined,
+    });
   }
 
   // ── LLM Keşif ──
@@ -444,14 +453,38 @@ KURALLAR:
     // Taranmis raw_posts'lari isaretle
     await svc.from('raw_posts').update({ slh_scanned_at: now }).in('id', rawPostIds);
 
-    // Bu batch'te kesfedilen normalized degerleri ile eslesen listings'leri de isaretle
-    const kesfedilenNorm = kayitlar.map((k: any) => k.normalized);
-    if (kesfedilenNorm.length > 0) {
+    // Bu batch'te kesfedilen illerle eslesen listings'leri de isaretle.
+    //
+    // 🚨 DALGA 5 (4 Ağu 2026) — `.in('origin_city', kesfedilenNorm)` idi.
+    //    `origin_city` Dalga 5'te DÜŞÜYOR; kaldığı yerde bırakılsa bu satır
+    //    drop'tan sonra 42703 atardı. Ayrıca `ilan_olustur` v4 metin kolonuna
+    //    yazmayı bıraktığı için predikat YENİ satırların hiçbirini zaten
+    //    tutmuyor — sessizce kapsam kaybediyordu.
+    //
+    //    `normalized` bu route'ta HER ZAMAN bir il adıdır (yukarıda
+    //    `type: 'city'` sabit yazılı, :380/:396), yani `ilId()` ile plaka
+    //    koduna birebir çevrilebilir. Çeviremediğimiz değer olursa
+    //    (`ilId` → null) onu sessizce atmak yerine AYIKLIYORUZ: LLM'in
+    //    il olmayan bir `normalized` üretmesi başlı başına bir sinyal.
+    const kesfedilenIlIds = Array.from(
+      new Set(
+        kayitlar
+          .map((k: any) => ilId(k.normalized))
+          .filter((id: number | null): id is number => id !== null),
+      ),
+    );
+    const cozulemeyenNorm = kayitlar
+      .map((k: any) => k.normalized)
+      .filter((n: string) => ilId(n) === null);
+    if (cozulemeyenNorm.length > 0) {
+      console.warn('[learn-aliases] normalized il adına çözülemedi:', cozulemeyenNorm);
+    }
+    if (kesfedilenIlIds.length > 0) {
       await svc
         .from('listings')
         .update({ slh_scanned_at: new Date().toISOString() })
         .is('slh_scanned_at', null)
-        .in('origin_city', kesfedilenNorm);
+        .in('origin_province_id', kesfedilenIlIds);
     }
 
     return NextResponse.json({
@@ -507,9 +540,19 @@ export async function PATCH(req: NextRequest) {
     if (alanlar.normalized !== undefined) payload.normalized = alanlar.normalized;
     if (alanlar.district !== undefined) payload.district = alanlar.district;
 
+    // #51 — onay anı detektörün DOĞRU yeri: üç canlı hatanın üçü de AI keşfinden
+    // `is_approved=false` doğdu, yani hepsi bu kapıdan geçti. Uyarı PATCH'te
+    // gönderilmeyen alanları MEVCUT satırdan tamamlamak zorunda — yalnız
+    // `district` düzenlenip onaylanırsa `normalized` `updates`'te olmaz ve
+    // kontrol sessizce atlanırdı.
+    const { data: mevcutSatir } = await svc
+      .from('aliases')
+      .select('type, normalized, district')
+      .eq('id', id)
+      .single();
+
     if (alanlar.alias !== undefined || alanlar.normalized !== undefined || alanlar.district) {
       // Tip gönderilmiyorsa mevcut satırdan oku — çakışma kontrolü tip bazlı.
-      const { data: mevcutSatir } = await svc.from('aliases').select('type').eq('id', id).single();
       const cakisma = await aliasCakismaBul(svc, {
         type: mevcutSatir?.type ?? 'city',
         ...alanlar,
@@ -520,7 +563,14 @@ export async function PATCH(req: NextRequest) {
 
     const { error } = await svc.from('aliases').update(payload).eq('id', id);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    return NextResponse.json({ success: true });
+    return NextResponse.json({
+      success: true,
+      warning:
+        ilceIlUyarisi(
+          alanlar.normalized ?? mevcutSatir?.normalized,
+          alanlar.district !== undefined ? alanlar.district : mevcutSatir?.district,
+        ) ?? undefined,
+    });
   }
 
   if (action === 'reject') {
@@ -542,20 +592,30 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: 'Guncellenecek alan yok' }, { status: 400 });
   }
 
+  // #51 — dördüncü yazma noktası; uyarı burada da mevcut satırla tamamlanıyor.
+  const { data: mevcutSatir } = await svc
+    .from('aliases')
+    .select('type, normalized, district')
+    .eq('id', id)
+    .single();
+
   if (alanlar.alias !== undefined || alanlar.normalized !== undefined || alanlar.district) {
     // Tip değişiyorsa YENİ tipe göre kontrol et — çakışma hedef tipte olur.
-    let tip = updates.type as string | undefined;
-    if (!tip) {
-      const { data: mevcutSatir } = await svc.from('aliases').select('type').eq('id', id).single();
-      tip = mevcutSatir?.type ?? 'city';
-    }
+    const tip = (updates.type as string | undefined) ?? mevcutSatir?.type ?? 'city';
     const cakisma = await aliasCakismaBul(svc, { type: tip, ...alanlar, excludeId: id });
     if (cakisma) return NextResponse.json({ error: cakisma.mesaj, conflict: cakisma }, { status: 409 });
   }
 
   const { error } = await svc.from('aliases').update(izinli).eq('id', id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ success: true });
+  return NextResponse.json({
+    success: true,
+    warning:
+      ilceIlUyarisi(
+        alanlar.normalized ?? mevcutSatir?.normalized,
+        alanlar.district !== undefined ? alanlar.district : mevcutSatir?.district,
+      ) ?? undefined,
+  });
 }
 
 // ──────────────────────────────────────────────

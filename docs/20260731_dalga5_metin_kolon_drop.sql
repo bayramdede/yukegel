@@ -215,7 +215,19 @@ begin
     p_listing->>'origin_district',
     p_listing->>'contact_phone',
     v_origin_pid,
-    nullif(p_listing->>'origin_district_official', '')::boolean,
+    -- ⬅️ #50 (4 Ağu 2026) — `ilce_resmi()` YEDEK BACAĞI EKLENDİ.
+    --    Sıra kasıtlı: çağıranın AÇIK değeri kazanır. TS tarafı (`lib/lokasyon.ts`)
+    --    `locations.json` ile zaten doğru cevabı üretiyor; onu ezmek gereksiz
+    --    davranış değişikliği olurdu. Fonksiyon YALNIZCA çağıranın hiç
+    --    göndermediği durumu doldurur — bugün pratikte tek örneği
+    --    `supabase/functions/parse-listing` (Deno ilçe listesine erişemiyor).
+    --    ⚠️ `ilce_resmi` NULL girdide `false` değil NULL döner; yani "ilçe
+    --    girilmemiş" ile "girilen ilçe resmî değil" ayrımı korunur. `coalesce`
+    --    ikinci bacak NULL dönerse kolon NULL kalır — istenen davranış bu.
+    coalesce(
+      nullif(p_listing->>'origin_district_official', '')::boolean,
+      public.ilce_resmi(v_origin_pid, p_listing->>'origin_district')
+    ),
     (p_listing->>'price_offer')::numeric,
     coalesce((p_listing->>'price_negotiable')::boolean, false),
     (p_listing->>'available_date')::date,
@@ -281,7 +293,14 @@ begin
     -- ⬅️ `coalesce(sp.name, t.s->>'city')` çıkarıldı
     t.s->>'district',
     sp.id,
-    nullif(t.s->>'district_official', '')::boolean,
+    -- ⬅️ #50 (4 Ağu 2026) — kalkıştakiyle aynı desen, gerekçe yukarıda.
+    --    `sp.id` burada NULL OLAMAZ: hemen yukarıdaki guard, ili çözülemeyen
+    --    durak varsa `22023` ile transaction'ı geri alıyor. Yine de `ilce_resmi`
+    --    NULL province_id'de NULL döndüğü için ikinci bir kırılma noktası yok.
+    coalesce(
+      nullif(t.s->>'district_official', '')::boolean,
+      public.ilce_resmi(sp.id, t.s->>'district')
+    ),
     coalesce((t.s->>'vehicle_count')::int, (p_listing->>'arac_adet')::int),
     t.s->>'cargo_type',
     (t.s->>'weight_ton')::numeric,

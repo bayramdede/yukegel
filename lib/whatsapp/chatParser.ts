@@ -49,15 +49,44 @@ const IOS_RE = new RegExp(`^\\[\\s*(${TARIH_KALIBI})[,\\s]\\s*(${SAAT_KALIBI})\\
 const ANDROID_RE = new RegExp(`^(${TARIH_KALIBI})[,\\s]\\s*(${SAAT_KALIBI})\\s*[-–—]\\s*(.+?):\\s?(.*)$`);
 
 /**
+ * Unicode `Cf` (format) sınıfı — GÖRÜNMEYEN, genişliği olmayan kontrol karakterleri.
+ *
+ * 🚨 4 AĞU 2026 — BUNLAR CANLI VERİDE BİR SALDIRI ARACI OLARAK BULUNDU. Bir gönderici
+ * mesaja `S<U+200C>apanca` / `<U+2060>Sarar` gibi görünmez karakter serpip aynı ilanı
+ * tekrar tekrar attırıyordu: `clean_hash` her seferinde değişiyor, tekilleştirme
+ * delinmiş oluyordu. Ekranda hiçbir fark yok — mesaj gözle birebir aynı görünüyor.
+ *
+ * ⚠️ **Liste `\u` KAÇIŞIYLA yazılır, ham karakterle DEĞİL.** Bu satır 4 Ağu'ya kadar
+ *    ham görünmezlerle yazılıydı ve üç karakteri EKSİKTİ (`200C`/`200D`/`2060`) —
+ *    kimse fark edemedi, çünkü eksik olan şey görünmüyor. Bir editör/formatter ham
+ *    karakteri silseydi koruma da görünmeden ölürdü.
+ *
+ * ⚠️ **U+FE0F (emoji varyasyon seçici) BİLEREK LİSTEDE YOK.** O `Cf` değil `Mn`, ve
+ *    `➡️` `⚠️` `✅` gibi her yerde geçen emojilerin parçası. Silmek SAKLANAN metni ve
+ *    dolayısıyla `clean_hash`'i binlerce eski mesajda değiştirir → yeniden içe
+ *    aktarımda kopya seli. Yalnız EŞLEŞTİRME tarafında siliniyor
+ *    (`whatsapp-parse::gorunmezleriSil`, `parse-listing`:74) — orada saklanan değer
+ *    de hash de yok, risk yok. İki listenin FARKLI olması kasıtlıdır.
+ */
+const GORUNMEZ_CF = /[\u200b\u200c\u200d\u200e\u200f\u202a\u202c\u2060\ufeff]/g;
+
+/** Görünmez `Cf` karakterlerini SİLER — boşluğa çevirmez, boşluk kelimeyi böler. */
+export function gorunmezleriSil(s: string): string {
+  return (s || '').replace(GORUNMEZ_CF, '');
+}
+
+/**
  * Görünmez / yön kontrol karakterlerini temizler.
- * U+202F (dar boşluk) iOS'ta AM/PM'den önce kullanılır — normal boşluğa çevrilmezse
- * saat kalıbı eşleşmez ve mesaj TAMAMEN kaybolur.
+ * U+202F (dar boşluk) ve U+00A0 iOS'ta AM/PM'den önce kullanılır — normal boşluğa
+ * çevrilmezse saat kalıbı eşleşmez ve mesaj TAMAMEN kaybolur.
+ *
+ * 🚨 ÇIKTISI SAKLANIR (`raw_posts.message`) VE `clean_hash`'İN GİRDİSİDİR. Silme
+ * listesini genişleten her değişiklik, o karakteri içeren eski satırların hash'ini
+ * değiştirir ve yeniden içe aktarımda kopya üretir. Kapsam dar tutulur; gerekçe
+ * `GORUNMEZ_CF` başlığında.
  */
 export function satiriTemizle(line: string): string {
-  return line
-    .replace(/[  ]/g, ' ')
-    .replace(/[‎‪‬‏​﻿]/g, '')
-    .trim();
+  return gorunmezleriSil(line.replace(/[\u202f\u00a0]/g, ' ')).trim();
 }
 
 export interface MesajBasligi {
@@ -99,7 +128,7 @@ export function zamanDamgasiCoz(
   hamZaman: string,
   tzOffset: string = VARSAYILAN_TZ
 ): { tarih: Date; yerelTarih: string } | null {
-  const temiz = hamZaman.replace(/[  ]/g, ' ').replace(/,/g, ' ').replace(/\s+/g, ' ').trim();
+  const temiz = hamZaman.replace(/[\u202f\u00a0]/g, ' ').replace(/,/g, ' ').replace(/\s+/g, ' ').trim();
 
   const m = new RegExp(
     `^(\\d{1,2})[./-](\\d{1,2})[./-](\\d{2,4})\\s+(\\d{1,2}):(\\d{2})(?::(\\d{2}))?\\s*(ÖÖ|ÖS|öö|ös|AM|PM|am|pm|A\\.M\\.|P\\.M\\.)?$`
@@ -254,12 +283,11 @@ export function eskiIcerigiKirp(
 
 /** ZIP/TXT dosya adından grup adı türetir (emoji, yön karakterleri, uzantı temizlenir). */
 export function grupAdiTuret(dosyaAdi: string): string {
-  return dosyaAdi
+  return gorunmezleriSil(dosyaAdi)
     .replace(/\.(zip|txt)$/i, '')
     .replace(/WhatsApp (Sohbeti|Chat) (ile |- )/i, '')
     .replace(/WhatsApp (Sohbeti|Chat) - /i, '')
     .replace(/[\u{1F000}-\u{1FFFF}]/gu, '')
-    .replace(/[‎‪‬‏​]/g, '')
     .replace(/\s+/g, ' ')
     .trim() || 'Bilinmiyor';
 }

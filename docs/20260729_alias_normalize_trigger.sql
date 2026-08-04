@@ -1,4 +1,13 @@
 -- ═══════════════════════════════════════════════════════════════════════════
+-- ⛔ BU DOSYADAKİ TRIGGER BÖLÜMÜ GEÇERSİZ — 4 Ağu 2026
+-- Yerine: docs/20260804_alias_normalize_trg_a.sql kullan.
+-- Sebep: buradaki `NEW.alias := lower(...)` satırının gerekçesi (sat. 64-66
+-- ve 106-111'deki "büyük harfli alias hiç tutmaz" iddiası) ÖLÇÜMLE ÇÜRÜTÜLDÜ.
+-- Alias yazılırken değil OKUNURKEN katlanıyor (parse-listing:323,337 ·
+-- whatsapp-parse:224,232). Üstelik lower('İSTANBUL') = 'i'+U+0307 üretir;
+-- bu tam olarak 4 Ağu'da 34 satırda onarılan hatanın kaynağıdır.
+-- İNDEKS bölümü (BÖLÜM 2) geçerliliğini korur.
+-- ═══════════════════════════════════════════════════════════════════════════
 -- W5/D3 — aliases: normalize trigger + katlanmış anahtar üzerinde UNIQUE indeks
 -- 29 Temmuz 2026 · Bayram çalıştıracak
 --
