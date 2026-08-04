@@ -91,6 +91,13 @@
 --             önce ve BÖLÜM 2 koduyla aynı release'te çıkar. Aşağıdaki BÖLÜM 1
 --             gövdesi referans olarak duruyor; **çalıştırılacak olan o dosya**.
 --             İkisi ayrışmasın: değişiklik önce v4 dosyasına, sonra buraya.
+--          🔄 4 Ağu 2026 — BÖLÜM 1 gövdesi GÜNCELLENDİ (#50): `district_official`
+--             iki yerde `coalesce(..., public.ilce_resmi(...))` oldu.
+--             📄 Çalıştırılabilir hâli: `docs/20260804_ilan_olustur_v41_ilce_resmi.sql`
+--             ⚠️ Bu ön koşulu BLOKE ETMEZ — değişiklik `district_official`e
+--                dokunuyor, `origin_city`/`city`ye değil, yani kolon drop'undan
+--                bağımsız. v4.1 çıkmadan da drop güvenli; sadece WhatsApp
+--                hattındaki ilanlarda `district_official` NULL kalmaya devam eder.
 -- [ ] 0.7  BÖLÜM 2 (kod temizliği) deploy edildi ve duman testi geçti.
 --
 -- [ ] 0.8  🚨 FONKSİYON GÖVDESİ TARAMASI — **DROP'TAN ÖNCE** çalıştırıldı ve

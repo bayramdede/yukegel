@@ -1130,9 +1130,21 @@ grant execute on function public.ilce_resmi(smallint, text) to anon, authenticat
 
 -- ── `ilan_olustur` entegrasyonu ─────────────────────────────────────────────
 --
--- ⚠️ Bu bölüm HENÜZ UYGULANMADI — Dalga 5'in `ilan_olustur` v4'ü ile aynı anda
---    yapılmalı, yoksa fonksiyon iki kez elden geçer. v4 gövdesinde
---    (`docs/20260731_dalga5_metin_kolon_drop.sql` BÖLÜM 1) şu iki satır değişir:
+-- 📄 ÇALIŞTIRILABİLİR HÂLİ: `docs/20260804_ilan_olustur_v41_ilce_resmi.sql` (4 Ağu, #50).
+--
+-- ⚠️ AŞAĞIDAKİ "Dalga 5 ile AYNI ANDA yapılmalı, yoksa fonksiyon iki kez elden
+--    geçer" GEREKÇESİ ARTIK GEÇERSİZ (4 Ağu 2026). v4 3 Ağu'da Dalga 5'ten
+--    BAĞIMSIZ çıktı (#26); fonksiyon zaten ikinci kez elden geçecek, yani
+--    beklemekle kaçınılan bir maliyet kalmadı — yalnız BEDELİ kaldı: o güne
+--    kadar WhatsApp hattından giren her ilanda `district_official` NULL.
+--    📌 Bu, "bir kararın gerekçesi ölür ama karar yaşamaya devam eder" deseninin
+--       bir örneği. Ertelenmiş her iş, ertelenme SEBEBİ hâlâ geçerli mi diye
+--       yeniden okunmalı.
+--    ✅ Değişiklik `district_official`e dokunur, `origin_city`/`city`ye DEĞİL —
+--       kolon drop'undan bağımsızdır, tek başına çıkar.
+--
+-- Değişen iki satır (v4 gövdesinde,
+-- `docs/20260731_dalga5_metin_kolon_drop.sql` BÖLÜM 1 — 4 Ağu'da işlendi):
 --
 --    listings INSERT'inde:
 --      nullif(p_listing->>'origin_district_official','')::boolean

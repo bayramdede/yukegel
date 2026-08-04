@@ -97,6 +97,15 @@
 > ✅ **2.5 DUMAN TESTİ DE GEÇTİ (#39, aynı gün).** Gerçek trafikte 149 ilan /
 > 176 durak, hepsinde `origin_province_id` dolu ve metin kolonları NULL.
 > Beş yol da koştu: whatsapp 135 · excel 13 · form 1 · repost 21 · moderatör 50.
+>
+> 📄 **`docs/20260804_ilan_olustur_v41_ilce_resmi.sql` (4 Ağu 2026, #50) — YAZILDI,
+> ÇALIŞTIRILMADI.** v4 gövdesinin aynısı, yalnız iki satır: `district_official` artık
+> `coalesce(çağıranın değeri, public.ilce_resmi(...))`. **Gövde elle kopyalanmadı** —
+> v4 dosyasından programla üretilip iki satırı yamandı, sonra `difflib` ile v4'e karşı
+> doğrulandı: tam iki hunk, parantez dengesi aynı. Sürüklenme riski sıfır.
+> 🔑 **Dalga 5'i BEKLEMİYOR.** Eski karar "v4 ile aynı anda" idi; gerekçesi "fonksiyon
+> iki kez elden geçmesin"di ve v4 3 Ağu'da tek başına çıkınca o gerekçe öldü.
+> `origin_city`/`city`ye dokunmuyor → drop'tan bağımsız.
 > ⚠️ Kanal kapsaması `source` ile ÖLÇÜLMEZ — o alan mesajın nereden geldiğini
 > tutar, hangi kodun yazdığını değil; moderatör de repost da `whatsapp` görünür.
 > Ayıranlar: `is_repost`, `reviewed_at`.
@@ -774,8 +783,17 @@ RLS açık · SELECT herkese (anon, authenticated) · yazma yok
 > "hangi il?" sorusunu cevaplamıyor.
 > ✅ Canlı veriye karşı çapraz doğrulandı: `district_official` dolu 62 durakta kolon ile
 > fonksiyon 58 `(true,true)` + 4 `(false,false)`, çapraz satır yok.
-> 🚫 **`ilan_olustur` HENÜZ ÇAĞIRMIYOR** — entegrasyon Dalga 5'in v4'ü ile aynı anda
-> yapılacak (#50). Yani bugün sadece sorgulanabilir bir sözlük; yazma yolları etkilenmedi.
+> 📄 **`ilan_olustur` ENTEGRASYONU YAZILDI, ÇALIŞTIRILMADI** —
+> `docs/20260804_ilan_olustur_v41_ilce_resmi.sql` (4 Ağu, #50). İki yerde
+> `coalesce(nullif(çağıranın değeri), public.ilce_resmi(...))`; sıra kasıtlı,
+> **çağıranın açık değeri kazanır**. Bugün ikinci bacağın fiilen çalıştığı TEK yol
+> `parse-listing`:848 — Deno `locations.json`'a erişemediği için bu alanı hiç
+> göndermiyor. WhatsApp hattı ilanların çoğunu ürettiği için no-op değil.
+> 🔑 **"Dalga 5 ile aynı anda yapılmalı" gerekçesi ÖLDÜ ve karar onunla ölmedi.**
+> Gerekçe "fonksiyon iki kez elden geçmesin"di; v4 3 Ağu'da Dalga 5'ten bağımsız
+> çıkınca (#26) ikinci geçiş zaten kaçınılmaz oldu. Değişiklik `district_official`e
+> dokunuyor, `origin_city`/`city`ye değil → **kolon drop'undan bağımsız, tek başına
+> çıkar.** 📌 Ertelenmiş her iş, ertelenme SEBEBİ hâlâ geçerli mi diye yeniden okunmalı.
 > ⚠️ **Tuzak — "resmi değil" ≠ "hata".** `Merter`, `Etlik`, `Işıkkent`, `Hadımköy` mahalle;
 > `Eminönü` 2008'de Fatih'e katıldı. Hepsinde `false` DOĞRU cevap. Ayrıca yazım tek kaynağa
 > bağlı: `Marmara Ereğlisi` `false` döner çünkü JSON'da bitişik — `Marmaraereğlisi`.

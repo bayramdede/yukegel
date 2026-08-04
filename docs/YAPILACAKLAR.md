@@ -40,6 +40,48 @@
 > ilan ömrü kısa, etki 5 satır, kaynak (alias) zaten kapatıldı → yeni hata üretmiyor.
 > Bu satır burada duruyor ki ileride biri "neden düzeltilmemiş" diye sormasın.
 >
+> 🟡 **4 AĞU 2026 — #50 YAZILDI, ÇALIŞTIRILMADI: `district_official` artık DB'de türetiliyor.**
+> 📄 `docs/20260804_ilan_olustur_v41_ilce_resmi.sql` — v4 gövdesinin aynısı, iki satır değişti:
+> `district_official` iki yerde `coalesce(nullif(çağıranın değeri), public.ilce_resmi(...))` oldu.
+> Sıra kasıtlı, **çağıranın açık değeri kazanır**: `lib/ilan-yaz.ts`:364 ve
+> `app/moderator/actions.ts`:232 `locations.json` üzerinden zaten doğru cevabı gönderiyor,
+> onu ezmek gereksiz davranış değişikliği olurdu. Fonksiyon yalnız çağıranın hiç
+> göndermediği durumu doldurur.
+>
+> 📌 **Bugün o durumun TEK örneği `supabase/functions/parse-listing`:848** — Deno
+> `locations.json`'a erişemediği için bu alanı hiç göndermiyor (kodda "tek boşluk" diye
+> kayıtlıydı). Doğrulandı: parse-listing'in RPC çağrısında ne `origin_district_official`
+> ne `district_official` var. **WhatsApp hattı ilanların çoğunu ürettiği için bu no-op DEĞİL.**
+>
+> 🔑 **ASIL BULGU — ERTELEME GEREKÇESİ ÖLDÜ, KARAR ONUNLA ÖLMEDİ.**
+> `districts_tablosu.sql`:1133 "Dalga 5'in v4'ü ile AYNI ANDA yapılmalı, yoksa fonksiyon
+> iki kez elden geçer" diyordu. **v4 3 Ağu'da Dalga 5'ten bağımsız çıktı (#26)** — yani
+> ikinci geçiş zaten kaçınılmaz oldu, beklemekle kaçınılan maliyet buharlaştı. Geriye
+> yalnız BEDELİ kaldı: o güne kadar WhatsApp hattından giren her ilanda
+> `district_official` NULL. Değişiklik `district_official`e dokunuyor, `origin_city`/`city`ye
+> DEĞİL → **kolon drop'undan bağımsız, tek başına bugün çıkabilir.**
+> 📌 **Kural: ertelenmiş her iş, ertelenme SEBEBİ hâlâ geçerli mi diye yeniden okunmalı.**
+> Bu, projenin "kayıt gerçeğe uymuyor" desenin bir varyantı — kayıt yanlış değildi,
+> yazıldığı gün DOĞRUYDU; dünya değişti, kayıt değişmedi.
+>
+> ✅ **Doğrulama (offline, canlı DB'ye dokunulmadı):** gövde elle kopyalanmadı, v4
+> dosyasından programla üretilip iki satırı yamandı; sonra `difflib` ile v4'e karşı
+> karşılaştırıldı → **tam iki hunk, ikisi de amaçlanan**, parantez dengesi ikisinde de 0.
+> `provinces.id` smallint doğrulandı, yani `sp.id` → `ilce_resmi(smallint, text)` imzasına
+> birebir oturuyor; aşırı yükleme belirsizliği yok.
+> ⚠️ **Sandbox'ta postgres yok** — sözdizimi gerçek bir sunucuda DENENMEDİ. Dosyanın
+> ADIM 0'ı bunu telafi ediyor: `ilce_resmi` canlıda mı diye saf `select` ile bakar.
+> 🚨 plpgsql gövdesi DDL anında doğrulanmaz — `ilce_resmi` yoksa `create or replace`
+> HATASIZ geçer ve ilk ilan denemesinde patlar. ADIM 0 atlanmaz.
+> 🚨 ADIM 0'da `t4` (`ilce_resmi(34,null)`) `false` gelirse DUR: fonksiyonun NULL
+> semantiği bozulmuş demektir ve `coalesce` "ilçe girilmemiş" satırları `false` ile
+> doldurur — sessiz veri bozulması.
+>
+> ⏭️ **Sıradaki:** Bayram ADIM 0'ı okur → ADIM 1'i çalıştırır → ADIM 2.3 (WhatsApp hattı)
+> ile ikinci bacağın fiilen çalıştığını doğrular. Geçmiş satırlar ONARILMAZ (#52 ile aynı
+> gerekçe: ileri-yönlü düzeltme).
+
+
 > 🚨 **YENİ CANLI BULGU — SIFIR GENİŞLİKLİ KARAKTER SALDIRISI (#61 KAPANDI).** `raw_posts`
 > içinde U+200C ve U+2060 serpilmiş mesajlar bulundu: bir gönderici tekilleştirmeyi delmek
 > için metne görünmez karakter koyuyor. **Tek kök sebep, İKİ AYRI zarar:**
