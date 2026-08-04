@@ -94,7 +94,12 @@
 > IS NULL` **0 satır**, `listing_stops.province_id IS NULL` **0** → guard geriye dönük hiçbir
 > akışı kırmıyor. Doğrulama: 2.2 → `origin_city` NULL · `origin_province_id` 34 · `city` NULL ·
 > `province_id` 6 · 2.3 → iki guard da `22023` · guard sonrası yarım satır **0**.
-> ⏳ Kalan: 2.5 duman testi (beş yazma yolu, özellikle parse-listing).
+> ✅ **2.5 DUMAN TESTİ DE GEÇTİ (#39, aynı gün).** Gerçek trafikte 149 ilan /
+> 176 durak, hepsinde `origin_province_id` dolu ve metin kolonları NULL.
+> Beş yol da koştu: whatsapp 135 · excel 13 · form 1 · repost 21 · moderatör 50.
+> ⚠️ Kanal kapsaması `source` ile ÖLÇÜLMEZ — o alan mesajın nereden geldiğini
+> tutar, hangi kodun yazdığını değil; moderatör de repost da `whatsapp` görünür.
+> Ayıranlar: `is_repost`, `reviewed_at`.
 >
 > 🚨🚨 **ŞEMA DEĞİŞTİ — `listings.origin_city` ve `listing_stops.city` ARTIK NULLABLE**
 > (3 Ağu 2026, v4 ADIM 0.5). v4 uygulandıktan sonra her `ilan_olustur` çağrısı `23502` attı
@@ -104,6 +109,27 @@
 > kurgulamıştı; o pencerede kolonun hâlâ **dolu olmayı zorunlu kıldığı** sorulmamıştı — ne v4
 > ne drop dosyası "NOT NULL" kelimesini bir kez geçiriyordu.
 > → **Kural: bir yazma yolunu kesmeden önce hedef kolonun KISITLARINA bak.**
+>
+> 📄 **`docs/20260803_pg_metin_kolon_tuketici_taramasi.sql` (3 Ağu 2026, #40) — ✅ ÇALIŞTIRILDI, SONUÇ TEMİZ.**
+> Salt okunur 7 bölümlük katalog taraması: `pg_proc` gövdeleri · view/matview · indeks · kısıt ·
+> `pg_attribute.attnotnull` · RLS · varsayılan · trigger. **Postgres tarafında metin kolonlarının
+> gerçek tüketicisi kalmadı — #37 son taneymiş.** Niye gerekti: Dalga 5 envanteri kapsamını *dile*
+> göre kurmuştu (`.ts`/`.tsx`), Postgres hiç envanterlenmedi; #37 tesadüfen bulundu ve tesadüf bir
+> yöntem değil. Dört fonksiyon eşleşmesinin dördü de yanlış pozitif: `ilan_olustur`ünki JSONB
+> **girdi anahtarı** (`p_listing->>'origin_city'`) — 🔑 bu kalıcı ve doğru, kolon düşse de çağıranlar
+> JSON'da `origin_city` göndermeye devam edecek, **Dalga 5'te bu satırlara dokunulmayacak**
+> (API sözleşmesi ≠ şema); diğer üçü (`get_nearby_listings_by_province`, `get_radar_city_overview`,
+> `get_radar_city_detail`) `provinces.name`i `as origin_city`/`as city` **takma adıyla** döndürüyor.
+> Yedi indeks doğrulandı; `drop column` onları kendiliğinden düşürür → drop dosyasına ayrıca
+> `drop index` gerekmiyor. İki kolonda kısıt yok, ikisi de nullable, trigger'ların hiçbiri gövdesinde
+> `city` geçirmiyor.
+> ❗ **Eksik: BÖLÜM 2 (view/matview), 5 (RLS), 6 (varsayılan) çıktıları yapıştırılmadı.** Boş dönmüş
+> olsa bile kaydedilmeli — şu an "boş" ile "bakılmadı" ayırt edilemiyor. En kritiği BÖLÜM 2:
+> **view/matview `drop column`'u fiilen ENGELLER.**
+> 🚨 **Taramanın kendi açığı:** filtre `l !~ '^\s*--'` yalnızca tamamen yorum olan satırı eliyor,
+> **satır sonu yorumunu** elemiyor — `… contact_phone,  -- ⬅️ origin_city çıkarıldı` yanlış pozitif
+> verdi. Aynı gün v4 sürüm tespitinde yapılan hatanın daha ince hâli: kural "yorum **satırını** at"
+> değil, "**yorumu** at" imiş → `regexp_replace(l, '--.*$', '')`.
 >
 > 🐛 **DÖRDÜNCÜ SESSİZ BUG (v4 yazılırken bulundu, düzeltildi).**
 > `parse-listing/index.ts`:884 döngü **dışında koşulsuz** `processing_status='processed'`
@@ -1225,7 +1251,8 @@ sayfalara **miras bırakmaz**. Dinamik OG görseli de yok (kök karta düşüyor
   - `docs/20260701_nearby_listings_rpc.sql`: `get_nearby_listings_by_city(p_city, p_district, p_limit)` RPC — **gerçek şema** (`origin_city`/`origin_district`, varış `listing_stops`'un son durağından `DISTINCT ON` ile) ile yazıldı.
     - ⏳ **Dalga 3 (30 Tem 2026) bu fonksiyonun ADINI DEĞİŞTİRİYOR:** `get_nearby_listings_by_province(p_province_id, p_district, p_limit)` — `docs/20260730_dalga3_radar_province_id.sql` BÖLÜM 4. Ad değişti çünkü `_by_city` artık yalan olurdu. İlçe karşılaştırması `ILIKE` yerine `public.il_key()` (katlanmış eşitlik); güvenli çünkü `eslesme` bir **sıralama ipucu**, filtre değil. SQL çalıştırılana kadar yeni kod `PGRST202` alır.
     - ✅ **KOVA E TEMİZLENDİ (3 Ağu 2026, #37 — `docs/20260803_get_nearby_cte_temizligi.sql`, ÇALIŞTIRILDI).** Dalga 3 dönüş ifadesini doğru çevirmişti (`dest_city` artık `pd.name`'den geliyor) ama `son_durak` CTE'sinin SELECT listesinde ölü bir `city` kalmıştı. Dalga 5 / BÖLÜM 5 `listing_stops.city`'yi düşürdüğünde fonksiyon `42703` atacak, `route.ts`:44 → `YolRehberiClient.tsx` zinciri yani **GPS'e dayalı keşif akışının tamamı sessizce ölecekti**. 🚨 Bu bulguyu `.ts`/`.tsx` taraması ASLA gösteremezdi — bağımlılık yalnızca fonksiyon GÖVDESİNDE, yani Postgres'te. Ders: "kod temizliği" envanteri ikinci bir kod tabanını (DB fonksiyonları) unutmamalı. Doğrulama: gövdede metin kolonu kalmadı · dört GRANT (`anon`/`authenticated`/`postgres`/`service_role`) `create or replace` sayesinde korundu · çağrı `0/0` döndü ve bu **kontrol sorgusuyla** doğrulandı (34'te aktif+onaylı ilan sayısı da 0). ⏳ Kalan tek adım 2.4 duman testi (deploy sonrası `/yol-rehberi` → "Yakınımdaki Yükler").
-  - **Not:** `docs/20260610_poi_module.sql` içindeki eski `get_nearby_listings_for_parked_driver` fonksiyonu `listings.dest_city`/`title`/`load_type` gibi olmayan kolonları referans alıyor — çağrılırsa hata verir, kullanılmıyor, silinmedi (geriye dönük doküman amaçlı duruyor).
+  - **Not:** `docs/20260610_poi_module.sql` içindeki eski `get_nearby_listings_for_parked_driver` fonksiyonu `listings.dest_city`/`title`/`load_type` gibi olmayan kolonları referans alıyor — çağrılırsa hata verir, kullanılmıyor.
+    - 🚨 **DÜZELTME (3 Ağu 2026, #40 katalog taraması):** bu fonksiyon **canlıda hiç YOK** — `pg_proc` taramasında çıkmadı. Yani "silinmedi, duruyor" ifadesi yanlıştı: o migration canlıya **hiç uygulanmamış**. Kendi başına risk değil, ama **repo'daki SQL ile canlı şemanın ayrıştığını** kanıtlıyor. Aynı sınıftan bilinen ikinci vaka #30 (districts migration'ı yazıldı, hiç çalıştırılmadı). ⚠️ `docs/*.sql` dosyalarından hangilerinin gerçekten koştuğu **hiçbir yerde kayıtlı değil** — dosyanın varlığı uygulandığı anlamına gelmiyor. → "Repo'da var, canlıda yok" envanteri çıkarılmalı.
   - `/api/listings/yakin` (GET, `?lat=&lng=`): en yakın ili bulur, RPC'yi çağırır, ilan listesini döner.
   - UI: `YolRehberiClient.tsx` — Liste/Harita yanına "📦 Yükler" toggle, `YukListeKart` bileşeni (kalkış→varış, fiyat, araç tipi, "YAKININDA" rozeti ilçe eşleşmesinde), `/ilan/[id]`'e link.
   - **Faz 1 kapsamı:** il bazlı (gerçek km mesafesi değil). Faz 2: `listings`/`listing_stops`'a gerçek koordinat + PostGIS bbox sorgusu (bkz. altta "🔮 Faz 2").

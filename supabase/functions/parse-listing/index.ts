@@ -819,11 +819,22 @@ Deno.serve(async (req) => {
     // büyük/küçük harf duyarlı `.includes()` yaptığından bu ilanlar kullanıcıya
     // GÖRÜNMÜYORDU. (Onarım: `docs/20260730_istanbul_kanonik.sql`.)
     //
-    // `ilan_olustur` v3 bunu YAPISAL olarak imkânsız kılıyor: RPC metni
-    // `il_key()` ile katlayıp `provinces`'tan çözüyor, `province_id`'yi KENDİSİ
-    // türetiyor ve `origin_city`'yi kanonik ada çevirerek yazıyor. Bu yüzden
-    // burada bir şey göndermeye gerek yok — Deno bu dosyada `lib/lokasyon.ts`'i
-    // zaten import EDEMEZ.
+    // `ilan_olustur` v3 bunu YAPISAL olarak imkânsız kıldı: RPC metni `il_key()`
+    // ile katlayıp `provinces`'tan çözüyor ve `province_id`'yi KENDİSİ türetiyor.
+    // Bu yüzden burada bir şey göndermeye gerek yok — Deno bu dosyada
+    // `lib/lokasyon.ts`'i zaten import EDEMEZ.
+    //
+    // ⚠️ GÜNCELLEME (3 Ağu 2026, v4 canlıda): bu yorum "…ve `origin_city`'yi
+    //    kanonik ada çevirerek YAZIYOR" diyordu — ARTIK YAZMIYOR. v4 metin
+    //    kolonlarına hiç dokunmuyor, yalnız `province_id` yazıyor; kolonlar
+    //    Dalga 5'te tamamen düşüyor. Gönderdiğimiz `origin_city` hâlâ GEREKLİ
+    //    ama artık yalnızca ÇÖZÜMLEME GİRDİSİ — saklanan bir değer değil.
+    //    (Yorumun kendisi 4 Ağu'da düzeltildi; koddan bağımsız yaşlanmıştı.)
+    //
+    // 🚨 v4 ÇÖZEMEZSE ARTIK REDDEDİYOR (`22023`), v3 gibi ham metni saklamıyor.
+    //    Bu yolun `origin_province_id` GÖNDERMEDİĞİNİ unutma: il yalnızca
+    //    aşağıdaki `origin_city` metninden çözülür. Yani buradaki alias
+    //    normalizasyonu artık sadece "doğru yazım" değil, ilanın VAR OLMA şartı.
     //
     // Tek boşluk: `district_official`. 973 ilçe `lib/constants/locations.json`'da
     // ve DB'de ilçe tablosu YOK, yani RPC bunu türetemez. Bu yoldan gelen
@@ -901,9 +912,24 @@ Deno.serve(async (req) => {
     // `reprocess-no-lane`:19). Yeni bir durum değeri eklemek beş okuyucuyu
     // birden güncellemeyi gerektirirdi ve anlam da doğru: "bu mesajdan lane
     // çıkarılamadı" — ister parser bulamadığı için, ister ili çözülemediği için.
+    // 🕐 `processed_at` damgası — 4 Ağu 2026'da eklendi (#41).
+    // 🚨 BURASI KOLONUN TEK YAZICISI. Eklenmeden önce `processed_at`'i repo'da
+    //    HİÇBİR ŞEY yazmıyordu (`grep -rn processed_at` → 0 eşleşme, ne TS ne
+    //    SQL). Yani kolon şemada vardı ve **her satırda NULL'dı** — başarılıda
+    //    da, `no_lane`de de. "Başarısız yolda eksik" değil, hiç kullanılmıyordu.
+    //    Sonuç: bir mesajın NE ZAMAN işlendiği kayıtta yoktu.
+    //    3 Ağu'da `no_lane` oranı %39.7'ye sıçrayınca "bunu v4 mü yaptı" sorusuna
+    //    cevap veremedik; işleme anını `created_at`ten TAHMİN etmek zorunda kaldık
+    //    (alım ile işleme aynı koşuda olduğu için tutuyor — ama parti mantığı
+    //    değiştiği gün bu tahmin sessizce çöker).
+    //    ⚠️ Bir kaydın en çok işe yaradığı an, onu yazmayı en gereksiz
+    //       bulduğumuz an: BAŞARISIZLIK anı.
     await supabase
       .from('raw_posts')
-      .update({ processing_status: created > 0 ? 'processed' : 'no_lane' })
+      .update({
+        processing_status: created > 0 ? 'processed' : 'no_lane',
+        processed_at: new Date().toISOString(),
+      })
       .eq('id', raw_post_id)
 
     if (created === 0) {

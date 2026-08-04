@@ -1,5 +1,159 @@
 # Yükegel — Yapılacaklar Listesi
 
+> ✅✅ **3 AĞU 2026 — #39 DUMAN TESTİ GEÇTİ. v4 BEŞ YAZMA YOLUNDA DA DOĞRULANDI.**
+> Gerçek trafik altında, tek günde: **149 ilan · 176 durak · hepsinde `il_bos 0`,
+> `metin_yazilmis 0`.** Kanallar: whatsapp 135 · excel 13 · form 1;
+> repost **21** · moderatör dokunmuş **50** · gölge profilli 93.
+>
+> 📌 **`source` yazma yolunu ayırmaz.** İlk sorgu üç `source` döndürdü ve bu
+> "iki kanal kayıp" gibi göründü — yanlış okuma: moderatör onayladığı WhatsApp
+> mesajını yine `whatsapp` yazıyor, repost ayrı kanal değil `is_repost` bayrağı.
+> Ayıran alanlar `is_repost` / `reviewed_at`. → Kanal kapsamasını `source` ile
+> ölçme; o alan **mesajın nereden geldiğini** kaydediyor, **hangi kodun yazdığını**
+> değil.
+>
+> 🔑 **`metin_yazilmis 0` ikinci bir şeyi kanıtladı:** bugün oluşan 149 satırın
+> hiçbiri `ilan_olustur`u atlamamış. Yani KOVA D'den (#34) artakalan gizli bir
+> doğrudan `.insert()` yolu **yok**. Dalga 5 drop'u bu taraftan güvenli.
+>
+> 🚨 **YENİ BULGU — KISMİ ŞERİT KAYBI GERİ ALINAMIYOR.**
+> `parse-listing/index.ts`:834-882 mesajdaki her şeridi ayrı `ilan_olustur`
+> çağrısıyla yazıyor; RPC hatasında `edgeLog('ERROR', …, {error_code})` + `continue`,
+> sonra `processing_status = created > 0 ? 'processed' : 'no_lane'` (:896).
+> → 3 şeritli bir mesajın 1 şeridi guard'a takılırsa: 2 ilan oluşur, mesaj
+> **`processed`** olur, kaybolan şerit `no_lane` kuyruğuna **hiç girmez** ve
+> `reprocess-no-lane` onu alias öğrenildikten sonra bir daha denemez.
+> ⚠️ İzsiz değil (edgeLog var) ama **kurtarılabilir değil**. #33'ün düzeltmesi
+> "hiç ilan oluşmadı" hâlini kurtardı, "bir kısmı oluşmadı" hâlini kurtarmıyor.
+> → Karar gerekiyor: şerit bazlı bir başarısızlık kuyruğu mu, yoksa kabul edilen
+> bir kayıp mı? Bugünkü hacimde (135 ilan) sıfır değilse ölçülmeli.
+>
+> 🐛 **BAYAT YORUM — `parse-listing/index.ts`:822-825 artık YANLIŞ.**
+> "`ilan_olustur` v3 … `origin_city`'yi kanonik ada çevirerek yazıyor" diyor.
+> v4 o kolona **yazmıyor**. Canlı dosyada yanlış yorum; bugün katalog taramasında
+> (#40) yanlış pozitif üreten satır-sonu yorumlarıyla aynı sınıf: yorum koddan
+> ayrı yaşlanıyor. → Düzeltilecek.
+> ℹ️ Not: parse-listing `origin_city` metnini **gönderiyor** (:839) — göndermediği
+> `origin_province_id`. Guard yalnız metin `provinces`tan çözülemezse atıyor.
+>
+> ✅ **`no_lane` ALARMI KAPANDI — v4'ün ETKİSİ SAPTANAMIYOR (4 Ağu 2026).**
+> İlk sayı korkutucuydu: 3 Ağu partisinde `no_lane` %39.7, önceki günler %3–5.
+> Üç adımda çözüldü ve **sıçrama v4 kaynaklı değilmiş.**
+>
+> 1️⃣ **Örnekleri okuyunca guard şüphesi düştü.** 4 Ağu'daki 13 `no_lane`
+> mesajının kalkışları Adana · Afyon · Mersin · Bolu · Eskişehir · Konya ·
+> Bilecik · Aydın — hepsi `provinces`tan çözülür. Guard tetiklenseydi
+> çözülemeyen bir il olması gerekirdi. Yani RPC hiç çağrılmamış; hata
+> `index.ts`:493 `if (!from) continue`'da, yani **ayrıştırıcıda**.
+>
+> 2️⃣ **Kompozisyon etkisi.** `message_date` kırılımı hafta sonlarının çok daha
+> zor olduğunu gösterdi: 26 Tem Paz %23.1 · 1 Ağu Cmt %50.0 · 2 Ağu Paz %44.2,
+> hafta içi %2.5–13.9. 3 Ağu partisi tam da **hafta sonu birikmişini** yuttu:
+> 31 `no_lane`in **25'i** 1–2 Ağu mesajlarından geldi.
+>
+> 3️⃣ **Benzeri benzerle karşılaştırınca fark kalmıyor.** Aynı gün içi hücreler
+> (parti = mesaj günü): v4 öncesi %2.5 · %3.3 · %5.3 · %20.8 · **%22.3**;
+> v4 sonrası 3 Ağu **%18.9**. Bandın içinde, hatta 28 Tem'in altında.
+> → **v4 guard'ının `no_lane` üzerinde ölçülebilir etkisi YOK.**
+>
+> 📌 **Eksen dersi (iki kez yanlış seçtim).** `created_at` = alım = **işleme**
+> zamanı (alım ile işleme aynı koşuda oluyor) → "hangi kod sürümü işledi"
+> sorusunun ekseni **bu**. `message_date` = mesajın yazıldığı gün → "trafik ne
+> cinsten" sorusunun ekseni. Sürüm karşılaştırması `message_date` ile yapılamaz:
+> 1–2 Ağu mesajları 4 Ağu'da, yani v4'ten SONRA işlendi. Ayrı sorular, ayrı
+> sütunlar; ikisini karıştırmak hem alarmı üretti hem geciktirdi.
+>
+> 🚨 **#41 — `processed_at` KOLONUNU HİÇBİR ŞEY YAZMIYORMUŞ. ⏳ KOD HAZIR, DEPLOY BEKLİYOR.**
+> Önce "`no_lane` satırlarında NULL kalıyor" sandım; `grep -rn processed_at`
+> tüm repoda (.ts/.tsx/.sql) **0 eşleşme** verdi. Yani kolon şemada var,
+> **hiçbir satırda dolu değil** — başarılıda da, başarısızda da. Eksik bir dal
+> değil, hiç kullanılmayan bir kolon.
+> → `parse-listing/index.ts`:924 artık iki dalda da damgalıyor. **Bayram deploy etmeli.**
+> 📌 Aynı sınıftan üçüncü vaka: `destination_city` (#28 — kolon hiç yokmuş),
+> `get_nearby_listings_for_parked_driver` (#40 — fonksiyon canlıda hiç yokmuş),
+> şimdi `processed_at` (kolon var, hiç yazılmamış). **Şemada bir şeyin bulunması
+> onun kullanıldığı anlamına gelmiyor** ve bu projede üç kez yanlış varsaydık.
+> ⚠️ Ders: bir alana dayanarak hüküm vermeden önce onu KİMİN yazdığına bak.
+> Bugün bu boşluk yüzünden "sıçramayı v4 mü yaptı" sorusunu doğrudan
+> cevaplayamadık, `created_at` üzerinden tahmin yürütmek zorunda kaldık.
+>
+> 🔎 **ASIL İŞ → #42:** taban `no_lane` (~%10–20 hafta içi, %44–50 hafta sonu)
+> v4'ten önce de vardı ve sebebi ayrıştırıcının tanımadığı formatlar:
+> oksuz alt alta iller (`Aydin\nMugla`) · iki taraf da ilçe (`DAZKIRI-ALİAĞA`) ·
+> kalkış ilçe (`BAŞAKŞEHİR➡️ANKARA`, `İST.TUZLA➡️ANTALYA`) · yurt dışı varış
+> (`MERSİN-ZAHO`) · sınır kapısı (`BOLU🔹CİLVEGÖZÜ`) · tek kalkış–çok varış+fiyat
+> (balya ilanları). Hafta sonu oranının 3–4 katı olması bunların ayrı bir sınıf
+> olduğunu düşündürüyor.
+>
+> ⚠️ Hâlâ ölçülmemiş tek şey **kısmi şerit kaybı** (yukarıda). DB'den
+> ölçülemiyor çünkü mesajdaki şerit sayısı `raw_posts`ta saklanmıyor. Cevabı
+> edge loglarında: `İlan oluşturulamadı (ilan_olustur)` kayıtlarının sayısı ve
+> `error_code` dağılımı. `22023` sıfıra yakınsa guard hiç tetiklenmemiş demektir.
+
+> ✅ **3 AĞU 2026 — #40 POSTGRES TARAFI TÜKETİCİ TARAMASI: TEMİZ.**
+> Dosya: `docs/20260803_pg_metin_kolon_tuketici_taramasi.sql` (salt okunur, 7 bölüm).
+> **Metin kolonlarının Postgres tarafında gerçek tüketicisi KALMADI — #37 son taneymiş.**
+>
+> 📌 **Niye yapıldı:** Dalga 5 BÖLÜM 2 envanteri kapsamını *dile* göre kurmuştu
+> (`.ts`/`.tsx`); Postgres hiç envanterlenmedi. #37 tesadüfen bulundu ve tesadüf
+> bir yöntem değil. v4 ile aciliyet doğdu: bugünden yeni satırlar NULL taşıyor,
+> yani kolonu hâlâ okuyan bir DB nesnesi **bugün sessizce boş** dönüyor, drop'tan
+> sonra `42703` atacak.
+>
+> **1. Fonksiyonlar (4 eşleşme, dördü de yanlış pozitif):**
+> `ilan_olustur` → `p_listing->>'origin_city'` JSONB **girdi anahtarı**. 🔑 Bu
+> bilinçli ve KALICI: v4'ün tasarımı "metin girdi olarak hayati, çıktı olarak
+> saklanmıyor". Kolon düştükten sonra da çağıranlar JSON'da `origin_city`
+> göndermeye devam edecek — **Dalga 5'te bu satırlara dokunulmayacak.**
+> API sözleşmesi ≠ şema. · `get_nearby_listings_by_province`, `get_radar_city_overview`,
+> `get_radar_city_detail` → hepsi `provinces.name`i `as origin_city` / `as city`
+> takma adıyla döndürüyor; #37 ve Dalga 3'ün yaptığı tam olarak bu (isim korundu,
+> kaynak değişti). Frontend sözleşmesi bozulmadı.
+>
+> 🚨 **Sorgunun kendi açığı çıktı — SATIR SONU YORUMU.** `ilan_olustur`ün 8
+> eşleşmesinden ikisi `… contact_phone,  -- ⬅️ origin_city çıkarıldı` gibi
+> satırlar. Filtre `l !~ '^\s*--'` yalnızca **tamamen** yorum olan satırı eler,
+> kodun sonuna eklenmiş yorumu elemez. Yani "kaldırıldı" diyen yorum yine
+> "kaldırılmamış" gibi sayıldı. ⚠️ Bu, aynı gün v4 sürüm tespitinde yapılan
+> hatanın daha ince hâli: o gün "yorum **satırlarını** at" diye düzeltmiştik,
+> asıl kural "**yorumu** at" imiş. → `regexp_replace(l, '--.*$', '')`.
+>
+> ❗ **Beklenip çıkmayan:** `get_nearby_listings_for_parked_driver` katalogda YOK
+> (`docs/20260610_poi_module.sql`). Demek ki o migration canlıya hiç uygulanmamış.
+> Eksik iş değil, eksik **risk** — ama repo'daki SQL ile canlı şemanın ayrıştığı
+> anlamına geliyor. #30 (districts) de "yazıldı, hiç çalıştırılmadı" durumunda:
+> aynı sınıf. → Bir kereye mahsus "repo'da olup canlıda olmayan migration" listesi
+> çıkarılmalı.
+>
+> **3. İndeksler:** yedisi de doğrulandı (110·44·29·25·24·11·2 tabanıyla birebir
+> aynı liste, eksik/fazla yok). ⚠️ 31 Tem'deki EK sorgusu `%origin_city%`
+> filtresiyle koştuğu için iki `listing_stops` indeksini döndürmemiş ve "yokluk
+> kanıtı değil" diye not düşülmüştü — **o boşluk kapandı**, bu tarama kataloğa
+> dayandığı için yedisini de gördü. ✅ `drop column` bu indeksleri kendiliğinden
+> düşürür (view'ların aksine CASCADE gerekmez) → **Dalga 5 drop dosyasına ayrıca
+> `drop index` yazmaya gerek yok.**
+>
+> **4. Kısıtlar:** tek satır `aliases.aliases_type_check` (`type='city'` enum,
+> başka tablo, `\mcity\M` sınırının bilinen yanlış pozitifi) → iki kolonda kısıt
+> YOK, drop'u engelleyen bir şey yok. **4.b NOT NULL:** ikisi de `false`,
+> bugünkü düzeltme tuttu. **7. Trigger'lar:** `listings`te 4, `listing_stops`ta 0;
+> dördünün fonksiyonu da 1. sorguda çıkmadı → temiz. (Trigger *adı* gövde
+> hakkında bir şey söylemez; hüküm iki sorgunun **kesişiminden** geliyor.)
+>
+> ❗ **2 (view/matview), 5 (RLS), 6 (varsayılan) çıktıları yapıştırılmadı** —
+> boş döndüyse bile yazılmalı, şu an "boş" ile "bakılmadı" ayırt edilemiyor.
+> En kritiği **BÖLÜM 2: view/matview `drop column`'u fiilen ENGELLER.**
+> → Dalga 5 öncesi teyit şart.
+>
+> 🔑 **#21'İN ANLAMI DEĞİŞTİ (aşağıdaki kayda ek).** Fark penceresi artık
+> homojen değil: 31 Tem→7 Ağu'nun 3 günü v4 öncesi, 4 günü sonrası. "Silinebilir
+> mi" hükmü ayakta (tarama taramadır; pozitif kontrol `learn-aliases`:437 hâlâ
+> indeksi tarıyor, sadece daha az satır eşleştiriyor — sayaç etkilenmez).
+> **Ama fark ikinci bir şey daha ölçüyor:** `idx_listings_origin` dışında farkı
+> >0 çıkan her indeks, onu kullanan sorgunun **bugün sessizce eksik sonuç
+> döndürdüğü** anlamına gelir — #37'nin okuma tarafındaki aynısı. 7 Ağu'da
+> beklenen "dördü de 0"; 0 değilse bu bir temizlik değil **arıza** bulgusudur.
+>
 > ✅✅ **3 AĞU 2026 — `ilan_olustur` v4 CANLIDA (#26).** RPC artık
 > `listings.origin_city` ve `listing_stops.city` metin kolonlarına **yazmıyor**;
 > yalnız `province_id` yazıyor. Doğrulama: 2.1 mutlu yol geçti · 2.2

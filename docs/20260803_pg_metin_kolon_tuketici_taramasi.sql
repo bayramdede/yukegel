@@ -193,19 +193,117 @@ select c.relname as tablo, t.tgname as trigger_adi,
 -- ============================================================================
 -- SONUÇ KAYDI
 -- ============================================================================
--- Çıktılar buraya yazılacak (tarih + kim çalıştırdı).
--- Boş dönmeyen her sorgu için: nesne adı · niye orada · karar (çevir / sil /
--- bilerek bırak) · hangi göreve bağlandı.
+-- ✅ ÇALIŞTIRILDI 3 Ağu 2026 — Bayram, canlı (gobepcswwsoswodhaufy).
 --
---   1. Fonksiyonlar   → [ ]
---   2. View'lar       → [ ]
---   3. İndeksler      → [ ]
---   4. Kısıtlar       → [ ]
---   4.b NOT NULL      → [ ]
---   5. Politikalar    → [ ]
---   6. Varsayılanlar  → [ ]
---   7. Trigger'lar    → [ ]
+--   1. Fonksiyonlar   → [x] 4 satır — HİÇBİRİ GERÇEK TÜKETİCİ DEĞİL (aşağıda)
+--   2. View'lar       → [ ] ❗ çıktı yapıştırılmadı — TEYİT BEKLİYOR
+--   3. İndeksler      → [x] 7 indeks — hepsi drop'ta otomatik düşer, #21 etkilendi
+--   4. Kısıtlar       → [x] 1 satır, alakasız (`aliases_type_check`) = temiz
+--   4.b NOT NULL      → [x] ikisi de false — bugünkü düzeltme tuttu
+--   5. Politikalar    → [ ] ❗ çıktı yapıştırılmadı — TEYİT BEKLİYOR
+--   6. Varsayılanlar  → [ ] ❗ çıktı yapıştırılmadı — TEYİT BEKLİYOR
+--   7. Trigger'lar    → [x] 4 trigger, hepsi 1. sorguda YOK = temiz
 --
--- ⚠️ "Boş döndü" de bir sonuçtur ve yazılmalı. Bu dosyanın varlık sebebi
---    #37'nin tesadüfen bulunmuş olmasıydı; bir dahaki sefere "baktık mı?"
---    sorusunun cevabı hatırlamaya değil kayda dayanmalı.
+-- ⚠️ 2/5/6 boş döndüyse bile yazılmalı; şu an "boş" ile "bakılmadı" ayırt
+--    edilemiyor ve bu dosyanın varlık sebebi tam olarak bu ayrımdı.
+--    En kritiği BÖLÜM 2: view/matview `drop column`'u fiilen ENGELLER.
+--
+-- ── GENEL HÜKÜM ──────────────────────────────────────────────────────────────
+-- Postgres tarafında metin kolonlarının GERÇEK tüketicisi KALMADI. #37 son
+-- taneymiş. Tesadüfle bulunan bulgu, katalogla teyit edildi.
+--
+-- ── 1. FONKSİYONLAR — 4 eşleşmenin dördü de yanlış pozitif ───────────────────
+-- Üç ayrı zararsız sınıf çıktı; üçü de kolon okuması DEĞİL:
+--
+--   (a) JSONB GİRDİ ANAHTARI — `ilan_olustur`: `p_listing->>'origin_city'`,
+--       `t.s->>'city'`, ve hata mesajındaki `origin_city=%` dizgesi.
+--       🔑 BU BİLİNÇLİ VE KALICI. v4'ün tasarımı "metin GİRDİ olarak hayati,
+--          ÇIKTI olarak saklanmıyor" idi. Kolon düştükten SONRA da çağıranlar
+--          JSON'da `origin_city` göndermeye devam edecek ve bu DOĞRU olacak.
+--          → Dalga 5'te bu satırlara dokunulmayacak. API sözleşmesi ≠ şema.
+--
+--   (b) ÇIKTI TAKMA ADI — `get_nearby_listings_by_province`: `RETURNS TABLE
+--       (... origin_city text, dest_city text ...)` ve `po.name as origin_city`.
+--       Kaynak `provinces.name`. Yani #37'nin düzeltmesi TAM OLARAK BU:
+--       isim korundu, kaynak değişti. Frontend sözleşmesi bozulmadı.
+--       Aynı sınıf: `get_radar_city_overview` (`p.name as city`),
+--       `get_radar_city_detail` (`jsonb_build_object(..., 'city', to_city ...)`).
+--       → Dalga 3'ün dört radar fonksiyonunu çevirdiği burada teyit edildi.
+--
+--   (c) 🚨 SATIR SONU YORUMU — SORGUNUN KENDİ AÇIĞI.
+--       `ilan_olustur`ün 8 eşleşmesinden ikisi şu satırlar:
+--         `listing_type, origin_district, contact_phone,  -- ⬅️ origin_city çıkarıldı`
+--         `listing_id, stop_order, district, province_id,  -- ⬅️ city çıkarıldı`
+--       Filtre `l !~ '^\s*--'` yalnızca TAMAMEN yorum olan satırları eler;
+--       kodun SONUNA eklenmiş yorumu elemez. Yani "kaldırıldı" diyen yorum,
+--       yine "kaldırılmamış" gibi sayıldı.
+--       ⚠️ Bu, 3 Ağu'da v4 sürüm tespitinde yapılan hatanın AYNISININ daha
+--          ince hâli. O gün "yorum satırlarını at" diye düzeltmiştik; asıl
+--          kural "yorumu at" imiş, "yorum satırını at" değil.
+--          → İleride: `regexp_replace(l, '--.*$', '')` ile satır içi yorumu da
+--            kırp. (Dize içindeki `--` için yanlış pozitif verir; bu tabloda
+--            yok, ama körü körüne kopyalanmamalı.)
+--
+--   ❗ BEKLENİP ÇIKMAYAN: `get_nearby_listings_for_parked_driver`.
+--      Dosya beklenen sonuçlarda "çıkacak, sorun değil" diye yazılmıştı
+--      (`docs/20260610_poi_module.sql`; hiç var olmamış `listings.dest_city`,
+--      `title`, `load_type` kolonlarına bakıyordu). Katalogda YOK.
+--      → Demek ki o migration canlıya hiç uygulanmamış ya da sonradan
+--        düşürülmüş. Bir eksik iş değil, bir eksik RİSK. Ama repo'da duran
+--        SQL ile canlı şemanın ayrıştığı anlamına gelir — #30 (districts)
+--        de "yazıldı, hiç çalıştırılmadı" durumunda. Aynı sınıf.
+--
+-- ── 3. İNDEKSLER — 7 tane, ve #21'in ölçüm planı BUNUNLA DEĞİŞİYOR ───────────
+--   listings.origin_city üzerinde 4:
+--     · idx_listings_origin              btree(origin_city)                    ← #21 pozitif kontrolü
+--     · idx_listings_origin_city         btree(origin_city) WHERE NOT NULL     ← idx_listings_origin'in kopyası
+--     · idx_listings_origin_city_lower   btree(lower(origin_city), created_at DESC)
+--     · listings_origin_city_trgm_idx    gin trgm
+--   listing_stops.city üzerinde 3:
+--     · idx_listing_stops_city_lower     btree(lower(city), listing_id)
+--     · listing_stops_city_idx           btree(city)
+--     · listing_stops_city_trgm_idx      gin trgm
+--
+--   ✅ DROP'U ENGELLEMEZLER. `alter table ... drop column` kolonu içeren
+--      indeksleri kendiliğinden düşürür (view'ların aksine CASCADE gerekmez).
+--      → Dalga 5 drop dosyasına ayrıca `drop index` yazmaya gerek YOK.
+--
+--   ✅ TABAN ZATEN ALINMIŞ — yeni bir t0 ölçümüne GEREK YOK. 31 Tem BÖLÜM 5
+--      yedisini birden saymış: 110 · 44 · 29 · 25 · 24 · 11 · 2, ~72 MB
+--      (bkz. YAPILACAKLAR #21). Bu tarama o listeyi canlıdan bağımsız
+--      doğruladı: aynı yedi indeks, aynı tanımlar, eksik/fazla yok.
+--      ⚠️ 31 Tem'deki EK sorgusu `%origin_city%` filtresiyle koşulduğu için
+--         iki `listing_stops` indeksini döndürmemişti ve bu "yokluk kanıtı
+--         değil" diye not düşülmüştü. Bugünkü tarama filtreyi kolon adına
+--         değil kataloğa dayadığı için o boşluk KAPANDI — yedisi de burada.
+--
+--   🔑 AMA 7 AĞU FARKININ ANLAMI v4 YÜZÜNDEN DEĞİŞTİ.
+--      Pencere (31 Tem → 7 Ağu) artık homojen değil: 3 gün v4 öncesi,
+--      4 gün v4 sonrası. 3 Ağu'dan itibaren yeni satırların metin kolonu NULL.
+--      → "Silinebilir mi" sorusu için fark hâlâ geçerli: tarama taramadır,
+--        satırın dolu olup olmaması sayacı etkilemez. Pozitif kontrol
+--        (`learn-aliases`:437) de hâlâ indeksi tarıyor, yalnızca daha az
+--        satır EŞLEŞTİRİYOR — sayaç bundan etkilenmez, hüküm ayakta.
+--      → Fakat fark ikinci bir şey daha söylüyor: `idx_listings_origin`
+--        DIŞINDA farkı >0 çıkan her indeks, onu kullanan sorgunun BUGÜN
+--        sessizce eksik sonuç döndürdüğü anlamına gelir — #37'nin birebir
+--        aynısı, okuma tarafında. 7 Ağu'da beklenen "dördü de 0"; 0 değilse
+--        bu bir temizlik değil, bir ARIZA bulgusudur.
+--
+--   ⚠️ `idx_listings_origin_city` kısmi (WHERE origin_city IS NOT NULL):
+--      v4'ten sonra yeni satır ALMIYOR, büyümesi durdu. Bu indeksin taranma
+--      sayısı diğerleriyle aynı anlama gelmez, ayrı yorumlanmalı.
+--
+-- ── 4. KISITLAR — temiz ──────────────────────────────────────────────────────
+--   Tek satır `aliases.aliases_type_check`: `type = 'city'` enum değeri,
+--   BAŞKA bir tablo, kolonlarla ilgisi yok. `\mcity\M` sınırının bilinen
+--   yanlış pozitifi (`pois.city` gibi). İki kolonda kısıt YOK → drop'u
+--   engelleyen bir şey yok.
+--
+-- ── 7. TRIGGER'LAR — temiz, ama sadece 1. sorguyla BİRLİKTE anlamlı ──────────
+--   listings üzerinde 4 (audit_listing_fn, set_listing_expires_at,
+--   sync_shadow_profile_listing_stats, sync_shadow_profile_listing_count),
+--   listing_stops üzerinde 0.
+--   Trigger ADI gövdesi hakkında hiçbir şey söylemez. Hüküm şuradan geliyor:
+--   dördünün fonksiyonu da 1. sorguda ÇIKMADI → gövdelerinde `city` geçmiyor.
+--   Tek başına bu liste bir şey kanıtlamazdı; kesişim kanıtlıyor.
