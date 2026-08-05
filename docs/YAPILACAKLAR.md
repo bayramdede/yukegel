@@ -1,5 +1,126 @@
 # Yükegel — Yapılacaklar Listesi
 
+> 🔬 **5 AĞU 2026 — #71 `parse-listing`'in 100 SANİYESİ AÇIKLANDI. KOD YAZILDI, DEPLOY EDİLMEDİ.**
+> Ayrıntı: `docs/PROJE_HARITASI.md` → BÖLÜM 6 "Bu boru hattının darboğazı AĞ DEĞİL, CPU".
+>
+> **ÖNCE BİR VARSAYIMI ÖLDÜRDÜM — kendi varsayımımdı.** "100 saniyenin içinde Anthropic
+> çağrısı mı var, DB gidiş-dönüşleri mi" diye sormuştum. **Üçüncü şık doğru çıktı: ikisi de
+> değil.** `supabase/functions/parse-listing/index.ts` içinde `fetch(`, `anthropic`,
+> `claude`, `messages.create` → **sıfır eşleşme**; tek `Deno.env.get` Supabase URL/anahtarı.
+> Fonksiyonda LLM YOK. `edgeLog('INFO', 'LLM parse tamamlandı')` satırı yanıltıcı isim —
+> `parseMessage()` saf regex. Soruyu "AI mı, DB mi" diye çerçevelemem hatalıydı.
+>
+> **ÖLÇÜLEN SEBEP — saf CPU.** `findPlaces` her token için
+> `cityAliases.find(a => trNorm(a.alias) === cand)` koşuyordu. `.find` eşleşmede kısa devre
+> yapar ama aramaların neredeyse tamamı ıskalıyor → her arama 1.163 alias'ın hepsini geziyor,
+> her biri için `trNorm` (36 regex `.replace`). Token başına 5 arama × 1.163 × 36 ≈
+> **209.000 regex işlemi, tek token için.**
+>
+> | satır | karakter | eski | yeni (soğuk) | hızlanma |
+> |---|---|---|---|---|
+> | 6 | 341 | **265 ms** | 9,8 ms | ~27× |
+> | 24 (ortalama) | 1 381 | **1 020 ms** | 6,0 ms | ~170× |
+> | 230 (en uzun) | 13 459 | **11 302 ms** | 16,7 ms | ~677× |
+>
+> (Sıcak indeksle 590–1240×; dürüst karşılaştırma soğuk sütunudur — indeks çağrı başına
+> bir kez kurulur.) `raw_posts` gerçeği: ortalama 657 karakter/24 satır, maks 13.121/230.
+>
+> **#65 İLE BAĞ — mekanizma artık tam.** CPU seri akar. `on_raw_post_insert` `FOR EACH ROW`,
+> eşzamanlılık sınırı yok → tek dakikada 640 satırlık içe aktarım 640 eşzamanlı çağrı ×
+> ~0,5–11 sn CPU. Canlı log: **78.116–150.166 ms**, 504'ler tam 150.000 ms geçidinde,
+> 546'lar Deno worker sınırı, **200'ler bile 78–148 sn**. Duvara çarpan çağrı `durumYaz`a
+> varamaz → satır `pending` kalır. 11:42'de 640 satır → 596 `pending` (%93);
+> 12:04'te 230 satır → 111 `pending` (%48).
+>
+> **DÜZELTME (yazıldı, DEPLOY BEKLİYOR):** `aliasIndeksi()` — alias dizisi başına bir kez
+> kurulan `Map` + önceden sıralanmış listeler, `WeakMap` ile dizi kimliğine bağlı.
+>
+> **DOĞRULAMA:** 303 mesajda (3 gerçek + 300 üretilmiş) `parseMessage` çıktısı **0 fark**;
+> `tsc --noEmit` temiz. Eşdeğerliğin dayanağı: `.find` ilk eşleşeni, `Map` ilk gireni tutar,
+> `tumAliaslar()` `ORDER BY id` okur. Çakışma canlıda **2 anahtar / 4 alias** ve dördü de
+> aynı `normalized`+`district`'e çözülüyor → seçim değişemez.
+>
+> ⚠️ **BULUNAN YAPISAL BORÇ:** aynı optimizasyon `app/api/whatsapp-parse/route.ts:290
+> `aliasDiziniKur()` içinde ZATEN vardı. Edge kopyası güncellenmemişti. Deno/Next sınırı
+> ortak modülü engelliyor → iki parser elle hizalanmak zorunda. Birinde düzeltilen
+> diğerine geçmiyor; bu sessiz ayrışma bir daha olacak.
+>
+> ⏳ **AÇIK:** deploy sonrası aynı log penceresini yeniden ölçmeden "#65 çözüldü" DEMEM.
+> Beklentim: çağrı süresi 150 sn duvarından milisaniyelere düşer ve yeni `pending`
+> birikmesi durur — ama bu bir tahmin, ölçüm değil. Mevcut 7.896 satırlık yığın **kendi
+> kendine erimez**, ayrı kurtarma işi gerekir (bunların 2.203'ünün ilanı ZATEN var,
+> yeniden işlenirse çift ilan doğar).
+
+> 🔬 **5 AĞU 2026 — #67 SEBEP BULUNDU, DÜZELTME CANLIDA, SONUÇ HENÜZ ÖLÇÜLMEDİ.**
+> Ayrıntı ve tam SQL: `docs/20260805_sayac_duzeltme.sql` · `docs/20260805_insert_maliyeti.sql` ·
+> `docs/20260805_stats_trigger_o1.sql`. `docs/PROJE_HARITASI.md` → `shadow_profiles` bölümü.
+>
+> **SEBEP — tek satırda ölçüldü:** `sync_shadow_profile_listing_stats` trigger'ı ilan başına
+> ÜÇ toplama sorgusu koşuyordu; en yoğun profil (3 556 ilan) için biri **3 096.881 ms**.
+> Plan ayrımı belirleyici: `Bitmap Index Scan` 25.7 ms · `Bitmap Heap Scan` **3 092 ms** ·
+> `Heap Blocks: exact=2977` · `Buffers: hit=1403 read=1586`. İndeks doğru satırları 26 ms'de
+> buluyor; `max/min(created_at)` indekste olmadığı için 2 977 heap bloğu ziyaret ediliyor,
+> 1 586'sı diskten. Maliyet profilin BÜYÜKLÜĞÜYLE orantılı → ölçümdeki iki tepeli dağılımın
+> (268 ms vs 5 403 ms) açıklaması bu.
+>
+> **CANLIYA UYGULANAN 6 DEĞİŞİKLİK (hepsi doğrulandı):**
+> 1. `trg_listings_shadow_profile_count` düşürüldü — `..._stats` zaten üstünü yazıyordu,
+>    sadece +1 hata ekliyordu (1 097 profil tam olarak +1 sapmıştı).
+> 2. Tek seferlik yeniden sayım — 3 414/3 414 doğru, fazla 0, eksik 0.
+> 3. `expire-listings` (0 2 * * *) unschedule — `expire-active-listings` (*/15) tamamen kapsıyor.
+> 4. Trigger gövdesi **O(1)**'e yeniden yazıldı (`docs/20260805_stats_trigger_o1.sql` ADIM C).
+> 5. `shadow-profile-recount` cron'u kuruldu (`0 3 * * *`, `active=true` — **doğrulandı**).
+>    Bu, 4'ün ÖN KOŞULU: yeni gövde artımlı olduğu için eski gövdenin `COUNT(*)` ile
+>    yaptığı kendi kendini onarma kayboldu.
+> 6. Her iki sayaç fonksiyonu `security definer` + `set search_path = public, pg_temp`;
+>    `sync_shadow_profile_yeniden_say(uuid)` EXECUTE'u public/anon/authenticated'tan alındı.
+>
+> 🚨 **ASIL BULGU — RLS SESSİZCE YUTUYORDU.** Düzeltmeden sonra 5 profil yine sürükledi.
+> Sebep CPU değil yetki: `shadow_profiles` RLS açık, tek politika `shadow_profiles_admin_all`
+> (admin-only). `anon`'da politika yok, admin olmayan `authenticated`'ta koşul false,
+> ve trigger `SECURITY DEFINER` **değildi** → `UPDATE ... where id = ...` **0 satır
+> etkiliyor, hata atmıyor**. Bu aynı zamanda daha önce "mekanizmayla açıklanamıyor"
+> dediğim **-29**'u da açıklıyor. Düzeltme sonrası `hala_sapan = 0`.
+> 📌 Kural olarak kaydedildi: RLS'li tabloya yazan her trigger fonksiyonu `SECURITY DEFINER`
+> + pinlenmiş `search_path` olmalı.
+>
+> 🚨 **ÜÇ İDDİAMI GERİ ALIYORUM:**
+> - **H3 (indeks bakımı) benim hipotezimdi ve ÇÜRÜDÜ:** tablo 407 MB, indeksler 125 MB,
+>   oran 0.31; yirmi indeksin ondokuzu küçük btree, tek GIN 14 MB. Bu profil 1 400 ms'lik
+>   INSERT üretmez.
+> - **`idx_listings_expire_sweep` GEREKSİZDİ, düşürüldü.** Aktif ilan 863, aktif+süresi
+>   dolmuş **0**, toplam 236 846. Planlayıcı indeksi seçmedi (`idx_scan = 0`, 0 bytes).
+>   "İndeks yok, o yüzden yavaş" derken seçicilik hesabı yapmamıştım.
+> - **"Süre dolumu cron'u trigger'ı da tetikliyor, gizli çarpan" — YANLIŞ.** Trigger
+>   `AFTER INSERT OR DELETE OR UPDATE **OF shadow_profile_id**`; cron `status`/`updated_at`
+>   yazıyor, o kolona dokunmuyor → hiç ateşlenmiyor. Tanımı okumadan söylemiştim.
+>
+> 🚨 **ÇERÇEVE DÜZELTMESİ — HAVUZ TÜKENMİŞ DEĞİL (#66'yı da ilgilendirir).**
+> `pg_stat_activity`: ~16 bağlantı, `max_connections = 60`. Yani PGRST003 Postgres'ten
+> değil **PostgREST'in kendi (çok daha küçük) havuzundan** geliyor. `max_connections`
+> büyütmek bu sorunu çözmez. Destekleyen ölçüm: `aliases` SELECT'i tek başına 0.575 ms,
+> üretimde ort **41 ms** — aradaki 40 ms sorgu değil **bekleme**.
+>
+> ⏳ **AÇIK — SONUÇ ÖLÇÜLMEDİ.** `pg_stat_statements` `2026-08-05 13:35:05+00`'da sıfırlandı;
+> o andan beri **hiç yeni ilan girmedi** (son 24 saatte 1 532 var, yani trafik var, sadece
+> pencere boş). Karşılaştırma tabanı: `ilan_olustur` ort **1 400.3 ms** / en kötü 28 939.6 ms,
+> `INSERT INTO listings` ort **1 022 ms**. Beklentim birkaç yüz ms — **beklenti, iddia değil.**
+>
+> 🟠 **AYNI SINIFTAN İKİNCİ HATA, UYKUDA:** `update_poi_rating` (`poi_reviews` trigger'ı)
+> RLS'li `pois`'e yazıyor ve `SECURITY DEFINER` değil. `pois`'te anon/authenticated için
+> UPDATE politikası yok. **`poi_reviews` şu an 0 satır** (`pois` 9 178) → etki yok.
+> Bilerek düzeltilmedi: #67 kapsamı dışı ve 0 satırda ölçülemez.
+>
+> 🔴 **GÜVENLİK — AÇIK:** `trigger_parse_listing()` gövdesinde `service_role` JWT'si
+> **düz metin** duruyor; `pg_get_functiondef` çağırabilen herkes okuyabilir. Anahtar
+> döndürülmeli ve `vault` / `current_setting` ile okunmalı. Kimlik bilgisi işlemi —
+> Bayram yapacak.
+>
+> 🧹 **KENDİ ARTIĞIM:** `hata42` ve `olcum42` şemaları advisor'da `rls_enabled_no_policy`
+> (INFO) olarak görünüyor. **Bilerek silmedim** — `hata42.hatali_id` 176 RPC-hatalı
+> raw_post id'sini tutuyor ve orijinal log CSV'si olmadan yeniden üretilemez.
+> `get_advisors` (security) ERROR/WARN döndürmedi.
+
 > ✅ **4 AĞU 2026 — #51 KAPANDI (KOD + VERİ). #52 BİLEREK KAPATILDI, ONARILMADI.**
 > **Kod:** `lib/lokasyon.ts::ilceHangiIllerde()` (ters arama) + `lib/alias-normalize.ts::ilceIlUyarisi()`
 > (iki seviyeli çelişki detektörü) yazıldı, `learn-aliases`'ın **üç yazma yoluna** (manuel

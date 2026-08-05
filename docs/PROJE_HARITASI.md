@@ -946,6 +946,52 @@ converted_user_id (nullable FK → auth.users.id)
 - Admin UI: `/admin/crm` — tablo + detay drawer (ilan geçmişi, isim/not/şirket düzenleme, durum yönetimi)
 - API: `app/api/admin/crm/route.ts` (GET + PATCH), `app/api/admin/crm/[id]/route.ts` (GET detay)
 
+#### Sayaç kolonları ve onları yazan trigger (5 Ağu 2026, #67 — YENİDEN YAZILDI)
+`listing_count` · `last_listing_at` · `first_listing_at` kolonlarını `listings` üzerindeki
+`listings_sync_shadow_profile_stats` (AFTER INSERT OR DELETE OR **UPDATE OF shadow_profile_id**)
+doldurur. Kolon kapsamlı olduğu için `status`/`updated_at` yazan süre-dolumu cron'u bu
+trigger'ı **tetiklemez**.
+
+🚨 **Eski gövde ilan başına ÜÇ toplama sorgusu koşuyordu** (`COUNT` + `MAX(created_at)` +
+`MIN(created_at)`, hepsi ayrı altsorgu). Ölçüldü — en yoğun profil (3 556 ilan) için tek
+sorgu `Execution Time: 3096.881 ms`. Plan: `Bitmap Index Scan` **25.7 ms**,
+`Bitmap Heap Scan` **3 092 ms**, `Heap Blocks: exact=2977`, `Buffers: hit=1403 read=1586`.
+Yani maliyet indeks değil **HEAP erişimi**: `max/min(created_at)` indekste yok, 2 977 blok
+ziyaret ediliyor, 1 586'sı diskten. Maliyet profilin büyüklüğüyle orantılı — ölçümdeki
+iki tepeli dağılımın (268 ms vs 5 403 ms) sebebi bu.
+
+Yeni gövde: INSERT dalı **O(1)** (`listing_count + 1`, `greatest`/`least` ile tarihler,
+heap'e hiç dokunmaz). DELETE ve profil DEĞİŞİKLİĞİ dalları `sync_shadow_profile_yeniden_say(uuid)`
+ile tam yeniden sayar. UPDATE dalı `is not distinct from` ile erken çıkar.
+⚠️ **TAKAS:** eski gövde her INSERT'te `COUNT(*)` attığı için kendi kendini onarıyordu,
+yeni gövde artımlı — onarmıyor. Karşılığı `shadow-profile-recount` cron'u (`0 3 * * *`,
+canlıda doğrulandı). Bu cron olmadan trigger'ın bu hâli kullanılmamalı.
+📄 `docs/20260805_stats_trigger_o1.sql`
+
+#### 🚨 RLS + trigger tuzağı — `SECURITY DEFINER` OLMAYAN TRIGGER SESSİZCE 0 SATIR YAZAR
+`shadow_profiles` üzerinde RLS **açık** ve tek politika var: `shadow_profiles_admin_all`
+(ALL, permissive, `{authenticated}`, USING/CHECK = `exists(select 1 from users where
+users.id = auth.uid() and users.role = 'admin')`). `anon` için hiç politika yok,
+admin olmayan `authenticated` için koşul false. `postgres` ve `service_role`'da
+`rolbypassrls = true`, diğer ikisinde yok.
+Sayaç trigger'ı `SECURITY DEFINER` **değildi** → RLS'e tabi bir rolle gelen INSERT'te
+`UPDATE shadow_profiles ... where id = ...` **0 satır etkiliyor, hata vermiyor**.
+Sürüklenen 5 profilin ve daha önce açıklanamayan **-29**'un sebebi budur.
+✅ Düzeltildi (5 Ağu, migration `shadow_profile_sayac_trigger_security_definer`):
+her iki fonksiyon `security definer` + `set search_path = public, pg_temp`;
+`sync_shadow_profile_yeniden_say(uuid)` üzerindeki EXECUTE `public`/`anon`/`authenticated`'tan
+geri alındı. Doğrulama: `prosecdef = true`, `proconfig = {search_path=public, pg_temp}`,
+tam yeniden sayım sonrası `hala_sapan = 0`.
+> **GENEL KURAL — yeni trigger yazarken:** RLS açık bir tabloya yazan her trigger
+> fonksiyonu `SECURITY DEFINER` + pinlenmiş `search_path` olmalı. Aksi hâlde yazma
+> **sessizce** düşer; `UPDATE` hata atmaz, sadece 0 satır etkiler.
+> 🟠 Aynı sınıftan ikinci kayıt: `update_poi_rating` (`poi_reviews` üzerinde trigger,
+> RLS'li `pois`'e yazıyor, `SECURITY DEFINER` değil). `pois`'te anon/authenticated için
+> UPDATE politikası yok. **Şu an uykuda: `poi_reviews` 0 satır** (`pois` 9 178). Düzeltilmedi.
+
+ℹ️ **Okuma tarafı sonucu:** `shadow_profiles` `anon` ve admin olmayan `authenticated` için
+**tamamen görünmez**. İstemciden bu tabloya yapılan her SELECT boş döner — hata değil, boş.
+
 ### `users` — `role`, `is_active`, `user_type`, `phone_verified`, `company_name`, `ai_listing_quota_daily` (NULL = sistem default), `kvkk_onay_at`
 > `kvkk_onay_at timestamptz` (28 Tem 2026, `SPRINT_01` K1) — KVKK aydınlatma metni + kullanım koşullarının onay anı. NULL = onay alınmamış (eski kayıt). `profil-tamamla` upsert'i yazıyor. ✅ Migration `docs/20260728_kvkk_onay.sql` çalıştırıldı (29 Tem 2026). Eski kullanıcılardan onay toplamak ayrı iş (panele tek seferlik modal gerekiyor, ticket açılmalı).
 > ✅ `is_active` (29 Tem 2026 doğrulandı): DB default `true`, kolon nullable ama NULL satır yok.
@@ -1078,6 +1124,59 @@ Sprintler 1–5: ✅
 ```
 ZIP/TXT → raw_posts → DB trigger → parse-listing Edge Fn → listings → audit trigger
 ```
+
+### 🚨 Bu boru hattının darboğazı AĞ DEĞİL, CPU (5 Ağu 2026, #71)
+
+**`parse-listing` içinde LLM çağrısı YOKTUR.** Dosyada tek `Deno.env.get` Supabase
+URL/anahtarı; `fetch(`, `anthropic`, `messages.create` **sıfır eşleşme**. Log satırı
+`'LLM parse tamamlandı'` diyor ama `parseMessage()` saf regex + `aliases` tablosudur.
+İsim yanıltıcı — 100 saniyeyi "AI yavaş" diye açıklamaya kalkışan herkes buradan başlar
+ve yanlış yere bakar.
+
+**Ölçülen sebep.** `findPlaces` her aranan token için
+`cityAliases.find(a => trNorm(a.alias) === cand)` çalıştırıyordu. `.find` eşleşmede kısa
+devre yapar — ama aramaların neredeyse tamamı **ıskalar**, yani pratikte her arama 1.163
+city alias'ının hepsini gezer ve her biri için `trNorm` çağırır. `trNorm` 36 regex
+`.replace` yapar. Token başına 5 arama (2 bigram + 3 unigram formu) × 1.163 alias ×
+36 regex ≈ **209.000 regex işlemi — tek token için**. `findVehicle`/`findBodyType` ayrıca
+her çağrıda `.filter().sort()` yapıyordu.
+
+Ölçüm (Node 22, gerçek alias kardinalitesi `city=1163 / vehicle=41 / body=28`):
+
+| satır | karakter | eski | yeni (soğuk, indeks kurulumu dahil) |
+|---|---|---|---|
+| 6 | 341 | **265 ms** | 9,8 ms |
+| 24 (ortalama mesaj) | 1 381 | **1 020 ms** | 6,0 ms |
+| 230 (en uzun mesaj) | 13 459 | **11 302 ms** | 16,7 ms |
+
+Maliyet satır sayısıyla **doğrusal** büyüyor (24→230 satır = 9,6× satır, 11,1× süre).
+`raw_posts` gerçeği: ortalama 657 karakter / 24 satır, en büyüğü 13.121 karakter / 230 satır.
+
+**Niye ölümcül:** bu iş ağ beklemesi değil, saf CPU — Deno worker'ında CPU **seri** akar.
+`on_raw_post_insert` `FOR EACH ROW` olduğu için tek dakikada 640 satırlık bir içe aktarım
+640 eşzamanlı çağrı doğurur, eşzamanlılık sınırı yoktur ve 640 × ~0,5–11 sn CPU aynı
+havuzda kuyruğa girer. Canlı log: çağrılar **78.116–150.166 ms** sürüyor, 504'ler tam
+150.000 ms geçit duvarında kümeleniyor, 546'lar Deno worker kaynak sınırı. **Başarılı
+(200) yanıtlar da 78–148 sn** — yani darboğaz istek başına iş değil, sistem çapında
+kuyruk. Duvara çarpan çağrı `durumYaz`a hiç varamaz ve satır `pending` kalır: **#65
+yığınının mekanizması budur.**
+
+**Düzeltme (#71).** `aliasIndeksi()` — alias dizisi başına **bir kez** kurulan
+`Map<trNorm(alias), Alias>` (şehir) + önceden sıralanmış `[anahtar, Alias][]` (araç/üstyapı),
+`WeakMap` ile dizi kimliğine bağlı. `tumAliaslar()` her çağrıda taze dizi döndürdüğü için
+indeks çağrı başına bir kez kurulur (~1 ms, 1.232 `trNorm`).
+
+> ⚠️ **Aynı desen `app/api/whatsapp-parse/route.ts:290 aliasDiziniKur()` içinde ZATEN
+> doğru yazılmıştı.** Edge kopyası güncellenmemişti. Deno/Next sınırı yüzünden ortak
+> modüle alınamıyor → **iki kopya elle hizalanmak zorunda**; birinde yapılan optimizasyon
+> diğerine kendiliğinden geçmez. Bu dosyanın en pahalı yapısal borcu budur.
+
+**Eşdeğerlik neye dayanıyor.** `.find` **ilk** eşleşeni döndürür; `Map` de `if (!has)` ile
+**ilk gireni** tutar ve `tumAliaslar()` `ORDER BY id` okur → seçim aynı. Fark ancak aynı
+`trNorm` anahtarına sahip iki city alias varsa görünürdü; canlıda **2 çakışma / 4 alias**
+var (`ist anadolu` → id 26 pri 90 & id 1087 pri 65; `kahta` → id 313 & 314) ve **dördü de
+aynı `normalized`+`district`'e** çözülüyor. Ek olarak 303 mesajda (3 gerçek + 300 üretilmiş)
+`JSON.stringify(parseMessage(...))` karşılaştırması **0 fark**, `tsc --noEmit` temiz.
 
 ---
 

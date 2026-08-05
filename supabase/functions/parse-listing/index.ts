@@ -344,6 +344,73 @@ function laneKey(from: string, fromDist: string | null | undefined, to: string, 
   return `${yerKey(from)}|${yerKey(fromDist)}|${yerKey(to)}|${yerKey(toDist)}`
 }
 
+// -------------------------
+// Alias indeksi — trNorm(a.alias) ALIAS DİZİSİ BAŞINA BİR KEZ
+// -------------------------
+// 🚨 #71 (5 Ağu 2026). Buradan önce `findPlaces` her aranan token için
+//    `cityAliases.find(a => trNorm(a.alias) === cand)` çalıştırıyordu. `.find`
+//    eşleşmede kısa devre yapar ama aramaların NEREDEYSE TAMAMI ıskalıyor, yani
+//    pratikte her arama 1.163 city alias'ının HEPSİNİ geziyor ve her biri için
+//    `trNorm` çağırıyordu. `trNorm` 36 regex `.replace` yapıyor. Token başına
+//    5 arama (2 bigram + 3 unigram formu) × 1.163 alias × 36 regex ≈ 209.000
+//    regex işlemi — TEK TOKEN için.
+//
+//    ÖLÇÜM (Node 22, gerçek alias kardinalitesi 1163/41/28):
+//      satır  karakter      eski        yeni (soğuk, indeks kurulumu dahil)
+//        6       341     265 ms          9.8 ms
+//       24     1 381   1 020 ms          6.0 ms
+//      230    13 459  11 302 ms         16.7 ms
+//    Eşdeğerlik: 303 mesaj (3 gerçek + 300 üretilmiş), 0 fark.
+//
+// ⚠️ NİYE ÖLÜMCÜL: bu iş AĞ BEKLEMESİ DEĞİL, saf CPU. Deno worker'ında CPU
+//    seri akar. Toplu içe aktarımda `on_raw_post_insert` FOR EACH ROW olduğu
+//    için tek dakikada 640 satır → 640 eşzamanlı çağrı → 640 × ~0.5-11 sn CPU
+//    aynı worker havuzunda kuyruğa girer. Ölçülen sonuç: çağrılar 78-150 sn
+//    sürüyor, 150.000 ms geçidinde 504 ile ölüyor ve `durumYaz`a hiç varamadan
+//    satırı `pending` bırakıyor (#65 yığınının mekanizması).
+//
+// NOT: aynı desen `app/api/whatsapp-parse/route.ts:290 aliasDiziniKur()` içinde
+//      ZATEN doğru yazılmış. Bu dosya güncellenmemişti — Deno/Next sınırı
+//      yüzünden ortak modüle alınamıyor, iki kopya elle hizalanmak zorunda.
+//
+// WeakMap anahtarı alias DİZİSİ. `tumAliaslar()` her çağrıda taze dizi
+// döndürdüğü için indeks çağrı başına bir kez kurulur (~1 ms, 1.232 trNorm).
+// Aynı dizi tekrar kullanılırsa (test/toplu iş) bedava.
+type AliasIndeksi = {
+  sehir: Map<string, Alias>
+  arac: [string, Alias][]
+  ustyapi: [string, Alias][]
+}
+const _aliasIndeksCache = new WeakMap<object, AliasIndeksi>()
+
+function aliasIndeksi(aliases: Alias[]): AliasIndeksi {
+  const onbellek = _aliasIndeksCache.get(aliases as unknown as object)
+  if (onbellek) return onbellek
+
+  const sehir = new Map<string, Alias>()
+  const arac: [string, Alias][] = []
+  const ustyapi: [string, Alias][] = []
+
+  for (const a of aliases) {
+    const anahtar = trNorm(a.alias)
+    // ⚠️ `.find` İLK eşleşeni döndürüyordu; Map'te de İLK giren kazanmalı.
+    //    `if (!has)` olmadan son giren kazanır ve aynı yazımın iki alias'ı
+    //    olduğunda seçim sessizce değişirdi.
+    if (a.type === 'city') { if (!sehir.has(anahtar)) sehir.set(anahtar, a) }
+    else if (a.type === 'vehicle') arac.push([anahtar, a])
+    else if (a.type === 'body') ustyapi.push([anahtar, a])
+  }
+
+  // Sıralama da çağrı başına bir kez — eskiden findVehicle/findBodyType her
+  // çağrıda `.filter().sort()` yapıyordu.
+  arac.sort((x, y) => (y[1].priority || 50) - (x[1].priority || 50))
+  ustyapi.sort((x, y) => (y[1].priority || 50) - (x[1].priority || 50))
+
+  const indeks: AliasIndeksi = { sehir, arac, ustyapi }
+  _aliasIndeksCache.set(aliases as unknown as object, indeks)
+  return indeks
+}
+
 function findPlaces(text: string, aliases: Alias[]): PlaceHit[] {
   const norm = trNorm(text)
   const tokens = norm.split(' ').filter(t => t.length >= 3)
@@ -352,14 +419,14 @@ function findPlaces(text: string, aliases: Alias[]): PlaceHit[] {
   // "Istanbul" ve "İstanbul" iki ayrı giriş oluyordu. Artık katlanmış anahtar.
   const seen = new Set<string>()
 
-  const cityAliases = aliases.filter(a => a.type === 'city')
+  const cityAliases = aliasIndeksi(aliases).sehir
 
   // Bigram
   for (let i = 0; i < tokens.length - 1; i++) {
     const bigram = tokens[i] + ' ' + tokens[i + 1]
     const bigram2 = stripSuffix(tokens[i]) + ' ' + stripSuffix(tokens[i + 1])
     for (const bg of [bigram, bigram2]) {
-      const match = cityAliases.find(a => trNorm(a.alias) === bg)
+      const match = cityAliases.get(bg)
       if (match && !seen.has(yerKey(match.normalized))) {
         hits.push({ normalized: match.normalized, priority: match.priority || 50, matched: bg, district: match.district || null })
         seen.add(yerKey(match.normalized))
@@ -373,7 +440,7 @@ function findPlaces(text: string, aliases: Alias[]): PlaceHit[] {
     const strippedFull = stripSuffix(token)
     const candidates = [...new Set([token, stripped1, strippedFull])]
     for (const cand of candidates) {
-      const match = cityAliases.find(a => trNorm(a.alias) === cand)
+      const match = cityAliases.get(cand)
       if (match && !seen.has(yerKey(match.normalized))) {
         hits.push({ normalized: match.normalized, priority: match.priority || 50, matched: cand, district: match.district || null })
         seen.add(yerKey(match.normalized))
@@ -393,9 +460,8 @@ function bestPlace(hits: PlaceHit[]): PlaceHit | null {
 // -------------------------
 function findVehicle(text: string, aliases: Alias[]): string | null {
   const norm = trNorm(text)
-  const vehicleAliases = aliases.filter(a => a.type === 'vehicle')
-  for (const va of vehicleAliases.sort((a, b) => (b.priority || 50) - (a.priority || 50))) {
-    if (norm.includes(trNorm(va.alias))) return va.normalized
+  for (const [anahtar, va] of aliasIndeksi(aliases).arac) {
+    if (norm.includes(anahtar)) return va.normalized
   }
   return null
 }
@@ -403,9 +469,8 @@ function findVehicle(text: string, aliases: Alias[]): string | null {
 // Üstyapı tespiti
 function findBodyType(text: string, aliases: Alias[]): string | null {
   const norm = trNorm(text)
-  const bodyAliases = aliases.filter(a => a.type === 'body')
-  for (const ba of bodyAliases.sort((a, b) => (b.priority || 50) - (a.priority || 50))) {
-    if (norm.includes(trNorm(ba.alias))) return ba.normalized
+  for (const [anahtar, ba] of aliasIndeksi(aliases).ustyapi) {
+    if (norm.includes(anahtar)) return ba.normalized
   }
   return null
 }
