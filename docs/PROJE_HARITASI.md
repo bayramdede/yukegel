@@ -1127,6 +1127,30 @@ ZIP/TXT → raw_posts → DB trigger → parse-listing Edge Fn → listings → 
 
 ### 🚨 Bu boru hattının darboğazı AĞ DEĞİL, CPU (5 Ağu 2026, #71)
 
+> **CANLI SONUÇ (v75 deploy 14:56:28 UTC, ölçüm 15:06 UTC / 328 satırlık import):**
+> Çağrı süresi **78–150 sn → 4,7–44 sn**. 504/546/500 sayısı **yığın → 0**.
+> `pending` kalan **%93 → %4,3**. 150.000 ms gateway duvarı artık hiç görülmüyor.
+>
+> Sürekli yükte (15:18–15:22, ~1.500 satır daha) süreler **8,6–73,3 sn**, yine hepsi 200.
+> 1.833 satırın %94,7'si `processed`, %1,6'sı `pending`, %3,7'si `no_lane`.
+> ⚠️ Rahatlama sınırsız değil: 73 sn, 150 sn duvarının yarısı. Hacim ikiye katlanırsa geri gelir.
+>
+> **Ama süre milisaniyelere DÜŞMEDİ** — bench'te parse maliyeti 6–17 ms'ti, canlıda
+> 20–70 sn kaldı. Nerede olmadığı ÖLÇÜLDÜ: aynı pencerede tüm DB sorgularının toplam
+> yürütme süresi ~300 sn / ~1.000 çağrı ≈ **çağrı başına 0,3 sn**. `ilan_olustur` da
+> suçlu değil — ort. 68,1 ms (#67'nin O(1) trigger'ından sonra; taban 1.400 ms'ti).
+> Geriye **Deno worker havuzunda kuyruk** kalıyor. Elemeyle varıldı, doğrudan ölçülmedi.
+>
+> 🆕 **#73:** `tumAliaslar()` HER çağrıda 1.242 alias'ı 2 sayfada yeniden çekiyordu —
+> ~1.000 çağrıda 1.931 SELECT, 47,6 sn DB süresi + her çağrıda 1.242 satırlık JSON parse.
+> 60 sn TTL'li modül önbelleği yazıldı (deploy bekliyor). Sıcak worker'da aynı diziyi
+> döndürdüğü için `aliasIndeksi()` WeakMap'i de vuruyor.
+>
+> ⚠️ Yan bulgu (#72): `net._http_response`'ta 328 isteğin 327'si "Timeout of 5000 ms
+> reached" hatası. pg_net'in 5 sn'lik timeout'u fonksiyonun gerçek süresinin çok altında,
+> yani HER ZAMAN dolacak. Durumu fonksiyon kendi yazdığı için satırlar yine işleniyor
+> (301/328), ama pg_net kaydı izleme için kullanılamaz halde.
+
 **`parse-listing` içinde LLM çağrısı YOKTUR.** Dosyada tek `Deno.env.get` Supabase
 URL/anahtarı; `fetch(`, `anthropic`, `messages.create` **sıfır eşleşme**. Log satırı
 `'LLM parse tamamlandı'` diyor ama `parseMessage()` saf regex + `aliases` tablosudur.

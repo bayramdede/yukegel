@@ -73,7 +73,25 @@ async function durumYaz(
 // (`tumSatirlar`); Deno/Next sınırı yüzünden ortak modüle alınamıyor.
 const SAYFA_BOYU = 1000
 
-async function tumAliaslar(): Promise<Alias[]> {
+// ─── Alias önbelleği (5 Ağu 2026, #73) ────────────────────────────────────
+// ÖLÇÜM: 15:06–15:22 arası ~1000 çağrıda `aliases` SELECT'i 1931 kez koştu
+// (çağrı başına 2 sayfa × 1242 aktif alias). Toplam 47,6 sn DB süresi + her
+// çağrıda ~1242 satırlık JSON'un ağdan çekilip parse edilmesi.
+//
+// Deno edge worker'ı sıcakken modül kapsamı YAŞAR. Yani bu önbellek, aynı
+// worker'a düşen sonraki isteklerde hem 2 HTTP turunu hem JSON parse'ı
+// hem de `aliasIndeksi()`'nin trNorm döngüsünü tamamen atlatır —
+// WeakMap aynı dizi kimliğini gördüğü için indeks de yeniden kurulmaz.
+//
+// TTL neden 60 sn: alias'lar `learn-aliases` çalışınca değişir. 60 sn'lik
+// bayatlık kabul edilebilir; buna karşılık yüzlerce eşzamanlı çağrılık bir
+// import patlaması worker başına TEK fetch'e iner.
+const ALIAS_TTL_MS = 60_000
+let _aliasOnbellek: Alias[] | null = null
+let _aliasZaman = 0
+let _aliasUcus: Promise<Alias[]> | null = null   // aynı anda gelen istekler tek fetch'i paylaşsın
+
+async function aliaslariCek(): Promise<Alias[]> {
   const hepsi: Alias[] = []
   for (let baslangic = 0; ; baslangic += SAYFA_BOYU) {
     const { data, error } = await supabase
@@ -86,6 +104,26 @@ async function tumAliaslar(): Promise<Alias[]> {
     const parca = (data || []) as Alias[]
     hepsi.push(...parca)
     if (parca.length < SAYFA_BOYU) return hepsi
+  }
+}
+
+async function tumAliaslar(): Promise<Alias[]> {
+  const simdi = Date.now()
+  if (_aliasOnbellek && simdi - _aliasZaman < ALIAS_TTL_MS) return _aliasOnbellek
+  if (_aliasUcus) return await _aliasUcus   // başka bir istek zaten çekiyor
+
+  _aliasUcus = aliaslariCek()
+  try {
+    const taze = await _aliasUcus
+    _aliasOnbellek = taze
+    _aliasZaman = Date.now()
+    return taze
+  } catch (e) {
+    // Çekme başarısızsa bayat veriyle devam et — hiç alias'sız parse etmekten iyi.
+    if (_aliasOnbellek) return _aliasOnbellek
+    throw e
+  } finally {
+    _aliasUcus = null
   }
 }
 
@@ -373,9 +411,9 @@ function laneKey(from: string, fromDist: string | null | undefined, to: string, 
 //      ZATEN doğru yazılmış. Bu dosya güncellenmemişti — Deno/Next sınırı
 //      yüzünden ortak modüle alınamıyor, iki kopya elle hizalanmak zorunda.
 //
-// WeakMap anahtarı alias DİZİSİ. `tumAliaslar()` her çağrıda taze dizi
-// döndürdüğü için indeks çağrı başına bir kez kurulur (~1 ms, 1.232 trNorm).
-// Aynı dizi tekrar kullanılırsa (test/toplu iş) bedava.
+// WeakMap anahtarı alias DİZİSİ. #73'ten sonra `tumAliaslar()` 60 sn boyunca
+// AYNI diziyi döndürüyor — yani sıcak worker'da indeks de yeniden kurulmuyor,
+// WeakMap doğrudan vuruyor. Soğuk worker'da bir kez kurulur (~1 ms, 1.242 trNorm).
 type AliasIndeksi = {
   sehir: Map<string, Alias>
   arac: [string, Alias][]

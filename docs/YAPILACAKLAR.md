@@ -1,7 +1,53 @@
 # Yükegel — Yapılacaklar Listesi
 
-> 🔬 **5 AĞU 2026 — #71 `parse-listing`'in 100 SANİYESİ AÇIKLANDI. KOD YAZILDI, DEPLOY EDİLMEDİ.**
+> 🆕 **5 AĞU 2026 — #73 SIRADAKİ DARBOĞAZ ÖLÇÜLDÜ: alias tablosu her çağrıda yeniden çekiliyor. KOD YAZILDI, DEPLOY EDİLMEDİ.**
+>
+> ~1000 çağrılık pencerede `aliases` SELECT'i **1931 kez** koştu (çağrı başına 2 sayfa ×
+> 1.242 aktif alias), 47,6 sn DB süresi. Üstüne her çağrıda ~1.242 satırlık JSON'un
+> ağdan çekilip parse edilmesi biniyor.
+>
+> **Ama DB toplamı hâlâ küçük.** Aynı pencerede TÜM sorguların toplam yürütme süresi
+> ~300 sn / ~1000 çağrı ≈ **çağrı başına 0,3 sn**. Çağrılar 20–70 sn sürüyor. Yani
+> kalan sürenin ezici çoğunluğu ne parse'ta (6–17 ms) ne DB yürütmesinde (0,3 sn) —
+> **Deno worker havuzunda kuyrukta**. Bunu kanıtlamadım, elemeyle buraya vardım.
+>
+> `tumAliaslar()` artık 60 sn TTL'li modül önbelleği kullanıyor; sıcak worker'da aynı
+> diziyi döndürdüğü için `aliasIndeksi()` WeakMap'i de vuruyor (indeks kurulumu bedava).
+> Uçuştaki fetch paylaşılıyor, fetch hata verirse bayat veriyle devam ediliyor.
+
+> 🔬 **5 AĞU 2026 — #71 `parse-listing` CPU DARBOĞAZI: ÇÖZÜLDÜ VE ÖLÇÜLDÜ (edge fn v75, 14:56:28 UTC).**
 > Ayrıntı: `docs/PROJE_HARITASI.md` → BÖLÜM 6 "Bu boru hattının darboğazı AĞ DEĞİL, CPU".
+>
+> **ÖLÇÜM — 15:06 UTC, 328 satırlık gerçek import:**
+>
+> | | v74 (önce) | v75 (sonra) |
+> |---|---|---|
+> | çağrı süresi (328'lik patlama) | 78.116–150.166 ms | **4.702–43.950 ms** |
+> | çağrı süresi (1.800'lük sürekli yük) | — | **8.631–73.334 ms** |
+> | 504 (150 sn duvarı) | yığınla | **0** |
+> | 546 / 500 | yığınla | **0** |
+> | işlenen oran | 640 satırın %7'si | **328 satırın %92'si** |
+> | `pending` kalan | %93 | **%4,3 (14 satır)** |
+>
+> ✅ 150.000 ms gateway duvarı artık hiç görülmüyor. `pending` birikmesi durdu.
+> 15:18–15:22 arası ~1.500 satır daha girdi; boru hattı gerçek zamana yakın çalıştı
+> (son giriş 15:22:47 → son işlenme 15:22:54). 1.833 satırın 1.736'sı `processed` (%94,7),
+> 30'u `pending` (%1,6), 67'si `no_lane` (%3,7).
+>
+> ⚠️ **Rahatlama sınırsız değil.** Sürekli yükte en uzun çağrı **73,3 sn**'ye çıktı.
+> 150 sn duvarı hâlâ orada; hacim kabaca ikiye katlanırsa yeniden çarpılır.
+>
+> ⚠️ **KENDİ TAHMİNİM YANLIŞ ÇIKTI.** "Çağrı süresi milisaniyelere düşer" demiştim.
+> Düşmedi — **15–44 sn'de kaldı**. Bench'te parse maliyeti 6–17 ms ölçülmüştü, demek ki
+> kalan 15–44 sn parse'ta DEĞİL: `ilan_olustur` RPC turları (#68, taban ort. 1.400 ms /
+> maks 28.939 ms) + 328 eşzamanlı çağrının PostgREST havuzunda kuyruğa girmesi (#66).
+> Bu bir ÇIKARIM, ölçüm değil — fonksiyon içine zaman damgası koymadan doğrulanmaz.
+>
+> 🆕 **#72 açıldı:** `net._http_response`'ta 328 isteğin **327'si hata** — hepsi
+> "Timeout of 5000 ms reached". 182'sinde DNS 5 sn boyunca çözülemedi, 145'inde bağlantı
+> kurulup cevap beklenirken doldu. Fonksiyon durumu kendi yazdığı için satırlar yine
+> işleniyor, ama pg_net kaydı izleme için kullanılamaz halde. 14 `pending` satır kuyruk
+> sonunda değil, sıra 9–279 arasına dağılmış.
 >
 > **ÖNCE BİR VARSAYIMI ÖLDÜRDÜM — kendi varsayımımdı.** "100 saniyenin içinde Anthropic
 > çağrısı mı var, DB gidiş-dönüşleri mi" diye sormuştum. **Üçüncü şık doğru çıktı: ikisi de
