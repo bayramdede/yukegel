@@ -24,6 +24,45 @@ function edgeLog(
 }
 
 // -------------------------
+// raw_posts durum yazımı — TEK GİRİŞ NOKTASI
+// -------------------------
+// 🚨 #65 (5 Ağu 2026). Bu fonksiyondan önce üç yerde çıplak `await ...update()`
+//    vardı ve ÜÇÜNÜN DE dönüşü kontrol edilmiyordu. Bağlantı havuzu tükendiğinde
+//    (PGRST003) update sessizce düşüyor, satır `pending` olarak kalıyordu.
+//    Ölçüm: RPC hatası alan 176 raw_post'un 110'u bu yüzden `pending`de mahsur.
+//
+// ⚠️ NİYE ÖLÜMCÜL: repo genelinde `processing_status = 'pending'` SEÇEN hiçbir
+//    yer yok — `reprocess-no-lane`:19, `learn-aliases`:83,216,508 ve
+//    `moderator/page.tsx`:216,228 yalnız `no_lane` okuyor. Yani `pending`de
+//    kalan satır ne kuyrukta görünür, ne yeniden denenir, ne bir ölçüme girer.
+//    Sessiz kayıp, gürültülü kayıptan pahalıdır.
+//
+// Bu fonksiyon hatayı ÇÖZMÜYOR — görünür kılıyor. Kurtarma yolu ayrı iş (#65).
+async function durumYaz(
+  supabase: any,
+  raw_post_id: string,
+  status: 'processed' | 'no_lane',
+  damgala: boolean,
+  neden: string
+): Promise<void> {
+  const yama: Record<string, unknown> = { processing_status: status }
+  if (damgala) yama.processed_at = new Date().toISOString()
+
+  const { error } = await supabase.from('raw_posts').update(yama).eq('id', raw_post_id)
+
+  if (error) {
+    edgeLog('ERROR', 'raw_posts durumu YAZILAMADI — satır pending kalıyor', {
+      raw_post_id,
+      output_status: 'status_write_failed',
+      hedef_status: status,
+      neden,
+      error_message: error.message ?? String(error),
+      error_code: error.code ?? null,
+    })
+  }
+}
+
+// -------------------------
 // Mesaj temizleme (LLM öncesi token tasarrufu)
 // -------------------------
 // PostgREST varsayılan olarak sorgu başına EN FAZLA 1000 satır döndürür
@@ -725,7 +764,11 @@ Deno.serve(async (req) => {
         output_status: 'pre_check_failed',
         error_message: 'raw_text boş veya null',
       })
-      await supabase.from('raw_posts').update({ processing_status: 'no_lane' }).eq('id', raw_post_id)
+      // ⚠️ `damgala: false` KASITLI. `processed_at` bugün üç sınıfı ayıran TEK
+      //    işaret: damgasız = "buraya hiç varılamadı" (boş metin ya da şerit yok),
+      //    damgalı = "şerit vardı, ilan oluşmadı". #42/#64 ölçümü buna dayanıyor.
+      //    Kalıcı çözüm `parse_lanes_found` kolonu (#64); o gelene kadar bozma.
+      await durumYaz(supabase, raw_post_id, 'no_lane', false, 'raw_text bos')
       return new Response(JSON.stringify({ success: false, reason: 'empty_raw_text' }), { status: 400 })
     }
 
@@ -771,7 +814,10 @@ Deno.serve(async (req) => {
     }
 
     if (result.lanes.length === 0) {
-      await supabase.from('raw_posts').update({ processing_status: 'no_lane' }).eq('id', raw_post_id)
+      // ⚠️ `damgala: false` — yukarıdakiyle aynı gerekçe. Bu dal #42'nin sınıfı:
+      //    canlı ölçümde 55 no_lane'in 23'ü buradan geçti (kova_a=1, kova_b=12,
+      //    kova_c=9). Damga atarsak o ayrım kaybolur.
+      await durumYaz(supabase, raw_post_id, 'no_lane', false, 'serit bulunamadi')
       return new Response(JSON.stringify({ success: true, lanes: 0 }))
     }
 
@@ -924,13 +970,18 @@ Deno.serve(async (req) => {
     //    değiştiği gün bu tahmin sessizce çöker).
     //    ⚠️ Bir kaydın en çok işe yaradığı an, onu yazmayı en gereksiz
     //       bulduğumuz an: BAŞARISIZLIK anı.
-    await supabase
-      .from('raw_posts')
-      .update({
-        processing_status: created > 0 ? 'processed' : 'no_lane',
-        processed_at: new Date().toISOString(),
-      })
-      .eq('id', raw_post_id)
+    //
+    // 🚨 #65 (5 Ağu 2026) — BU UPDATE'İN DÖNÜŞÜ KONTROL EDİLMİYORDU. Havuz
+    //    tükendiğinde (PGRST003) sessizce düşüyor ve satır `pending` kalıyordu.
+    //    176 RPC-hatalı postun 110'u tam olarak böyle mahsur kaldı. Artık
+    //    `durumYaz` başarısızlığı `status_write_failed` ile logluyor.
+    await durumYaz(
+      supabase,
+      raw_post_id,
+      created > 0 ? 'processed' : 'no_lane',
+      true,
+      created > 0 ? 'ilan olustu' : 'serit var ilan yok'
+    )
 
     if (created === 0) {
       edgeLog('WARN', 'Lane bulundu ama hiç ilan oluşmadı — no_lane kuyruğunda bırakıldı', {

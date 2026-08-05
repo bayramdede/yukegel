@@ -98,14 +98,24 @@
 > 176 durak, hepsinde `origin_province_id` dolu ve metin kolonları NULL.
 > Beş yol da koştu: whatsapp 135 · excel 13 · form 1 · repost 21 · moderatör 50.
 >
-> 📄 **`docs/20260804_ilan_olustur_v41_ilce_resmi.sql` (4 Ağu 2026, #50) — YAZILDI,
-> ÇALIŞTIRILMADI.** v4 gövdesinin aynısı, yalnız iki satır: `district_official` artık
+> ✅ **`docs/20260804_ilan_olustur_v41_ilce_resmi.sql` (4 Ağu 2026, #50) — ÇALIŞTIRILDI
+> ve CANLIDA DOĞRULANDI.** v4 gövdesinin aynısı, yalnız iki satır: `district_official` artık
 > `coalesce(çağıranın değeri, public.ilce_resmi(...))`. **Gövde elle kopyalanmadı** —
 > v4 dosyasından programla üretilip iki satırı yamandı, sonra `difflib` ile v4'e karşı
 > doğrulandı: tam iki hunk, parantez dengesi aynı. Sürüklenme riski sıfır.
-> 🔑 **Dalga 5'i BEKLEMİYOR.** Eski karar "v4 ile aynı anda" idi; gerekçesi "fonksiyon
+> 🔑 **Dalga 5'i BEKLEMEDİ.** Eski karar "v4 ile aynı anda" idi; gerekçesi "fonksiyon
 > iki kez elden geçmesin"di ve v4 3 Ağu'da tek başına çıkınca o gerekçe öldü.
 > `origin_city`/`city`ye dokunmuyor → drop'tan bağımsız.
+> ✅ **Doğrulama:** `prosrc like '%ilce_resmi%'` → 1 · ADIM 0 `true/true/false/null` ·
+> `begin; ilan_olustur(... district_official YOK ...); rollback;` →
+> `Gebze true` · `Tuzla true` · `Merter false` · ilçesiz durak `null`.
+> 🚨 **İlk ölçüm yanlış alarm verdi: canlı satırların hepsi NULL'dı ama hepsi
+> deploy'dan ÖNCEKİ 16 saniyelik toplu içe aktarmaya aitti.** "Deploy'dan sonra bak"
+> derken saat değil OLAY sırası doğrulanmalı — aynı dakikada olmak, sonra olmak değil.
+> 📌 Yazma yolu testlerinde varsayılan yöntem **canlı trafiği beklemek değil**,
+> `begin; …; rollback;` ile fonksiyonu doğrudan çağırmak: anında ve kesin.
+> ⏭️ Geçmiş satırlar onarılmadı (#52 ile aynı gerekçe); v4.1 öncesi WhatsApp
+> ilanlarında `district_official` NULL kalır — anlamı "bilinmiyor", bozuk veri değil.
 > ⚠️ Kanal kapsaması `source` ile ÖLÇÜLMEZ — o alan mesajın nereden geldiğini
 > tutar, hangi kodun yazdığını değil; moderatör de repost da `whatsapp` görünür.
 > Ayıranlar: `is_repost`, `reviewed_at`.
@@ -783,8 +793,9 @@ RLS açık · SELECT herkese (anon, authenticated) · yazma yok
 > "hangi il?" sorusunu cevaplamıyor.
 > ✅ Canlı veriye karşı çapraz doğrulandı: `district_official` dolu 62 durakta kolon ile
 > fonksiyon 58 `(true,true)` + 4 `(false,false)`, çapraz satır yok.
-> 📄 **`ilan_olustur` ENTEGRASYONU YAZILDI, ÇALIŞTIRILMADI** —
-> `docs/20260804_ilan_olustur_v41_ilce_resmi.sql` (4 Ağu, #50). İki yerde
+> ✅ **`ilan_olustur` ENTEGRASYONU CANLIDA (4 Ağu, #50)** —
+> `docs/20260804_ilan_olustur_v41_ilce_resmi.sql`. Rollback'li doğrudan çağrıyla
+> doğrulandı: `Gebze true` · `Tuzla true` · `Merter false` · ilçesiz durak `null`. İki yerde
 > `coalesce(nullif(çağıranın değeri), public.ilce_resmi(...))`; sıra kasıtlı,
 > **çağıranın açık değeri kazanır**. Bugün ikinci bacağın fiilen çalıştığı TEK yol
 > `parse-listing`:848 — Deno `locations.json`'a erişemediği için bu alanı hiç

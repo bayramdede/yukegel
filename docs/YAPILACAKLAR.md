@@ -40,7 +40,7 @@
 > ilan ömrü kısa, etki 5 satır, kaynak (alias) zaten kapatıldı → yeni hata üretmiyor.
 > Bu satır burada duruyor ki ileride biri "neden düzeltilmemiş" diye sormasın.
 >
-> 🟡 **4 AĞU 2026 — #50 YAZILDI, ÇALIŞTIRILMADI: `district_official` artık DB'de türetiliyor.**
+> ✅ **4 AĞU 2026 — #50 KAPANDI, CANLIDA DOĞRULANDI: `district_official` artık DB'de türetiliyor.**
 > 📄 `docs/20260804_ilan_olustur_v41_ilce_resmi.sql` — v4 gövdesinin aynısı, iki satır değişti:
 > `district_official` iki yerde `coalesce(nullif(çağıranın değeri), public.ilce_resmi(...))` oldu.
 > Sıra kasıtlı, **çağıranın açık değeri kazanır**: `lib/ilan-yaz.ts`:364 ve
@@ -77,9 +77,30 @@
 > semantiği bozulmuş demektir ve `coalesce` "ilçe girilmemiş" satırları `false` ile
 > doldurur — sessiz veri bozulması.
 >
-> ⏭️ **Sıradaki:** Bayram ADIM 0'ı okur → ADIM 1'i çalıştırır → ADIM 2.3 (WhatsApp hattı)
-> ile ikinci bacağın fiilen çalıştığını doğrular. Geçmiş satırlar ONARILMAZ (#52 ile aynı
-> gerekçe: ileri-yönlü düzeltme).
+> ✅ **CANLI DOĞRULAMA (4 Ağu, Bayram çalıştırdı):**
+> · ADIM 0 → `t1/t2/t3/t4 = true/true/false/null`. NULL semantiği sağlam.
+> · `pg_proc.prosrc like '%ilce_resmi%'` → **1**. Gövde gerçekten değişti.
+> · Kesin test — `ilan_olustur` bir transaction içinde `district_official` GÖNDERİLMEDEN
+>   çağrıldı (parse-listing'i taklit), sonra `rollback`:
+>   `Gebze → true` · `Tuzla → true` · `Merter → false` · ilçesiz durak → **null**.
+>   **Üç değerin üçü de çıktı** — hem türetme hem NULL ayrımı çalışıyor.
+>
+> 🚨 **İLK ÖLÇÜM YANLIŞ ALARM VERDİ VE SEBEBİ ZAMANLAMAYDI — kaydı bunun için duruyor.**
+> ADIM 2.3 (canlı WhatsApp satırlarını oku) 10 satırın **hepsinde** `district_official`
+> NULL gösterdi; ilçesi dolu olanlarda bile (`Gebze`, `Domaniç`, `Ereğli`). "Düzeltme
+> çalışmadı" gibi görünüyordu. **Değildi:** satırlar `17:33:30`–`17:33:46` arası 16
+> saniyelik TEK bir toplu içe aktarmaya aitti ve migration dosyası `17:33:32`'de
+> yazılmıştı — yani satırların tamamı deploy'dan ÖNCEYE ait, NULL olmaları beklenen
+> davranıştı. 📌 **Ders: "deploy'dan sonra bak" derken saat değil OLAY sırası
+> doğrulanmalı.** Aynı dakikada olmak, sonra olmak değildir. Zaman damgası
+> okunmasaydı çalışan bir düzeltme geri alınabilirdi.
+> 📌 İkinci ders: canlı trafiği beklemek yerine `begin; … rollback;` ile fonksiyonu
+> DOĞRUDAN çağırmak hem anında hem kesin sonuç verdi. Yazma yolu testlerinde varsayılan
+> yöntem bu olmalı — trafik beklemek ölçümü zamanlamaya bağımlı kılıyor.
+>
+> ⏭️ **Geçmiş satırlar ONARILMAZ** (#52 ile aynı gerekçe: ileri-yönlü düzeltme).
+> WhatsApp hattından v4.1 öncesi girmiş ilanlarda `district_official` NULL kalır —
+> tanımlı anlamı "bilinmiyor", bozuk veri değil.
 
 
 > 🚨 **YENİ CANLI BULGU — SIFIR GENİŞLİKLİ KARAKTER SALDIRISI (#61 KAPANDI).** `raw_posts`
