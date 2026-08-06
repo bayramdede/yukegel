@@ -31,9 +31,14 @@ Etiket secim kurallari:
 - spam: tek tip kopyala-yapistir, reklam icerigi, anlamsiz mesajlar`;
 
 // Lone surrogate + kontrol karakterlerini temizle (WhatsApp emoji kalıntıları JSON'u bozar)
+// 🚨 #86 (6 Ağu 2026): eski hali `/[\uD800-\uDFFF]/g` idi. `u` bayrağı olmadığı için
+// JS bunu KOD BİRİMİ bazında uygular ve GEÇERLİ vekil çiftlerinin de iki yarısını
+// ayrı ayrı siler → BMP-üstü TÜM emojiler (👉📍🔹🚛) sessizce yok oluyordu.
+// Amaç yalnız BOZUK (eşsiz) vekilleri atmaktı. Aynı hata 4 dosyadaydı:
+// burası · parse-listing/index.ts:139 · llm-parse/route.ts · learn-aliases/route.ts.
 function temizle(s: string): string {
   return s
-    .replace(/[\uD800-\uDFFF]/g, '')               // lone surrogates
+    .replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, '') // SADECE eşsiz vekiller
     .replace(/\x00/g, '')                           // null byte
     .replace(/[\x01-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '') // kontrol karakterleri
     .replace(/\s+/g, ' ')

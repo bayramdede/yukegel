@@ -147,6 +147,13 @@ function normalizeArrows(s: string): string {
   return (s || '')
     .replace(/➡️?|→|--?>|==>/g, ' -> ')
     .replace(/⬅️?|←/g, ' <- ')
+    // #63 — parse-listing/index.ts cleanMessage() ile EŞ. Birini değiştiren diğerine bakmalı.
+    // 👉 / 📍 yalnız iki yanında harf varken ayraç ("MERSİN📍MUĞLA", "Van 👉 bulanık").
+    // Satır başındaki 👉/📍 işaretçidir ("👉AFYON...", "📍 Yükleme:"), ayraç değil.
+    .replace(/(?<=[A-Za-zÇĞİÖŞÜçğıöşü])\s*[👉📍]\s*(?=[A-Za-zÇĞİÖŞÜçğıöşü])/gu, ' -> ')
+    // "KIZILTEPE = OSMANİYE". İki yanı harf şartı "Tlf=0544..." yakalanmasını engeller.
+    .replace(/(?<=[A-Za-zÇĞİÖŞÜçğıöşü])\s*=+\s*(?=[A-Za-zÇĞİÖŞÜçğıöşü])/g, ' -> ')
+    // "/" bilinçli olarak ayraç DEĞİL — veride baskın kullanımı ilçe/il ("Kartal / İstanbul").
     .replace(/\s+/g, ' ').trim();
 }
 

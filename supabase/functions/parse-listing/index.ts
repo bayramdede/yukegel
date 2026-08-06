@@ -135,14 +135,35 @@ const BLACKLIST_PHRASES = [
 ]
 
 function cleanMessage(text: string): string {
-  // Lone surrogate karakterleri temizle (WhatsApp mesajlarında oluşabilir, JSON'u bozar)
-  text = text.replace(/[\uD800-\uDFFF]/g, '')
+  // 🚨 #86 (6 Ağu 2026) — BU SATIR SESSİZCE TÜM BMP-ÜSTÜ EMOJİLERİ SİLİYORDU.
+  // Eski hali `/[\uD800-\uDFFF]/g` idi. `u` bayrağı YOK, yani JS bunu KOD BİRİMİ
+  // bazında uygular ve GEÇERLİ vekil ÇİFTLERİNİN de iki yarısını ayrı ayrı siler.
+  // 👉 U+1F449 = D83D DC49 · 📍 U+1F4CD = D83D DCCD · 🔹 U+1F539 = D83D DD39
+  // → hepsi burada, aşağıdaki hiçbir kural çalışmadan ÖNCE, BOŞLUK BIRAKMADAN yok oluyordu.
+  // İki sonuç: (a) #63'ün 👉/📍 ayraç kuralı ÖLÜ KODDU (ASCII `=` kuralı çalışıyordu,
+  // çünkü `=` BMP'de), (b) "MERSİN👉İRAN" → "MERSİNİRAN" token yapışması —
+  // yani :161'deki emoji-strip'in "boşlukla değiştir" önlemi bu karakterler için
+  // hiç devreye giremiyordu. Ölçüm (son 30 gün, damgasız no_lane 490):
+  // BMP-üstü emoji içeren 239 · boşluksuz yapışma 43 · #63 hedefi 58 · 🔹 9.
+  // Doğru davranış: SADECE YALNIZ (eşsiz) vekilleri sil, geçerli çiftlere dokunma.
+  text = text.replace(
+    /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g,
+    ''
+  )
   return text
     .split('\n')
     .map(line => {
       // Ok karakterlerini ASCII'ye çevir (emoji-strip'ten ÖNCE)
       // ➡ U+27A1, ⏩ U+23E9 (YUKİ), ⏪ U+23EA, ▶ U+25B6, ⏩ vb. aynı range'de
       line = line.replace(/[➡➜➔⟶⏩⏪▶◀⇒⇔]/gu, '->')
+      // #63: 👉 (U+1F449) ve 📍 (U+1F4CD) SADECE satır içinde, iki yanında harf varken ayraç.
+      // "Van 👉 bulanık" / "*MERSİN📍MUĞLA*" → ayraç.
+      // "👉AFYON..." / "📍 *Yükleme:*" → satır başı işaretçi, ayraç DEĞİL; alttaki emoji-strip boşluğa çevirir.
+      line = line.replace(/(?<=[A-Za-zÇĞİÖŞÜçğıöşü])\s*[👉📍]\s*(?=[A-Za-zÇĞİÖŞÜçğıöşü])/gu, ' -> ')
+      // #63: "KIZILTEPE = OSMANİYE KADİRLİ". İki yanı harf şartı "Tlf=0544..." yakalanmasını engeller.
+      line = line.replace(/(?<=[A-Za-zÇĞİÖŞÜçğıöşü])\s*=+\s*(?=[A-Za-zÇĞİÖŞÜçğıöşü])/g, ' -> ')
+      // NOT: "/" bilinçli olarak ayraç DEĞİL — veride baskın kullanımı ilçe/il ("Kartal / İstanbul",
+      // "Aliağa /İZMİR"). Ayraç yapmak gerçek olmayan hat üretir. Ölçüm: docs/YAPILACAKLAR.md #63.
       // Emojileri BOŞ KARAKTERLE değil BOŞLUKLA değiştir
       // Aksi halde "KIZILTEPE🔲ANTEP" → "kiziltepeantep" oluşur (token ayırıcı kaybolur)
       line = line.replace(/[\u{1F000}-\u{1FFFF}\u{2600}-\u{27FF}\u{2300}-\u{23FF}\u{2B00}-\u{2BFF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA9F}]/gu, ' ')
@@ -691,7 +712,19 @@ function parseMessage(message: string, aliases: Alias[]): {
 
       if (isYuklemeli) {
         const yuklemePlaces = findPlaces(line, aliases)
-        blockOrigin = bestPlace(yuklemePlaces)
+        // 🚨 #88-A (6 Ağu 2026): ESKİDEN burada koşulsuz `blockOrigin = bestPlace(...)`
+        //    vardı. `isYuklemeli` yalnız "yukle" ALT DİZİSİNE bakıyor, o yüzden yükle
+        //    ile HİÇ İLGİSİ OLMAYAN dolgu satırları da ateşliyor:
+        //      "2 koli 55*50*50 üstuste yüklenmez."   → yuklenmez ⊃ yukle
+        //      "3 tabana 3 üstü yüklenir"             → yuklenir  ⊃ yukle
+        //      "1 Kapak yer Yanyana yükleme üstene birşey konulmaz."
+        //    Bu satırlarda yer yok → bestPlace null → blockOrigin SİLİNİYORDU ve
+        //    hemen altındaki "Teslim Yeri ... / Van" satırı sahipsiz kalıyordu.
+        //    Kalıp gerçek ve yaygın: "Yüklemeli Parça Aracı" şablonu (0 532 203 43 81).
+        //    ARTIK: yer içermeyen "yükle*" satırı bloğu BOZMAZ, sadece atlanır.
+        const yeniOrigin = bestPlace(yuklemePlaces)
+        if (!yeniOrigin) continue
+        blockOrigin = yeniOrigin
         blockVehicle = findVehicle(line, aliases)
         blockBody = findBodyType(line, aliases)
         // Aynı satırda hem kaynak hem hedef varsa (ör: "İKİTELLİ YÜKLEME HADIMKÖY")
@@ -724,7 +757,19 @@ function parseMessage(message: string, aliases: Alias[]): {
 
       // Ok, boşluklu tire veya kendi içinde ilişki olan satır → reset
       // NOT: satır başı tire (-TUZLA) reset etmemeli — yalnızca ayraç tireler resetler
-      if (blockOrigin && (ARROW_RE.test(line) || BLOCK_RESET_RE.test(line) || splitByRelation(line) !== null)) {
+      // 🚨 #88-B (6 Ağu 2026): `splitByRelation(line) !== null` şartı, BLOCK_RESET_RE'nin
+      //    bilinçli olarak DIŞARIDA bıraktığı boşluksuz tireyi arka kapıdan geri sokuyordu.
+      //    `splitByRelation` "(KISA-UZUN) DORSE" satırını `rel:'dash_nospace'` diye
+      //    ayrıştırır (sol="(KISA", sağ="UZUN) DORSE") → blok resetleniyordu. Oysa bu
+      //    satır bir DORSE TARİFİ, ilişki değil. Gerçek örnek `acb96bbc`:
+      //      MANİSA TURGUTLU YÜKLEMELİ / (KISA-UZUN) DORSE / AKŞEHİR TIR
+      //    Manisa→Konya/Akşehir şeridi bu yüzden hiç doğmuyordu (alias'ların ikisi de var).
+      //    ARTIK: ilişkili satır ancak İÇİNDE TANINAN YER VARSA resetler. Yersiz satır
+      //    (dorse/ödeme/ölçü tarifi) bloğu bozmaz. Gerçek güzergâh satırını Pass 1 zaten alır.
+      if (blockOrigin && (
+        ARROW_RE.test(line) || BLOCK_RESET_RE.test(line) ||
+        (splitByRelation(line) !== null && findPlaces(line, aliases).length > 0)
+      )) {
         blockOrigin = null
         continue
       }

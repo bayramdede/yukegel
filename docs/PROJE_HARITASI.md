@@ -636,6 +636,62 @@ yukegel/
 │                                         #      ama Kastamonu+Kayseri ilçesi) — testte BİLEREK duruyor.
 │                                         #    Alias TABLOSUNA değil saf fonksiyona bakar; veri düzeltmeleri
 │                                         #      testi kırmaz. Saf Node, kimlik bilgisi istemez.
+├── scripts/test-clean-message.mts         # `npm run test:clean` (6 Ağu 2026, #86) — 16 kontrol.
+│                                         #    parse-listing `cleanMessage`'ı, yani parser'ın İLK adımı.
+│                                         #    🚨 TEST FONKSİYONU ELLE KOPYALANMAZ: `index.ts`ten ÇALIŞMA
+│                                         #      ANINDA sökülüp import edilir (BLACKLIST_PHRASES → parseMessage
+│                                         #      arası, marker bazlı; satır numarası kullanmaz).
+│                                         #      SEBEP: #63'ün ilk testi zinciri elle kopyaladığı için 17/17
+│                                         #      geçmişti ve YANLIŞTI — kopyada olmayan :150 hiç çalışmadı.
+│                                         #      Yanlış sebeple geçen test, olmayan testten zararlıdır.
+│                                         #    🧪 MUTASYONLA DOĞRULANDI: eski regex geri konunca 5 vaka düşüyor.
+│                                         #      Tekrarla: `KAYNAK_INDEX=/tmp/mut/index.ts npm run test:clean`
+│                                         #    📌 Yalnız metin bozulmasını ölçer; ŞERİT ÜRETİMİNİ ölçmez
+│                                         #      (findPlaces substring eşlediği için yapışık metin de tutabilir).
+│                                         #    Saf Node, kimlik bilgisi istemez.
+├── scripts/olc-86.mts                     # `npm run olc:86` (6 Ağu 2026, #86) — ÖLÇÜM, test değil.
+│                                         #    Eski vs yeni `cleanMessage`, son 30 günün damgasız `no_lane`
+│                                         #      satırlarında: kaç satır 0 şeritten ≥1 şerite geçiyor.
+│                                         #    🚨 KİMLİK BİLGİSİ İSTER (`.env.local`) — bu yüzden CI'da değil,
+│                                         #      Bayram elle çalıştırır. Kum havuzunun `supabase.co` erişimi YOK.
+│                                         #    Veriyi KENDİSİ çeker; elle taşıma denendi ve md5 tutmadı
+│                                         #      (`dogubayazit`→`dogubayazio`, 18 sayfanın ilkinde, sessiz).
+│                                         #    Parser'ı da kaynaktan söker + mutantı kendi üretir.
+│                                         #    🚨 SAYFALAMA ŞART: PostgREST tek istekte en fazla 1000 satır döner,
+│                                         #      `.limit(5000)` bu SUNUCU tavanını KALDIRMAZ — sessizce keser.
+│                                         #      İlk sürüm 1242 alias'ın 1000'iyle ölçtü → KAZANÇ 40 çıktı, 46'ymış.
+│                                         #      Şimdi `.range()` + `alias.length === count` sertifikası var.
+│                                         #      Aynı çukur `parse-listing/index.ts:70`'te zaten not düşülmüştü.
+│                                         #    🔑 `.env.local` env okuması İLK-GEÇEN-KAZANIR (dotenv semantiği).
+│                                         #      `Object.fromEntries` SON geçeni alır → satır 5'teki bozuk
+│                                         #      (4 parçalı) SERVICE_ROLE_KEY seçilip `Invalid API key` veriyordu.
+│                                         #    ⚠️ Çıktıdaki `KAYIP (≥1 → 0)` satırı 0 DEĞİLSE düzeltme zarar veriyor.
+│                                         #    ⚠️ `ŞÜPHELİ` sayacı (#87): solu boş `->` satırı içeren kazançlar.
+│                                         #      O satırlarda parser varışı DÜŞÜRÜP kökenleri birbiriyle eşliyor,
+│                                         #      yani "kazanç" UYDURMA şerit olabilir. KAYIP sütunu bunu görmez.
+├── scripts/test-pass2.mts                 # `npm run test:pass2` (6 Ağu 2026, #88) — 12 kontrol.
+│                                         #    `parseMessage` PASS 2 ("YÜKLEMELİ blok") koruması.
+│                                         #    Pass 2, `yükle*` satırını blok kökeni sayar, altındakiler varış.
+│                                         #    🚨 #88-A: `isYuklemeli` yalnız "yukle" ALT DİZİSİNE bakar →
+│                                         #      "yüklenmez"/"yüklenir"/"yükleme üstene…" DOLGU satırları da
+│                                         #      ateşliyor, yer olmadığı için blockOrigin NULL'lanıyordu.
+│                                         #    🚨 #88-B: reset koşulundaki `splitByRelation(line) !== null`,
+│                                         #      BLOCK_RESET_RE'nin bilinçle dışarıda bıraktığı BOŞLUKSUZ tireyi
+│                                         #      geri sokuyordu: "(KISA-UZUN) DORSE" → dash_nospace → blok reset.
+│                                         #    ⚠️ TEST FONKSİYONU ELLE KOPYALANMAZ — kaynaktan sökülür (#86 dersi).
+│                                         #    🧪 MUTASYONLA DOĞRULANDI: A geri alınınca 3, B geri alınınca 2 düşer.
+│                                         #      `KAYNAK_INDEX=/tmp/mut/index.ts npm run test:pass2`
+│                                         #    📌 ALIAS'LAR SENTETİK — canlı kapsamayı ÖLÇMEZ, onu olc:88 yapar.
+│                                         #    📌 "Kemerburgaz aynı il → şerit YOK" vakası HATA DEĞİL, kayıtlı
+│                                         #      gerçek davranış: iki district de NULL → isDiff false. Alias işi.
+├── scripts/olc-88.mts                     # `npm run olc:88` (6 Ağu 2026, #88) — ÖLÇÜM, test değil.
+│                                         #    DÖRT varyant aynı canlı satırlarda: eski · yalnizA · yalnizB · yeni.
+│                                         #      Böylece "hangi düzeltme ne kazandırdı" ayrışır (olc:86 tek ikiliydi).
+│                                         #    Varyantlar kaynaktan STRING DEĞİŞİMİYLE üretilir; değişim tutmazsa
+│                                         #      script PATLAR — sessizce "eski = yeni" ölçüp 0 kazanç raporlamasın diye.
+│                                         #    Sayfalama + env ilk-geçen-kazanır + alias sertifikası olc-86'dan aynen.
+│                                         #    🚨 KİMLİK BİLGİSİ İSTER — Bayram elle çalıştırır (kum havuzu erişemez).
+│                                         #    ⚠️ `KAYIP (≥1 → 0)` 0 DEĞİLSE düzeltme çalışan satırı bozuyor.
 ├── lib/ilan-yaz.ts                       # 🚨 ILAN_VER_ANALIZ W0/W1 (29 Tem 2026) — `listings` yazan TEK YOL.
 │                                         #    `server-only`. ilanYaz(userId, girdi, kaynak) → ayrık birlik.
 │                                         #    Doğrulama + beyaz liste + sınırlar (MAX_DURAK=10, MAX_ARAC_ADET=50,
@@ -684,6 +740,43 @@ yukegel/
 ├── lib/whatsapp/telefon.ts               # 📱 TEK KAYNAK telefon regex (05XXXXXXXXX) ✅
 ├── app/api/raw-posts/telefon-doldur/route.ts  # 📱 contact_phone geriye-doldurma (içe aktarmadan AYRI) ✅
 ├── supabase/functions/parse-listing/index.ts
+│                                         # 🚨 :150 VEKİL TEMİZLİĞİ — cleanMessage'ın İLK satırı, #86 (6 Ağu).
+│                                         #    Amaç: JSON'u bozan EŞSİZ (yalnız) UTF-16 vekillerini atmak.
+│                                         #    ESKİ HÂLİ `/[\uD800-\uDFFF]/g` İDİ ve YANLIŞTI: `u` bayrağı
+│                                         #      olmayan sınıf KOD BİRİMİ bazında uygulanır, GEÇERLİ çiftin
+│                                         #      iki yarısı ayrı ayrı eşleşir → BMP-üstü TÜM emojiler
+│                                         #      (👉 D83D+DC49 · 📍 · 🔹 · 🚛) BOŞLUK BIRAKMADAN siliniyordu.
+│                                         #    İki sonucu: (a) aşağıdaki :149 kuralı ÖLÜ KODDU (v79),
+│                                         #      (b) "MERSİN👉İRAN" → "MERSİNİRAN" token yapışması.
+│                                         #    ➡ (U+27A1) BMP'de olduğu için etkilenmedi — tutarsızlığın
+│                                         #      yıllarca fark edilmeme sebebi bu.
+│                                         #    DOĞRUSU: yalnız eşsiz vekiller —
+│                                         #      /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g
+│                                         #    Aynı hata 4 dosyadaydı (llm-parse · crm/analiz · learn-aliases).
+│                                         #    Koruma: `npm run test:clean` · Ölçüm: `npm run olc:86`
+│                                         # 🔀 cleanMessage() AYRAÇ SIRASI KRİTİK — ok/işaret dönüşümü
+│                                         #    emoji-strip'ten (:169) ÖNCE olmak ZORUNDA, yoksa ayraç
+│                                         #    boşluğa dönüp kaybolur. (Vekil temizliği ise HEPSİNDEN önce
+│                                         #    çalışır — #86'nın bu kadar yıkıcı olmasının sebebi oydu.)
+│                                         #    :158 ➡➜➔⟶⏩⏪▶◀⇒⇔ → "->" (koşulsuz)
+│                                         #    :162 👉📍 → " -> " AMA yalnız İKİ YANI HARFSE
+│                                         #    :164 =   → " -> " aynı şart ("Tlf=0544…" elensin)
+│                                         #    🚨 "/" AYRAÇ DEĞİL, BİLİNÇLİ: veride baskın kullanımı
+│                                         #      ilçe/il ("Kartal / İstanbul"). Ayraç yapmak gerçek
+│                                         #      olmayan hat üretir. Ölçüm: YAPILACAKLAR.md #63.
+│                                         #    ⚠️ EŞİ: app/api/whatsapp-parse/route.ts normalizeArrows()
+│                                         # 🚨 parseMessage PASS 2 ("YÜKLEMELİ blok") — #88, 6 Ağu 2026.
+│                                         #    Kural: `yükle*` satırı blok KÖKENİNİ kurar, altındaki satırlar
+│                                         #    VARIŞ olur; blok bir "ilişki satırı" görünce resetlenir.
+│                                         #    İki hata bu bloğu sessizce koparıyordu, ikisi de düzeltildi:
+│                                         #    #88-A yersiz `yükle*` satırı (yüklenmez/yüklenir/üstene…) köken
+│                                         #      NULL'luyordu → artık `if (!yeniOrigin) continue`, blok bozulmaz.
+│                                         #    #88-B reset koşulu `splitByRelation(line) !== null` ile boşluksuz
+│                                         #      tireyi geri sokuyordu ("(KISA-UZUN) DORSE") → artık ilişkili satır
+│                                         #      ancak `findPlaces(line).length > 0` ise resetler.
+│                                         #    📌 BLOCK_RESET_RE boşluksuz tireyi BİLEREK dışarıda bırakır;
+│                                         #      splitByRelation ise bırakmaz — ikisini "veya"lamak tuzaktı.
+│                                         #    Koruma: `npm run test:pass2` · Ölçüm: `npm run olc:88`
 ├── proxy.ts
 │   └── api/ilanlar/[id]/route.ts       # Public AI-readable API ✅
 ├── public/robots.txt                   # 🔍 SPRINT_01 S4 — 4 blok (*, GoogleBot, GPTBot, ClaudeBot),
@@ -1017,6 +1110,35 @@ ip, user_agent, created_at
 
 ### `raw_posts`, `aliases`, `vehicles`
 
+#### `raw_posts` — süpürücü kolonları (5 Ağu 2026, #76)
+```
+parse_attempts        smallint not null default 0   -- süpürücünün kaç kez tetiklediği
+last_parse_attempt_at timestamptz                   -- son tetikleme anı (soğuma penceresi)
+```
+Yalnız `parse_listing_supur()` yazar. `parse_attempts >= 3` olan satır bir daha
+denenmez — sonsuz döngü koruması. İndeks:
+`raw_posts_supurucu_idx (created_at) WHERE processing_status='pending' AND processed_at IS NULL`.
+
+#### `raw_posts.processing_status` — DÖRT değer, üçü değil
+CHECK: `'pending' | 'processed' | 'rejected' | 'no_lane'`.
+
+| değer | anlamı | `processed_at` |
+|---|---|---|
+| `pending` | kuyrukta / teslim edilememiş. **Terminal DEĞİL.** Repo genelinde bunu SEÇEN yer yok → burada asılı kalan satır görünmez kayıptır. | NULL |
+| `processed` | parse edildi, ≥1 ilan üretti | dolu |
+| `no_lane` | parse edildi, ilan üretmedi. 🚨 damga İKİ SINIFI ayırır (bkz. yukarısı) | branşa göre |
+| `rejected` | **hiç işlenmedi, kapsam dışı bırakıldı** (6 Ağu 2026, #65 rafı). Moderasyon reddi değil. | NULL |
+
+🚨 `processing_status <> 'pending'` artık "işlenmiş" DEMEK DEĞİL — `rejected` de o filtreye
+giriyor. 6 Ağu öncesi yazılmış ölçüm scriptleri bu varsayımla yazıldı.
+
+🚨 **`processed_at` her `no_lane` satırına ATILMAZ, bu KASITLI.** `durumYaz`'ın üç çağrı
+yerinden ikisi (`index.ts:874` "raw_text bos", `:923` "serit bulunamadi") `damgala:false`
+geçer; yalnız `:1081` ("serit var ilan yok") damgalar. Ölçüm (5 Ağu, son 12 saat):
+111 `no_lane`'in 21'i damgalı, 90'ı değil. **Bu bir regresyon değil** — damgasız olanlar
+`reprocess-no-lane`'in alias öğrenildikten sonra yeniden deneyeceği kümedir; damga atmak
+#42'nin kova ayrımını yok ederdi. Sayıyı "damgalama bozuk" diye okumadan önce buraya bak.
+
 ### `aliases` kolonözeti
 ```
 alias      — ham/kısaltma form (küçük harf, normalize edilmiş)
@@ -1122,8 +1244,199 @@ Sprintler 1–5: ✅
 ## 6. WHATSAPP PARSE PIPELINE
 
 ```
-ZIP/TXT → raw_posts → DB trigger → parse-listing Edge Fn → listings → audit trigger
+ZIP/TXT → raw_posts → DB trigger → parse_listing_gonder() → parse-listing Edge Fn → listings → audit trigger
+                                          ↑
+                          pg_cron (dakikada bir) → parse_listing_supur()
 ```
+
+### 🧹 Teslim edilemeyen tetiklemelerin süpürücüsü (5 Ağu 2026, #76 — CANLI)
+
+**Sorun.** `on_raw_post_insert` `FOR EACH ROW` çalıştığı için 1.500 satırlık bir import
+1.500 eşzamanlı `pg_net` POST'u doğurur. Bir kısmı hiç teslim edilmez; satır sonsuza kadar
+`pending` kalır ve **kimse yeniden denemez**. #65 yığınının mekanizması bu.
+
+**Üç fonksiyona bölündü — token artık TEK yerde:**
+
+| fonksiyon | rolü |
+|---|---|
+| `parse_listing_gonder(uuid)` | Tek satır için edge fonksiyonu POST'lar. Token'ı **Vault'tan** okur (#70). |
+| `trigger_parse_listing()` | Artık ince sarmalayıcı: `perform parse_listing_gonder(new.id)`. |
+| `parse_listing_supur(int default 50)` | Teslim edilememiş satırları bulup yeniden tetikler. |
+
+> 🔐 Dönüşüm `pg_get_functiondef()` → `replace()` → `execute` ile Postgres'in **içinde**
+> yapıldı; token hiçbir log'a, migration metnine veya asistan bağlamına girmedi.
+>
+> Her ikisi de `SECURITY DEFINER` + `SET search_path = pg_catalog, public` (hijack koruması)
+> ve `REVOKE ALL ... FROM public, anon, authenticated` — çünkü PUBLIC varsayılan olarak
+> EXECUTE alır ve o hâliyle **anon kullanıcı service_role token'lı isteği tetikleyebilirdi.**
+
+#### 🔐 #70 — token artık `pg_proc`'ta DEĞİL, Vault'ta (5 Ağu 2026)
+
+**Önce maruziyet ölçüldü, abartılmadı.** `anon` rolünün Postgres seviyesinde `pg_proc`
+SELECT yetkisi **var** (`has_table_privilege` → true) — ama PostgREST `pg_catalog`'u dışarı
+açmıyor ve `public` şemasında `pg_proc`/`pg_get_functiondef` kullanan view/fonksiyon sayısı
+**sıfır**. Yani token **internetten çekilebilir değildi**; görebilmek için doğrudan DB
+bağlantısı (SQL editor, DBeaver, postgres şifresi) gerekiyordu.
+🚨 **Sonuç: JWT rotasyonu ACİL DEĞİL. Asıl kusur sızma değil, düz metin durmasıydı.**
+
+Çıkarma ve Vault'a yazma tek bir `DO` bloğunun içinde yapıldı (`regexp_match` →
+`vault.create_secret`); JWT hiçbir migration çıktısına veya istemci bağlamına girmedi.
+`parse_listing_gonder()` artık `vault.decrypted_secrets`'ten okuyor ve **sır bulunamazsa
+`raise exception` ile patlıyor** — çünkü sessizce `'Bearer '` göndermek 401 üretir, satır
+`pending` kalır ve bu #65'in birebir yeniden üretilmesi olurdu.
+
+**Doğrulama (16:34 UTC), dördü de yapıldı:** ① Vault sırrı fonksiyondaki değerle aynı
+(değer gösterilmeden `like` ile) · ② `prosrc like '%eyJ%'` → **0 fonksiyon** ·
+③ var olmayan uuid ile çağrı → **404 "raw_post bulunamadı"** (401 gelseydi Vault okuması
+bozuk demekti; veriye dokunmadan auth'u izole eden test budur) · ④ uçtan uca: lane
+içermeyen gerçek bir INSERT → trigger → gonder → vault → pg_net → edge fn → `200 {"lanes":0}`
+→ `no_lane`, 0 ilan.
+
+> ⚠️ `raw_posts.source` CHECK kısıtı yalnız `'whatsapp'` ve `'facebook'` kabul ediyor —
+> `'manual'` **23514** ile reddedilir. Test satırı yazacaksan bunu bil.
+>
+> 🔁 **Geri alma:** token Vault'ta duruyor; gerekirse eski düz metin biçim oradan okunup
+> yeniden kurulabilir.
+>
+> ⏭ **Kalan (Bayram):** JWT rotasyonu — dashboard işi.
+>
+> 🔬 **5 Ağu 2026 — ŞEMA SORUSU ÖLÇÜLDÜ.** ("Yeni şemaya geçmişiz" izlenimi yarı doğru çıktı.)
+>
+> | Ölçüm | Sonuç |
+> |---|---|
+> | `get_publishable_keys` | **İkisi de var**: legacy `anon` (JWT) **ve** `sb_publishable_Eiw2…` |
+> | Legacy `anon` durumu | `disabled: false` → **hâlâ etkin** |
+> | Repoda `sb_publishable` / `PUBLISHABLE_KEY` referansı | **0** |
+> | Repoda `NEXT_PUBLIC_SUPABASE_ANON_KEY` referansı | **14+ dosya** (`lib/supabase.ts`, `lib/auth.ts`, `proxy.ts`, `app/**`) |
+> | Vault token'ının `role` iddiası | `service_role` |
+> | Vault token'ının `iat` / `exp` | `1776665410` / `2092241410` |
+> | Legacy `anon` key'in `iat` / `exp` | `1776665410` / `2092241410` — **BİREBİR AYNI** |
+>
+> **Sonuç:** yeni şema panelde *mevcut* ama projeye *uygulanmamış*. Vault'taki token bir
+> **legacy** `service_role` JWT'si ve anon key'le aynı anda, aynı secret'tan basılmış
+> (`iat`/`exp` özdeşliği bunun kanıtı). Dolayısıyla **bağımsız rotasyon henüz mümkün değil**;
+> JWT secret'ı döndürülürse anon key de ölür ve site kırılır. Önceki uyarı geçerliliğini
+> koruyor. (Uyarı: env değişkeninin *adı* `..._ANON_KEY` olsa da *değeri* panelden
+> `sb_publishable_…` yapılmış olabilir — bu yalnız Vercel env'inden doğrulanabilir.)
+>
+> ✅ **6 AĞU 2026 05:42 UTC — AŞAMA 1 UYGULANDI VE ÖLÇÜLDÜ (Bayram).**
+> Vault sırrı `sb_secret_…` ile değiştirildi. Doğrulama:
+>
+> | Ölçüm | Sonuç |
+> |---|---|
+> | Vault sırrının formatı | `sb_secret_`, uzunluk **41** (eskisi `eyJ`, 219) — `updated_at 05:42:11` |
+> | Yedek sır bozulmamış mı | `parse_listing_service_role_jwt_YEDEK_20260805` = legacy JWT, 219, **sağlam** |
+> | Olmayan uuid probu | **404** `raw_post bulunamadı` — 05:42'den **sonra**, yani auth geçti |
+> | **Uçtan uca gerçek satır** (`aacfc60d-…`, 05:44) | trigger → gonder → vault → pg_net → edge fn → **200 `{"success":true,"lanes":0}`** → `no_lane`, 0 ilan |
+>
+> 🚨 **404 tek başına kanıt DEĞİLDİ** — eski legacy token'la da 404 alınırdı. Kanıt, Vault
+> sırrının formatının `sb_secret_` olduğunun ayrıca ölçülmesi. Bu yüzden ikisi birlikte yazıldı.
+>
+> **Böylece ölçülmemiş risklerden biri kapandı: edge fonksiyonu `sb_secret_…`'i Bearer olarak
+> KABUL EDİYOR.** Test satırı silinmedi, `processed` + `slh_scanned_at` işaretlendi
+> (moderatör ve AI-keşif kuyruklarını kirletmesin diye).
+>
+> 🔬 **AŞAMA 2 ÖN ÖLÇÜMÜ (6 Ağu, üretime dokunmadan).** Vercel env'i değiştirmeden önce
+> her iki anahtar da DB'nin içinden `pg_net` ile kendi REST/Auth uçlarına atıldı.
+> `sb_secret_` değeri **Vault'tan okundu, hiçbir yerde gösterilmedi**.
+>
+> | İstek | Anahtar | Sonuç | Yorum |
+> |---|---|---|---|
+> | `GET /rest/v1/listings?limit=1` | `sb_publishable_` | **200** + gerçek satır | anon RLS politikası çalışıyor |
+> | `GET /auth/v1/settings` | `sb_publishable_` | **200** (`google: true`) | GoTrue anahtarı kabul ediyor |
+> | `GET /rest/v1/raw_posts?limit=1` | `sb_secret_` | **200** + satır | **service_role yetkisi doğrulandı**, RLS aşılıyor |
+> | `GET /rest/v1/raw_posts?limit=1` | `sb_publishable_` | **200** + `[]` | RLS anon'u doğru engelliyor (kontrol grubu) |
+>
+> Son iki satır birlikte anlamlı: aynı uca iki anahtarla gidildi, biri satır gördü diğeri
+> görmedi → yetki ayrımı gerçekten çalışıyor. Tek başına `200` yeterli olmazdı.
+>
+> ⚠️ **HÂLÂ ÖLÇÜLMEDİ:** bu testler sunucu tarafı HTTP çağrılarıdır. `@supabase/ssr` 0.10.2'nin
+> **tarayıcıdaki** oturum/çerez akışını publishable key ile denemedim — Aşama 2 duman testinin
+> asıl konusu bu. (Oturumların geçerliliği korunmalı: JWT secret'ı değişmiyor, yalnız
+> `apikey` başlığı değişiyor — ama bu **beklenti, ölçüm değil**.)
+>
+> ✅ **6 AĞU 2026 — AŞAMA 2 UYGULANDI VE CANLIDA ÖLÇÜLDÜ.** Bayram Vercel env değerlerini
+> değiştirip redeploy etti. Tarayıcıdan doğrulandı (`www.yukegel.com`):
+>
+> | Ölçüm | Sonuç |
+> |---|---|
+> | Client bundle'da anahtar taraması (15 script indirildi, içerik tarandı) | **1 script `sb_publishable_` içeriyor, legacy JWT içeren 0** |
+> | `GET /rest/v1/users?id=eq.…` (tarayıcıdan) | **200** |
+> | **Mevcut oturum** | **Korundu** — ana sayfa "Hoş geldiniz, Bayram DEDE" |
+> | İlan akışı (anon okuma yolu) | Render ediyor — Tekirdağ/Muratlı → … satırları geldi |
+> | `/ilan/[id]` (bu sayfa `SUPABASE_SERVICE_ROLE_KEY` kullanır) | Tam render — **sunucu tarafı service_role yolu da çalışıyor** |
+> | Konsol hataları | Yok |
+> | Pipeline (son 30 dk) | cron **30/30 succeeded**, http **5×200 + 2×404**, süpürücü kapsamında bekleyen **0** |
+>
+> 🚨 **Önceki "beklenti, ölçüm değil" notunu kapatıyorum:** oturumların korunacağını
+> *beklediğimi* yazmıştım — canlıda **ölçüldü ve korundu**. JWT secret'ı değişmediği,
+> yalnız `apikey` başlığı değiştiği için mevcut çerezler geçerli kaldı.
+>
+> ⏭ **Yalnız Aşama 3 kaldı** (legacy anahtarları panelden disable etmek) — **bugün değil.**
+>
+> ✅ **Rotasyon zaten yanlış araç. Doğru yol — kesintisiz, 4 adım:**
+> 1. Panelden yeni bir **secret key** (`sb_secret_…`) üret. *(Kimlik bilgisi — Bayram.)*
+> 2. Vault sırrını o değere güncelle:
+>    `select vault.update_secret((select id from vault.secrets where name='parse_listing_service_role_jwt'), '<sb_secret_…>');`
+>    **Değeri SQL editöründe Bayram yapıştırır**; token benim bağlamıma girmez.
+> 3. **Ölçüm hazır:** olmayan bir uuid ile `select public.parse_listing_gonder(gen_random_uuid());`
+>    → edge fn `404` dönerse yeni anahtar kabul ediliyor, `401` dönerse etmiyor → adım 2'yi geri al.
+>    *(Edge fonksiyonunun `sb_secret_…`'i Bearer olarak kabul edip etmediği ÖLÇÜLMEDİ — iddia etmiyorum, ölçüm bu.)*
+> 4. Site `sb_publishable_…`'a geçtikten sonra legacy anahtarları panelden devre dışı bırak
+>    → JWT secret rotasyonuna **hiç gerek kalmaz**.
+
+**Süpürücünün seçim ölçütü** (hepsi birlikte): `processing_status='pending'` · `processed_at IS NULL` ·
+ilanı yok · `created_at` **son 12 saat** içinde ama **5 dakikadan eski** · `parse_attempts < 3` ·
+`last_parse_attempt_at` 10 dakikadan eski. `for update skip locked` ile çakışan cron
+koşuları aynı satırı iki kez göndermez. Cron: `parse-listing-retry-sweeper :: * * * * *`,
+`select public.parse_listing_supur(50);`
+
+> 🚨 **Hız sınırı (50/tur) tasarımın merkezinde, süsü değil.** Naif bir süpürücü 5.723
+> satırı tek seferde ateşlerdi — yani kaybı yaratan patlamanın birebir aynısını.
+> Pencere **6 Ağu 2026'da 2 saatten 12 saate çıkarıldı** (Bayram onayı, #65) — aşağıya bak.
+
+> 📐 **PENCERE × HIZ = PATLAMA TAVANI (6 Ağu 2026, #65).** Uygunluk penceresi
+> `pencere − 5dk`, hız 50 satır/dk → tek patlamada taşınabilir tavan:
+> 2sa'te 50×115 = **~5.750** · 12sa'te 50×715 = **~34.500**.
+> Gözlenen en büyük patlama 1.933/saat (2.989/gün). 2sa'te pay ~3×, 12sa'te ~18×.
+> 🚨 Pencereyi büyütmek tavanı büyütür ama **ANLIK yükü büyütmez** — hız yine `p_limit`.
+> Genişletme günü ölçümü: **0 satır süpürüldü**, çünkü 0-12sa yaş kovaları boştu.
+>
+> 🚨 **ARTIK İKİ ADIM VAR — ADIM 0 RAFA KALDIRIR, ADIM 1 SÜPÜRÜR.**
+> Pencere genişledi diye eski yükler dirilmesin diye ADIM 0 eklendi: 12 saatten eski
+> `pending` satırlar `processing_status='rejected'`e çekilir (tur başına en çok 500).
+> Bayram kuralı: *"eski ilan dirilmesin."* Böylece pencere ileride yine genişletilse
+> bile yığın erişilemez kalır ve `pending` bir daha birikmez.
+>
+> ⚠️ **`rejected` = "HİÇ İŞLENMEDİ, KAPSAM DIŞI BIRAKILDI"** — moderasyon reddi DEĞİL.
+> Değer CHECK kısıtında zaten vardı ve `raw_posts`'ta hiç kullanılmıyordu (6 Ağu'da 0 satır).
+> `processed_at` bilerek **NULL** bırakılır (satır parse edilmedi, damgalanamaz);
+> `parse_attempts=0` + `last_parse_attempt_at IS NULL` hiç denenmediğinin kanıtı olarak kalır.
+> 🚨 Eski ölçüm scriptlerinde `processing_status <> 'pending'` = "işlenmiş" varsayımı
+> artık YANLIŞ — `rejected` de o filtreye giriyor (örn. `20260805_no_lane_format_olcumu.sql:249`).
+>
+> **6 Ağu uygulama ölçümü:** 5.693 satır rafa kaldırıldı (en eski 14 May, en yeni 5 Ağu 12:04).
+> Hepsinde `last_parse_attempt_at IS NULL`, ilanı olan **0**, damgalı **0** → temiz küme.
+> Sonrası: `pending` **0** · `rejected` 5.693 · `processed` 57.961 · `no_lane` 4.519.
+> Boru hattı ileriye dönük sağlıklı: son 24sa'te 862 cron koşusu **0 hata**,
+> gelen 3.009 satırın 2.388'i trigger + 30'u süpürücü.
+
+**İlk tur ölçümü (#78, 16:19–16:20 UTC).** 30 aday satır → 30 tetikleme → **28 `processed`,
+2 `no_lane`**, 119 ilan, 0 cron hatası, `parse_attempts` en fazla 1.
+
+> ⚠️ **Mükerrer alarmı çıktı ve YANLIŞTI — kayda geçiyor.** `(raw_post_id, raw_post_segment)`
+> ile gruplayınca 12 "mükerrer grup" göründü. Sebep: **`raw_post_segment` canlıda her satırda
+> NULL** (süpürülen 119 ilanın 0'ı dolu) ve varış bilgisi `listings`'te değil
+> `listing_stops`'ta. Örnek `96dfd5cd`: 19 ilanın hepsi Mersin (33) çıkışlı ama **19 farklı
+> varış ili** — tek mesaj, çok güzergâh. Kesin kanıt: bir raw_post'un tüm ilanları
+> **≤1,18 sn** içinde yazılmış (tek çağrı) ve `parse_attempts=1`. Çift gönderim iki ayrı
+> zaman kümesi bırakırdı. **Ders: `listings` tek başına mükerrer testi için yetersiz;
+> varışsız gruplama sahte pozitif üretir.**
+
+**#77 — yalancı `pending` düzeltmesi (aynı gün).** İlan ÜRETMİŞ ama `pending` kalmış
+**2.203 satır** (18 May – 5 Ağu) `processed` yapıldı; `processed_at` ilgili ilanın
+`min(created_at)`'inden dolduruldu. **Yeniden ayrıştırma YOK** (Bayram kararı) — mükerrer
+riski sıfır. Doğrulandı: kalan yalancı pending **0**, `processed_at < created_at` olan **0**.
 
 ### 🚨 Bu boru hattının darboğazı AĞ DEĞİL, CPU (5 Ağu 2026, #71)
 
@@ -1141,15 +1454,38 @@ ZIP/TXT → raw_posts → DB trigger → parse-listing Edge Fn → listings → 
 > suçlu değil — ort. 68,1 ms (#67'nin O(1) trigger'ından sonra; taban 1.400 ms'ti).
 > Geriye **Deno worker havuzunda kuyruk** kalıyor. Elemeyle varıldı, doğrudan ölçülmedi.
 >
-> 🆕 **#73:** `tumAliaslar()` HER çağrıda 1.242 alias'ı 2 sayfada yeniden çekiyordu —
-> ~1.000 çağrıda 1.931 SELECT, 47,6 sn DB süresi + her çağrıda 1.242 satırlık JSON parse.
-> 60 sn TTL'li modül önbelleği yazıldı (deploy bekliyor). Sıcak worker'da aynı diziyi
-> döndürdüğü için `aliasIndeksi()` WeakMap'i de vuruyor.
+> 🆕 **#73 — ÖNBELLEK YAZILDI, DEPLOY EDİLDİ (v76), AMA HİÇBİR ŞEY KAZANDIRMADI.**
+> `tumAliaslar()` HER çağrıda 1.242 alias'ı 2 sayfada çekiyordu. 60 sn TTL'li modül
+> önbelleği yazıldı, 15:50:54 UTC'de v76 olarak deploy edildi. **Beş ardışık import'ta
+> `pg_stat_statements` deltasıyla ölçüldü:**
 >
-> ⚠️ Yan bulgu (#72): `net._http_response`'ta 328 isteğin 327'si "Timeout of 5000 ms
-> reached" hatası. pg_net'in 5 sn'lik timeout'u fonksiyonun gerçek süresinin çok altında,
-> yani HER ZAMAN dolacak. Durumu fonksiyon kendi yazdığı için satırlar yine işleniyor
-> (301/328), ama pg_net kaydı izleme için kullanılamaz halde.
+> | parti | alias SELECT | çağrı | oran | çekim döngüsü |
+> |---|---|---|---|---|
+> | 19 satır | +42 | +19 | 2,21 | 21 |
+> | 4 satır | +10 | +4 | 2,50 | 5 |
+> | 8 satır | +18 | +8 | 2,25 | 9 |
+> | 33 satır | +68 | +33 | 2,06 | 34 |
+> | **toplam** | **+138** | **+64** | | **68** |
+>
+> Önbelleksiz taban çizgisi **2,00**. 64 çağrı **68 ayrı çekim** üretti → **sıfır isolate
+> yeniden kullanımı.** 🚨 **Kök sebep: bu iş yükü ardışık trafik değil, EŞZAMANLI fan-out.**
+> `pg_net` N POST'u aynı anda ateşler; her istek **soğuk isolate**'e düşer, modül kapsamı
+> ölür. Deno'da modül önbelleği yalnız *ardışık* isteklerde yaşar. En net vaka: 33 satır
+> 1,3 sn içinde geldi ve yine 34 ayrı çekim yaptı.
+> **Karar: kod kalıyor (zararsız), ama #73 ÇÖZÜLDÜ SAYILMIYOR.** Ancak isolate havuzu
+> doyup runtime kuyruğa girdiğinde (#71'in 20–74 sn profili) işe yarayabilir; 300+ satırlık
+> doğal bir import'ta yeniden ölçülecek, oran 2,00'de kalırsa geri alınacak.
+>
+> ⚠️ **#72 — ÖNCEKİ ÖNERİMİ GERİ ÇEKİYORUM.** "Timeout'u yükseltelim" demiştim; ölçüm bunu
+> yanlışladı. 16:07'de `net._http_response` 33 isteğin **24'ünü** timeout kaydetti ama
+> **33/33 satır işlendi** — yani kayıt **yanlış negatif** üretiyor. Sebep: `pg_net`'in
+> `timeout_milliseconds` (varsayılan 5000) curl handle'ını iptal eder ama **edge fonksiyonunu
+> DURDURMAZ**; fonksiyon çalışmaya devam edip durumunu `durumYaz()` ile kendisi yazar.
+> 🚨 Timeout'u ~74 sn'ye çıkarmak **daha kötü**: `pg_net.batch_size = 200` eşzamanlı slot var,
+> slotlar 15× uzun tutulur, 1.500 satırlık import'un ~40 sn'lik boşalması **~10 dakikaya** çıkar.
+> **Doğru okuma:** izleme kaynağı `net._http_response` DEĞİL, `raw_posts.processing_status`'tur.
+> Gerçek boşluk timeout değeri değil, **teslim edilemeyen tetiklemenin yeniden denenmemesiydi**
+> → süpürücü (#76) ile kapatıldı.
 
 **`parse-listing` içinde LLM çağrısı YOKTUR.** Dosyada tek `Deno.env.get` Supabase
 URL/anahtarı; `fetch(`, `anthropic`, `messages.create` **sıfır eşleşme**. Log satırı

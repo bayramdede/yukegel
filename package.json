@@ -12,7 +12,11 @@
     "test:parser": "npx tsx lib/whatsapp/__tests__/chatParser.test.ts",
     "test:lokasyon": "npx tsx scripts/test-lokasyon.mts",
     "test:districts": "npx tsx scripts/test-districts.mts",
-    "test:alias": "npx tsx scripts/test-alias-detektor.mts"
+    "test:alias": "npx tsx scripts/test-alias-detektor.mts",
+    "test:clean": "npx tsx scripts/test-clean-message.mts",
+    "test:pass2": "npx tsx scripts/test-pass2.mts",
+    "olc:86": "npx tsx scripts/olc-86.mts",
+    "olc:88": "npx tsx scripts/olc-88.mts"
   },
   "dependencies": {
     "@next/third-parties": "^16.2.6",

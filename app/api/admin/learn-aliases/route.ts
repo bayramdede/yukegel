@@ -243,7 +243,12 @@ export async function POST(req: NextRequest) {
       .join(', ');
 
     // 3. Metinleri birleştir (lone surrogate'leri temizle — JSON serialize hatasını önler)
-    const stripSurr = (s: string) => s.replace(/[\uD800-\uDFFF]/g, '')
+    // 🚨 #86 (6 Ağu 2026): eski hali `/[\uD800-\uDFFF]/g` idi, `u` bayrağı yok →
+    // GEÇERLİ vekil çiftlerini de siliyordu. Burada risk ekstra yüksekti: emoji
+    // boşluk bırakmadan silinince "MERSİN👉İRAN" → "MERSİNİRAN" olur ve Haiku
+    // bu yapışık token'dan UYDURMA alias öğrenebilir. Yalnız EŞSİZ vekiller atılır.
+    const stripSurr = (s: string) =>
+      s.replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, '')
     const metinler = rawPosts
       .map((r: any, i: number) => `[${i + 1}] (ID:${r.id})\n${stripSurr((r.raw_text || '').substring(0, 200))}`)
       .join('\n\n---\n\n'); // 400→200 char: prompt boyutunu yarıya indir

@@ -2,8 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 
 // WhatsApp mesajlarında tek başına surrogate (U+D800–U+DFFF) karakterler
 // JSON.stringify ile gönderilince Anthropic API 400 hatası verir.
+// 🚨 #86 (6 Ağu 2026): eski hali `/[\uD800-\uDFFF]/g` idi ve GEÇERLİ vekil
+// çiftlerini de siliyordu → BMP-üstü TÜM emojiler (👉📍🔹🚛) LLM'e hiç ulaşmıyordu.
+// Amaç yalnız BOZUK (eşsiz) vekilleri atmaktı; sağlam emoji atmak değil.
+// Aynı hata 4 dosyadaydı: burası · parse-listing/index.ts:139 ·
+// admin/crm/[id]/analiz/route.ts · admin/learn-aliases/route.ts.
 function stripSurrogates(s: string): string {
-  return s.replace(/[\uD800-\uDFFF]/g, '')
+  return s.replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, '')
 }
 
 export async function POST(request: NextRequest) {
