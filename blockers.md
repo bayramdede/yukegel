@@ -2,7 +2,15 @@
 
 > Format: madde · neden ilerlenemiyor · ne zaman kapanır.
 
-## 🔴 #92 deploy SONRASI olc:87 — KENDİNE ŞERİT kapısı geçti, KAYIP kapısı GEÇMEDİ
+## ✅ KARARLANDI (Bayram, 7 Ağu 2026) — v90 KALIYOR
+- 163 yanlış kendine-şeride karşı 1 gerçek kayıp (`Ankara Ş.İçi`) + 2 kabul
+  edilebilir kayıp (yurt dışı hedef) — net kazanç pozitif kabul edildi, v90 geri
+  alınmadı.
+- **Takip işi (bloke değil, backlog):** `Ş.İçi` / "şehir içi" gibi metinde
+  AÇIKÇA aynı-il kastı geçen satırlarda kendine-şerit korumasına istisna
+  eklenmeli — `docs/YAPILACAKLAR.md`'ye ayrı madde olarak düşüldü.
+
+## 🔴 #92 deploy SONRASI olc:87 — KENDİNE ŞERİT kapısı geçti, KAYIP kapısı GEÇMEDİ (arşiv — karar yukarıda)
 - **Deploy oldu:** `supabase functions deploy parse-listing` bu makineden
   çalıştırıldı (CLI mevcutmuş, `deploy_edge_function` MCP'ye hiç gerek kalmadı).
   `list_edge_functions` → **v90 ACTIVE**, `updated_at 2026-08-07 12:51:38 UTC`.

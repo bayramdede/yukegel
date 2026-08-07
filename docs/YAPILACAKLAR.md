@@ -285,6 +285,40 @@
 > 3. `npm run olc:87` **tekrar** — iki kapı birden: `≥1→0` = 0 **ve**
 >    `yeni` satırında KENDİNE ŞERİT = 0. `canli` satırındaki sayı düşmüyorsa
 >    düzeltme sahaya inmemiş demektir.
+>
+> ### ✅ 7 AĞU 2026 (öğleden sonra) — PUSH + DEPLOY OLDU (v90). BİR KAPI GEÇTİ, BİRİ GEÇMEDİ.
+>
+> 📌 **"sandbox push/deploy edemez" varsayımı bu oturumda YANLIŞ çıktı** —
+> `supabase` CLI bu makinede kuruluymuş; `supabase functions deploy parse-listing`
+> doğrudan çalıştı. `list_edge_functions` → **v90 ACTIVE**, `12:51:38 UTC`.
+> `git diff origin/main -- .../index.ts` boş — deploy edilen kod = `78cc902`.
+>
+> `npm run olc:87` canlıya karşı koşuldu (10.126 satır, son 30 gün):
+>
+> | kapı | sonuç |
+> |---|---|
+> | KENDİNE ŞERİT (`yeni`) | **0** ✅ (canlıda 163 vardı) |
+> | KAYIP (`≥1→0`) | **3** 🚨 (kapı 0 istiyor) |
+>
+> **3 KAYIP satır elle okundu:**
+> 1. `4aadf724` — `"ANKARA -> ANKARA Ş.İÇİ"`. Eski `Ankara→Ankara` **bug değildi** —
+>    şehir içi taşıma, meşru bir iş. Yeni: 0 şerit. Düzeltme burada gerçek bir
+>    aynı-il vakasını kurban etti.
+> 2-3. `d7d6edda`, `59169e5a` — Mersin/Esenyurt → **Rusya** (St. Petersburg /
+>    Ivanovo / Rostov). Sistem yalnız 81 ili tanıyor; yurt dışı hedef zaten temsil
+>    edilemiyordu, eski kod bunu yanlışlıkla `Mersin→Mersin`e düşürüyordu (asıl
+>    kendine-şerit bug'ı). Kabul edilebilir kayıp.
+>
+> **✅ KARAR (Bayram, 7 Ağu 2026): v90 KALIYOR.** 163 yanlış kendine-şeride karşı
+> 1 gerçek + 2 kabul edilebilir kayıp — net kazanç pozitif.
+>
+> 🆕 **Yeni backlog maddesi — "Ş.İçi" istisnası:** metinde açıkça "şehir içi" /
+> "Ş.İÇİ" kastı geçen aynı-il satırları kendine-şerit korumasından muaf tutulmalı.
+> 30 günde yalnız 1 örnek (`4aadf724`) ama kural küçük örneklemde de yanlış
+> olabilir. Öncelik düşük — kritik yolu bloke etmiyor.
+> 📌 **DERS (dördüncü kez, ama bu sefer olumlu tarafta):** KAYIP sütunu ilk üç
+> seferde "temiz" yalanı söylemişti; bu kez **doğru alarmı verdi** — 3 satır
+> gerçekten kayboldu ve script bunu yakaladı. Kapı, tasarlandığı gibi çalıştı.
 
 > ## ✅ 7 AĞU 2026 — #89 SAHADA. Push ve deploy'u Bayram yaptı.
 >

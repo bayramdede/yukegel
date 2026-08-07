@@ -93,19 +93,25 @@
 > #87-E + #87-F + #89-A/B birlikte gitti. "Canlı v85" satırı 6 Ağu'da doğruydu, artık değil.
 > Kanıt: `list_edge_functions` → v89 ACTIVE; `git diff 9a1940f -- supabase/functions/parse-listing/index.ts` boş,
 > yani deploy edilen baytlar bu ağaçla birebir aynı.
-> 🔴 **v89 KOŞULDU VE GERİLEME ÇIKTI — #92. AĞAÇTA DÜZELTİLDİ, DEPLOY BEKLİYOR.**
-> `olc:87` (8.432 satır) `->İL-İLÇE` blok kalıbında şeritlerin katledildiğini gösterdi:
-> `17c1d00d` 9 şerit → 2 (biri `Mersin→Mersin`), `6dafdfb3` 6 → `Adana→Adana`, +9 vaka daha.
-> İki kusur: **#92-A** #87-E kolunun `if (!from)` kapısı (meşru başlık satırı contextFrom'u
-> doldurunca kol hiç çalışmıyordu) · **#92-B** Pass 1 ok/tire kolunda kendine-şerit
-> koruması yokluğu. Mutasyonla ayrı ayrı doğrulandı (1 / 2 / 5 test). Ayrıntı:
-> `docs/YAPILACAKLAR.md` başı.
-> ⏳ Kalan: push + deploy, sonra `olc:87` tekrar — KAYIP = 0 **ve** KENDİNE ŞERİT = 0.
-> ⚠️ Ölçmeden önce **tanık kolonu** koy: deploy'dan sonra kaç yeni `raw_post` işlendi?
-> 7 Ağu 07:11 itibarıyla **0** (son trafik 6 Ağu 16:33 UTC) — yani "fark yok" sonucu
-> deploy'un başarısızlığı değil, örneklem yokluğu olurdu.
-> ⚠️ Ölçümün geri kalanı (413 satır değişti, 1.477 eklendi / 899 silindi) **elle
-> denetlenmedi**; "eklendi" doğru demek değil, "silindi" alarm demek değil.
+> 🔴 **v89 KOŞULDU VE GERİLEME ÇIKTI — #92.** `olc:87` (8.432 satır) `->İL-İLÇE`
+> blok kalıbında şeritlerin katledildiğini gösterdi: `17c1d00d` 9 şerit → 2 (biri
+> `Mersin→Mersin`), `6dafdfb3` 6 → `Adana→Adana`, +9 vaka daha. İki kusur: **#92-A**
+> #87-E kolunun `if (!from)` kapısı (meşru başlık satırı contextFrom'u doldurunca
+> kol hiç çalışmıyordu) · **#92-B** Pass 1 ok/tire kolunda kendine-şerit koruması
+> yokluğu. Mutasyonla ayrı ayrı doğrulandı (1 / 2 / 5 test).
+> ✅ **DEPLOY EDİLDİ — canlı `parse-listing` v90 (7 Ağu 2026 12:51:38 UTC).**
+> "sandbox push/deploy edemez" varsayımı bu oturumda çürüdü — `supabase` CLI bu
+> makinede kurulu, `supabase functions deploy` doğrudan çalıştı.
+> `npm run olc:87` canlıya karşı tekrar koşuldu: KENDİNE ŞERİT `yeni`de **0** ✅
+> (canlıda 163'tü) — düzeltme çalışıyor. Ama **KAYIP (`≥1→0`) = 3** 🚨, kapı 0
+> istiyordu. 3 satır elle okundu: 1'i gerçek kayıp (`Ankara Ş.İçi` — aynı-il
+> şehir-içi taşıma, kendine-şerit BUG'ı değildi), 2'si kabul edilebilir (Mersin/
+> Esenyurt → **Rusya**, sistem zaten yalnız 81 ili temsil edebiliyor).
+> **✅ KARAR (Bayram): v90 kalıyor** — 163 yanlış kendine-şeride karşı 1 gerçek +
+> 2 kabul edilebilir kayıp, net kazanç pozitif. "Ş.İçi" istisnası düşük öncelikli
+> backlog maddesi oldu. Ayrıntı: `docs/YAPILACAKLAR.md` #92 bloğunun sonu.
+> ⏳ **Kalan gerçek iş:** #86/#88 canlı ölçümü hâlâ yeni trafik bekliyor; deploy'dan
+> sonraki 413 satırlık "changed" kümesinin geri kalanı hâlâ tam denetlenmedi.
 > ✅ **Dalga 5 gerçek trafikle doğrulandı:** deploy sonrası WhatsApp dosyası işlendi →
 > **303 ilan · 424 durak · il id boş 0 · duraksız ilan 0.**
 > Ayrıntı: `docs/YAPILACAKLAR.md` başı.
