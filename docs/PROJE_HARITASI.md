@@ -395,7 +395,9 @@
 > ✅ **Runbook Adım 1–7 ve 9 ZATEN TAMAM (4 Ağu 2026, #31).** Bu satır önce "ilçe adımları
 > (3, 4, 6) hâlâ bekliyor" diyordu; ölçüm aksini gösterdi — Adım 3 ve 7 boş döndü, Adım 4'ün
 > 92 satırının 92'si dolu ve **sıfır id kayması**, `payas` ve Adım 6'nın beş kararı uygulanmış.
-> Kalan gerçek iş: **Adım 8.2** (`listing_stops.district` 'KEMALPAŞA' 17 satır → #44).
+> ✅ **Adım 8.2 / #44 KAPANDI** — bu satır bayattı, gerçekte #44 4 Ağu'da UPDATE ile
+> kapanmıştı (53/53 kanonik). 7 Ağu'da yeniden ölçülüp teyit edildi: `KEMALPAŞA`
+> (büyük harf) **0** satır. Ayrıntı: `docs/COGRAFI_GECIS.md` Adım 8.2.
 >
 > Önceki: 29 Temmuz 2026 — **SPRINT_01 W5 (alias veri bütünlüğü) kod tarafı tamamlandı.**
 > **W5:** Bozuk `aliases.normalized` yazımı (`Istanbul` 13 satır / `İstanbul` 154 satır) sahte

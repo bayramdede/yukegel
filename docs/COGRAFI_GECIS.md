@@ -303,10 +303,15 @@ yazım döneminde metin kolonu **birinci sınıf veri olarak kalır** — Dalga 
   ölçüm aksini gösterdi — üçü de çalıştırılmış (Adım 3 → 0 satır, Adım 4'ün 92 satırının
   92'si dolu ve **sıfır id kayması**, Adım 6'nın beş kararı uygulanmış), Adım 7 doğrulaması
   boş dönüyor. Kanıt: `docs/20260804_adim3_4_6_on_kontrol.sql`.
-  ⏳ Kalan: **Adım 8.2** — `listing_stops.district`'te `KEMALPAŞA` 17 satır sözlük yazımına
-  çekilecek (#44). `Kemalpaşa` 11 → 36 çıkarken `KEMALPAŞA` 17'de sabit kalmış: yeni trafik
-  doğru yazıyor, kalan 17 satır **eski kalıntı**. `aliases.district` metin kalmaya devam
-  ediyor — Dalga 5 sonrası sistemdeki tek metin konum alanı bu olacak.
+  ✅ **Adım 8.2 / #44 KAPANDI — bu satır BAYATMIŞ.** #44 aslında **4 Ağu'da zaten
+  kapanmıştı** (`docs/YAPILACAKLAR.md`: "Kemalpaşa UPDATE'i zaten çalıştırılmıştı,
+  53/53 kanonik + `district_official=true`") ama bu dosyaya hiç yansıtılmamıştı —
+  iki dosyada aynı durum, biri güncel biri bayat kaldı (#41 dersi, tekrar). 7 Ağu'da
+  yeniden ölçtüm, teyit: `KEMALPAŞA` (büyük harf) **0** satır, aynı normalize
+  karşılaştırmayla (`translate(lower(...),'ıçğöşü','icgosu')='kemalpasa'`) hem
+  `listings.origin_district` (69) hem `listing_stops.district` (146) tamamı kanonik
+  `Kemalpaşa`. `aliases.district` metin kalmaya devam ediyor — Dalga 5 sonrası
+  sistemdeki tek metin konum alanı bu.
 
 ## Bilinen tuzaklar
 
