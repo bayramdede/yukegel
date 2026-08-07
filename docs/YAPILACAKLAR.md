@@ -179,7 +179,23 @@
 >   **takipli** (NFC, `ş` = U+015F) gösteriyor; `git status` ise **takipsiz**
 >   (NFD, `s` + U+0327) diyor. Aynı isim iki farklı kodlamada. Depoda `.xlsx`
 >   tutulması ayrı bir tartışma; bu ikizlik ondan önce çözülmeli. **Bayram'da.**
-> - ⚠️ `.git/index.lock` yine kalmış; `git` yazma denemesi uyarı basıyor.
+> - ✅ **`.git/index.lock` kilidi AŞILDI — commit atıldı: `9a2a4b4`.** Kilit hâlâ
+>   diskte (silemiyoruz), ama git'in indeksi nereye yazacağı `GIT_INDEX_FILE` ile
+>   değiştirilebiliyor; o zaman kilit dosyası da oraya düşüyor ve bayat kilit
+>   devre dışı kalıyor:
+>   ```bash
+>   cp .git/index /tmp/yk-index
+>   export GIT_INDEX_FILE=/tmp/yk-index
+>   git add -A && git commit -F mesaj.txt
+>   cat /tmp/yk-index > .git/index   # ⚠️ ŞART: gerçek indeksi geri senkronla,
+>   ```                              #    yoksa sonraki `git status` bayat okur
+>   İki tuzak: (1) `git add … | head` **çalışmaz** — SIGPIPE git'i indeks
+>   yazmadan öldürür, çıktıyı dosyaya yönlendir; (2) sandbox'ta git kimliği yok,
+>   `GIT_AUTHOR_*`/`GIT_COMMITTER_*` elle verilmeli.
+> - 🔴 **`git push` sandbox'tan İMKÂNSIZ** — `could not read Username for
+>   'https://github.com'`. Kimlik bilgisi yok, olmamalı da. **Push Bayram'da.**
+> - 🔴 Kilit dosyasının kendisi (`.git/index.lock`) **hâlâ silinmeli** — Bayram'ın
+>   makinesinde `rm -f .git/*.lock`. Silinmezse Bayram'ın kendi git'i de takılır.
 >
 > ---
 >
