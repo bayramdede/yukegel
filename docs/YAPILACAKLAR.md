@@ -1,5 +1,43 @@
 # Yükegel — Yapılacaklar Listesi
 
+> ## ✅ 7 AĞU 2026 — WHATSAPP YÜKLEME `/moderator/whatsapp-yukle`YE AYRILDI
+>
+> **İstek:** "Moderatör ve WhatsApp dosyası upload sürecini incele. Gerekirse
+> ayrı sayfalar yap."
+>
+> Keşif ajanıyla `app/moderator/page.tsx` (1349 satır, ~35 `useState`, tab
+> yok — hepsi tek ekranda conditional render) ve `WhatsappYukle.tsx` (441
+> satır) haritalandı. **Ayırmayı haklı çıkaran somut kanıt:** `WhatsappYukle()`
+> **parametresiz** bir bileşen — moderasyon kuyruğuyla (ilanlar, filtreler,
+> toplu işlemler) hiçbir prop/state paylaşmıyor, ama aynı 1349 satırlık dosyanın
+> içine (satır 892, koşulsuz render) gömülüydü. Yükleme akışı dakikalarca
+> sürebiliyor (ZIP açma + parça bölme + 429/504'te otomatik yeniden deneme
+> döngüsü, `WhatsappYukle.tsx`'e bkz.) — bu süre boyunca 200 satırlık
+> moderasyon tablosu (her tuş vuruşunda `useMemo`'suz yeniden hesaplanan
+> filtre/sıralama) aynı React ağacında gereksiz yere canlı kalıyordu.
+>
+> **Yapılan:** `app/moderator/whatsapp-yukle/page.tsx` (yeni) — `WhatsappYukle`
+> bileşenini değiştirmeden barındıran, kendi nav'ı + "Moderasyona dön" linki
+> olan ayrı bir sayfa. `/moderator`den gömülü render kaldırıldı, yerine nav'a
+> "📱 WhatsApp Yükle" linki eklendi. Yetki kontrolü üç katmanda zaten sağlam:
+> `proxy.ts`'teki `KORUNMALI` listesi `/moderator` ÖNEKİYLE eşleştiği için yeni
+> rota otomatik korunuyor, sayfanın kendi client-side kontrolü `/moderator/
+> page.tsx`'teki ile birebir aynı desen, gerçek sınır zaten sunucuda
+> (`/api/whatsapp-parse` → `requireStaff()`) — hiçbiri değişmedi.
+> **Doğrulama:** `tsc --noEmit` temiz, gerçek `next build` temiz (`/moderator/
+> whatsapp-yukle` yeni statik rota olarak listede).
+>
+> 📌 **Dokunulmadı, kayıtlı bulgular (bu görevin kapsamı dışı, ayrı iş):**
+> `duzenleKaydet` doğrudan tarayıcıdan N+1 update/insert atıyor (transaction
+> yok, koda göre bilinçli teknik borç) · "Çözümsüz" (no_lane) manuel ilan
+> akışı normal düzenleme state'iyle string-prefix hilesiyle (`'no_lane_'+id`)
+> aynı state'i paylaşıyor, kırılgan · filtre/arama `useMemo`suz, 200 satırda
+> her tuş vuruşunda yeniden hesaplanıyor · "Sonraya Bırak" listesi bellekte
+> (sayfa yenilenince sıfırlanıyor) — zaten `docs/YAPILACAKLAR.md`'de açık bir
+> madde olarak kayıtlıydı. WhatsApp'ın kendi 60sn Vercel timeout riski daha
+> önce (22 Tem 2026 olayı sonrası) ayrı bir mühendislik dalgasıyla azaltılmış
+> durumda — tamamen ortadan kalkmadı ama bu görevin konusu değildi.
+
 > ## 🔴 7 AĞU 2026 — GÜVENLİK: KAYIT/GİRİŞ DENETİMİ, İKİ KRİTİK AÇIK KAPANDI
 >
 > **İstek:** "Kullanıcı kayıt ve login süreçlerini kontrol et."

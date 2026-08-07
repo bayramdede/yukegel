@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { createClient } from '../../lib/supabase';
 import { useRouter } from 'next/navigation';
-import WhatsappYukle from './WhatsappYukle';
+import Link from 'next/link';
 import { ilanTelefonlariGetir, ilanTelefonGuncelle, moderatorIlanOlustur } from './actions';
 // ⚠️ `ILLER` = `IL_ADLARI`. Buradaki il filtresi Dalga 5'ten sonra
 //    `ilAdi(id) === filtreKalkis` diye TAM EŞİTLİK karşılaştırıyor; `ilAdi()`
@@ -838,7 +838,12 @@ export default function Moderator() {
             <span style={{ fontWeight: 800, fontSize: '1rem' }}><span style={{ color: '#22c55e' }}>YÜKE</span><span style={{ color: '#e2e8f0' }}>GEL</span></span>
             <span style={{ color: '#8b949e', fontSize: '0.8rem' }}>/ Moderatör</span>
           </div>
-          <button onClick={cikisYap} style={{ background: 'none', border: '1px solid #30363d', color: '#8b949e', borderRadius: 6, padding: '4px 12px', fontSize: '0.8rem', cursor: 'pointer' }}>Çıkış</button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <Link href="/moderator/whatsapp-yukle" style={{ color: '#4ade80', fontSize: '0.8rem', textDecoration: 'none', border: '1px solid #166534', borderRadius: 6, padding: '4px 12px' }}>
+              📱 WhatsApp Yükle
+            </Link>
+            <button onClick={cikisYap} style={{ background: 'none', border: '1px solid #30363d', color: '#8b949e', borderRadius: 6, padding: '4px 12px', fontSize: '0.8rem', cursor: 'pointer' }}>Çıkış</button>
+          </div>
         </div>
       </nav>
 
@@ -888,8 +893,6 @@ export default function Moderator() {
           </div>
         </div>
       )}
-
-      <WhatsappYukle />
 
       {/* FİLTRE ÇUBUĞU */}
       <div style={{ background: '#161b22', borderBottom: '1px solid #30363d', position: 'sticky', top: 52, zIndex: 40 }}>

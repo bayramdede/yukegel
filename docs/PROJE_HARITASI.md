@@ -1,6 +1,17 @@
 # Yükegel — Proje Haritası
 > **Kullanım:** Her sohbet başında sadece bu dosyayı oku. Kaynak dosyaları sadece o dosyada değişiklik yapacaksan oku.  
 >
+> ✅ **7 AĞU 2026 — WhatsApp yükleme artık AYRI SAYFA: `/moderator/whatsapp-yukle`.**
+> `WhatsappYukle.tsx` (parametresiz, moderasyon kuyruğuyla state paylaşmıyor)
+> eskiden `/moderator` (1349 satır, ~35 `useState`) içine gömülüydü — dakikalarca
+> sürebilen yükleme akışı gereksiz yere 200 satırlık moderasyon tablosuyla aynı
+> React ağacındaydı. Bileşen değiştirilmeden yeni rotaya taşındı, `/moderator`e
+> nav linki eklendi. Yetki üç katmanda zaten sağlamdı (proxy `/moderator`
+> önekiyle otomatik, sayfanın kendi client kontrolü, `requireStaff()` sunucuda)
+> — hiçbiri değişmedi. `tsc`/`next build` temiz. `app/moderator/page.tsx`'in
+> geri kalan karmaşıklığına (N+1 update, no_lane state paylaşımı, useMemo'suz
+> filtre) dokunulmadı — ayrıntı `docs/YAPILACAKLAR.md` başı.
+>
 > 🔴 **7 AĞU 2026 — GÜVENLİK: İKİ KRİTİK AÇIK KAPANDI (kayıt/giriş denetimi).**
 > **(1) `public.users`** tablo düzeyinde `anon`/`authenticated`'e GENİŞ GRANT
 > verilmiş olduğu için RLS'in `using(true)` SELECT policy'si (rozet için
