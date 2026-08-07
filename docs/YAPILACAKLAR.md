@@ -1,5 +1,15 @@
 # Yükegel — Yapılacaklar Listesi
 
+> ## ⏳ ERTELENDİ (6 EYLÜL 2026'YA KADAR) — Dalga 5 yedek tablolarını sil
+>
+> `public.dalga5_yedek_20260806` (14 MB, 234.840 satır) ve
+> `public.dalga5_yedek_stops_20260806` (18 MB, 245.086 satır) — coğrafi geçişin
+> son geri dönüş yolu. 7 Ağu'da "coğrafi geçiş bittiyse temizle" istendi;
+> retention tarihi hatırlatıldı, **Bayram: "Bekleyelim, listede dursun."**
+> **6 Eylül 2026'dan önce silme** — kod-yazılı karar + Bayram'ın onayı iki kez
+> teyitli. O tarihten sonra: `drop table` öncesi tek kontrol — geçen 30 günde
+> bu tablolara bakan bir sorgu/rapor oldu mu (olmadıysa temiz silinir).
+>
 > ## ✅ 7 AĞU 2026 — GÜVENLİK + VERİ BÜTÜNLÜĞÜ: #29 · #30 · V7 · V6
 >
 > ### #29 ve #30 ZATEN KAPALIYMIŞ — önce ÖLÇ, sonra yaz (#91 dersi)

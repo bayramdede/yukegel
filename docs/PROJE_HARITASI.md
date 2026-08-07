@@ -13,6 +13,11 @@
 > `listings` toplamından (243.644) **8.804 az**. O 8.804 satırın hepsi 3-6 Ağu arası
 > yazıldı ve hepsinde `origin_province_id` dolu — yani fark, `ilan_olustur` v4'ün
 > 3 Ağu'dan beri metne yazmadığının **kanıtı**, eksik yedek değil.
+> 📌 **7 Ağu 2026 — Bayram kararı: BEKLE.** "Coğrafi geçiş tamamlandıysa yedekleri
+> temizle" isteği geldi; retention tarihi (6 Eylül) hatırlatılınca **"Bekleyelim,
+> listede dursun"** dendi. Yani 6 Eylül'den önce silme **iki kez** teyitli:
+> kod-yazılı karar (yukarıda) + Bayram'ın bilerek onayı. 6 Eylül'den önce tekrar
+> "sil" istenirse bu not hatırlatılmalı; erken silmek tek geri dönüş yolunu kapatır.
 > 🔬 **BÖLÜM 6 sonuçları:** kalan metin kolonu 0 (tanık: iki `*_province_id` kolonu yerinde) ·
 > `pg_proc`'ta 21 eşleşme **tek tek gözle** okundu (runbook sınıflandırma regex'ini yasaklıyor —
 > 31 Tem'de o kestirme dört fonksiyonu yanlışlıkla temize çıkarmıştı), hepsi zararsız ·
