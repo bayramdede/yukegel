@@ -731,43 +731,77 @@ function parseMessage(message: string, aliases: Alias[]): {
     //    #87 öncesi tire davranışının aynısı.
     // 📌 Ders: bir kolu "ulaşılabilir" yapmak, o kolun ele geçirdiği satırların ESKİ
     //    yolunu da kapatır. #87-A'da kazanç sayıldı, kaybedilen yol sayılmadı.
-    if (!from) {
-      if (rel.rel === 'arrow' && !rel.left.trim()) {
-        const alt = splitByRelation(rel.right)
-        if (alt && alt.left.trim()) {
-          const altFrom = bestPlace(findPlaces(alt.left, aliases))
-          const altTo = bestPlace(findPlaces(alt.right, aliases))
-          // ⚠️ Burada YALNIZ `ayniSehir` kullanmak KAYBIN AYNISINI TEKRARLARDI:
-          //    kurtarmaya çalıştığımız iki vaka da İSTANBUL İÇİ (Avcılar→Tuzla).
-          //    Şart :792'deki blok kuralıyla aynı olmalı — şehir FARKLI *veya* İLÇE farklı.
-          if (altFrom && altTo &&
-              (!ayniSehir(altTo.normalized, altFrom.normalized) ||
-               !ayniIlce(altTo.district, altFrom.district))) {
-            // ⚠️ #87-F: burada `contextFrom` GÜNCELLENMEZ — gerekçe yukarıda.
-            lanes.push({
-              from: altFrom.normalized,
-              fromDistrict: altFrom.district || null,
-              to: altTo.normalized,
-              toDistrict: altTo.district || null,
-              vehicle: findVehicle(line, aliases),
-              body_type: findBodyType(line, aliases),
-              weight_ton: extractWeight(line),
-              pallet: extractPallet(line),
-              raw_line: line
-            })
-          }
+    // 🚨 #92 (7 Ağu 2026) — KAPI `if (!from)` İDİ VE YANLIŞTI. SAKIN GERİ ALMA.
+    //    #87-F "kol contextFrom yazmasın" diyerek kolun KENDİ yazdığı bağlamı kesti.
+    //    Ama `contextFrom`u asıl dolduran şey kolun kendisi değil, MEŞRU BİR BAŞLIK
+    //    SATIRI (:646). Yani gerçek hayatta kol zaten hiç çalışmıyordu:
+    //      "MERSİN HEMEN YÜKLENİR"   → :646 contextFrom = Mersin
+    //      "->MERSİN-ANKARA"         → from = contextFrom = Mersin, yani `!from` FALSE
+    //                                → kol atlanır, satır normal yola düşer
+    //                                → bestPlace("MERSİN-ANKARA") = Mersin (eşit öncelik,
+    //                                  metinde önce geçen kazanır) → **Mersin→Mersin**
+    //    `npm run olc:87` (7 Ağu, 8.432 satır) bu kalıpta 9 DOĞRU şeridin 2'ye düştüğünü
+    //    gösterdi (`17c1d00d` · `94be0c0d` · `b467e6c3` · `c7484f34` · `65b65d38` …).
+    //    KAYIP sütunu yine 0'dı: satırda hâlâ şerit var, sadece YANLIŞ şerit.
+    // 📌 DERS (üçüncü kez aynı ders): #87-A sol-boş oku ilişki sayarak bu satırları
+    //    TİRE kuralından çaldı. Çalınan yolu geri veren kolu, çalınmanın en sık
+    //    görüldüğü duruma (başlıklı blok) KAPALI yazmışız. Bir kolu koşullandırırken
+    //    "bu koşul sahada ne sıklıkla doğru?" diye sor — burada neredeyse hiç.
+    // ⚠️ YÖN GÜVENCESİ DEĞİŞTİ, BİLEREK: bu kol artık "yalnız ekler, silmez" DEĞİL.
+    //    `from` doluyken de devreye girdiği için normal yolun üreteceği şeridi
+    //    DEĞİŞTİRİR. Gerekçe: değiştirdiği şerit ölçülmüş biçimde yanlış (Mersin→Mersin).
+    //    Bu yüzden `olc:87`in KENDİNE ŞERİT sütunu artık zorunlu bir kapıdır.
+    if (rel.rel === 'arrow' && !rel.left.trim()) {
+      const alt = splitByRelation(rel.right)
+      if (alt && alt.left.trim()) {
+        const altFrom = bestPlace(findPlaces(alt.left, aliases))
+        const altTo = bestPlace(findPlaces(alt.right, aliases))
+        // ⚠️ Burada YALNIZ `ayniSehir` kullanmak KAYBIN AYNISINI TEKRARLARDI:
+        //    kurtarmaya çalıştığımız iki vaka da İSTANBUL İÇİ (Avcılar→Tuzla).
+        //    Şart aşağıdaki normal yolun kuralıyla aynı olmalı — şehir FARKLI *veya* İLÇE farklı.
+        if (altFrom && altTo &&
+            (!ayniSehir(altTo.normalized, altFrom.normalized) ||
+             !ayniIlce(altTo.district, altFrom.district))) {
+          // ⚠️ #87-F: burada `contextFrom` GÜNCELLENMEZ. Her sol-boş ok satırı
+          //    kendi sağını bağımsız çözer; blok başlığı bozulmaz.
+          lanes.push({
+            from: altFrom.normalized,
+            fromDistrict: altFrom.district || null,
+            to: altTo.normalized,
+            toDistrict: altTo.district || null,
+            vehicle: findVehicle(line, aliases),
+            body_type: findBodyType(line, aliases),
+            weight_ton: extractWeight(line),
+            pallet: extractPallet(line),
+            raw_line: line
+          })
+          continue
         }
+        // Sağ taraf ilişki gibi görünüyor ama uçlardan biri yere çözülmüyor
+        // ("-> ANKARA - 5000 TL") → normal yola düş, satırı yutma.
       }
-      continue
     }
+    if (!from) continue
     // Başarılı from → contextFrom güncelle
     contextFrom = from
+
+    // 🚨 #92-B (7 Ağu 2026) — BU İKİ KOLDA KENDİNE-ŞERİT KORUMASI HİÇ YOKTU.
+    //    :672'deki `+` kolu `!ayniSehir` ile koruyordu, Pass 2 de koruyordu, ama
+    //    Pass 1'in ASIL ok/tire kolu `from`u `to`ya hiç kıyaslamadan yazıyordu.
+    //    Sonuç: `Mersin→Mersin` gibi anlamsız şeritler DB'ye kadar gidiyordu
+    //    (`olc:87` 7 Ağu çıktısı). Koruma yokluğu #92-A'nın zararını görünmez kıldı:
+    //    yanlış varış "en azından bir şerit" olarak sayıldığı için KAYIP sütununa
+    //    düşmedi. İki kusur birbirini örtüyordu.
+    // 📌 Kural :743 ile AYNI olmalı — şehir FARKLI *veya* İLÇE farklı. Sadece
+    //    `ayniSehir` kullanmak `İstanbul→İstanbul/Tuzla` gibi GERÇEK şeritleri öldürür.
+    const kendineSerit = (to: PlaceHit): boolean =>
+      ayniSehir(to.normalized, from.normalized) && ayniIlce(to.district, from.district)
 
     if (rightParts.length > 1) {
       for (const part of rightParts) {
         const partHits = findPlaces(part, aliases)
         const to = bestPlace(partHits)
-        if (to) {
+        if (to && !kendineSerit(to)) {
           lanes.push({
             from: from.normalized,
             fromDistrict: from.district || null,
@@ -783,7 +817,7 @@ function parseMessage(message: string, aliases: Alias[]): {
       }
     } else {
       const to = bestPlace(toHits)
-      if (to) {
+      if (to && !kendineSerit(to)) {
         lanes.push({
           from: from.normalized,
           fromDistrict: from.district || null,

@@ -1,5 +1,88 @@
 # Yükegel — Yapılacaklar Listesi
 
+> ## 🔴 7 AĞU 2026 — #92: CANLIDA GERİLEME VAR. DÜZELTİLDİ, DEPLOY BEKLİYOR.
+>
+> **v89 sahada şerit katlediyor.** Bayram'ın koşturduğu `npm run olc:87` çıktısı
+> (8.432 satır, son 30 gün) gösterdi:
+>
+> ```
+> 17c1d00d  eski: Mersin→Ankara , →Antalya , →Sivas , →Gaziantep , →K.Maraş ,
+>                 →K.Maraş/Elbistan , →Malatya , →Yalova , →Bursa   (9 doğru şerit)
+>           yeni: Mersin→MERSİN , Mersin→Bursa                       (2, biri saçma)
+>           metin: "MERSİN HEMEN YÜKLENİR ⏎ 13-60 TENTELİ-FRİGO ⏎ ->MERSİN-ANKARA …"
+> ```
+>
+> Aynı kalıp: `6dafdfb3` (6 şerit → `Adana→Adana`), `c7484f34` (3 → 1 kendine şerit),
+> `94be0c0d` · `b467e6c3` · `65b65d38` · `3a4976b8` · `f6daed73` · `28d0441c` ·
+> `8a72f090` · `85fce313`.
+>
+> ### İki ayrı kusur, birbirini örtüyorlardı
+>
+> **#92-A — kurtarma kolu sahada hiç çalışmıyordu.** #87-E'nin eklediği kol
+> `if (!from)` kapısının arkasındaydı. #87-F kolun KENDİ yazdığı `contextFrom`u
+> kesti ama asıl `contextFrom`u dolduran şey kolun kendisi değil, **meşru bir başlık
+> satırı** (`index.ts:646`). Yani gerçek hayatta kapı neredeyse hep kapalıydı:
+>
+> | satır | ne oluyor |
+> |---|---|
+> | `MERSİN HEMEN YÜKLENİR` | `:646` → `contextFrom = Mersin` |
+> | `->MERSİN-ANKARA` | `from = contextFrom = Mersin` → `!from` **false** → kol atlanır |
+> | ↳ normal yol | `bestPlace("MERSİN-ANKARA")` = **Mersin** (eşit öncelik 90, metinde önce geçen kazanır) → `Mersin→Mersin` |
+>
+> **#92-B — Pass 1'in ok/tire kolunda kendine-şerit koruması HİÇ YOKTU.** `+` kolu
+> (`:672`) ve Pass 2 koruyordu, asıl kol korumuyordu. `Mersin→Mersin` DB'ye kadar gitti.
+>
+> ### 🚨 KAYIP=0 ÜÇÜNCÜ KEZ YALAN SÖYLEDİ — VE ARTIK BU BİR SÜTUN
+>
+> Üç varyantta da `≥1→0` sütunu **0**'dı. Sebep tek ve basit: **yanlış şerit, şerit
+> SAYISINI düşürmez.** Bug ancak 25 örneğin elle okunmasıyla çıktı; #87-E ve #87-F'de
+> de aynı şey olmuştu. Umuda dayanan bir kapı kapı değildir, o yüzden
+> `scripts/olc-87.mts`e **KENDİNE ŞERİT** sütunu eklendi (`kendineMi()`), il **ve**
+> ilçe karşılaştırarak — `İstanbul→İstanbul/Tuzla` gerçek bir şerittir, suçlu değildir.
+> `yeni` satırında bu sayı **0 olmak zorunda**.
+>
+> Ayrıca `olc-87.mts`in tabanı v89'a taşındı: varyantlar artık
+> `canli` / `yalniz92A` / `yalniz92B` / `yeni`. #87-A/B/D substitusyonları dosyada
+> **duruyor** (silinmedi), tekrar ölçmek gerekirse `TABAN`a eklemek yeter.
+>
+> ### Doğrulama — mutasyonla, ayrı ayrı
+>
+> | mutant | ne geri alındı | düşen test |
+> |---|---|---|
+> | A | `if (!from &&` kapısı geri kondu | **1** — yalnız #92-A'nınki |
+> | B | iki push'tan `&& !kendineSerit(to)` silindi | **2** — yalnız #92-B'ninkiler |
+> | A+B (= canlı v89) | ikisi de | **5** — `Mersin→Mersin` ve `Adana→Adana` birebir üretildi |
+>
+> ⚠️ **#92-A'nın ilk testi mutantı YAKALAMIYORDU** — #87-B'nin aynı tuzağı. #92-B
+> kendine şeridi elediği için Pass 1 hiç şerit üretmiyor, `lanes.length === 0` kalıyor
+> ve Pass 3 sezgisi doğru cevabı KAZARA buluyordu. Test metnine önce gerçek bir Pass 1
+> şeridi (`MERSİN -> KONYA`) eklendi; Pass 3 kapanınca mutant düştü. Ölçülen fark:
+>
+> ```
+> canlı v89     : Mersin→Konya , Mersin→MERSİN        ← yanlış şerit
+> yalnız #92-B  : Mersin→Konya                        ← sekiz varış KAYIP
+> #92-A + #92-B : Mersin→Konya , Mersin→Ankara , Mersin→Antalya
+> ```
+>
+> ⚠️ **YÖN GÜVENCESİ BİLEREK KALDIRILDI.** #87-E kolu artık "yalnız ekler, silmez"
+> değil; `from` doluyken de çalıştığı için normal yolun şeridini **değiştirir**.
+> Gerekçe: değiştirdiği şerit ölçülmüş biçimde yanlış. Bedeli de bu yüzden ödendi:
+> KENDİNE ŞERİT sütunu artık zorunlu kapı.
+>
+> 📌 **DERS, ÜÇÜNCÜ KEZ AYNI DERS:** *bir kolu "ulaşılabilir" yapmak, o satırların
+> ESKİ yolunu da kapatır.* #87-A sol-boş oku ilişki sayarak bu satırları TİRE
+> kuralından çaldı; çalınan yolu geri veren kolu, çalınmanın **en sık görüldüğü**
+> duruma (başlıklı blok) kapalı yazdık. Bir kolu koşullandırırken sor:
+> **"bu koşul sahada ne sıklıkla doğru?"** Burada: neredeyse hiç.
+>
+> ### ⏭️ SIRADAKİ — BAYRAM
+>
+> 1. `git push origin main`
+> 2. `npm run deploy` (kum havuzu deploy EDEMEZ — bkz. aşağıdaki #89 bloğu)
+> 3. `npm run olc:87` **tekrar** — iki kapı birden: `≥1→0` = 0 **ve**
+>    `yeni` satırında KENDİNE ŞERİT = 0. `canli` satırındaki sayı düşmüyorsa
+>    düzeltme sahaya inmemiş demektir.
+
 > ## ✅ 7 AĞU 2026 — #89 SAHADA. Push ve deploy'u Bayram yaptı.
 >
 > Bir gece önceki "sabah runbook"u artık geçersiz; olduğu gibi silmiyorum çünkü

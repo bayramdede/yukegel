@@ -246,10 +246,16 @@ ok('#87-E — kamyon varyantı (1d640d19)',
   'EYSAN TAŞIMACILIK\n➡️ AVCILAR LİMAN - TUZLA\nKAPALI KAMYON - HAFİF',
   ['İstanbul/Avcılar→İstanbul/Tuzla']);
 
-// 📌 #87-E kolu ŞERİT EKLEYEBİLİR AMA SİLEMEZ: yalnız `from` null iken, yani
-//    satırın zaten düştüğü yerde çalışır. Aşağıdaki iki test o sınırı sabitler —
-//    contextFrom VARSA eski davranış aynen sürmeli, #87-E devreye girmemeli.
-ok('#87-E kolu contextFrom varken DEVREYE GİRMEZ',
+// ⚠️ BU YORUM 7 AĞU 2026'DA GEÇERSİZ KALDI — #92-A. Eski hâli şuydu:
+//      "#87-E kolu ŞERİT EKLEYEBİLİR AMA SİLEMEZ: yalnız `from` null iken çalışır."
+//    O güvence BİLEREK kaldırıldı; `if (!from)` kapısı kolu sahada neredeyse hiç
+//    çalıştırmıyordu (bkz. index.ts'teki #92 yorumu). Kol artık `from` doluyken de
+//    devreye giriyor ve normal yolun üreteceği şeridi DEĞİŞTİREBİLİYOR.
+// 📌 Aşağıdaki test HÂLÂ `Bursa→Konya` veriyor ama ARTIK BAŞKA SEBEPLE: kol devreye
+//    giriyor, `alt` çözülüyor (sol=KONYA), ama "EREĞLİ" sentetik alias kümesinde YOK
+//    → `altTo` null → kol şerit basmadan normal yola düşüyor. Yani bu test artık
+//    "kol kapalı" değil, "kol ucu çözemezse satırı YUTMAZ" kuralını sabitliyor.
+ok('#92-A — kolun ucu yere çözülmezse satır yutulmaz',
   'BURSA YÜKLEME\n➡️ KONYA - EREĞLİ',
   ['Bursa→Konya']);
 
@@ -302,6 +308,69 @@ ok('#89-A — eşit öncelikte de ilçe düşmez',
 ok('#89-A — dolu ilçe ezilmez (ilk kazanır)',
   'BURSA YÜKLEME\n➡️ANKARA GÖLBAŞI YENİMAHALLE',
   ['Bursa→Ankara/Gölbaşı']);
+
+console.log('\n── #92-A: başlıklı blokta sol-boş ok + iç tire (CANLI GERİLEME) ──');
+// 🚨 CANLIDA ÖLÇÜLDÜ, TAHMİN DEĞİL. `npm run olc:87` (7 Ağu 2026, 8.432 satır)
+//    v89 parser'ının bu kalıpta şeritleri KATLEDİĞİNİ gösterdi:
+//      17c1d00d  eski: 9 doğru şerit → yeni: Mersin→MERSİN , Mersin→Bursa
+//      6dafdfb3  eski: 6 doğru şerit → yeni: Adana→ADANA
+//      c7484f34  eski: 3 doğru şerit → yeni: 1 kendine şerit
+//      ayrıca 94be0c0d · b467e6c3 · 65b65d38 · 3a4976b8 · f6daed73 · 28d0441c ·
+//             8a72f090 · 85fce313
+// 📌 KAYIP (≥1→0) SÜTUNU YİNE 0'DI. Yanlış şerit, şerit SAYISINI düşürmez; bu
+//    yüzden hiçbir otomatik kapıya takılmadı, 25 örneğin elle okunmasıyla çıktı.
+//    Aynı ders üçüncü kez: #87-E, #87-F, #92. Kalıcı çözüm olc-87.mts'e KENDİNE
+//    ŞERİT sütunu eklemek — o iş YAPILACAKLAR.md'de.
+// 🧪 MUTANT: index.ts'te kolun başına `if (!from) {` kapısını geri koy.
+
+ok('#92-A — 17c1d00d: başlık contextFrom doldururken kol yine de çalışır',
+  'MERSİN HEMEN YÜKLENİR\n13-60 TENTELİ-FRİGO\n%80 PEŞİN ÖDEME\n->MERSİN-ANKARA\n->MERSİN-ANTALYA',
+  ['Mersin→Ankara', 'Mersin→Antalya']);
+
+// ⚠️ YUKARIDAKİ TEST TEK BAŞINA MUTASYONU YAKALAMIYORDU — #87-B'nin aynı tuzağı.
+//    #92-A geri alınınca Pass 1 hiç şerit üretmiyor (#92-B kendine şeridi eliyor),
+//    `lanes.length === 0` kalıyor ve Pass 3 sezgisi doğru cevabı KAZARA buluyor.
+//    Aşağıdaki metin önce GERÇEK bir Pass 1 şeridi kuruyor (Mersin→Konya): artık
+//    `lanes.length !== 0`, Pass 3 KAPALI, satırları yalnız #92-A kurtarabilir.
+// 📊 Üç varyantın ölçülmüş çıktısı (bu metin):
+//      canlı v89 (A+B yok) : Mersin→Konya , Mersin→MERSİN     ← yanlış şerit
+//      yalnız #92-B        : Mersin→Konya                     ← sekiz varış KAYIP
+//      #92-A + #92-B       : Mersin→Konya , Mersin→Ankara , Mersin→Antalya
+//    Yani #92-B tek başına yanlış şeridi susturur ama satırı KURTARMAZ; ikisi şart.
+ok('#92-A — Pass 3 kurtarması KAPALIYKEN de blok çözülür',
+  'MERSİN -> KONYA\nMERSİN HEMEN YÜKLENİR\n->MERSİN-ANKARA\n->MERSİN-ANTALYA',
+  ['Mersin→Konya', 'Mersin→Ankara', 'Mersin→Antalya']);
+
+ok('#92-A — 6dafdfb3: Adana bloğu, üç varış',
+  'ADANA YÜKLEME VAR\n->ADANA-KONYA\n->ADANA-İZMİR\n->ADANA-SAMSUN',
+  ['Adana→Konya', 'Adana→İzmir', 'Adana→Samsun']);
+
+// 🔒 #87-E/F HÂLÂ ÇALIŞMALI: köken YOKKEN de aynı kol aynı sonucu vermeli.
+//    (Yukarıdaki #87-E/F blokları bunu ayrıca sabitliyor; burası kapıyı
+//     kaldırmanın o vakaları bozmadığını aynı yerde gösterir.)
+ok('#92-A — kökensiz hâl (#87-E) aynen korunur',
+  'EYSAN TAŞIMACILIK\n➡️ AVCILAR LİMAN - TUZLA',
+  ['İstanbul/Avcılar→İstanbul/Tuzla']);
+
+console.log('\n── #92-B: Pass 1 ok/tire kolunda kendine-şerit koruması ──');
+// 🚨 Pass 1'in ASIL ok kolunda `from`u `to`ya kıyaslayan HİÇBİR şart yoktu.
+//    `+` kolu (:672) ve Pass 2 koruyordu, burası korumuyordu. `Adana→Adana`
+//    DB'ye kadar gidiyordu. Bu eksiklik #92-A'nın zararını da GİZLEDİ.
+// 🧪 MUTANT: iki koldan da `&& !kendineSerit(to)` şartını sil.
+
+ok('#92-B — aynı il aynı ilçe şerit ÜRETMEZ',
+  'ADANA YÜKLEME\n➡️ ADANA TENTELİ TIR',
+  []);
+
+// 🔒 KORUMA: kural `ayniSehir && ayniIlce` — sadece `ayniSehir` olsaydı bu
+//    GERÇEK şeridi öldürürdü (#87-E'nin kurtardığı vakaların aynısı).
+ok('#92-B — aynı il FARKLI ilçe şerit KALIR',
+  'AVCILAR YÜKLEME\n➡️ TUZLA KAPALI TIR',
+  ['İstanbul/Avcılar→İstanbul/Tuzla']);
+
+ok('#92-B — çoklu varış kolunda da kendine şerit elenir',
+  'BURSA YÜKLEME\n➡️ BURSA + KONYA',
+  ['Bursa→Konya']);
 
 console.log('\n── KORUMA: #88 ve mevcut davranış bozulmadı ──');
 

@@ -85,12 +85,22 @@
 > 📌 **DERS: KAYIP=0 "temiz" demek değildir.** Yanlış şerit satırda şerit sayısını
 > düşürmez → KAYIP sütununa hiç yansımaz. **"Şerit eklendi ≠ şerit doğru"** uyarısını
 > scriptin kendisi yazıyor; örnekleri elle okumanın yerini ölçüm tutmuyor.
+> 🔴 **VE BU DERS ÜÇÜNCÜ KEZ ISIRDI (#87-E · #87-F · #92).** "Örnekleri elle oku"
+> bir kapı değil bir umuttur; üç kerede ikisinde tutmadı. 7 Ağu 2026'da `olc-87.mts`e
+> **KENDİNE ŞERİT** sütunu eklendi — artık bu sınıf hata bir SAYI, göz kararı değil.
 >
 > ✅ **DEPLOY EDİLDİ — canlı `parse-listing` v89 (7 Ağu 2026 05:41:56 UTC, Bayram CLI ile).**
 > #87-E + #87-F + #89-A/B birlikte gitti. "Canlı v85" satırı 6 Ağu'da doğruydu, artık değil.
 > Kanıt: `list_edge_functions` → v89 ACTIVE; `git diff 9a1940f -- supabase/functions/parse-listing/index.ts` boş,
 > yani deploy edilen baytlar bu ağaçla birebir aynı.
-> ⏳ Kalan: `olc:87` tekrar koşulmalı; KAYIP = 0 **ve** örnekler elle okunmalı.
+> 🔴 **v89 KOŞULDU VE GERİLEME ÇIKTI — #92. AĞAÇTA DÜZELTİLDİ, DEPLOY BEKLİYOR.**
+> `olc:87` (8.432 satır) `->İL-İLÇE` blok kalıbında şeritlerin katledildiğini gösterdi:
+> `17c1d00d` 9 şerit → 2 (biri `Mersin→Mersin`), `6dafdfb3` 6 → `Adana→Adana`, +9 vaka daha.
+> İki kusur: **#92-A** #87-E kolunun `if (!from)` kapısı (meşru başlık satırı contextFrom'u
+> doldurunca kol hiç çalışmıyordu) · **#92-B** Pass 1 ok/tire kolunda kendine-şerit
+> koruması yokluğu. Mutasyonla ayrı ayrı doğrulandı (1 / 2 / 5 test). Ayrıntı:
+> `docs/YAPILACAKLAR.md` başı.
+> ⏳ Kalan: push + deploy, sonra `olc:87` tekrar — KAYIP = 0 **ve** KENDİNE ŞERİT = 0.
 > ⚠️ Ölçmeden önce **tanık kolonu** koy: deploy'dan sonra kaç yeni `raw_post` işlendi?
 > 7 Ağu 07:11 itibarıyla **0** (son trafik 6 Ağu 16:33 UTC) — yani "fark yok" sonucu
 > deploy'un başarısızlığı değil, örneklem yokluğu olurdu.
@@ -792,7 +802,7 @@ yukegel/
 │                                         #    Sayfalama + env ilk-geçen-kazanır + alias sertifikası olc-86'dan aynen.
 │                                         #    🚨 KİMLİK BİLGİSİ İSTER — Bayram elle çalıştırır (kum havuzu erişemez).
 │                                         #    ⚠️ `KAYIP (≥1 → 0)` 0 DEĞİLSE düzeltme çalışan satırı bozuyor.
-├── scripts/test-87.mts                    # `npm run test:87` (6 Ağu 2026, #87) — 16 kontrol.
+├── scripts/test-87.mts                    # `npm run test:87` (6-7 Ağu 2026, #87 · #89-A · #92) — 24 kontrol.
 │                                         #    SOLU BOŞ `->` satırı ("➡️SAMSUN") + `+` fiyat satırı koruması.
 │                                         #    🚨 #87-A: splitByRelation'ın ok kolu `if (left && right)` istiyordu →
 │                                         #      solu boş ok NULL dönüyor, parseMessage:646'daki "sol yoksa
@@ -811,7 +821,28 @@ yukegel/
 │                                         #      şeridi eklenerek düzeltildi.
 │                                         #    📌 "➡️ANKARA\n➡️KONYA" → Ankara→Konya BEKLENEN davranış (Pass 3),
 │                                         #      #87 öncesinden beri böyle. Uydurma yok vakası: "➡️ANKARA\nTENTELİ TIR".
-├── scripts/olc-87.mts                     # `npm run olc:87` (6 Ağu 2026, #87) — ÖLÇÜM, test değil.
+│                                         #    🚨 #92-A (7 Ağu): #87-E kolunun `if (!from)` kapısı KALDIRILDI. Kapı,
+│                                         #      kolu sahada neredeyse hiç çalıştırmıyordu — meşru bir başlık satırı
+│                                         #      contextFrom'u dolduruyor, `from` null olmuyor, satır normal yola
+│                                         #      düşüp KENDİNE ŞERİT üretiyordu ("MERSİN HEMEN YÜKLENİR" +
+│                                         #      "->MERSİN-ANKARA" → Mersin→Mersin). Canlıda ölçüldü: 9 şerit → 2.
+│                                         #    🚨 #92-B (7 Ağu): Pass 1'in ok/tire kolunda kendine-şerit koruması
+│                                         #      HİÇ YOKTU (`+` kolu ve Pass 2 koruyordu). Kural: aynı il VE aynı
+│                                         #      ilçe → şerit yok. Sadece `ayniSehir` bakmak İstanbul→İstanbul/Tuzla
+│                                         #      gibi GERÇEK şeritleri öldürürdü.
+│                                         #    🧪 MUTASYONLA DOĞRULANDI: 92A→1 düşer, 92B→2, ikisi birden→5.
+│                                         #      #92-A'nın İLK testi de Pass 3 tuzağına düştü (yukarıdaki uyarı);
+│                                         #      metne önce gerçek bir Pass 1 şeridi eklenerek kapatıldı.
+├── scripts/olc-87.mts                     # `npm run olc:87` (6-7 Ağu 2026, #87 → #92) — ÖLÇÜM, test değil.
+│                                         #    🚨 TABAN HAREKETLİ: her deploydan sonra `canli` varyantının tanımı
+│                                         #      güncellenir. 6 Ağu taban = #87 öncesi; 7 Ağu taban = v89.
+│                                         #      Varyantlar: canli · yalniz92A · yalniz92B · yeni.
+│                                         #      #87-A/B/D substitusyonları dosyada DURUYOR — tekrar ölçmek
+│                                         #      gerekirse TABAN tanımına eklemek yeter.
+│                                         #    🚨 KENDİNE ŞERİT SÜTUNU ZORUNLU KAPIDIR (7 Ağu, #92). `yeni`
+│                                         #      satırında 0 olmalı. Sebep: KAYIP=0 ÜÇ KEZ (#87-E · #87-F · #92)
+│                                         #      "temiz" dedi, üçünde de canlıda bozuk şerit vardı — yanlış şerit
+│                                         #      şerit SAYISINI düşürmez. `kendineMi()` il VE ilçe karşılaştırır.
 │                                         #    🚨 olc-86/88'DEN YAPICA FARKLI, ÇIKTISI ONLARLA KIYASLANAMAZ.
 │                                         #      Onlar "şeritsiz satır şerit kazandı mı" (0→≥1) soruyordu.
 │                                         #      #87'nin hasarı BAŞARILI GÖRÜNEN `processed` satırlarda: şerit var
@@ -819,7 +850,8 @@ yukegel/
 │                                         #      şerit KÜMELERİ karşılaştırılır → eklenen / silinen / değişen.
 │                                         #    📌 Değişim sayısı bir "kazanç" rakamı DEĞİL. `KAYIP (≥1→0)` yine 0 olmalı.
 │                                         #    📌 SİLİNEN şerit alarm değil (uydurma da silinir) ama her biri elle bakılmalı.
-│                                         #    5 varyant string değişimiyle üretilir; tutmazsa PATLAR (sessiz eski=yeni yok).
+│                                         #    Varyantlar string değişimiyle üretilir; tutmazsa PATLAR (sessiz eski=yeni yok).
+│                                         #    #92-B koruması İKİ push noktasında olmalı — sayı da doğrulanır.
 │                                         #    Sayfalama + alias/satır sertifikası + `solBosOkVar()` imza kontrolü.
 │                                         #    🚨 KİMLİK BİLGİSİ İSTER — Bayram elle çalıştırır (kum havuzu erişemez).
 ├── scripts/olc89-karsilastir.mts          # `npm run olc:89` (6 Ağu 2026, #89-Ö) — ÖLÇÜM, test değil.
