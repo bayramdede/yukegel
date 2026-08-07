@@ -194,8 +194,12 @@
 >   `GIT_AUTHOR_*`/`GIT_COMMITTER_*` elle verilmeli.
 > - 🔴 **`git push` sandbox'tan İMKÂNSIZ** — `could not read Username for
 >   'https://github.com'`. Kimlik bilgisi yok, olmamalı da. **Push Bayram'da.**
-> - 🔴 Kilit dosyasının kendisi (`.git/index.lock`) **hâlâ silinmeli** — Bayram'ın
->   makinesinde `rm -f .git/*.lock`. Silinmezse Bayram'ın kendi git'i de takılır.
+> - 🔴 **Yöntem TEK ATIŞLIK.** Commit başarılı olsa bile git `.git/HEAD.lock`'u
+>   silemiyor, o da diskte kalıyor; **ikinci commit denemesi** `cannot lock ref
+>   'HEAD'` ile düşüyor. `GIT_INDEX_FILE` yalnız indeks kilidini atlatır, ref
+>   kilidini atlatmaz. Yani sandbox'tan oturum başına en fazla bir commit.
+> - 🔴 Kilit dosyaları (`.git/index.lock`, `.git/HEAD.lock`) **silinmeli** —
+>   Bayram'ın makinesinde `rm -f .git/*.lock`. Silinmezse Bayram'ın git'i de takılır.
 >
 > ---
 >

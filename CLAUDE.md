@@ -21,3 +21,7 @@ Haritadan anlayabiliyorsan kaynak dosyayı okuma. Değişiklik yapacaksan o dosy
 - Uzun dosyalarda `write_file` tercih et, `edit_file` ile partial match riski var
 - Server action → ayrı dosyada `'use server'` directive
 - RLS bypass → sadece admin/mod doğrulandıktan sonra `getServiceSupabase()`
+
+#Otomasyon
+- Otonom yapabileceğin her şeyi yap. Bir soru sıradaki maddeyi engellemiyorsa, o soruyu blockers.md dosyasına yaz ve bir sonraki maddeyle devam et. 
+- Sadece gerçekten ilerlemeyi tıkayan kritik bir durumda dur ve sor.
