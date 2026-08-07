@@ -377,6 +377,22 @@
 > (7 Ağu 07:11 itibarıyla deploy sonrası `raw_post` sayısı **0**). "Deploy edildi" ile
 > "işe yaradı" ayrı iki iddiadır; belgede artık ayrı ayrı işaretli.
 >
+> ### ✅ 7 AĞU 2026 (13:15 UTC) — GÜNCELLEME: TRAFİK GELDİ, KISMEN ÖLÇÜLDÜ
+>
+> v89 deploy'undan (05:41) ölçüm anına (13:15) kadar **2.246 `raw_post`** işlendi.
+> `#89` yukarıda ayrı bölümde tam kapandı (bkz. o blok). `#86`+`#88` için **birleşik**
+> canlı sinyal:
+>
+> | donem | no_lane | processed | no_lane oranı |
+> |---|---|---|---|
+> | v89 ÖNCESİ (7 gün) | 234 | 3.750 | %5,9 |
+> | v89 SONRASI (canlı) | 82 | 2.135 | **%3,7** |
+>
+> `no_lane` oranı düştü — yön beklentiyle uyumlu. ⚠️ **Bu #86 ile #88'i AYIRAMAZ**
+> (ikisi de aynı deploy'da gitti); tekil katkı için `olc-86`/`olc-88`'in yaptığı gibi
+> aynı metni eski/yeni parser'la **yerel** koşup kıyaslamak gerekir — bu yapılmadı.
+> `#65` log penceresi yeniden ölçümü de hâlâ açık.
+>
 > 📌 **DERS (#41'in tekrarı, bu kez kurbanı kendi belgemdi):** *durum bir yerde değil
 > İKİ yerde yazılıysa, biri eskiyor.* Sürüm numarası hem başlıkta hem gövdede
 > tekrarlanınca kaçınılmaz oldu. Bundan sonra madde gövdesine sürüm numarası yazma;
