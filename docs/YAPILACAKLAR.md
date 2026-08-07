@@ -1,5 +1,28 @@
 # Yükegel — Yapılacaklar Listesi
 
+> ## ☀️ SABAH — SIRAYLA ÜÇ KOMUT (6 Ağu 2026 gecesinden kalan)
+>
+> ```bash
+> # 0) Kum havuzu kendi bıraktığı kilidi silemedi (mount izni: unlink "Operation
+> #    not permitted"). Bu yüzden BU DOSYANIN son hâli commit'lenemedi.
+> rm -f .git/index.lock
+> git add -A && git commit -m 'docs: #89 kaydi + sabah runbook'
+>
+> # 1) Push — kum havuzunda GitHub kimliği yok, commit YEREL kaldı.
+> #    Commit 9a1940f "#89-A: findPlaces dedup Set -> Map" hazır ve testli.
+> git push origin main
+>
+> # 2) Edge function deploy — canlı hâlâ v87, #89-A sahada DEĞİL.
+> supabase functions deploy parse-listing --project-ref gobepcswwsoswodhaufy
+>
+> # 3) Deploy sonrası canlı doğrulama (çevrimdışı ölçüm yerine geçmez)
+> #    Beklenen: varış ilçe doluluğu %25,5'ten YÜKSELİR, kendine şerit 165'ten DÜŞER.
+> ```
+>
+> **Bu ikisi dışında her şey bitti ve doğrulandı.** Ayrıntı hemen aşağıda (#89).
+> 🔴 Ayrıca senin kararını bekleyen tek şey: 9 riskli ilçe alias'ı (Araç, Olur,
+> Keskin, Kiraz, Akdeniz, Defne, Çelebi, Göle, 19 Mayıs) — bkz. #89-B.
+
 > 🟡 **6 AĞU 2026 (gece) — #89: İLÇELER SESSİZCE DÜŞÜYORDU. KOD + VERİ DÜZELTİLDİ,
 > ÖLÇÜLDÜ, TESTLENDİ. **EDGE FUNCTION DEPLOY EDİLMEDİ — TEK KALAN ADIM O.**
 >
