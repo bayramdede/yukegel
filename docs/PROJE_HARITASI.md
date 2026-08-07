@@ -1113,6 +1113,17 @@ id smallint PK (1-81, plaka kodu) · plate char(2) · name text
 > duraklar dahil; ayrıca tanınmayan il varsa **hiçbir şey yazmadan** çıkıyor (yarım yazım yok).
 > **Ders: "yazma yolu" denince UPDATE'leri de say.**
 >
+> 🚨 **İDEMPOTENT DEĞİL — AYNI `raw_post_id` İKİNCİ KEZ GÖNDERİLİRSE KOPYA İLAN DOĞAR**
+> (7 Ağu 2026, #90). Gövdede `on conflict` **yok** (`pg_get_functiondef` üzerinde sayım = 0),
+> `listings.raw_post_id` üzerindeki `idx_listings_raw_post` **UNIQUE değil**, tek kısıt
+> yabancı anahtar. Yani `parse_listing_gonder(raw_post_id)` ile geriye dönük yeniden
+> parse **onarım değil ÇOĞALTMADIR**. 3.745 `raw_post`'a toplu tetikleme 7 günlük
+> veriyi ikiye katlar. Geriye dönük yeniden işleme isteniyorsa önce fonksiyona
+> "önceki ilanları aynı transaction'da sil, yeniden üret" kipi eklenmeli.
+> ⚠️ Ders: **bir yazma yolunun idempotent olduğunu varsayma, RPC'nin tanımına bak.**
+> `raw_post_id` alanının var olması "bu satır o post'un tekil karşılığıdır" demek değil;
+> tekilliği garanti eden şey kolonun varlığı değil ÜZERİNDEKİ KISITTIR.
+>
 > ⚡ **`public.ilan_olustur(p_listing jsonb, p_stops jsonb) → jsonb`** (29 Tem 2026, V5).
 > İlan + duraklarını TEK transaction'da yazar, trigger'ın hesapladığı
 > `id, audit_score, moderation_status, is_shadow_banned` ile döner. `security invoker`

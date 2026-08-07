@@ -1,30 +1,84 @@
 # Yükegel — Yapılacaklar Listesi
 
-> ## ☀️ SABAH — SIRAYLA ÜÇ KOMUT (6 Ağu 2026 gecesinden kalan)
+> ## ✅ 7 AĞU 2026 — #89 SAHADA. Push ve deploy'u Bayram yaptı.
 >
-> ```bash
-> # 0) Kum havuzu kendi bıraktığı kilidi silemedi (mount izni: unlink "Operation
-> #    not permitted"). Bu yüzden BU DOSYANIN son hâli commit'lenemedi.
-> rm -f .git/index.lock
-> git add -A && git commit -m 'docs: #89 kaydi + sabah runbook'
+> Bir gece önceki "sabah runbook"u artık geçersiz; olduğu gibi silmiyorum çünkü
+> **hangi adımın kim tarafından yapıldığı** ileride önemli olacak:
 >
-> # 1) Push — kum havuzunda GitHub kimliği yok, commit YEREL kaldı.
-> #    Commit 9a1940f "#89-A: findPlaces dedup Set -> Map" hazır ve testli.
-> git push origin main
+> | adım | durum | kanıt |
+> |---|---|---|
+> | `git push origin main` | ✅ Bayram yaptı | `git status -sb` → `## main...origin/main`, sapma yok |
+> | `supabase functions deploy parse-listing` | ✅ Bayram yaptı | `list_edge_functions` → `version: 89, status: ACTIVE`, 2026-08-07 05:41:56 UTC |
+> | deploy edilen baytlar = commit'lenen kod | ✅ | `git log -1 -- supabase/functions/parse-listing/index.ts` → `9a1940f`, o dosya için çalışma ağacı temiz |
 >
-> # 2) Edge function deploy — canlı hâlâ v87, #89-A sahada DEĞİL.
-> supabase functions deploy parse-listing --project-ref gobepcswwsoswodhaufy
+> 🚨 **Kum havuzu deploy edemedi, bu bir araç kısıtıdır, tekrar edecektir.** Elimdeki
+> tek yol MCP `deploy_edge_function` idi; o da 58 KB'lık Türkçe-diakritik + emoji
+> yoğun kodu ELLE yeniden yazmamı gerektiriyordu. Bozulmayı `pg_net` ile GÖREBİLİRDİM
+> ama v87'ye dönmek de aynı elle-yazmayı gerektirdiği için **GERİ ALAMAZDIM** — deploy
+> etmeyi bu yüzden reddettim. Bayram CLI ile yaptı, yani yeniden yazma adımı hiç
+> olmadı. Ders: **geri alamayacağın bir değişikliği, görebiliyor olman yetkilendirmez.**
 >
-> # 3) Deploy sonrası canlı doğrulama (çevrimdışı ölçüm yerine geçmez)
-> #    Beklenen: varış ilçe doluluğu %25,5'ten YÜKSELİR, kendine şerit 165'ten DÜŞER.
-> ```
->
-> **Bu ikisi dışında her şey bitti ve doğrulandı.** Ayrıntı hemen aşağıda (#89).
-> 🔴 Ayrıca senin kararını bekleyen tek şey: 9 riskli ilçe alias'ı (Araç, Olur,
-> Keskin, Kiraz, Akdeniz, Defne, Çelebi, Göle, 19 Mayıs) — bkz. #89-B.
+> ⏳ **Deploy sonrası canlı ölçüm HENÜZ YAPILAMADI — trafik yok.** Tanık sorgusu:
+> `now()` 2026-08-07 05:43:10 UTC, deploy 05:41:56 (74 sn önce), son ilan
+> 2026-08-06 16:39:03, son `raw_post` 16:33:52. Yani ölçülecek yeni kayıt YOK;
+> bu bir deploy başarısızlığı DEĞİL. Baseline karşılaştırması için ya yeni trafik
+> beklenecek ya da mevcut kayıtlar yeniden parse edilecek (bkz. aşağıda).
+> **Baseline: 7 günde varış ilçesi doluluğu 3.363/13.183 = %25,5.**
 
-> 🟡 **6 AĞU 2026 (gece) — #89: İLÇELER SESSİZCE DÜŞÜYORDU. KOD + VERİ DÜZELTİLDİ,
-> ÖLÇÜLDÜ, TESTLENDİ. **EDGE FUNCTION DEPLOY EDİLMEDİ — TEK KALAN ADIM O.**
+> 🔴 **7 AĞU 2026 — #90: `parse_listing_gonder` İDEMPOTENT DEĞİL. GERİYE DÖNÜK
+> YENİDEN PARSE YAPMAYIN — KOPYA İLAN ÜRETİR.** İncelendi, ölçüldü, YAPILMADI.
+>
+> "Deploy sonrası trafik yok, o zaman eski kayıtları yeniden parse edip #89-A'nın
+> faydasını gerçekleştireyim" diye başladım. Veriye dokunmadan önce yazma yolunu
+> okudum ve **iyi ki okumuşum**:
+>
+> - `index.ts:1157` her `raw_line` grubu için `ilan_olustur` RPC'sini çağırıyor.
+> - `ilan_olustur` **düz INSERT**. `pg_get_functiondef` içinde `on conflict` sayısı **0**.
+> - `listings.raw_post_id` üzerindeki tek indeks `idx_listings_raw_post` ve **UNIQUE DEĞİL**;
+>   tek kısıt `listings_raw_post_id_fkey` (yabancı anahtar).
+>
+> 🚨 Yani işlenmiş bir `raw_post`'u tekrar göndermek eskisini güncellemez, **ikinci bir
+> ilan doğurur**. 3.745 `raw_post`'a toplu tetikleme atsaydım 7 günlük veriyi
+> ikiye katlamış olacaktım. **Bir yazma yolunun idempotent olduğunu VARSAYMA; RPC'nin
+> tanımına bak.** Bu tam olarak izin verilmiş ama güvenli olmayan bir işti — "DB
+> yazma serbest" iznini almış olmam, mekanizmanın doğru olduğu anlamına gelmiyordu.
+>
+> ## Onarımın gerçek değeri: sanılandan çok küçük
+>
+> Son 7 gün, `raw_post`'tan doğan 11.649 ilan — ama moderasyon durumuna göre:
+> archived 6.363 · rejected 1.819 · pending 1.410 · **active+approved 1.290** ·
+> passive+approved 767. Yani **canlı olan yalnız 1.290 ilan**, hepsi 5-6 Ağustos'tan.
+> Yük ilanı çabuk ölen bir varlık; 5 gün önceki yük zaten geçersiz.
+>
+> Onarılabilir alt küme (kalkış ilçesi NULL **ve** `notes` satırında o ile ait bir ilçe
+> alias'ı açıkça yazılı): tüm durumlarda 1.615, **canlı+bekleyende 412** (241 aktif,
+> 171 pending). 25 örnek elle okundu, 25'i de doğru (`Muş Bulanık`, `Yozgat Sorgun`,
+> `Ankara Yenimahalle`, `Kocaeli Gebze`…).
+>
+> ## Neden yine de SQL ile yazmadım
+>
+> Tespit sorgusu `notes ILIKE '%alias%'` — **substring, token değil.** Aynı ilanda
+> birden fazla farklı ilçe eşleşen **26 satır** var; **14'ünde en yüksek öncelik
+> seviyesinde bile iki farklı ilçe** kalıyor, yani seçim yazı turası. Örnek:
+> `Şanlıurfa Birecik->Şanlıurfa Siverek` — ikisi de Şanlıurfa, ikisi de 7 harf,
+> öncelikleri eşit. Doğru ayraç **metindeki KONUM** (ok işaretinden önce mi sonra mı).
+>
+> 🚨 Buna konum ayracı ekleseydim **parser'ı SQL'de yeniden yazmış olacaktım** — #86
+> dersinin kılık değiştirmiş hâli. Harness parser'ı `index.ts`'ten çalışma anında
+> söküyor tam da bu yüzden. İkinci bir uygulama = ikinci bir doğruluk kaynağı = sessiz
+> sapma. **Ölçmek için yaklaşık bir sorgu yazmak meşrudur; YAZMAK için değildir.**
+>
+> ## Doğru yol (yapılmadı, karar senin)
+>
+> Faydayı geriye dönük almak isteniyorsa sıra şu: (1) `parse-listing`'e idempotent bir
+> **yeniden işleme kipi** eklenir — aynı `raw_post_id`'nin önceki ilanlarını tek
+> transaction'da silip yeniden üretir; (2) `pg_net` ile sunucu tarafında koşulur.
+> ⚠️ Bu, sistemin **en riskli parçası olan yazma yolunu** değiştirir ve deploy gerektirir;
+> gece, denetimsiz, geri alamayacağım bir anda yapılacak iş değil. Ayrıca kazanç 412
+> ilan — yeni trafik zaten v89 ile doğru ayrışıyor. **Yapmamak muhtemelen doğru karar.**
+
+> 🟢 **6-7 AĞU 2026 — #89: İLÇELER SESSİZCE DÜŞÜYORDU. KOD + VERİ DÜZELTİLDİ,
+> ÖLÇÜLDÜ, TESTLENDİ, DEPLOY EDİLDİ (v89, 7 Ağu 2026).** Kalan: canlı doğrulama.
 >
 > ## Nereden çıktı
 >
@@ -74,10 +128,15 @@
 >    priority 60, `is_active=true`, `created_by_ai=false`, `is_approved=true` —
 >    `Yenimahalle`→Ankara/Yenimahalle dahil.
 >
-> 🔴 **KASTEN DIŞARIDA BIRAKILAN 9 İSİM — KARAR SENDE.** Günlük Türkçe kelime ya da
-> nakliye terimiyle çakıştıkları için eklemedim: **Araç, Olur, Keskin, Kiraz, Akdeniz,
-> Defne, Çelebi, Göle, 19 Mayıs**. "Araç" ve "Olur" özellikle tehlikeli — her ilanda
-> geçebilir. SQL dosyasında yorum olarak da duruyor.
+> ✅ **9 İSİM KALICI OLARAK DIŞARIDA — BAYRAM ONAYLADI (7 Ağu 2026).** Günlük Türkçe
+> kelime ya da nakliye terimiyle çakıştıkları için eklenmedi: **Araç, Olur, Keskin,
+> Kiraz, Akdeniz, Defne, Çelebi, Göle, 19 Mayıs**. "Araç" ve "Olur" özellikle
+> tehlikeli — her nakliye ilanında geçebilir ("2 araç", "uygun olur").
+> 🚨 **Bu bir eksiklik değil, KARARDIR.** İleride "ilçe alias'ları eksik" diye bakan
+> biri (ben dahil) bunları tamamlanmamış iş sanıp eklemesin. Eklenecekse tek başına
+> değil, önce **substring değil token eşleşmesi + bağlam** güvencesiyle eklenmeli;
+> aksi hâlde `findPlaces` her "2 araç" yazan ilanda Kastamonu/Araç bulur.
+> 📌 Aynı gerekçe `docs/` altındaki #89-B SQL dosyasında da yorum olarak duruyor.
 >
 > ## Doğrulama
 >
@@ -103,28 +162,15 @@
 > gelmesi **birleşme değil, aynı şeridin ilçesinin dolmasıdır.** Sınıflandırıcı üçe
 > ayrıldı (YÜKSELTME / BİRLEŞME / AÇIKLANAMAYAN) ve 48 vakanın hepsi yükseltme çıktı.
 >
-> ## 🔴 KALAN TEK ADIM — DEPLOY
+> ## ✅ DEPLOY EDİLDİ — v89, 7 Ağu 2026 05:41:56 UTC (Bayram, CLI ile)
 >
-> ```bash
-> supabase functions deploy parse-listing --project-ref gobepcswwsoswodhaufy
-> ```
+> Kum havuzu deploy edemedi; gerekçe ve ders yukarıdaki 7 Ağu bloğunda.
 >
-> **Neden ben yapmadım.** Deploy iznini vermiştin ve testler yeşil — engel izin değil,
-> mekanizma. Kum havuzundan supabase.co'ya ağ yok (`scripts/deploy.sh` zaten yalnız
-> Vercel+git yapıyor, edge function deploy'u AYRI bir elle adım). Elimdeki tek yol MCP
-> `deploy_edge_function`, o da **58 KB / 1.267 satırlık parser'ı elimle yeniden
-> yazmamı** gerektiriyor. Dosya Türkçe diyakritik ve regex içinde emoji dolu.
->
-> 🔴 **Asıl kırılma noktası kopyalama hatası değil, GERİ DÖNÜŞ YOLUNUN OLMAMASI.**
-> Bozuk yazsam bile fark ederdim: `pg_net` Postgres'ten edge fonksiyonu çağırabiliyor
-> (`parse_listing_gonder`), yani canlı çıktıyı sondalayıp yereldeki ile
-> karşılaştırabilirdim. Ama **v87'yi geri yüklemek de aynı elle-yazma işlemini
-> gerektirir** — yani hatayı görürüm, düzeltemem. Sen yokken canlıda geri alınamaz
-> bozuk parser bırakma ihtimali, bir gecelik ayrıştırma kazancından ağır basıyor.
-> Kod commit'lendi, ölçüldü, testlendi — sabah tek komut.
->
-> 📌 Deploy sonrası: `olc:89` çevrimdışıydı, **canlıda da doğrula** — son 24 saatin
-> kendine-şerit sayısı 165'ten düşmeli, varış ilçe doluluğu %25,5'ten yükselmeli.
+> 📌 **KALAN: canlı doğrulama.** `olc:89` çevrimdışı bir ölçümdü; sahayı kanıtlamaz.
+> Beklenen: son 24 saatin kendine-şerit sayısı 165'ten DÜŞER, varış ilçe doluluğu
+> %25,5'ten YÜKSELİR. ⚠️ Ölçmeden önce **tanık kolonu** koy: deploy'dan sonra kaç yeni
+> `raw_post` işlendi? Sıfırsa fark yokluğu deploy'un başarısızlığı değil, örneklem
+> yokluğudur — 7 Ağu 05:43'te tam olarak bu oldu.
 >
 > 🚨 **6 AĞU 2026 — #87-F AÇIK: KAYIP = 0 ÇIKTI, AMA ÇIKTI YİNE DE YANLIŞTI.
 > DÜZELTME YAZILDI VE MUTASYONLA DOĞRULANDI; DEPLOY EDİLMEDİ. KARAR SENDE.**
