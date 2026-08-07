@@ -36,8 +36,10 @@
   Silmeyi commit'lemek geçmişte kalır (geri alınabilir) ama yine de bir karar.
 - **Ne yapılmalı (Bayram):** kasıtlıysa `git rm --cached` + commit; değilse
   `git checkout -- <dosya>` ile geri getir. O güne kadar `git status` kirli kalır.
+Cevap: temizle.
 
 ## 🟢 `.rmtest` — sandbox'ın bıraktığı çöp
 - FUSE'un `rm`'e hâlâ izin verip vermediğini ölçmek için oluşturuldu; ölçüm
   sonucu **hayır**, dolayısıyla silinemedi. İşlevi yok.
 - **Ne yapılmalı (Bayram):** `rm -f .rmtest`
+Cevap: onay verdim
