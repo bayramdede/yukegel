@@ -1,6 +1,23 @@
 # Yükegel — Proje Haritası
 > **Kullanım:** Her sohbet başında sadece bu dosyayı oku. Kaynak dosyaları sadece o dosyada değişiklik yapacaksan oku.  
 >
+> 🔴 **7 AĞU 2026 — GÜVENLİK: İKİ KRİTİK AÇIK KAPANDI (kayıt/giriş denetimi).**
+> **(1) `public.users`** tablo düzeyinde `anon`/`authenticated`'e GENİŞ GRANT
+> verilmiş olduğu için RLS'in `using(true)` SELECT policy'si (rozet için
+> bilerek yazılmıştı) **herkesin TCKN/VKN/email/telefon/role okumasına** ve
+> **her girişli kullanıcının kendini admin yapmasına** izin veriyordu — ikisi
+> de bizzat `SET LOCAL ROLE` ile çalıştırılıp kanıtlandı, sonra kapatıldı
+> (kolon bazlı GRANT'a geçildi: SELECT yalnız 5 kamuya açık kolon, UPDATE
+> yalnız kendi satırında 5 form alanı). **(2)** `app/api/auth/merge/route.ts`
+> istemciden gelen `mergeUserId`i doğrulamadan kabul ediyordu — herkese açık
+> `/u/<uuid>` profilinden alınan RASTGELE bir kullanıcının hesabı ele
+> geçirilebiliyordu (ilan/araç/TCKN transferi + kurbanın hesabını pasifleştirme).
+> Artık sunucu iki hesabın gerçekten aynı e-postaya ait olduğunu kendisi
+> doğruluyor. Ayrıca `tekil-kontrol` route'una kota eklendi (kotasız TCKN/VKN
+> sorgusu). Kayıt: `docs/20260807_guvenlik_kayit_giris.sql`. **Manuel aksiyon
+> bekliyor (Bayram):** Supabase Dashboard'dan "leaked password protection"
+> açılmalı — kod/SQL ile yapılamaz. Ayrıntı: `docs/YAPILACAKLAR.md` başı.
+>
 > ✅ **7 AĞU 2026 — PERFORMANS: ANA SAYFA 400 KAT, SAYAÇ 158 KAT HIZLANDI.**
 > Ölçüldü (`pg_stat_statements`, tahmin değil): ana sayfa sorgusu ort. 1026ms/
 > maks 21,4sn, sayım sorgusu 1269ms. İki kök sebep: (1) planlayıcı `moderation_

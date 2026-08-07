@@ -1,5 +1,90 @@
 # Yükegel — Yapılacaklar Listesi
 
+> ## 🔴 7 AĞU 2026 — GÜVENLİK: KAYIT/GİRİŞ DENETİMİ, İKİ KRİTİK AÇIK KAPANDI
+>
+> **İstek:** "Kullanıcı kayıt ve login süreçlerini kontrol et."
+>
+> Denetim bir keşif ajanıyla (dosya haritalama) + kendi elimle DB'de gerçek
+> saldırı simülasyonuyla (`SET LOCAL ROLE`, işlem içi, hep `ROLLBACK`) yapıldı.
+> Bulguları kabul etmeden önce HER BİRİNİ bizzat çalıştırıp kanıtladım.
+>
+> ### 🔴🔴 #1 — `public.users`: herkes TCKN/VKN/email/telefon okuyabiliyordu, herkes kendini admin yapabiliyordu
+>
+> RLS SELECT policy'si `using(true)` idi (rozet/herkese açık profil kartı için
+> BİLEREK öyle yazılmış) — ama tablo düzeyinde `anon`/`authenticated`'e GENİŞ
+> `GRANT` (SELECT/UPDATE/DELETE/TRUNCATE, tüm kolonlar) verilmiş olduğu ortaya
+> çıktı. **RLS satır düzeyini korur, kolon düzeyini korumaz** — kolon koruması
+> yalnız GRANT/REVOKE ile sağlanır ve bu tabloda hiç yapılmamıştı.
+>
+> **Kanıtlanan (7 Ağu, `SET LOCAL ROLE anon`, işlem geri alındı):**
+> `anon` rolüyle **104 satırın tamamı, 8 TCKN, 21 email** okunabiliyordu —
+> giriş bile gerekmiyordu, herkese açık `anon` API anahtarıyla.
+> `authenticated` rolüyle (gerçek bir 'user' rolündeki hesabın kimliğiyle
+> simüle edildi) **kendi `role` kolonunu `'admin'` yapmak** başarılı oldu.
+>
+> **Düzeltme:** `revoke all on public.users from anon, authenticated;` sonra
+> yalnız gerçekten gerekli kolonlar geri verildi — SELECT: `id, display_name,
+> user_type, phone_verified, created_at` (rozet + herkese açık profil kartı,
+> kod taranarak bu ihtiyaç doğrulandı); UPDATE (authenticated, kendi satırı):
+> `display_name, company_name, bio, phone, phone_verified` (panelin gerçekten
+> istemciden yazdığı tek alanlar). Kullanıcının KENDİ tam profilini görmesi
+> zaten servis rolüyle çalışıyordu (`app/panel/page.tsx`, `profil-tamamla/
+> actions.ts`) — bu kısıtlama o akışları hiç etkilemedi.
+> **Doğrulama (aynı gün tekrar test edildi):** PII okuma → `42501 permission
+> denied` ✅ · rol yükseltme → `42501 permission denied` ✅ · rozet okuma →
+> hâlâ çalışıyor ✅ · kendi profilini güncelleme → hâlâ çalışıyor ✅.
+> Kayıt: `docs/20260807_guvenlik_kayit_giris.sql` (ölçüm+uygulama+doğrulama).
+>
+> 📌 **Aynı kalıp başka tabloda var mı diye tarandı** (`qual='true'` olan tüm
+> SELECT policy'leri): `districts`/`provinces`/`listing_stops`/`listings`/
+> `poi_reviews` — hepsi kontrol edildi, hiçbirinde hassas kolon açığa çıkmıyor
+> (`listings.contact_phone` zaten doğru şekilde kolon bazlı kapalıydı — bu
+> tabloda daha önce yapılmış, `users`'ta hiç yapılmamış).
+>
+> ### 🔴 #2 — `app/api/auth/merge/route.ts`: hesap ele geçirme
+>
+> `mergeUserId`/`keepUserId` istemciden (`app/giris/page.tsx`'te URL parametresi
+> `?merge_user_id=`) geliyordu. Eski yetki kontrolü yalnız "çağıran bu İKİ
+> ID'DEN BİRİ mi" diye bakıyordu. **Saldırgan kendi id'sini `keepUserId`
+> yapıp `mergeUserId`'ye herkese açık `/u/<uuid>` profil URL'inden aldığı
+> RASTGELE bir kullanıcının id'sini koyabiliyordu** — kontrol geçiyordu.
+> Sonuç: kurbanın ilanları/araçları kendi hesabına taşınıyor, TCKN/VKN/telefonu
+> kendi profiline kopyalanıyor, kurbanın hesabı `is_active=false` ile devre
+> dışı bırakılıyordu — **kurbandan hiçbir eylem gerekmeden tam hesap ele
+> geçirme**, tek bir craft edilmiş link.
+> **Düzeltme:** sunucu artık iki hesabın GERÇEKTEN aynı e-postaya ait
+> olduğunu (Supabase Auth admin API ile, istemciye güvenmeden) kendisi
+> doğruluyor — bu route'un tek belgelenmiş meşru senaryosu zaten "aynı
+> e-postayla farklı sağlayıcıdan gelen iki hesabın birleşmesi". Eşleşmezse 403.
+>
+> ### 🟠 #3 — `app/api/auth/tekil-kontrol/route.ts`: kotasız TCKN/VKN/telefon sorgusu
+>
+> Projenin GERİ KALANINDA HER YERDE (`giriş`, `otp`, `dogrulama-tekrar`)
+> `lib/kota.ts` kullanılırken bu route tek istisnaydı — oturumsuz, kotasız,
+> sınırsız hızda "bu TCKN/VKN/telefon kayıtlı mı" sorulabiliyordu (gizlilik
+> sızıntısı + toplu telefon numarası taraması riski). IP başına 20/5dk kota
+> eklendi (`lib/kota.ts`, projenin geri kalanıyla aynı desen).
+>
+> ### 🟡 Dokunulmadı — takip gerektiren bulgular
+>
+> - **`phone_verified` hâlâ istemciden doğrudan yazılabiliyor**
+>   (`PanelClient.tsx::otpDogrula` OTP başarılı DÖNDÜKTEN SONRA client'ın
+>   kendisi set ediyor). Devtools'la OTP adımı atlanıp doğrudan PATCH
+>   edilebilir. Düzgün çözüm bu yazmayı sunucuya taşımak (`profil-tamamla`
+>   deseni) — canlı özelliği kırma riski taşıdığı için bu oturumda aceleye
+>   getirilmedi, ayrı görev.
+> - **OTP doğrulama brute-force korumasına tabi değil** — yalnız SMS
+>   *gönderimi* kotalı, kod tahmin etme denemesi değil. Supabase platform
+>   seviyesinde bir sınırı olabilir, doğrulanmadı.
+> - **`auth_leaked_password_protection` kapalı** (Supabase Advisor) —
+>   HaveIBeenPwned kontrolü. DB/kod ile açılamıyor, **Bayram'ın Supabase
+>   Dashboard'dan (Authentication → Policies) açması gerekiyor.**
+> - Kayıt formu e-posta enumeration (sektör normu, düşük öncelik),
+>   `switch-account` eski implicit-flow yöntemi kullanıyor (tutarlılık
+>   kontrolü ayrı görev).
+>
+> **Doğrulama (kod tarafı):** `tsc --noEmit` temiz, gerçek `next build` temiz.
+
 > ## ✅ 7 AĞU 2026 — LANDING + İLAN DETAYI PERFORMANSI: 400 KAT VE 158 KAT
 >
 > **İstek:** "İlanlar çok hızlı gelmeli. İlan detayı da hızlı açılmalı."

@@ -18,6 +18,32 @@ export async function POST(request: Request) {
 
     const service = getServiceSupabase()
 
+    // 🚨 GÜVENLİK (7 Ağu 2026) — yukarıdaki kontrol TEK BAŞINA yetmiyordu.
+    // `mergeUserId`/`keepUserId` istemciden (URL parametresinden — `app/giris/
+    // page.tsx`teki `?merge_user_id=`) geliyor. Eski kontrol yalnız "çağıran bu
+    // İKİ ID'DEN BİRİ mi" diye bakıyordu — çağıran kendi id'sini `keepUserId`
+    // yaparsa `mergeUserId`'ye RASTGELE BİR BAŞKA KULLANICININ id'sini
+    // koyabiliyordu (herkese açık `u/[id]` profil URL'inden alınabilir) ve kontrol
+    // GEÇİYORDU. Sonuç: keyfi bir kullanıcının ilanları/araçları/TCKN-VKN-telefonu
+    // çağıranın hesabına aktarılıyor, kurbanın hesabı `is_active=false` ile
+    // devre dışı bırakılıyordu — tam hesap ele geçirme, kurbanın hiçbir eylemi
+    // gerekmeden.
+    //
+    // Düzeltme: bu route'un TEK meşru senaryosu (yorumlarda da yazılı) "aynı
+    // e-postayla farklı sağlayıcıdan (Google/şifre) gelen İKİ hesabın birleşmesi."
+    // Bu, iki auth kaydının gerçek e-postasını KENDİMİZ (istemciye güvenmeden)
+    // karşılaştırarak sunucu tarafında ZORUNLU kılınıyor. Saldırgan kurbanın
+    // e-postasını taklit edemez — Supabase Auth'un kendi kaydıdır.
+    const [{ data: keepAuthOn }, { data: mergeAuthOn }] = await Promise.all([
+      service.auth.admin.getUserById(keepUserId),
+      service.auth.admin.getUserById(mergeUserId),
+    ])
+    const keepEmailOn = keepAuthOn?.user?.email?.trim().toLowerCase()
+    const mergeEmailOn = mergeAuthOn?.user?.email?.trim().toLowerCase()
+    if (!keepEmailOn || !mergeEmailOn || keepEmailOn !== mergeEmailOn) {
+      return NextResponse.json({ error: 'Bu iki hesap birleştirilemez.' }, { status: 403 })
+    }
+
     // 1. İlanları taşı
     await service.from('listings').update({ user_id: keepUserId }).eq('user_id', mergeUserId)
 
@@ -69,14 +95,14 @@ export async function POST(request: Request) {
     }
     // Sağlayıcı listesi: 'phone' hardcode ediliyordu — Google ile gelen kullanıcıya
     // yanlış metadata yazıyordu. Gerçek sağlayıcıları auth kaydından oku.
-    const { data: keepAuth } = await service.auth.admin.getUserById(keepUserId)
-    const gercekProviders = (keepAuth?.user?.identities ?? []).map(i => i.provider).filter(Boolean)
+    // (`keepAuthOn` yukarıdaki güvenlik kontrolünden — ikinci bir `getUserById` gerekmiyor.)
+    const gercekProviders = (keepAuthOn?.user?.identities ?? []).map(i => i.provider).filter(Boolean)
     guncelleme.auth_providers = [...new Set([
       ...(yeniProfil?.auth_providers ?? []),
       ...(eskiProfil?.auth_providers ?? []),
       ...gercekProviders,
     ])]
-    if (!yeniProfil?.email && keepAuth?.user?.email) guncelleme.email = keepAuth.user.email
+    if (!yeniProfil?.email && keepAuthOn?.user?.email) guncelleme.email = keepAuthOn.user.email
     guncelleme.is_active = true
 
     const { error: aktarimHatasi } = await service
@@ -95,7 +121,7 @@ export async function POST(request: Request) {
     }
 
     // Oturum emekli kimlikte — canlı hesaba geçmek için link gerekiyor.
-    const keepEmail = keepAuth?.user?.email
+    const keepEmail = keepAuthOn?.user?.email
 
     if (keepEmail) {
       const origin = new URL(request.url).origin
