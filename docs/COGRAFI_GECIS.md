@@ -297,8 +297,13 @@ yazım döneminde metin kolonu **birinci sınıf veri olarak kalır** — Dalga 
   `aliases_katlanmis_anahtar_uniq`). 🚫 Burada **BÖLÜM 1'in de** çalıştığı yazıyordu —
   `aliases_normalize_trg` **canlıda yok**, 4 Ağu ön kontrolünde `pg_trigger` 0 satır döndü.
   ✅ Tekillik garantisi ayakta: `learn-aliases` DB seviyesinde katlanmış kopya üretemiyor.
-  ❌ Normalizasyon garantisi yok: yalnız `lib/alias-normalize.ts` + `learn-aliases` route'u.
-  → görev #43.
+  ✅ **#43 KAPANDI (4 Ağu 2026, trigger seçenek (a)).** Bu satır bayattı —
+  `docs/20260804_alias_normalize_trg_a.sql` kuruldu; `lower()` bilerek ÇIKARILDI
+  (`lower('İ')` U+0307 üretiyordu), `\s+` sıkıştırma + `district=''`→NULL korundu.
+  **7 Ağu'da yeniden ölçüldü, canlı teyit:** `pg_trigger` → `aliases_normalize_trg`
+  `tgenabled='O'`; gerçek `insert` (rollback'li) `'  TEST   İĞNE   ALIAS  '` →
+  `TEST İĞNE ALIAS` / uzunluk 15, `district='   '` → `NULL`. Normalizasyon artık
+  DB seviyesinde garanti, yalnız `learn-aliases` route'una bağlı değil.
 - ✅ **İlçe adımları KAPANDI (4 Ağu 2026, #31).** Burada "Adım 3/4/6 **bekliyor**" yazıyordu;
   ölçüm aksini gösterdi — üçü de çalıştırılmış (Adım 3 → 0 satır, Adım 4'ün 92 satırının
   92'si dolu ve **sıfır id kayması**, Adım 6'nın beş kararı uygulanmış), Adım 7 doğrulaması

@@ -388,10 +388,12 @@
 > **0 satır** döndü (`docs/20260804_adim3_4_6_on_kontrol.sql` BÖLÜM 0).
 > ✅ Canlı olan: `aliases_katlanmis_anahtar_uniq` (kısmi UNIQUE) — katlanmış kopya DB
 >    seviyesinde doğamaz, D3'ün asıl amacı tutuyor.
-> ❌ Canlı olmayan: `aliases_normalize_trg` — lowercase / `\s+` sıkıştırma / `''`→NULL
->    yalnız `lib/alias-normalize.ts`'te ve tek çağıranı `learn-aliases` route'u.
->    Trigger'sız indeks güvenlik ağı değil **mayın**: normalize edilmemiş yazma sessizce
->    düzelmez, **23505 ile patlar**. → görev #43. Ayrıntı: "`aliases` kolon özeti".
+> ✅ **#43 KAPANDI (4 Ağu 2026)** — yukarıdaki "canlı olmayan" satırı bayattı.
+>    `docs/20260804_alias_normalize_trg_a.sql` ile trigger kuruldu (seçenek (a),
+>    `lower()` bilerek çıkarıldı — U+0307 riski). **7 Ağu'da yeniden ölçüldü:**
+>    `pg_trigger` → `aliases_normalize_trg` `tgenabled='O'`; canlı `insert`
+>    (rollback'li) `'  TEST   İĞNE   ALIAS  '` → `TEST İĞNE ALIAS` / uzunluk 15,
+>    `district='   '`→`NULL`. Normalizasyon artık DB seviyesinde garanti.
 > ✅ **Runbook Adım 1–7 ve 9 ZATEN TAMAM (4 Ağu 2026, #31).** Bu satır önce "ilçe adımları
 > (3, 4, 6) hâlâ bekliyor" diyordu; ölçüm aksini gösterdi — Adım 3 ve 7 boş döndü, Adım 4'ün
 > 92 satırının 92'si dolu ve **sıfır id kayması**, `payas` ve Adım 6'nın beş kararı uygulanmış.
@@ -1469,9 +1471,11 @@ testi yorumdaki "lower()" yüzünden **yanlış pozitif** verir; davranışı da
   `alias` lowercase+boşluk sadeleştirme, `normalized`/`district` trim, boş `district` → NULL.
   ℹ️ Yalnız bu üç kolon listelendiği için `is_active`-only UPDATE trigger'ı TETİKLEMEZDİ —
   Adım 9 toplu pasifleştirmesi zaten bu yüzden güvenliydi, trigger'ın yokluğundan değil.
-  🚨 **Sonuç:** normalizasyon tek bacaklı — `lib/alias-normalize.ts` ve tek çağıranı
-  `learn-aliases` route'u. O route'tan geçmeyen yazma ham değer yazar ve aşağıdaki indekse
-  **23505** ile takılır. Trigger'sız indeks güvenlik ağı değil **mayın**. → görev #43.
+  🚨 **Sonuç (o an için doğruydu):** normalizasyon tek bacaklı — `lib/alias-normalize.ts`
+  ve tek çağıranı `learn-aliases` route'u. O route'tan geçmeyen yazma ham değer yazar ve
+  aşağıdaki indekse **23505** ile takılır. Trigger'sız indeks güvenlik ağı değil **mayın**.
+  → görev #43 **[KAPANDI 4 Ağu, 7 Ağu'da yeniden ölçülüp teyit edildi — yukarıdaki "Runbook"
+  bloğuna bak].**
   🚨 **AMA DOSYADAKİ HÂLİYLE KURULMAMALI (4 Ağu ölçümü).** Trigger'ın `alias` satırındaki
   `lower()` var olmayan bir sorunu çözüyor. Hem bu dosyanın :64-66'sı hem
   `lib/alias-normalize.ts`:80-81 *"büyük harfli alias hiç tutmaz, sessizce ölü kayıt olur"*

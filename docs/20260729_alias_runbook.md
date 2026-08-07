@@ -20,9 +20,9 @@ SONUÇ KAYDI bölümünde duruyor).
 | 6 elle kararlar | ✅ | beşi de uygulanmış (Kahramankazan ×2, Çekmeköy, Esenyurt, Adıyaman pasif, Artvin pasif) |
 | 7 doğrulama | ✅ | iki sorgu da boş |
 | 9 katlanmış kopyalar | ✅ | dolaylı ama kesin: `aliases_katlanmis_anahtar_uniq` **canlı**, kopya kalsaydı 23505 ile kurulamazdı |
-| **8.2 ilçe onarımı** | ⏳ | `listing_stops.district` `KEMALPAŞA` **17 satır** → görev #44 |
-| 8.1 / 8.4 şehir kolonları | ⏭️ | bilinçli atlanıyor — Dalga 5'te düşecek kolonlar |
-| **10 trigger** | 🚨 | BÖLÜM 2 (indeks) canlı, **BÖLÜM 1 (`aliases_normalize_trg`) YOK** → görev #43 |
+| **8.2 ilçe onarımı** | ✅ | #44 KAPANDI (4 Ağu, aynı gün UPDATE ile) — 7 Ağu'da yeniden ölçüldü, `KEMALPAŞA` 0 satır |
+| 8.1 / 8.4 şehir kolonları | ✅ | Dalga 5'te düştü (6 Ağu) — artık atlanacak kolon da yok |
+| **10 trigger** | ✅ | #43 KAPANDI (4 Ağu, `docs/20260804_alias_normalize_trg_a.sql`) — 7 Ağu'da canlı `insert`+rollback ile yeniden doğrulandı |
 
 📌 **Bu tablo neden var:** 4 Ağu'ya kadar `PROJE_HARITASI.md`, `COGRAFI_GECIS.md` ve
 görev listesi "Adım 3/4/6 bekliyor" diyordu — **üçü de yanlıştı**. Aynı belgeler
