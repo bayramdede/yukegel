@@ -80,7 +80,15 @@ Kabul: Adım 8.1 kapsama oranı %98+, Adım 8.2 sıfır satır, Adım 8.4'te `an
 ve `authenticated → SELECT/INSERT/UPDATE` satırlarının bulunması (satır **sayısı** değil;
 çıktıda REFERENCES ve postgres/service_role satırları da normal olarak görünür).
 
-### Dalga 2 — yazma yolları (✅ kod hazır, ✅ RPC v3 canlıda, ⏳ deploy bekliyor)
+### Dalga 2 — yazma yolları (✅ kod hazır, ✅ RPC v3 canlıda, ✅ CANLIDA)
+
+> ✅ **7 Ağu 2026 — "⏳ deploy bekliyor" ibaresi kaldırıldı.** Bu başlık 30 Tem'den beri
+> öyle duruyordu. Kanıt iki katmanlı: (1) `git diff origin/main -- app/ lib/` boş, yani
+> Vercel'in derlediği kaynak bu ağaç; (2) **davranışsal tanık** — 6 Ağu deploy'undan sonra
+> işlenen gerçek WhatsApp dosyasında **303 ilan · 424 durak · `province_id` boş 0 ·
+> duraksız ilan 0**. `province_id` yazılmasaydı o kolon 303 satırda NULL olurdu.
+> 📌 Tanık kolonu `303`; "boş 0" tek başına okunsa hiçbir şey kanıtlamazdı — hiç ilan
+> yazılmamış da olabilirdi.
 
 `province_id` yazılmaya başlar, **metin kolonları da yazılmaya devam eder**
 (`lib/lokasyon.ts::ilCiftYazim()` tek çağrıda ikisini de verir).

@@ -25,6 +25,43 @@
 > beklenecek ya da mevcut kayıtlar yeniden parse edilecek (bkz. aşağıda).
 > **Baseline: 7 günde varış ilçesi doluluğu 3.363/13.183 = %25,5.**
 
+> ## 🧹 7 AĞU 2026 — #91: BAYAT "DEPLOY BEKLİYOR" İDDİALARI SÜPÜRÜLDÜ
+>
+> Belgede **on bir ayrı yerde** "canlı hâlâ v79" / "canlı v85 içermiyor" /
+> "DEPLOY BEKLİYOR" yazıyordu. Hepsi yazıldıkları gün DOĞRUYDU; v89 ile hepsi
+> yalan oldu. Bunları tek tek kapattım — **varsayarak değil, kodu okuyarak.**
+>
+> **Kapatmanın dayanağı tek bir gerçek:** `git diff 9a1940f -- supabase/functions/parse-listing/index.ts`
+> **boş**, `git diff origin/main -- app/ lib/` **boş**. Yani deploy edilen baytlar =
+> bu ağaç = push edilmiş kaynak. Dolayısıyla ağaçta duran her düzeltme sahadadır.
+> Yine de her maddeyi ayrı ayrı aradım:
+>
+> | madde | ayırt edici kod | nerede | durum |
+> |---|---|---|---|
+> | #86 vekil çifti | `/[\uD800-\uDBFF](?![\uDC00-\uDFFF])\|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g` | 4 dosyanın hepsinde | ✅ canlı |
+> | #87-E/F | `contextFrom` | `index.ts:314 · 321 · 638-646 · 694` | ✅ canlı |
+> | #65 alias indeksi | `aliasIndeksi()` + `WeakMap` | `index.ts:448-474` | ✅ canlı |
+> | #88 Pass-2 | ağaçta | `index.ts` | ✅ canlı, ölçüm açık |
+> | U+0307 (`:82`) | `.replace(/İ/g,'i')` | `lib/alias-normalize.ts:82` | ✅ **davranışla** kanıtlandı |
+> | A11 LLM timeout | `LLM_TIMEOUT_MS = 45_000` | `learn-aliases/route.ts:28` | ✅ push edildi, el testi açık |
+> | Dalga 2 `province_id` | — | `lib/ilan-yaz.ts` vb. | ✅ **davranışla** kanıtlandı |
+>
+> 🔑 **İki maddeyi kodu okuyarak kapatamazdım, davranışla kapattım.** `lib/` ve `app/`
+> için elimdeki kanıt yalnız "origin/main ile aynı"ydı; bu "derlendi ve hizmet veriyor"
+> demek DEĞİL. Onun yerine tanık aradım: U+0307 için **onarımdan sonra öğrenilmiş 27 yeni
+> alias, U+0307'lüsü 0**; Dalga 2 için **6 Ağu'da yazılan 303 ilanda `province_id` boş 0**.
+> Her ikisinde de asıl kanıt `27` ve `303`; sıfırlar tek başına hiçbir şey söylemezdi.
+>
+> ⚠️ **AÇIK KALANLAR — deploy kapandı, ÖLÇÜM kapanmadı.** `olc:87` · `olc:88` · `olc:89`
+> canlı doğrulamaları ve #65'in log penceresi yeniden ölçümü hâlâ yeni trafik bekliyor
+> (7 Ağu 07:11 itibarıyla deploy sonrası `raw_post` sayısı **0**). "Deploy edildi" ile
+> "işe yaradı" ayrı iki iddiadır; belgede artık ayrı ayrı işaretli.
+>
+> 📌 **DERS (#41'in tekrarı, bu kez kurbanı kendi belgemdi):** *durum bir yerde değil
+> İKİ yerde yazılıysa, biri eskiyor.* Sürüm numarası hem başlıkta hem gövdede
+> tekrarlanınca kaçınılmaz oldu. Bundan sonra madde gövdesine sürüm numarası yazma;
+> "şu commit'ten sonraki her sürümde var" de — o ifade eskimez.
+
 > 🔴 **7 AĞU 2026 — #90: `parse_listing_gonder` İDEMPOTENT DEĞİL. GERİYE DÖNÜK
 > YENİDEN PARSE YAPMAYIN — KOPYA İLAN ÜRETİR.** İncelendi, ölçüldü, YAPILMADI.
 >
@@ -172,8 +209,8 @@
 > `raw_post` işlendi? Sıfırsa fark yokluğu deploy'un başarısızlığı değil, örneklem
 > yokluğudur — 7 Ağu 05:43'te tam olarak bu oldu.
 >
-> 🚨 **6 AĞU 2026 — #87-F AÇIK: KAYIP = 0 ÇIKTI, AMA ÇIKTI YİNE DE YANLIŞTI.
-> DÜZELTME YAZILDI VE MUTASYONLA DOĞRULANDI; DEPLOY EDİLMEDİ. KARAR SENDE.**
+> 🟢 **6 AĞU 2026 — #87-F: KAYIP = 0 ÇIKTI, AMA ÇIKTI YİNE DE YANLIŞTI.
+> DÜZELTME YAZILDI, MUTASYONLA DOĞRULANDI, ✅ DEPLOY EDİLDİ (v89, 7 Ağu 2026).**
 >
 > #87-E sonrası ölçüm tekrar koşuldu: **7.621 satır, dört varyantın hepsinde KAYIP = 0.**
 > Beklenen sonuç buydu ve doğruydu. Ama örnekler elle okununca **iki satırda kendine
@@ -218,14 +255,17 @@
 > zaten söylüyor: *"şerit EKLENDİ ≠ şerit DOĞRU"*. Ölçüm elle okumanın yerini tutmuyor;
 > ikisi **farklı hata sınıfı** yakalıyor.
 >
-> ⚠️ **AÇIK İŞ: deploy.** Canlı **v85** ne #87-E ne #87-F içeriyor. Deploy sonrası
-> `olc:87` tekrar koşulmalı — **KAYIP = 0 görülmeli VE örnekler elle okunmalı.**
+> ✅ **DEPLOY EDİLDİ — v89 (7 Ağu 2026 05:41:56 UTC).** "Canlı v85" satırı 6 Ağu'da
+> doğruydu; artık değil. `contextFrom` düzeltmesi `index.ts`'te (L314/321/638-646/694)
+> ve deploy edilen baytlar bu ağaçla birebir aynı (`git diff 9a1940f` boş).
+> ⏳ **AÇIK İŞ — canlı doğrulama (Bayram'ın makinesinde):** `npm run olc:87`
+> tekrar koşulmalı — **KAYIP = 0 görülmeli VE örnekler elle okunmalı.**
 > 413 satırlık "changed" kümesinin geri kalanı hâlâ denetlenmedi.
 
 ---
 
-> 🚨 **6 AĞU 2026 — #87-E (ÇÖZÜLDÜ, yukarıdaki #87-F ile birlikte deploy bekliyor): CANLIDA ŞERİT KAYBETTİREN BİR REGRESYON VAR.
-> DÜZELTME YAZILDI VE TEST EDİLDİ, AMA HENÜZ DEPLOY EDİLMEDİ. KARAR SENDE.**
+> 🟢 **6 AĞU 2026 — #87-E (ÇÖZÜLDÜ, #87-F ile birlikte ✅ DEPLOY EDİLDİ — v89, 7 Ağu 2026):
+> CANLIDA ŞERİT KAYBETTİREN BİR REGRESYON VARDI. DÜZELTME YAZILDI, TEST EDİLDİ, SAHADA.**
 >
 > `npm run olc:87` ölçümü (7.299 satır, son 30 gün) **"≥1→0 (KAYIP) = 2"** verdi.
 > O sütun **sıfır olmak zorunda** — sıfır değilse düzeltme ÇALIŞAN bir satırı öldürüyor.
@@ -261,9 +301,9 @@
 >   başka hiçbiri düşmedi.** Yani testler gerçekten bu düzeltmeyi koruyor.
 > - Regresyon: `test:clean` · `test:pass2` · `test:lokasyon` · `test:districts` → hepsi yeşil.
 >
-> ⚠️ **AÇIK İŞ: deploy.** Canlıdaki `parse-listing` **v85** bu düzeltmeyi İÇERMİYOR;
-> kayıp kalıbı sahada hâlâ geçerli. Deploy sonrası `npm run olc:87` **tekrar
-> çalıştırılmalı ve KAYIP sütunu 0 görülmelidir.**
+> ✅ **DEPLOY EDİLDİ — v89 (7 Ağu 2026).** "Canlı v85 bu düzeltmeyi içermiyor" satırı
+> 6 Ağu'da doğruydu; artık değil. Kayıp kalıbı sahada kapandı.
+> ⏳ Kalan: `npm run olc:87` tekrar çalıştırılmalı ve **KAYIP sütunu 0 görülmelidir.**
 >
 > ⚠️ **ÖLÇÜMÜN GERİ KALANI HÂLÂ ELLE DENETLENMEDİ.** 397 satır değişti (1.441 şerit
 > eklendi, 855 silindi). Script'in kendi uyarısı: **"şerit EKLENDİ" ≠ "şerit DOĞRU"**,
@@ -483,8 +523,9 @@
 > #86/#88'in 0→≥1 sayılarıyla kıyaslanamaz.** `KAYIP (≥1→0)` yine 0 olmalı.
 >
 > ⏳ **BEKLEYEN:** `npm run olc:87` Bayram'ın makinesinde koşacak (sandbox'ta
-> `supabase.co`ya ağ yok). Deploy kararı da Bayram'da — #86 + #88 + #87 birlikte gidebilir.
-> Canlı `parse-listing` hâlâ **v79**.
+> `supabase.co`ya ağ yok).
+> ✅ Deploy tarafı kapandı: #86 + #88 + #87(A–F) birlikte gitti, canlı **v89**
+> (7 Ağu 2026 05:41:56 UTC). "Canlı hâlâ v79" satırı 6 Ağu'da doğruydu, artık değil.
 >
 > 🧹 **SİLİNMELİ:** `scripts/sonda-87.mts` — geçici teşhis sondası, `test-87.mts`
 > onun yerini aldı. Bu oturumda silinemedi (izin yok), elle silinmeli.
@@ -495,8 +536,10 @@
 >
 > ---
 >
-> 🚨 **6 AĞU 2026 — #88 (YENİ): PASS 2'DE İKİ AYRI "BLOK KOPARMA" HATASI.
-> DÜZELTİLDİ, BİRİM TESTİ MUTASYONLA DOĞRULANDI, ÖLÇÜM + DEPLOY BEKLİYOR.**
+> 🟢 **6 AĞU 2026 — #88: PASS 2'DE İKİ AYRI "BLOK KOPARMA" HATASI.
+> DÜZELTİLDİ, MUTASYONLA DOĞRULANDI, ✅ DEPLOY EDİLDİ (v89, 7 Ağu). ÖLÇÜM AÇIK.**
+> ⚠️ Ölçüm hâlâ yapılmadı: deploy'dan sonra sıfır trafik (son `raw_post` 6 Ağu 16:33).
+> `npm run olc:88` yeni parti geldikten sonra koşulmalı.
 >
 > **#83 (#42 C) bunun için açılmıştı ve CEVAPLANDI:** "Kova C'nin 160/306'sı
 > `yükle*` kalıbında, Pass 2 tam bu kalıp için yazılmış — niye tutmuyor?"
@@ -560,8 +603,13 @@
 > `B` → "‼ MANİSA TURGUTLU YÜKLEMELİ ‼ / (KISA-UZUN) DORSE" kalıbı 2 satır
 > (`acb96bbc · 686725c5`) — yani bu kalıp tek bir gönderenin şablonu, nadir.
 >
-> ⏳ **BAYRAM — KALAN TEK İŞ: DEPLOY.** `parse-listing` canlıda hâlâ **v79**;
-> #86 (net 45) + #88 (10) birlikte gidecek → toplam ~55 satır / 30 gün.
+> ✅ **DEPLOY EDİLDİ — v89 (7 Ağu 2026 05:41:56 UTC).** "canlıda hâlâ v79" satırı
+> 6 Ağu'da doğruydu, artık değil. #86 ve #88 birlikte sahaya indi.
+> ⚠️ **~55 satır / 30 gün rakamı ÖLÇÜM DEĞİL, TAHMİN** (#86 net 45 + #88 10).
+> Deploy sonrası tek bir yeni `raw_post` gelmedi (son trafik 6 Ağu 16:33 UTC), yani
+> tahminin doğrulanması yeni trafiği bekliyor. Ölçerken **tanık kolonu** ekle:
+> aynı pencerede işlenen toplam satır sayısı olmadan "45 kazandık" da "0 kazandık"
+> da bir şey kanıtlamaz.
 >
 > 📌 **AÇIK KALAN:** kalan ~435 `no_lane` satırın derdi ne #86 ne #88. Kova C'nin
 > geri kalanı için ayrı iş gerekir (#42) — ama #65'in 3.968 `pending`'i yanında
@@ -609,7 +657,7 @@
 > (`📍ÇATALCA👉🏻MANAVGAT` — ten rengi değiştiricisi 👉 kuralını bloke ediyor ama
 > emoji-strip'in boşluk ikamesi şeridi yine de kurtarıyor).
 
-> 🚨 **6 AĞU 2026 — #86: VEKİL ÇİFTİ SİLME HATASI. DÖRT DOSYA. DEPLOY BEKLİYOR.**
+> 🟢 **6 AĞU 2026 — #86: VEKİL ÇİFTİ SİLME HATASI. DÖRT DOSYA. ✅ DEPLOY EDİLDİ (v89, 7 Ağu).**
 >
 > **TEK CÜMLE:** `/[\uD800-\uDFFF]/g` — `u` bayrağı yok — **geçerli vekil
 > çiftlerini de siliyordu**, yani BMP-üstü **tüm** emojiler (👉 📍 🔹 🚛) parser'ın
@@ -634,7 +682,10 @@
 > (`whatsapp-parse/route.ts` temiz — hiç vekil temizliği yapmıyor.)
 > ⚠️ `learn-aliases` en riskliydi: yapışık token'dan Haiku **uydurma alias** öğrenebilirdi.
 >
-> ⏳ **BAYRAM:** `parse-listing` edge function DEPLOY edilmeli (canlı hâlâ v79).
+> ✅ **DEPLOY EDİLDİ — v89 (7 Ağu 2026).** "canlı hâlâ v79" satırı 6 Ağu'da doğruydu,
+> artık değil. Dördü de sahada: `index.ts` v89 içinde (deploy edilen baytlar `9a1940f`
+> ile birebir), diğer üç dosya `app/api/**` altında ve `origin/main` ile aynı — Vercel
+> `main`'den build ediyor.
 >
 > 🔁 **RETRAKSİYON — #63 için verdiğim "52 satır / 30 gün" TAHMİNİ GEÇERSİZ.**
 > O sayı 👉/📍 kuralının çalıştığı varsayımıyla hesaplanmıştı; kural ölü koddu.
@@ -1014,8 +1065,9 @@
 > varamaz → satır `pending` kalır. 11:42'de 640 satır → 596 `pending` (%93);
 > 12:04'te 230 satır → 111 `pending` (%48).
 >
-> **DÜZELTME (yazıldı, DEPLOY BEKLİYOR):** `aliasIndeksi()` — alias dizisi başına bir kez
-> kurulan `Map` + önceden sıralanmış listeler, `WeakMap` ile dizi kimliğine bağlı.
+> **DÜZELTME (✅ DEPLOY EDİLDİ — v89, 7 Ağu 2026):** `aliasIndeksi()` — alias dizisi başına
+> bir kez kurulan `Map` + önceden sıralanmış listeler, `WeakMap` ile dizi kimliğine bağlı.
+> Kod `parse-listing/index.ts:448-474`'te; deploy edilen baytlar bu ağaçla aynı.
 >
 > **DOĞRULAMA:** 303 mesajda (3 gerçek + 300 üretilmiş) `parseMessage` çıktısı **0 fark**;
 > `tsc --noEmit` temiz. Eşdeğerliğin dayanağı: `.find` ilk eşleşeni, `Map` ilk gireni tutar,
@@ -1027,11 +1079,16 @@
 > ortak modülü engelliyor → iki parser elle hizalanmak zorunda. Birinde düzeltilen
 > diğerine geçmiyor; bu sessiz ayrışma bir daha olacak.
 >
-> ⏳ **AÇIK:** deploy sonrası aynı log penceresini yeniden ölçmeden "#65 çözüldü" DEMEM.
-> Beklentim: çağrı süresi 150 sn duvarından milisaniyelere düşer ve yeni `pending`
-> birikmesi durur — ama bu bir tahmin, ölçüm değil. Mevcut 7.896 satırlık yığın **kendi
+> ⏳ **AÇIK — ÖLÇÜM (deploy artık yapıldı, v89 / 7 Ağu 2026).** Aynı log penceresini
+> yeniden ölçmeden "#65 çözüldü" DEMEM. Beklentim: çağrı süresi 150 sn duvarından
+> milisaniyelere düşer ve yeni `pending` birikmesi durur — ama bu bir tahmin, ölçüm değil.
+> 7 Ağu 07:11 itibarıyla deploy sonrası **tek bir yeni `raw_post` yok** (son trafik
+> 6 Ağu 16:33 UTC), yani ölçüm örneklem bekliyor. Mevcut 7.896 satırlık yığın **kendi
 > kendine erimez**, ayrı kurtarma işi gerekir (bunların 2.203'ünün ilanı ZATEN var,
 > yeniden işlenirse çift ilan doğar).
+> 🔗 Bu son cümle 5 Ağu'da bir sezgiydi; 7 Ağu'da **#90'da kanıtlandı**: `ilan_olustur`
+> düz INSERT, `on conflict` yok, `idx_listings_raw_post` UNIQUE değil. Yani "çift ilan
+> doğar" bir ihtimal değil, kesinlik. Toplu yeniden işleme yolu **kapalı**.
 
 > 🔬 **5 AĞU 2026 — #67 SEBEP BULUNDU, DÜZELTME CANLIDA, SONUÇ HENÜZ ÖLÇÜLMEDİ.**
 > Ayrıntı ve tam SQL: `docs/20260805_sayac_duzeltme.sql` · `docs/20260805_insert_maliyeti.sql` ·
@@ -1468,7 +1525,9 @@
 > ✅ **KOD DÜZELTİLDİ (4 Ağu).** `lib/alias-normalize.ts`:82 →
 > `trTemizle(...).replace(/İ/g,'i').toLowerCase()`. Doğrulandı: `İZMİT` artık
 > `izmit` (5 karakter), eskiden `i̇zmi̇t` (7). `aliasKey(yeni) === aliasKey(ham)`
-> altı örnekte de `true`. `tsc --noEmit` temiz. **Deploy bekliyor.**
+> altı örnekte de `true`. `tsc --noEmit` temiz. **✅ CANLIDA** — `git diff origin/main
+> -- lib/` boş ve davranışsal tanık var: onarımdan sonra öğrenilen 27 yeni alias'ın
+> U+0307'lüsü 0. Tanık kolonu `27`; onsuz "U+0307 = 0" hiçbir şey kanıtlamazdı.
 > ✅ **VERİ ONARIMI DA TAMAMLANDI** — `docs/20260804_u0307_alias_onarimi.sql`:
 > yedek 34 → **UPDATE 24** (gölge kopya pasif) → **UPDATE 9** (gerçek kayıp onarıldı)
 > → **UPDATE 1** (homoglif 1023 pasif). Doğrulama: `aktif_u0307 0` · `pasif_u0307 25` ·
@@ -1476,8 +1535,13 @@
 > 🧪 `trNorm` eşleşme testi **9/9**: `nizip`·`istoç`·`ivedik`·`kdz ereğli`·`delice`·
 > `iskendurun`·`iscehisardan`·`ş.kochisar`·`yeni mahalle` artık mesaj metniyle tutuyor.
 > Onarım öncesi kıyas: `ni̇zi̇p` → `ni zi p` ≠ `nizip`. Fark tam olarak buydu.
-> ⏳ **TEK KALAN: kodu DEPLOY et.** Edilmezse learn-aliases yeni U+0307 satırları
-> üretmeye devam eder ve bu onarım aşınır.
+> ✅ **KAPANDI — DEPLOY EDİLDİ VE CANLI DAVRANIŞLA DOĞRULANDI (7 Ağu 2026).**
+> `lib/alias-normalize.ts` `origin/main` ile birebir aynı; Vercel `main`'den build ediyor.
+> Ama "push'landı" ile "canlıda çalışıyor" aynı şey değil, o yüzden **davranışsal tanık**:
+> onarımdan sonra (4 Ağu →) **27 yeni alias öğrenildi**, bunların **U+0307'lüsü 0**,
+> tablodaki **aktif U+0307 toplamı 0** (son alias 6 Ağu 17:02).
+> 🔑 Buradaki tanık kolonu `27`. Onsuz "U+0307 = 0" hiçbir şey kanıtlamazdı —
+> learn-aliases hiç koşmamış da olabilirdi. **Sıfırı tek başına okuma.**
 >
 > 📚 **SÜREÇ DERSİ — ÇAKIŞMA KONTROLÜ TEK İNDEKSE BAKMAZ.**
 > BÖLÜM 3'ün ilk denemesi **23505** ile patladı (`idx_aliases_type_alias`) ve atomik
@@ -2941,7 +3005,7 @@ sayfaya** düşüyordu. Aynı sayfa, iki farklı davranış, sıfır hata sinyal
       döndüğünü doğrula; ayrıca **Google ile girişte de** döndüğünü ayrıca dene
 
 ## ⚠️ BUGLAR
-- [x] **A11 — "AI Keşfi Başlat" her seferinde timeout** ✅ kod tarafı tamam (31 Tem 2026) — **deploy bekliyor**
+- [x] **A11 — "AI Keşfi Başlat" her seferinde timeout** ✅ kod tarafı tamam (31 Tem 2026) — **kod push edildi ve `origin/main` ile aynı (7 Ağu 2026 doğrulaması); Vercel `main`'i otomatik deploy ediyor.** Canlı el testi hâlâ yapılmadı: aşağıdaki "canlı test" maddesi AÇIK.
   Belirti: `/admin/ogrenme-merkezi` → limit **10** (panelin en düşük seçeneği) ile "AI Keşfi
   Başlat" → `LLM 8 saniyede yanit vermedi — limit azalt veya tekrar dene`.
   Sebep: `app/api/admin/learn-aliases/route.ts` `maxDuration = 60` ilan ediyor ama LLM
