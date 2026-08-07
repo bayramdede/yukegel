@@ -1180,9 +1180,12 @@ Deno.serve(async (req) => {
     //    aşağıdaki `origin_city` metninden çözülür. Yani buradaki alias
     //    normalizasyonu artık sadece "doğru yazım" değil, ilanın VAR OLMA şartı.
     //
-    // Tek boşluk: `district_official`. 973 ilçe `lib/constants/locations.json`'da
-    // ve DB'de ilçe tablosu YOK, yani RPC bunu türetemez. Bu yoldan gelen
-    // ilanlarda NULL kalıyor — tanımlı anlamı "bilinmiyor", bozuk veri değil.
+    // ✅ GÜNCELLEME (7 Ağu 2026, #50): bu yorum "district_official NULL kalıyor,
+    //    DB'de ilçe tablosu YOK" diyordu — artık YANLIŞ. Dalga 5 `public.districts`
+    //    tablosunu (973 ilçe) açtı ve `ilan_olustur` v4.1 `district_official`
+    //    boş gelirse `ilce_resmi(province_id, district)` ile kendisi türetiyor.
+    //    Bu satır o yüzden hiçbir şey GÖNDERMİYOR bile — RPC'nin yedek bacağı
+    //    dolduruyor. Canlı ölçüm: WhatsApp kanalında flag doluluğu %0 → %98.
     // ⚠️ Migration: `docs/20260730_ilan_olustur_v3.sql` — v2 ile deploy edilirse
     // `origin_province_id` sessizce NULL kalır (hata vermez, sadece boş).
     let created = 0

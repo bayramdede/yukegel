@@ -1,8 +1,16 @@
 # Coğrafi Veri Standardizasyonu — Geçiş Planı
 
-> Durum: **Dalga 1 kod tarafı hazır, SQL ÇALIŞTIRILMADI.** (30 Tem 2026)
-> Strateji: **çift yazım** — metin kolonları yerinde kalır, `province_id` yanlarında birikir,
-> okuma yolları doğrulandıktan sonra ayrı bir migration ile drop edilir.
+> ✅ **Durum (7 Ağu 2026, ölçülerek doğrulandı): GEÇİŞ TAMAMLANDI, Dalga 1-5 hepsi
+> canlıda.** Yukarıdaki "Dalga 1 SQL ÇALIŞTIRILMADI" satırı **30 Tem'den beri hiç
+> güncellenmemiş** en bayat cümleydi — dosyanın en üstünde durup en son fark edildi.
+> Çift yazım stratejisi de artık tarihsel: metin kolonları (`origin_city`,
+> `listing_stops.city`) Dalga 5'te **drop edildi** (6 Ağu), il/ilçe artık yalnızca
+> `province_id` + `district`/`district_official`. Güncel özet için
+> `docs/PROJE_HARITASI.md`'nin en üstüne bak.
+>
+> ~~Durum: Dalga 1 kod tarafı hazır, SQL ÇALIŞTIRILMADI. (30 Tem 2026)
+> Strateji: çift yazım — metin kolonları yerinde kalır, `province_id` yanlarında birikir,
+> okuma yolları doğrulandıktan sonra ayrı bir migration ile drop edilir.~~
 
 ## Neden
 
@@ -70,11 +78,18 @@ filtre tarafı "resmî ilçe" ile "serbest etiket"i karıştırmaz.
 
 ## Dalgalar
 
-### Dalga 1 — şema (⏳ SQL bekliyor)
+### Dalga 1 — şema (✅ ÇALIŞTIRILDI)
 
-`docs/20260730_province_id.sql` çalıştırılacak. Koddan **önce** çalıştırılabilir: hiçbir mevcut
-kolonu düşürmez, hiçbir mevcut davranışı bozmaz. Adım 5'in ön raporunu **çalıştırmadan önce oku**
-ve çıktıyı sakla — kaç satırın id alamayacağını orada görürsün.
+> ✅ **7 Ağu 2026 — başlık düzeltildi, bu satır 30 Tem'den beri bayattı.**
+> `docs/20260730_province_id.sql` **30 Tem 2026'da çalıştırıldı.** Backfill %100/%100
+> (234.229 ilan + 244.379 durak o gün), çelişki sıfır, GRANT'lar yerinde. 7 Ağu'da
+> yeniden ölçüldü: **81 il**, 256.041 ilanın **0**'ı, 268.415 durağın **0**'ı
+> `province_id` boş. Dalga 5 ile metin kolonu da düştüğü için artık geri dönüş yok —
+> bu dalga kalıcı.
+
+`docs/20260730_province_id.sql`. Koddan **önce** çalıştırılabilirdi: hiçbir mevcut
+kolonu düşürmüyordu, hiçbir mevcut davranışı bozmuyordu. Adım 5'in ön raporu
+çalıştırmadan önce okunmuştu — kaç satırın id alamayacağı orada görülmüştü.
 
 Kabul: Adım 8.1 kapsama oranı %98+, Adım 8.2 sıfır satır, Adım 8.4'te `anon → SELECT`
 ve `authenticated → SELECT/INSERT/UPDATE` satırlarının bulunması (satır **sayısı** değil;
@@ -107,7 +122,7 @@ disiplinle değil. Çağıran yine de açıkça `province_id` gönderirse o kaza
 | `lib/ilan-yaz.ts` | ✅ | `ilNormalize` → `ilCiftYazim` + `ilceNormalize`. `p_listing`'e `origin_province_id`/`origin_district_official`, `p_stops`'a `province_id`/`district_official`. `listings` yazan tek TS yolu; whatsapp + excel-import buradan geçiyor. |
 | `app/moderator/actions.ts` | ✅ | `ilanYaz()` kullanmıyor, RPC'yi doğrudan çağırıyor — ayrı güncellendi. |
 | `app/panel/actions.ts` | ✅ | RPC'yi **atlayan tek yazma yolu** (`update` + durak replace). 🚨 Buradaki tehlike id'nin boş kalması değil, **eski değerde kalması**: metin Ankara'ya çevrilip id 34'te kalırsa satır kendi kendisiyle çelişir. Bu yüzden id ve metin aynı yerde birlikte hesaplanıyor. Beyaz listeye yeni kolonlar eklendi. |
-| `supabase/functions/parse-listing/index.ts` | ✅ (kod değişikliği gerekmedi) | Deno, `lib/lokasyon.ts`'i import **edemez**; `tsconfig.json` `exclude`'unda olduğu için `tsc` bu dosyayı **hiç görmez**. RPC v3 id'yi metinden türettiği için gerek kalmadı — dosyaya bunun *neden* böyle olduğunu anlatan blok eklendi. Tek boşluk: `district_official` bu yolda NULL kalıyor (tanımlı anlamı "bilinmiyor"). |
+| `supabase/functions/parse-listing/index.ts` | ✅ (kod değişikliği gerekmedi) | Deno, `lib/lokasyon.ts`'i import **edemez**; `tsconfig.json` `exclude`'unda olduğu için `tsc` bu dosyayı **hiç görmez**. RPC v3 id'yi metinden türettiği için gerek kalmadı — dosyaya bunun *neden* böyle olduğunu anlatan blok eklendi. `district_official` bu yolda ✅ **artık RPC v4.1 (#50) `ilce_resmi()` ile dolduruyor** (bu satır bayattı, 7 Ağu'da düzeltildi). |
 | `app/api/excel-import/route.ts` | ✅ (değişiklik gerekmedi) | `sehirCoz()` alias'ı çözüp adı `ilanYaz()`'a veriyor; çift yazım orada oluyor. |
 | `app/api/whatsapp/route.ts` | ✅ (değişiklik gerekmedi) | `ilanYaz()` üzerinden geçiyor. |
 
@@ -150,7 +165,7 @@ Doğrulama: `npx tsc --noEmit` temiz, `test:lokasyon` 21/21, `test:parser` 29/29
 | `docs/20260604_radar_intelligence_rpc.sql` | 4 `ILIKE` + trigram index'i **düşür** | 🟡 Trigram index'in varlık sebebi kalmıyor |
 | `docs/20260616_radar_analitik_indexes.sql` | `idx_listings_origin_city_created` → province sürümü | 🟢 |
 | `docs/20260701_nearby_listings_rpc.sql` | `:63` `origin_city ILIKE p_city` | 🟡 |
-| `app/moderator/page.tsx` | ✅ `duzenleKaydet()` çift yazıma geçti (`origin_province_id` + durak `province_id`), `aliasOgren()` katlama hatası düzeltildi | 🔴 **AÇIK BULUNAN BUG:** düzenleme yolu server action'dan geçmiyordu; metni düzeltip id'yi ESKİ DEĞERDE bırakıyordu. Dalga 3'ten sonra moderatör düzeltmesi radar'a hiç işlemeyecekti. |
+| `app/moderator/page.tsx` | ✅ `duzenleKaydet()` çift yazıma geçti (`origin_province_id` + durak `province_id`), `aliasOgren()` katlama hatası düzeltildi | 🔴 **BULUNAN BUG (KAPANDI, 30 Tem 2026):** düzenleme yolu server action'dan geçmiyordu; metni düzeltip id'yi ESKİ DEĞERDE bırakıyordu. Sol sütundaki düzeltmeyle aynı anda giderildi — bu hücre "ne bulunmuştu"nun kaydı, hâlâ açık değil. |
 | `app/api/admin/radar/route.ts` | ✅ `ilId()` ile ada→id, tanınmayan il 400 | 🟢 |
 | `app/api/admin/radar/analitik/route.ts` | ✅ `city`+`counterpart` → `p_province_id`/`p_counterpart_id` | 🟢 |
 | `app/api/listings/yakin/route.ts` | ✅ `get_nearby_listings_by_city` → `_by_province` | 🟢 `enYakinIl` 81 anahtarı `locations.json` ile birebir doğrulandı |
@@ -179,7 +194,7 @@ saymamıştı; yalnız parse-text güncellenseydi iki AI kanalı sessizce ayrı�
 |---|---|---|---|
 | `/api/parse-text` | ⚠️ **DB'ye yazmıyor** → `MetindenIlan.tsx` → `ilan-ver/page.tsx` `aiCiktisiniUygula()` → forma prefill → `ilanYaz()` | ✅ `ilCiftYazim()` | ✅ `ilceNormalize()` |
 | `/api/whatsapp` (Twilio) | `ilanYaz()` doğrudan | ✅ `ilCiftYazim()` | ✅ `ilceNormalize()` |
-| `parse-listing` (Deno, WhatsApp ZIP) | `ilan_olustur` RPC doğrudan | ✅ RPC v3 `il_key()` ile türetir | ❌ **NULL kalıyor** |
+| `parse-listing` (Deno, WhatsApp ZIP) | `ilan_olustur` RPC doğrudan | ✅ RPC v3 `il_key()` ile türetir | ✅ RPC v4.1 (#50) `ilce_resmi()` ile türetir — aşağıdaki "Kapatılmayan tek boşluk" başlığı KAPANDI |
 
 Yani Dalga 2 `ilanYaz()` + RPC v3'ü kapattığı anda id tarafı üç kanalda da bitmişti.
 Dalga 4'e kalan tek gerçek iş prompt kalitesiydi.
@@ -210,14 +225,27 @@ KONMADI.
 > Coğrafi kuralları birini güncelleyip diğerini bırakma; fark yalnızca `province_id` NULL
 > sayısında görünür, hiçbir yerde hata vermez. Her iki dosyanın başında karşılıklı uyarı var.
 
-#### Kapatılmayan tek boşluk
+#### ✅ Boşluk KAPANDI (v4.1 / #50) — bu başlık bayattı
 
-`parse-listing` (Deno) kanalında `district_official` NULL kalıyor: 973 ilçe
-`lib/constants/locations.json`'da, Deno oradan import edemiyor ve **DB'de ilçe tablosu yok**,
-yani RPC de türetemiyor. Kolon şu an **hiçbir yerde OKUNMUYOR** (4 yazma yolu yazıyor, sıfır
-okuyucu) — W5 ilçe temizliği için bir veri kalitesi işareti. Kapatmanın tek temiz yolu
-`provinces` gibi bir `districts` tablosu açmak; Dalga 5 ile birlikte değerlendir, tek başına
-öncelik değil.
+7 Ağu 2026'da ölçülerek bulundu: `ilan_olustur` RPC'si **v4.1**'de (`#50`) bir "yedek
+bacak" kazanmış — `origin_district_official` / `listing_stops.district_official`
+çağıran açıkça göndermezse RPC kendisi `public.ilce_resmi(province_id, district)`
+ile türetiyor. `districts` tablosu (973 ilçe) Dalga 5 ile birlikte açılmıştı;
+tam da bu boşluğu kapatmak için kullanılmış. Yorum RPC gövdesinde birebir yazılı:
+*"Bugün o durumun TEK örneği `parse-listing`:848 — Deno `locations.json`'a
+erişemediği için bu alanı hiç göndermiyor."*
+
+**Canlı ölçüm (7 Ağu):** WhatsApp kanalı (Deno), 4 Ağu öncesi/sonrası —
+
+| dönem | ilan | flag dolu | resmi=true | resmi=false |
+|---|---|---|---|---|
+| v50 öncesi | 12.303 | **0** | 0 | 0 |
+| v50 sonrası | 10.306 | **10.092 (%98)** | 9.840 | 252 |
+
+⚠️ `supabase/functions/parse-listing/index.ts`'in kendi yorumu (`:1183-1185`, "DB'de
+ilçe tablosu YOK") **hâlâ bayat** — RPC tarafında kapandığı için Deno'nun bunu bilmesine
+gerek kalmadı, ama yorum yanlış bilgi veriyor. Kod davranışını etkilemez (salt yorum),
+düzeltildi ama henüz deploy edilmedi (sonraki gerçek deploy'a eklensin, tek başına acil değil).
 
 ### Dalga 5 — metin kolonlarını düşür
 
@@ -334,9 +362,12 @@ değiştirmeli. `İ` (U+0130) **önce** düz `i`ye çevrilir — aksi hâlde Pos
 **`ilan_olustur` RPC'si jsonb alıyor.** Fonksiyon gövdesi ile çağıran arasındaki ayrışma
 **derleme zamanında görünmez**; eksik alan sessizce NULL yazılır. RPC'ye kolon eklerken dört
 çağıranı birlikte güncelle. — v3'te `province_id` için bu tuzak **kapatıldı**: RPC id'yi
-metinden kendisi türetiyor, çağıran unutsa bile alan doluyor. Ama bu yalnız `province_id` için
-geçerli; `district_official` gibi DB'den türetilemeyen alanlar hâlâ çağırana bağlı ve hâlâ
-sessizce NULL kalır.
+metinden kendisi türetiyor, çağıran unutsa bile alan doluyor. ✅ **v4.1'de (#50, 7 Ağu 2026
+düzeltmesi) `district_official` için de kapandı** — bu satır önce "DB'den türetilemeyen alanlar
+hâlâ çağırana bağlı" diyordu, **yanlıştı**: Dalga 5'in açtığı `districts` tablosu sayesinde RPC
+artık `ilce_resmi(province_id, district)` ile bunu da kendisi türetiyor, çağıran göndermese
+bile. Genel kural hâlâ geçerli — yalnızca bu iki alan (id, official) DB'den türetilebiliyor;
+RPC'ye eklenecek YENİ bir alan için aynı güvence otomatik gelmez, elle kurulmalı.
 
 **Çift yazım döneminde yalnız id yazan bir yol tehlikeli.** Metin kolonu boş kalırsa, henüz metne
 bakan okuma yolları (HomeClient varış filtresi, radar RPC'leri) o ilanı **görünmez** yapar.
