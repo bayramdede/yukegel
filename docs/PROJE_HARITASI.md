@@ -1,6 +1,14 @@
 # Yükegel — Proje Haritası
 > **Kullanım:** Her sohbet başında sadece bu dosyayı oku. Kaynak dosyaları sadece o dosyada değişiklik yapacaksan oku.  
 >
+> ✅ **7 AĞU 2026 — "YAZARAK İLAN EKLE" ÖNCE REGEX DENİYOR, ÇÖZEMEZSE CLAUDE'A DÜŞÜYOR.**
+> Yeni: `lib/lane-parser.ts` (Deno `parse-listing`in deterministik primitiflerinin
+> senkron kopyası) + `hizliAyristir()`. `app/api/parse-text/route.ts` artık önce
+> bunu dener; çözerse AI kotasına hiç dokunmadan döner. `tsc`/`next build` temiz,
+> 1269 alias'lık gerçek veriyle 6 örnek elle doğrulandı. İki bilinen kusur açık
+> (biri miras/bilerek dokunulmadı, biri veri kalitesi — Bayram kararı bekliyor).
+> Ayrıntı: `docs/YAPILACAKLAR.md` başı, dosya haritasında `lib/lane-parser.ts`.
+>
 > ✅ **6 AĞU 2026 — DALGA 5 BİTTİ. METİN KOLONLARI DÜŞTÜ, CANLI DOĞRULANDI.**
 > `listings.origin_city` ve `listing_stops.city` **artık yok**. Coğrafi standardizasyon
 > Dalga 1→5 tamamlandı; il artık **yalnız** `province_id` (plaka kodu 1-81).
@@ -937,6 +945,26 @@ yukegel/
 │                                         #    `max(DB, bellek)` — `lib/ilan-limit.ts` ile aynı gerekçe.
 │                                         #    §9: `bak()` kaydetmez; `isle()` yalnız çağrı BAŞARILI dönünce.
 │                                         #      Sağlayıcı arızası kullanıcının kotasını yakmaz.
+├── lib/lane-parser.ts                    # 🆕 7 Ağu 2026 — "yazarak ilan ekle" artık ÖNCE bunu dener.
+│                                         #    `supabase/functions/parse-listing/index.ts`teki (Deno) deterministik
+│                                         #      (alias tablosu tabanlı, LLM'siz) primitiflerin ELLE SENKRON kopyası —
+│                                         #      `lib/whatsapp/telefon.ts` deseniyle aynı gerekçe (Deno kendi klasörü
+│                                         #      dışını import edemez). `hizliAyristir()` Deno'nun çok-şeritli broadcast
+│                                         #      state machine'i (`parseMessage`) DEĞİL — tek-ilan metni için tedbirli
+│                                         #      bir sarmalayıcı: ilişkinin (ok/tire/"'den...'e") İKİ tarafı da alias
+│                                         #      tablosundan çözülemezse `null` döner, çağıran Claude'a düşer.
+│                                         #    `app/api/parse-text/route.ts` bunu dener; çözerse AI kotasına HİÇ
+│                                         #      dokunulmaz (`source:'regex'`), çözemezse mevcut kota+Claude yolu aynen
+│                                         #      çalışır (`source:'llm'`).
+│                                         #    🚨 NEREDEYSE #71 TEKRARLANIYORDU: `aliases` 1269 aktif satır (>1000
+│                                         #      PostgREST sayfa sınırı); `.range()` sayfalama şart, tek sorgu sessizce
+│                                         #      keser. `aliaslariGetir()` bunu Deno'daki `aliaslariCek()` ile aynı yapıyor.
+│                                         #    📌 Bilinen miras kusur (bilerek dokunulmadı): `detectAdType`'ın
+│                                         #      "yuklenecek" anahtar kelimesi yük ilanlarını "arac" sanabilir —
+│                                         #      Deno kaynağından birebir kopya, ayrı görev gerektirir.
+│                                         #    📌 Yan bulgu (kod değil VERİ): `aliases`'ta frigo/frigorifik/frigolu
+│                                         #      `type='vehicle'` etiketli ama değer üstyapı — Bayram kararı bekliyor.
+│                                         #      Ayrıntı: `docs/YAPILACAKLAR.md` başı.
 ├── lib/ilan-limit.ts                     # 🚨 V6 (7 Ağu 2026) — ilan tavanı + 24 saatlik mükerrer tespiti.
 │                                         #    ilanLimitOku() → system_config['rate_limit']['spam_threshold']
 │                                         #      (max_listings_per_hour/day), hata → 20/60 fallback.

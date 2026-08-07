@@ -1,13 +1,50 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSupabase } from '../../../lib/auth';
+import { getServerSupabase, getServiceSupabase } from '../../../lib/auth';
 import { getAiQuotaForUser, countAiListingsLast24h } from '../../../lib/auditLimits';
 import { istekIp } from '../../../lib/kota';
 import { aiKotaBak, aiKotaIsle, AI_IP_SAATLIK } from '../../../lib/ai-kota';
 import { structuredLog } from '../../../lib/logger';
+import { hizliAyristir, type Alias } from '../../../lib/lane-parser';
 
 export const runtime = 'nodejs';
 
 // ── V7: KOTA ARTIK ÇAĞRI BAZINDA — gerekçe `lib/ai-kota.ts` başlığında ────────
+
+// ── 7 Ağu 2026 — REGEX ÖNCE, LLM SON ÇARE ─────────────────────────────────
+// `lib/lane-parser.ts::hizliAyristir()` metni önce ücretsiz, deterministik
+// (alias tablosu tabanlı) ayrıştırıcıdan geçirir. Yalnız İKİ tarafı da (kalkış
+// VE en az bir varış) net bir ilişkiyle (ok/tire/"'den...'e") çözebiliyorsa
+// sonuç kabul edilir — Claude'a HİÇ gidilmez, AI kotası hiç kontrol edilmez/
+// harcanmaz. Çözemezse (belirsiz cümle, ilişki bulunamadı vb.) `null` döner ve
+// akış aşağıdaki mevcut LLM yoluna aynen devam eder — kullanıcı hiçbir şey
+// kaybetmez, yalnız o istek ücretli kalır.
+// ⚠️ Bilerek TEDBİRLİ: yanlış ama akla yatkın bir otomatik-doldurma, kullanıcı
+// fark etmeden yanlış ilan göndermesine yol açabilir — "çözemedim, LLM dene"
+// bundan çok daha güvenli bir varsayılan.
+// 🚨 PostgREST varsayılan olarak sorgu başına EN FAZLA 1000 satır döndürür
+// (Supabase `db.max-rows`) — HATASIZ, sessizce keser. Aktif alias sayısı bugün
+// **1269** (>1000): sayfalamadan çekersen aliasların yaklaşık üçte biri hiç
+// görülmeden şehir/araç/üstyapı tespiti yapılır. Aynı tuzak `parse-listing`
+// (Deno) `aliaslariCek()`'te ve `whatsapp-parse` route'unda `.range()` ile
+// kapatılmış; burada da AYNI desen.
+const ALIAS_SAYFA_BOYU = 1000;
+
+async function aliaslariGetir(): Promise<Alias[]> {
+  const hepsi: Alias[] = [];
+  const client = getServiceSupabase();
+  for (let baslangic = 0; ; baslangic += ALIAS_SAYFA_BOYU) {
+    const { data, error } = await client
+      .from('aliases')
+      .select('type, alias, normalized, priority, district')
+      .eq('is_active', true)
+      .order('id', { ascending: true })
+      .range(baslangic, baslangic + ALIAS_SAYFA_BOYU - 1);
+    if (error) throw new Error(`aliases okunamadı: ${error.message}`);
+    const parca = (data || []) as Alias[];
+    hepsi.push(...parca);
+    if (parca.length < ALIAS_SAYFA_BOYU) return hepsi;
+  }
+}
 
 // ── URL çıkarma + arşivleme yardımcısı ──────────────────────────────────────
 const URL_REGEX = /https?:\/\/[^\s\u200b\u200c\u200d\u2060\u00A0]+/gi;
@@ -28,10 +65,10 @@ function extractUrlsFromText(text: string): Array<{ url: string; domain: string;
   });
 }
 
-// Tek bir kullanıcı metnini Anthropic Haiku ile yapılandırılmış JSON'a çevirir.
-// "regex/alias-first, LLM as last resort" felsefesine sadık kalmak için ileride
-// alias-bazlı bir hızlı parse adımı eklenebilir; tekil mesajlarda doğruluk önemli
-// olduğu için ilk versiyonda doğrudan LLM kullanılıyor (Haiku, kısa giriş, ucuz).
+// Regex ayrıştırıcı çözemezse SON ÇARE olarak Anthropic Haiku ile yapılandırılmış
+// JSON'a çevirir. ("regex/alias-first, LLM as last resort" — 7 Ağu 2026'da
+// yukarıdaki `hizliAyristir` denemesiyle gerçekten uygulandı; bu satır önce
+// "ileride eklenebilir" diyordu.)
 //
 // ── COĞRAFİ SÖZLEŞME (`docs/COGRAFI_GECIS.md` Dalga 4) ──────────────────────
 // 🚨 Bu uç nokta VERİTABANINA YAZMAZ. Çıktı `MetindenIlan.tsx` → `ilan-ver/page.tsx`
@@ -49,14 +86,67 @@ function extractUrlsFromText(text: string): Array<{ url: string; domain: string;
 
 export async function POST(request: NextRequest) {
   try {
-    // ── Auth: giriş gerekli (quota kullanıcı başına hesaplandığı için)
+    // ── Auth: giriş gerekli (quota kullanıcı başına hesaplandığı için, regex
+    //    yolu da dahil — girişsiz istek bu uca hiç ulaşmasın istiyoruz)
     const ssrClient = await getServerSupabase();
     const { data: { user } } = await ssrClient.auth.getUser();
     if (!user) {
       return NextResponse.json({ success: false, error: 'Giriş gerekli.' }, { status: 401 });
     }
 
-    // ── Quota: günlük AI ilan limiti
+    const { text } = await request.json();
+    if (!text || typeof text !== 'string' || text.trim().length < 10) {
+      return NextResponse.json({ success: false, error: 'Lütfen daha uzun bir ilan metni girin.' }, { status: 400 });
+    }
+
+    // ── URL arşivleme (fire-and-forget, hangi ayrıştırma yolu kullanılırsa kullanılsın) ──
+    const foundUrls = extractUrlsFromText(text);
+    if (foundUrls.length > 0) {
+      void Promise.resolve(
+        ssrClient
+          .from('archived_links')
+          .upsert(
+            foundUrls.map(({ url, domain, category }) => ({
+              url, domain, category,
+              source: 'user_text',
+              user_id: user.id,
+              status: 'pending_review',
+            })),
+            { onConflict: 'url', ignoreDuplicates: true }
+          )
+      ).catch(() => {});
+    }
+
+    // ── REGEX ÖNCE — çözebilirse Claude'a hiç gidilmez, kota hiç dokunulmaz.
+    try {
+      const aliases = await aliaslariGetir();
+      const bugunIso = new Date().toISOString().split('T')[0];
+      const hizli = hizliAyristir(text, aliases, bugunIso);
+      if (hizli) {
+        structuredLog('INFO', 'llm-parser', 'Regex ayrıştırıcı çözdü — Claude atlandı', {
+          user_id: user.id,
+          origin_city: hizli.origin_city,
+          stop_count: hizli.stops.length,
+        });
+        return NextResponse.json({
+          success: true,
+          result: hizli,
+          raw_text: text,
+          quota: null,
+          source: 'regex',
+        });
+      }
+    } catch (regexHata: any) {
+      // Regex yolu ARIZALANDIYSA sessizce LLM'e düş — bu yol bir optimizasyon,
+      // tek doğruluk kaynağı değil. Ama görünür logla, aksi hâlde alias
+      // okumasının kalıcı olarak kırıldığını kimse fark etmez.
+      structuredLog('WARN', 'llm-parser', 'Regex ayrıştırıcı hata verdi, LLM yoluna düşülüyor', {
+        user_id: user.id,
+        error: regexHata?.message || String(regexHata),
+      });
+    }
+
+    // ── Quota: günlük AI ilan limiti (yalnız regex çözemediyse buraya gelinir)
     const ip = istekIp(request);
     const [quota, dbKullanim] = await Promise.all([
       getAiQuotaForUser(user.id),
@@ -103,29 +193,6 @@ export async function POST(request: NextRequest) {
         error: `Çok fazla AI isteği gönderildi. ${durum.ipBekleSn} saniye sonra tekrar deneyin.`,
         quotaReached: true, quota, used: kullanim,
       }, { status: 429 });
-    }
-
-    const { text } = await request.json();
-    if (!text || typeof text !== 'string' || text.trim().length < 10) {
-      return NextResponse.json({ success: false, error: 'Lütfen daha uzun bir ilan metni girin.' }, { status: 400 });
-    }
-
-    // ── URL arşivleme (fire-and-forget, ana akışı etkilemez) ─────────────────
-    const foundUrls = extractUrlsFromText(text);
-    if (foundUrls.length > 0) {
-      void Promise.resolve(
-        ssrClient
-          .from('archived_links')
-          .upsert(
-            foundUrls.map(({ url, domain, category }) => ({
-              url, domain, category,
-              source: 'user_text',
-              user_id: user.id,
-              status: 'pending_review',
-            })),
-            { onConflict: 'url', ignoreDuplicates: true }
-          )
-      ).catch(() => {});
     }
 
     const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -241,6 +308,7 @@ KURALLAR:
       result,
       raw_text: text,
       quota: { limit: quota, used: kullanim, remaining: Math.max(0, quota - kullanim - 1) },
+      source: 'llm',
     });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error?.message || 'Beklenmeyen bir hata oluştu.' }, { status: 500 });

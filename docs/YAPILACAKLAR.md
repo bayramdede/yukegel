@@ -1,5 +1,92 @@
 # Yükegel — Yapılacaklar Listesi
 
+> ## ✅ 7 AĞU 2026 — "YAZARAK İLAN EKLE" ARTIK ÖNCE REGEX, SONRA CLAUDE
+>
+> **İstek:** yazarak ilan eklerken her seferinde Claude'a sormak yerine kendi
+> ayrıştırma fonksiyonumuzu kullanalım.
+>
+> **Yapılan — YENİ:** `lib/lane-parser.ts`. `supabase/functions/parse-listing/
+> index.ts`teki (Deno, WhatsApp toplu import) deterministik ayrıştırma
+> primitiflerinin (`cleanMessage`/`trNorm`/`stripSuffix`/`extractPhones`/
+> `detectAdType`/`splitByRelation`/`findPlaces`/`findVehicle`/`findBodyType`/
+> `extractWeight`/`extractPallet`) ELLE SENKRON kopyası — `lib/whatsapp/
+> telefon.ts` deseniyle aynı gerekçe: Deno kendi klasörü dışını import edemez.
+> Üstüne `extractPrice`/`extractDate`/`detectDateFlexible` (Deno'da hiç yok,
+> yalnız bu modülde) ve tek-ilan odaklı yeni bir orkestratör: `hizliAyristir()`.
+>
+> **`hizliAyristir` Deno'nun `parseMessage`'ı DEĞİL.** Deno'nunki çok-şeritli
+> WhatsApp broadcast'i için aylarca sertleştirildi (#86-#92); web textarea'sına
+> yazılan TEK bir serbest metin ilanı farklı bir girdi dağılımı. Güven eşiği
+> KATI: en az bir ilişki (ok/tire/"'den...'e") bulunup HEM sol HEM sağ tarafı
+> alias tablosundan bir yere çözülebilmeli — yoksa `null` döner, çağıran LLM'e
+> düşer. Belirsizde sessizce yanlış doldurmak, "çözemedim" demekten kötüdür.
+>
+> **`app/api/parse-text/route.ts` akışı değişti:** auth → metin oku → URL
+> arşivle → **regex dene** → çözdüyse `source:'regex'` ile dön, **AI kotasına
+> hiç dokunulmaz** → çözemediyse mevcut kota kontrolü + Claude yolu aynen
+> çalışır (`source:'llm'`). Kullanıcı hiçbir şey kaybetmiyor, yalnız daha az
+> istek ücretli kalıyor.
+>
+> 🚨 **NEREDEYSE #71'İN AYNISINI TEKRARLIYORDUM.** `aliases` tablosu bugün
+> **1269** aktif satır — PostgREST'in sayfa başı 1000 satır sınırının üstünde.
+> Sayfalamadan tek sorguyla çekilseydi alias'ların ~üçte biri hatasız-sessizce
+> görünmez olurdu (Deno'da #71'in ta kendisi). `aliaslariGetir()` Deno'daki
+> `aliaslariCek()` ile aynı `.range()` sayfalama desenini kullanıyor.
+>
+> **Doğrulama:** `tsc --noEmit` temiz · `npx next build` temiz (gerçek prod
+> build, sandbox değil) · mevcut `test:lokasyon`/`test:alias` bozulmadı (dosya
+> paylaşılmıyor, regresyon riski yok) · gerçek DB alias verisiyle (1269 satır)
+> 6 örnek metin elle koşuldu (3'ü `MetindenIlan.tsx`'teki resmî örnekler):
+>
+> | örnek | sonuç |
+> |---|---|
+> | "İstanbul Tuzla'dan Ankara Sincan'a 24 ton..." | ✅ regex çözdü, tam doğru |
+> | "Boş tırım var, İzmir'de... İstanbul, Bursa, Kocaeli yönüne..." | ✅ doğru şekilde `null` — ilişki kurulamıyor, LLM'e düşer |
+> | "Adana → Mersin, 10 palet meyve, frigo, 5 ton" | ⚠️ regex çözdü ama iki bilinen kusur çıktı (aşağıda) |
+>
+> ### 🐛 Bulunan iki kusur — biri düzeltildi, biri MİRAS (bilerek dokunulmadı)
+>
+> 1. **DÜZELTİLDİ — `extractPrice` ayraçsız 4+ haneli fiyatı yanlış okuyordu.**
+>    `\d{1,3}(?:[.,]\d{3})*` deseni "15000" (ayraçsız) girdisinde `*` sıfır
+>    tekrara düşüp yalnız SON 3 haneyi ("000"=0) yakalıyordu → `price: null`
+>    dönüyordu (15000 TL değil 0 TL okunup elenmiş oluyordu). Alternatifli
+>    desene (`ayraçlı+ | ayraçsız düz \d+`) çevrildi, "15000 TL" → `15000`
+>    doğru sonucu verdi. Bu YENİ kod, Deno'da karşılığı yok, senkron yükümlülüğü
+>    taşımıyor.
+> 2. **MİRAS, DOKUNULMADI — `detectAdType`'ın "yuklenecek" anahtar kelimesi
+>    yanlış yönlü.** "10 palet meyve, frigo, 5 ton, **yarın yüklenecek**" açıkça
+>    bir YÜK ilanı ama `aracKelimeler` listesi "yuklenecek"i içerdiği için
+>    `listing_type:'arac'` dönüyor. Bu satır Deno kaynağından BİREBİR kopya —
+>    aynı kusur `parse-listing`de de var, WhatsApp kanalını da etkiliyor.
+>    Kasıtlı düzeltmedim: (a) kapsam dışı — bu görev "kendi fonksiyonumuzu
+>    kullanalım", "Deno'nun sezgisini iyileştirelim" değil, (b) paylaşılan
+>    referans mantığı sessizce değiştirmek tam da bu projenin tekrar tekrar
+>    yakındığı hata sınıfı. Düşük risk: `listing_type` formun İLK alanı,
+>    kullanıcı önizlemede bir tık ile düzeltir. **Ayrı görev önerilir.**
+>
+> ### 🔍 Yan bulgu — `aliases` tablosunda veri kalitesi sorunu (kod DEĞİL, veri)
+>
+> Gerçek alias verisiyle test ederken çıktı: `frigo` / `frigorifik` / `frigolu`
+> alias'ları `type='vehicle'` olarak etiketlenmiş, ama `normalized='Frigorifik'`
+> — bu açıkça bir ÜSTYAPI (body) değeri, araç TİPİ değil (`TIR`/`Kamyon`/...
+> enum'unda yok). Sonuç: `findVehicle` bunu "araç tipi" sanıp döndürüyor, form
+> tarafındaki `ARAC_TIPLERI` beyaz listesi tanımadığı için SESSİZCE atıyor —
+> zararsız ama üstyapı bilgisi kayboluyor (`findBodyType` de yakalamıyor, çünkü
+> `body` tipli tek eşleşen alias "frigo tır" iki kelime, yalnız "frigo" değil).
+> **Bu satırı DEĞİŞTİRMEDİM** — `aliases` verisi hem bu yeni yolu hem canlı
+> WhatsApp hattını besliyor, veri değişikliği ayrı ölçüm+karar ister. **Yeni
+> görev: `type='vehicle'` olan frigo/frigorifik/frigolu satırları `type='body'`
+> olarak taşınmalı mı, yoksa `type='vehicle'` bilerek mi böyle (frigo TIR'ı bir
+> "araç sınıfı" sayan bir mantık olabilir)? Bayram kararı gerekiyor.**
+>
+> ⚠️ **ÖLÇÜLMEDİ — gerçek trafikte kaçta kaçı regex'le çözülüyor.** `/api/parse-
+> text` ham metni DB'ye yazmıyor, yani geçmiş trafik üzerinden "regex hit oranı"
+> hesaplanamaz (ölçecek veri yok). `structuredLog('INFO'/'WARN', 'llm-parser', ...)`
+> her iki yolu da Vercel loglarına düşürüyor — birkaç günlük canlı trafikten
+> sonra log tabanlı bir oran çıkarılabilir. Deploy Next.js uygulamasının kendisi
+> (Vercel, push'ta otomatik) — ayrı bir `supabase functions deploy` GEREKMİYOR,
+> bu route Deno tarafında değil.
+
 > ## ⏳ ERTELENDİ (6 EYLÜL 2026'YA KADAR) — Dalga 5 yedek tablolarını sil
 >
 > `public.dalga5_yedek_20260806` (14 MB, 234.840 satır) ve
