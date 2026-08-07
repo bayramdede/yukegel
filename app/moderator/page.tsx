@@ -135,7 +135,23 @@ export default function Moderator() {
   const [islem, setIslem] = useState<string>('');
   const [duzenleId, setDuzenleId] = useState<string>('');
   const [duzenleData, setDuzenleData] = useState<any>({});
-  const [sonraBak, setSonraBak] = useState<Set<string>>(new Set());
+  // 8 Ağu 2026 (pratiklik) — `docs/YAPILACAKLAR.md`'de açık bir madde olarak
+  // duran gap: bu liste bellekteydi, sayfa yenilenince sıfırlanıyordu. Moderatör
+  // "sonra bakarım" deyip 5 dk sonra sayfayı yenilerse tüm ertelemeler kaybolup
+  // aynı ilanlar tekrar önüne düşüyordu. `localStorage`'a taşındı — cihaz
+  // bazlı (birden fazla moderatör aynı hesabı paylaşırsa senkron olmaz, ama bu
+  // bugünkü tek-moderatör kullanımı için yeterli; DB'ye taşımak ayrı bir iş).
+  const SONRA_BAK_ANAHTAR = 'moderator_sonra_bak_v1';
+  const [sonraBak, setSonraBak] = useState<Set<string>>(() => {
+    if (typeof window === 'undefined') return new Set();
+    try {
+      const ham = window.localStorage.getItem(SONRA_BAK_ANAHTAR);
+      return ham ? new Set(JSON.parse(ham)) : new Set();
+    } catch { return new Set(); }
+  });
+  useEffect(() => {
+    try { window.localStorage.setItem(SONRA_BAK_ANAHTAR, JSON.stringify([...sonraBak])); } catch { /* quota vb. — sessizce yut, bellek içi hâli yine çalışır */ }
+  }, [sonraBak]);
   const [sonraBakGoster, setSonraBakGoster] = useState(false);
   const [llmYukleniyor, setLlmYukleniyor] = useState(false);
   const [istatistik, setIstatistik] = useState<any>(null);
@@ -353,6 +369,61 @@ export default function Moderator() {
     else setSelectedIds(new Set(siralanmis.map(i => i.id)));
   }
 
+  // ── 8 Ağu 2026 (pratiklik) — İYİMSER YEREL GÜNCELLEME ────────────────────
+  //
+  // ÖNCEKİ HÂL: her tekli/toplu aksiyondan sonra (approve/reject/arşiv/shadow
+  // ban/düzeltme iste — 13 ayrı çağrı noktası) TAM `getIlanlar()` (200 satır +
+  // ayrı bir server action'la telefon birleştirme) + `getIstatistik()` (5 ayrı
+  // count sorgusu) yeniden çekiliyordu. Sonuç: her tık ~yarım-bir saniye ağ
+  // gecikmesi + tüm listenin yeniden render'ı — üstelik `siradakineGec()`'in
+  // 350ms'lik "sonrakine kaydır" animasyonuyla YARIŞIYORDU, ekran sık sık
+  // moderatör kaydırırken listenin altından kayıyordu.
+  //
+  // YENİ HÂL: sunucunun her aksiyon için TAM OLARAK hangi alanları yazdığı
+  // (`app/api/moderator/toplu-islem/route.ts`ten okunarak) burada birebir
+  // tekrarlanıyor; başarılı bir çağrıdan sonra `ilanlar` state'i AĞA
+  // GİTMEDEN, anında güncelleniyor. Sekmenin server sorgusu hangi
+  // `moderation_status`ları gösteriyorsa (`getIlanlar()`teki filtre bloğuyla
+  // BİREBİR aynı mantık) yeni durum artık o kümede değilse satır listeden
+  // kayboluyor, aksi hâlde rozeti güncellenmiş hâlde yerinde kalıyor (ör.
+  // "approved" sekmesinde shadow ban uygulamak ilanı KAYBETMEMELİ, yalnız
+  // "👁 Shadow" rozetini eklemeli). `getIstatistik()` hâlâ çağrılıyor (5 ucuz
+  // count sorgusu, listeyi etkilemiyor) ama artık render'ı bloklamıyor.
+  const AKSIYON_ALANLARI: Record<string, Record<string, unknown>> = {
+    approve:           { moderation_status: 'approved',  status: 'active' },
+    reject:            { moderation_status: 'rejected',  status: 'passive' },
+    passive:           { status: 'passive' },
+    archive:           { moderation_status: 'archived',  status: 'passive' },
+    unarchive:         { moderation_status: 'pending' },
+    shadow_ban_kaldir: { is_shadow_banned: false, moderation_status: 'approved', status: 'active' },
+    shadow_ban:        { is_shadow_banned: true },
+    correction_needed: { moderation_status: 'correction_needed', status: 'passive' },
+  };
+
+  function ilanlariYereldeUygula(ids: string[], patch: Record<string, unknown>) {
+    const set = new Set(ids);
+    const yeniDurum = patch.moderation_status as string | undefined;
+    // Bu sekme moderation_status'a göre mi süzüyor? (`getIlanlar()`teki tab
+    // filtresiyle aynı liste — 'hepsi'/'riskli'/'no_lane' başka kritere bakar.)
+    const kalirMi = (mevcutDurum: string) => {
+      if (yeniDurum === undefined) return true; // bu aksiyon moderation_status değiştirmiyor (ör. sade shadow_ban)
+      if (filtre === 'arsiv')  return yeniDurum === 'archived';
+      if (filtre === 'hepsi')  return yeniDurum !== 'archived';
+      if (filtre === 'riskli') return yeniDurum !== 'archived';
+      if (filtre === 'no_lane') return true; // ayrı liste (raw_posts), bu aksiyonlardan etkilenmez
+      return yeniDurum === filtre; // pending/approved/rejected/passive/correction_needed
+    };
+    setIlanlar(prev => prev
+      .filter(i => !set.has(i.id) || kalirMi(i.moderation_status))
+      .map(i => set.has(i.id) ? { ...i, ...patch } : i));
+    setSelectedIds(prev => {
+      let degisti = false;
+      const yeni = new Set(prev);
+      for (const id of ids) if (yeni.delete(id)) degisti = true;
+      return degisti ? yeni : prev;
+    });
+  }
+
   // ── Toplu işlem helper (service role API)
   async function topluApi(ids: string[], action: 'approve' | 'reject' | 'passive' | 'archive' | 'unarchive' | 'shadow_ban_kaldir' | 'shadow_ban') {
     const res = await fetch('/api/moderator/toplu-islem', {
@@ -374,10 +445,10 @@ export default function Moderator() {
     try {
       const apiAction = action === 'delete' ? 'reject' : action;
       await topluApi(ids, apiAction);
-      setSelectedIds(new Set());
+      ilanlariYereldeUygula(ids, AKSIYON_ALANLARI[apiAction]);
     } catch (e: any) { alert('Hata: ' + e.message); }
     setBulkYukleniyor(false);
-    getIlanlar(); getIstatistik();
+    getIstatistik();
   }
 
   // ── Sprint 3: Toplu shadow ban kaldır
@@ -409,19 +480,20 @@ export default function Moderator() {
           correction_message: duzeltmeMesaj || null,
         }),
       });
+      ilanlariYereldeUygula(ids, AKSIYON_ALANLARI.correction_needed);
     } catch (e: any) { alert('Hata: ' + e.message); }
     setDuzeltmeModal(null); setDuzeltmeSebep(''); setDuzeltmeMesaj('');
     setIslem('');
-    getIlanlar(); getIstatistik();
+    getIstatistik();
   }
 
   // Sprint 3+: Tekil shadow ban uygula
   async function shadowBanla(id: string) {
     setIslem(id);
-    try { await topluApi([id], 'shadow_ban'); }
+    try { await topluApi([id], 'shadow_ban'); ilanlariYereldeUygula([id], AKSIYON_ALANLARI.shadow_ban); }
     catch (e: any) { alert('Hata: ' + e.message); }
     setIslem('');
-    setTimeout(() => { getIlanlar(); getIstatistik(); }, 200);
+    getIstatistik();
   }
 
   async function topluShadowBanKaldir() {
@@ -431,41 +503,44 @@ export default function Moderator() {
     setBulkYukleniyor(true);
     try {
       await topluApi(ids, 'shadow_ban_kaldir');
-      setSelectedIds(new Set());
+      ilanlariYereldeUygula(ids, AKSIYON_ALANLARI.shadow_ban_kaldir);
     } catch (e: any) { alert('Hata: ' + e.message); }
     setBulkYukleniyor(false);
-    getIlanlar(); getIstatistik();
+    getIstatistik();
   }
 
   async function topluOnaylaYesil() {
     const ids = siralanmis.filter(i => skorRenk(i).badge === '🟢').map(i => i.id);
     if (!ids.length) return;
-    try { await topluApi(ids, 'approve'); getIlanlar(); getIstatistik(); }
+    try { await topluApi(ids, 'approve'); ilanlariYereldeUygula(ids, AKSIYON_ALANLARI.approve); getIstatistik(); }
     catch (e: any) { alert('Toplu onay hatası: ' + e.message); }
   }
 
   async function topluReddet(badge: '🟡' | '🔴') {
     const ids = siralanmis.filter(i => skorRenk(i).badge === badge).map(i => i.id);
     if (!ids.length) return;
-    try { await topluApi(ids, 'reject'); getIlanlar(); getIstatistik(); }
+    try { await topluApi(ids, 'reject'); ilanlariYereldeUygula(ids, AKSIYON_ALANLARI.reject); getIstatistik(); }
     catch (e: any) { alert('Toplu red hatası: ' + e.message); }
   }
 
   async function arsivIslem(id: string, geriAl = false) {
     setIslem(id);
-    try { await topluApi([id], geriAl ? 'unarchive' : 'archive'); }
+    try {
+      await topluApi([id], geriAl ? 'unarchive' : 'archive');
+      ilanlariYereldeUygula([id], AKSIYON_ALANLARI[geriAl ? 'unarchive' : 'archive']);
+    }
     catch (e: any) { alert('Arşiv hatası: ' + e.message); }
     setIslem('');
-    setTimeout(() => { getIlanlar(); getIstatistik(); }, 200);
+    getIstatistik();
   }
 
   // ── Sprint 3: Tekil shadow ban kaldır
   async function shadowBanKaldir(id: string) {
     setIslem(id);
-    try { await topluApi([id], 'shadow_ban_kaldir'); }
+    try { await topluApi([id], 'shadow_ban_kaldir'); ilanlariYereldeUygula([id], AKSIYON_ALANLARI.shadow_ban_kaldir); }
     catch (e: any) { alert('Hata: ' + e.message); }
     setIslem('');
-    setTimeout(() => { getIlanlar(); getIstatistik(); }, 200);
+    getIstatistik();
   }
 
   async function kullaniciAskiyaAl(userId: string, displayName: string) {
@@ -496,7 +571,8 @@ export default function Moderator() {
     await supabase.from('listings').update({ moderation_status: yeniModerasyon, status: yeniStatus, reviewed_at: new Date().toISOString() }).eq('id', id);
     setIslem('');
     siradakineGec(id, false);
-    setTimeout(() => { getIlanlar(); getIstatistik(); }, 300);
+    ilanlariYereldeUygula([id], { moderation_status: yeniModerasyon, status: yeniStatus });
+    getIstatistik();
   }
 
   function sonraBakEkleVeGec(id: string) {
@@ -628,7 +704,20 @@ export default function Moderator() {
     if (mod === 'onayla') await aliasOgren(duzenleData);
     setDuzenleId(''); setIslem('');
     siradakineGec(id, true);
-    setTimeout(() => { getIlanlar(); getIstatistik(); }, 300);
+    // Kart HEMEN doğru veriyle güncellensin — tam yeniden çekmeye gerek yok,
+    // yeni değerler zaten yukarıda çözülmüştü (`kalkisIl`/`cozulmusDuraklar`).
+    // `stop.id` yeni eklenen duraklarda null kalır ama gösterimde kullanılmıyor
+    // (kart `stops.map((s,i) => <div key={i}>`, id'ye bakmıyor).
+    ilanlariYereldeUygula([id], {
+      ...updateData,
+      listing_stops: cozulmusDuraklar.map((d, i) => ({
+        id: d.id, stop_order: i + 1, province_id: d.ilId, district: d.ilceAd,
+        vehicle_count: d.kaynak.vehicle_count || 1, cargo_type: d.kaynak.cargo_type || null,
+        weight_ton: d.kaynak.weight_ton || null, pallet_count: d.kaynak.pallet_count || null,
+      })),
+      contact_phone: duzenleData.contact_phone || null,
+    });
+    getIstatistik();
   }
 
   function stopEkle() { setDuzenleData({ ...duzenleData, stops: [...(duzenleData.stops || []), { id: null, city: 'İstanbul', district: '', weight_ton: '', pallet_count: '', vehicle_count: 1, cargo_type: '', notes: '' }] }); }
@@ -1301,9 +1390,9 @@ export default function Moderator() {
                 const ids = seciliIlanlar.filter(i => !i.is_shadow_banned && i.moderation_status === 'approved').map(i => i.id);
                 if (!confirm(`${ids.length} ilan shadow ban'a alınacak. Devam et?`)) return;
                 setBulkYukleniyor(true);
-                try { await topluApi(ids, 'shadow_ban'); setSelectedIds(new Set()); }
+                try { await topluApi(ids, 'shadow_ban'); ilanlariYereldeUygula(ids, AKSIYON_ALANLARI.shadow_ban); }
                 catch (e: any) { alert('Hata: ' + e.message); }
-                setBulkYukleniyor(false); getIlanlar(); getIstatistik();
+                setBulkYukleniyor(false); getIstatistik();
               }} disabled={bulkYukleniyor}
                 style={{ padding: '7px 16px', borderRadius: 8, border: '1px solid #7f1d1d', background: '#2a0d0d', color: '#f87171', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer', opacity: bulkYukleniyor ? 0.5 : 1 }}>
                 👁 Shadow Banla
@@ -1319,9 +1408,10 @@ export default function Moderator() {
               <button onClick={async () => {
                 if (!confirm(`${selectedIds.size} ilan bekleyenlere alınacak. Devam et?`)) return;
                 setBulkYukleniyor(true);
-                try { await topluApi(Array.from(selectedIds), 'unarchive'); setSelectedIds(new Set()); }
+                const ids = Array.from(selectedIds);
+                try { await topluApi(ids, 'unarchive'); ilanlariYereldeUygula(ids, AKSIYON_ALANLARI.unarchive); }
                 catch (e: any) { alert('Hata: ' + e.message); }
-                setBulkYukleniyor(false); getIlanlar(); getIstatistik();
+                setBulkYukleniyor(false); getIstatistik();
               }} disabled={bulkYukleniyor}
                 style={{ padding: '7px 16px', borderRadius: 8, border: '1px solid #374151', background: '#1f2937', color: '#e2e8f0', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer', opacity: bulkYukleniyor ? 0.5 : 1 }}>
                 ↩ Bekleyenlere Al

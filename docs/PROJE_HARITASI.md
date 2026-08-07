@@ -1,6 +1,16 @@
 # Yükegel — Proje Haritası
 > **Kullanım:** Her sohbet başında sadece bu dosyayı oku. Kaynak dosyaları sadece o dosyada değişiklik yapacaksan oku.  
 >
+> ✅ **8 AĞU 2026 — Moderatör paneli: 13 aksiyon iyimser yerel güncellemeye geçti.**
+> Onayla/reddet/arşivle/shadow-ban/düzeltme-iste — hepsi her tıktan sonra TAM
+> `getIlanlar()` (200 satır) + `getIstatistik()` çekiyordu; bu, "sonrakine
+> yumuşak kaydır" animasyonuyla yarışıp listeyi moderatörün altından kaydırıyordu.
+> Yeni `ilanlariYereldeUygula()` sunucunun her aksiyon için yazdığı alanları
+> (`toplu-islem/route.ts`ten birebir) bilip `ilanlar` state'ini ağa gitmeden
+> günceller — sekme değişmişse satır kalkar, değişmemişse rozeti güncellenir.
+> "Sonraya Bırak" listesi de `localStorage`'a taşındı (sayfa yenilenince
+> sıfırlanmıyor artık). `tsc`/`next build` temiz. Ayrıntı: `docs/YAPILACAKLAR.md` başı.
+>
 > ✅ **7 AĞU 2026 — WhatsApp yükleme artık AYRI SAYFA: `/moderator/whatsapp-yukle`.**
 > `WhatsappYukle.tsx` (parametresiz, moderasyon kuyruğuyla state paylaşmıyor)
 > eskiden `/moderator` (1349 satır, ~35 `useState`) içine gömülüydü — dakikalarca

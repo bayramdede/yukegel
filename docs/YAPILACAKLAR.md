@@ -1,5 +1,60 @@
 # Yükegel — Yapılacaklar Listesi
 
+> ## ✅ 8 AĞU 2026 — MODERATÖR PANELİ: 13 AKSİYON İYİMSER YEREL GÜNCELLEMEYE GEÇTİ
+>
+> **İstek:** "Moderatörü daha pratik yap. Bu şekilde olmak zorunda değil."
+>
+> **Bulgu (kod okunarak, tahmin değil):** onayla/reddet/arşivle/shadow-ban/
+> düzeltme-iste — 13 ayrı çağrı noktasının HEPSİ her aksiyondan sonra TAM
+> `getIlanlar()` (200 satır + ayrı bir server action'la telefon birleştirme)
+> + `getIstatistik()` (5 count sorgusu) çekiyordu. Bunun somut sonucu: her tek
+> tıkta ~yarım saniyelik ağ gecikmesi + tüm listenin yeniden render'ı — ve bu,
+> `siradakineGec()`'in 350ms'lik "sonrakine yumuşak kaydır" animasyonuyla
+> YARIŞIYORDU. Moderatör onaylayıp sıradakine kayarken ekran sık sık listenin
+> yeni hâliyle altından kayıyordu.
+>
+> **Düzeltme:** `app/api/moderator/toplu-islem/route.ts`'in her aksiyon için
+> TAM OLARAK hangi alanları yazdığı (`approve`/`reject`/`passive`/`archive`/
+> `unarchive`/`shadow_ban`/`shadow_ban_kaldir`/`correction_needed`) satır satır
+> okunup `AKSIYON_ALANLARI` sabitinde birebir tekrarlandı. Yeni
+> `ilanlariYereldeUygula(ids, patch)` yardımcı fonksiyonu, sunucu isteği
+> başarılı dönünce `ilanlar` state'ini AĞA GİTMEDEN günceller — hangi sekmenin
+> hangi `moderation_status`ları gösterdiğini (`getIlanlar()`teki tab filtresiyle
+> BİREBİR aynı mantık) bilerek karar verir: yeni durum artık o sekmede
+> görünmeyecekse satır listeden kalkar, aksi hâlde rozeti güncellenmiş hâlde
+> yerinde kalır (ör. "approved" sekmesinde shadow ban uygulamak ilanı
+> KAYBETMEZ, yalnız "👁 Shadow" rozeti eklenir — bunu ATLASAYDIK moderatör
+> "nereye gitti" diye şaşırırdı). `getIstatistik()` hâlâ çağrılıyor (5 ucuz
+> count sorgusu) ama artık liste render'ını bloklamıyor.
+>
+> `duzenleKaydet()`in "Kaydet ve Onayla"/"Sadece Kaydet" dalları da aynı yola
+> alındı — zaten çözülmüş `kalkisIl`/`cozulmusDuraklar` değerleri patch'e
+> dönüştürülüp anında uygulanıyor, ikinci bir sorguya gerek kalmadı.
+>
+> **Dokunulmadan bırakılan tek çağrı noktası:** `kullaniciAskiyaAl` — bu
+> aksiyon sunucuda o kullanıcının TÜM ilanlarını topluca etkiliyor
+> (`kullanici-askiya/route.ts`) ama `ilanlar` state'i `user_id` kolonunu hiç
+> tutmuyor, yani etkilenen satırları yerelde bulup güncellemenin güvenilir bir
+> yolu yok. Bu aynı zamanda düşük frekanslı bir aksiyon (kullanıcı arama +
+> askıya alma, hızlı tekrarlı bir tıklama değil) — refetch'i olduğu gibi
+> bırakmak, yanlış bir yerel tahminle veri tutarsızlığı riskine girmekten iyi.
+>
+> **Ayrıca düzeltildi — "Sonraya Bırak" kalıcılığı** (`docs/YAPILACAKLAR.md`'de
+> önceden açık bir madde olarak duruyordu): erteleme listesi artık
+> `localStorage`'da, sayfa yenilenince sıfırlanmıyor.
+>
+> **Doğrulama:** `tsc --noEmit` temiz, gerçek `next build` temiz. Canlı
+> ölçüm yapılmadı (bu bir DB/sunucu davranışı değil, saf istemci render/ağ
+> optimizasyonu — ölçülecek bir sunucu tarafı metriği yok).
+>
+> 📌 **Dokunulmadı, ayrı iş:** `duzenleKaydet`'in N+1 update/insert deseni
+> (transaction yok) · "Çözümsüz" (no_lane) akışının düzenleme state'ini
+> string-prefix hilesiyle paylaşması · filtre/aramanın `useMemo` kullanmaması ·
+> klavye kısayolu YOK (onayla/reddet/sonrakine geç hâlâ yalnız fare ile) —
+> bu sonuncusu büyük hacimde triyaj yapan bir moderatör için ayrı, daha büyük
+> bir kazanç olabilir ama tasarım kararı gerektiriyor (hangi tuş, hangi karta
+> uygulanacak), bu oturumda spekülatif olarak eklenmedi.
+
 > ## ✅ 7 AĞU 2026 — WHATSAPP YÜKLEME `/moderator/whatsapp-yukle`YE AYRILDI
 >
 > **İstek:** "Moderatör ve WhatsApp dosyası upload sürecini incele. Gerekirse
