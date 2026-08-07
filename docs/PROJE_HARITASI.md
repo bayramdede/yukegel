@@ -112,6 +112,11 @@
 > backlog maddesi oldu. Ayrıntı: `docs/YAPILACAKLAR.md` #92 bloğunun sonu.
 > ⏳ **Kalan gerçek iş:** #86/#88 canlı ölçümü hâlâ yeni trafik bekliyor; deploy'dan
 > sonraki 413 satırlık "changed" kümesinin geri kalanı hâlâ tam denetlenmedi.
+> ✅ **#89 CANLI DOĞRULAMASI KAPANDI (7 Ağu 13:10 UTC).** v89'un işlediği gerçek
+> 2.246 `raw_post`'la ölçüldü (tanık kolonu önce kondu): varış ilçe doluluğu
+> **%33,8 → %65,5** yükseldi, kendine-şerit **165 → 64** düştü (sıfıra inmedi çünkü
+> v89 henüz #92 fix'ini içermiyordu — o v90'da, henüz trafik almadı). İki yön
+> beklentisi de tuttu, tahmin değil ölçüm.
 > ✅ **Dalga 5 gerçek trafikle doğrulandı:** deploy sonrası WhatsApp dosyası işlendi →
 > **303 ilan · 424 durak · il id boş 0 · duraksız ilan 0.**
 > Ayrıntı: `docs/YAPILACAKLAR.md` başı.

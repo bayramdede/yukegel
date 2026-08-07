@@ -527,6 +527,24 @@
 > Beklenen: son 24 saatin kendine-şerit sayısı 165'ten DÜŞER, varış ilçe doluluğu
 > %25,5'ten YÜKSELİR. ⚠️ Ölçmeden önce **tanık kolonu** koy: deploy'dan sonra kaç yeni
 > `raw_post` işlendi? Sıfırsa fark yokluğu deploy'un başarısızlığı değil, örneklem
+>
+> ### ✅ 7 AĞU 2026 (13:10 UTC) — CANLI DOĞRULAMA YAPILDI, İKİ BEKLENTİ DE TUTTU
+>
+> **Tanık kolonu önce koyuldu:** deploy (05:41:56) ile ölçüm anı (13:10) arasında
+> **2.246 yeni `raw_post`** işlenmiş (son satır 09:49) — yani "fark yok" çıksaydı bu
+> örneklem yokluğu OLMAZDI, gerçek sinyal olurdu. Karşılaştırma penceresi: v89
+> öncesi 7 gün (11.731 ilan) vs v89 sonrası gerçek trafik (7.995 ilan).
+>
+> | ölçüt | v89 ÖNCESİ (7 gün) | v89 SONRASI (canlı) |
+> |---|---|---|
+> | varış ilçe doluluğu | 33,8% (baseline notundaki %25,5 farklı pencere) | **65,5%** ✅ YÜKSELDİ |
+> | kendine-şerit satır | **165** (dokümandaki sayıyla birebir eşleşti) | **64** ✅ DÜŞTÜ |
+>
+> 📌 Kendine-şerit **sıfıra inmedi** (64 kaldı) — beklenen, çünkü v89 #92 düzeltmesini
+> henüz İÇERMİYORDU (#92 fix v90'da, bu ölçümden sonra deploy edildi, henüz trafik almadı).
+> v90'ın kendi canlı kendine-şerit sayısı ayrı bir ölçüm ister, yeni trafik gerekiyor.
+> **#89 canlı doğrulaması bu haliyle KAPANDI** — iki yön beklentisi de (yükseliş/düşüş)
+> gerçek trafikle doğrulandı, tahmin değil.
 > yokluğudur — 7 Ağu 05:43'te tam olarak bu oldu.
 >
 > 🟢 **6 AĞU 2026 — #87-F: KAYIP = 0 ÇIKTI, AMA ÇIKTI YİNE DE YANLIŞTI.
