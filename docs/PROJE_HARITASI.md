@@ -1,12 +1,24 @@
 # Yükegel — Proje Haritası
 > **Kullanım:** Her sohbet başında sadece bu dosyayı oku. Kaynak dosyaları sadece o dosyada değişiklik yapacaksan oku.  
 >
+> ✅ **7 AĞU 2026 — #93 KAPANDI: `detectAdType` "yuklenecek" DÜZELTMESİ, CANLI v91.**
+> Ölçüm: `raw_text`'te tam "yuklenecek" geçen 1350 `arac`-etiketli ilandan 25'i
+> elle okundu, **25'i de** gerçekte yük simsarı kalıbıydı ("X'ten büyük balya
+> yüklenecek" = yük var/araç aranıyor, boş araç DEĞİL); yalnız 2'sinde başka
+> gerçek araç sinyali vardı. Kelime hem Deno (`parse-listing`) hem `lib/lane-
+> parser.ts`ten çıkarıldı, `npm run test:ad-type` (yeni, index.ts'ten çalışma
+> anında sökülür, mutasyonla doğrulandı) + 6 mevcut regresyon paketi yeşil.
+> **Deploy edildi — v91 ACTIVE.** Geçmiş ~1350 yanlış etiketli ilan: yalnız 1'i
+> hâlâ aktif+onaylı görünüyordu, **Bayram kararı: DEĞME** (#90 kalıbı — küçük
+> kazanç, geçmiş veri olduğu gibi bırakıldı). Ayrıntı: `docs/YAPILACAKLAR.md` başı.
+>
 > ✅ **7 AĞU 2026 — "YAZARAK İLAN EKLE" ÖNCE REGEX DENİYOR, ÇÖZEMEZSE CLAUDE'A DÜŞÜYOR.**
 > Yeni: `lib/lane-parser.ts` (Deno `parse-listing`in deterministik primitiflerinin
 > senkron kopyası) + `hizliAyristir()`. `app/api/parse-text/route.ts` artık önce
 > bunu dener; çözerse AI kotasına hiç dokunmadan döner. `tsc`/`next build` temiz,
-> 1269 alias'lık gerçek veriyle 6 örnek elle doğrulandı. İki bilinen kusur açık
-> (biri miras/bilerek dokunulmadı, biri veri kalitesi — Bayram kararı bekliyor).
+> 1269 alias'lık gerçek veriyle 6 örnek elle doğrulandı. ✅ İki bilinen kusur da
+> KAPANDI: frigo/frigorifik veri kalitesi taşındı (dosya haritasında `lib/lane-
+> parser.ts` girdisine bak), "yuklenecek" #93 ile düzeltildi (bir üstteki madde).
 > Ayrıntı: `docs/YAPILACAKLAR.md` başı, dosya haritasında `lib/lane-parser.ts`.
 >
 > ✅ **6 AĞU 2026 — DALGA 5 BİTTİ. METİN KOLONLARI DÜŞTÜ, CANLI DOĞRULANDI.**
@@ -959,9 +971,9 @@ yukegel/
 │                                         #    🚨 NEREDEYSE #71 TEKRARLANIYORDU: `aliases` 1269 aktif satır (>1000
 │                                         #      PostgREST sayfa sınırı); `.range()` sayfalama şart, tek sorgu sessizce
 │                                         #      keser. `aliaslariGetir()` bunu Deno'daki `aliaslariCek()` ile aynı yapıyor.
-│                                         #    📌 Bilinen miras kusur (bilerek dokunulmadı): `detectAdType`'ın
-│                                         #      "yuklenecek" anahtar kelimesi yük ilanlarını "arac" sanabilir —
-│                                         #      Deno kaynağından birebir kopya, ayrı görev gerektirir.
+│                                         #    ✅ Miras kusur KAPANDI (#93, 7 Ağu 2026) — `detectAdType`'ın
+│                                         #      "yuklenecek" anahtar kelimesi hem burada hem Deno'da çıkarıldı,
+│                                         #      canlı v91'e deploy edildi. `npm run test:ad-type` bekçisi.
 │                                         #    ✅ Yan bulgu KAPANDI (7 Ağu 2026) — `aliases`'ta frigo/frigorifik/frigolu
 │                                         #      `type='vehicle'→'body'` taşındı (`docs/20260807_frigo_body_tasima.sql`,
 │                                         #      id 230/231/232), öncelik 80→70 (body tavanına eşitlendi). Kod deploy'u

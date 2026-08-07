@@ -53,16 +53,53 @@
 >    desene (`ayraçlı+ | ayraçsız düz \d+`) çevrildi, "15000 TL" → `15000`
 >    doğru sonucu verdi. Bu YENİ kod, Deno'da karşılığı yok, senkron yükümlülüğü
 >    taşımıyor.
-> 2. **MİRAS, DOKUNULMADI — `detectAdType`'ın "yuklenecek" anahtar kelimesi
->    yanlış yönlü.** "10 palet meyve, frigo, 5 ton, **yarın yüklenecek**" açıkça
->    bir YÜK ilanı ama `aracKelimeler` listesi "yuklenecek"i içerdiği için
->    `listing_type:'arac'` dönüyor. Bu satır Deno kaynağından BİREBİR kopya —
->    aynı kusur `parse-listing`de de var, WhatsApp kanalını da etkiliyor.
->    Kasıtlı düzeltmedim: (a) kapsam dışı — bu görev "kendi fonksiyonumuzu
->    kullanalım", "Deno'nun sezgisini iyileştirelim" değil, (b) paylaşılan
->    referans mantığı sessizce değiştirmek tam da bu projenin tekrar tekrar
->    yakındığı hata sınıfı. Düşük risk: `listing_type` formun İLK alanı,
->    kullanıcı önizlemede bir tık ile düzeltir. **Ayrı görev önerilir.**
+> 2. **MİRAS, o an dokunulmadı — ayrı görev olarak açıldı, aşağıda KAPANDI.**
+>    `detectAdType`'ın "yuklenecek" anahtar kelimesi yanlış yönlüydü.
+>
+> ### ✅ 7 AĞU 2026 — #93 KAPANDI: `detectAdType`'tan "yuklenecek" çıkarıldı
+>
+> **Ölçüm önce, karar sonra.** `raw_posts.raw_text`'i (WhatsApp kanalı geçmiş
+> veriyi tutuyor, `/api/parse-text` tutmuyor) tarayınca: `listing_type='arac'`
+> olan ve metninde tam "yuklenecek" geçen **1350** ilan bulundu. Rastgele **25**'i
+> elle okundu — **25'i de** gerçekte yük simsarı kalıbıydı: "Urfa'dan büyük balya
+> yüklenecek", "Sarımsak yüklenecek", "Şişe yüklenecek" — Türkçe nakliye
+> jargonunda "X yüklenecek" = "X kalkışlı yük var, araç aranıyor" demek, "boş
+> aracım var" demek DEĞİL. Ayrıca bu 1350'nin yalnız **2'sinde** başka bir
+> gerçek araç sinyali (`bos arac`/`bos tir`/`bos kamyon`/`yuk ariyor`) de vardı
+> — yani kelimeyi çıkarmak neredeyse hiçbir GERÇEK araç ilanını kaçırmıyor.
+>
+> **Yapıldı:** `aracKelimeler` listesinden `'yuklenecek'` çıkarıldı — hem
+> `supabase/functions/parse-listing/index.ts` (Deno, canlı) hem `lib/lane-
+> parser.ts`'te (senkron kopya, ikisi birden değişti).
+>
+> **Yeni bekçi: `npm run test:ad-type`** (`scripts/test-ad-type.mts`). `trNorm`+
+> `detectAdType` `index.ts`ten ÇALIŞMA ANINDA sökülür — elle kopyalanmaz (#86
+> dersi). 12 kontrol: gerçek "yuklenecek" örnekleri artık `yuk`, gerçek araç
+> sinyalleri (`boş araç`/`boş tır`/`boş kamyon`/`yük arıyor`) hâlâ `arac`,
+> "yuklenecek" + gerçek araç sinyali BİRLİKTE geçince yine `arac` (kelimeyi
+> çıkarmak diğer sinyalleri bozmuyor). **Mutasyonla doğrulandı:** kelime geri
+> konunca tam **5** test düştü, gerisi sağlam kaldı.
+> **Regresyon:** `test:87`/`test:pass2`/`test:clean`/`test:lokasyon`/
+> `test:districts`/`test:alias` + `tsc --noEmit` hepsi yeşil.
+>
+> ✅ **DEPLOY EDİLDİ — canlı `parse-listing` v91 (7 Ağu 2026).** `list_edge_
+> functions` ile doğrulandı: `version: 91, status: ACTIVE`.
+>
+> **Geçmiş veri — Bayram kararı: DEĞME.** Düzeltmeden önceki ~1350 yanlış
+> etiketli ilanın durum dağılımı ölçüldü:
+>
+> | durum | sayı |
+> |---|---|
+> | pasif + arşivlenmiş (ölü ilan) | 1174 |
+> | pasif + onaylı | 124 |
+> | pasif + reddedilmiş | 38 |
+> | pasif + bekliyor (moderatör kuyruğu) | 11 |
+> | **aktif + onaylı (şu an canlıda görünen)** | **1** |
+>
+> Yalnız 1 ilan şu an gerçekten yanlış görünüyordu; toplu `UPDATE` riski/emeği
+> bu kadar küçük bir kazanca değmedi — #90'daki "onarımın gerçek değeri
+> sanılandan küçük" dersiyle aynı kalıp. İleri-yönlü düzeltme kalıcı, geçmiş
+> veri olduğu gibi bırakıldı.
 >
 > ### ✅ 7 AĞU 2026 — `aliases` veri kalitesi düzeltildi: frigo/frigorifik/frigolu artık `body`
 >

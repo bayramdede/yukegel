@@ -290,7 +290,14 @@ function detectAdType(text: string): 'yuk' | 'arac' {
   // 'bosaltir'/'boşaltır' kasıtlı çıkarıldı — "YÜKLER BOŞALTIR" gibi ifadeler yük ilanında araç
   // varış noktasını belirtir, araç ilanı sinyali değil.
   // 'yukum var' da çıkarıldı — "yükümüz var" = yük ilanı sinyali.
-  const aracKelimeler = ['bos arac', 'bos tir', 'bos kamyon', 'yuklenecek', 'yuk ariyor', 'boş araç', 'boş tır']
+  // 🚨 'yuklenecek' 7 Ağu 2026'da ÇIKARILDI (#93). Canlı ölçüm: bu tek kelimeyle
+  // 'arac' sayılan 1350 ilandan 25'i elle okundu, 25'i de aslında YÜK ilanıydı
+  // ("Urfa'dan büyük balya yüklenecek", "Sarımsak yüklenecek" — klasik yük
+  // simsarı kalıbı: "X yüklenecek" = "X kalkışlı yük var, araç aranıyor").
+  // Ayrıca bu 1350'nin yalnız 2'sinde BAŞKA bir gerçek araç sinyali de vardı —
+  // yani kelimeyi çıkarmak neredeyse hiçbir gerçek araç ilanını kaçırmıyor.
+  // Kanıt/ölçüm: `docs/YAPILACAKLAR.md` başı, `npm run test:ad-type`.
+  const aracKelimeler = ['bos arac', 'bos tir', 'bos kamyon', 'yuk ariyor', 'boş araç', 'boş tır']
   for (const k of aracKelimeler) {
     if (norm.includes(trNorm(k))) return 'arac'
   }
