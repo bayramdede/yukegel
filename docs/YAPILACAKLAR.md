@@ -1,5 +1,59 @@
 # Yükegel — Yapılacaklar Listesi
 
+> ## ✅ 7 AĞU 2026 — LANDING + İLAN DETAYI PERFORMANSI: 400 KAT VE 158 KAT
+>
+> **İstek:** "İlanlar çok hızlı gelmeli. İlan detayı da hızlı açılmalı."
+>
+> **Ölçüm önce.** `pg_stat_statements`e bakıldı — tahmin değil, gerçek üretim
+> trafiği. Ana sayfa/filtre sorgusu (355 çağrı) **ortalama 1026ms, en kötü
+> 21.373ms**. Sayım sorgusu (hero rozeti) **1269ms**. Bunlar "yavaş hissediliyor"
+> değil, ölçülmüş, kullanıcının gerçekten beklediği süreler.
+>
+> ### Bulgu 1 — planlayıcı satır sayısını 8 kat yanlış tahmin ediyordu
+>
+> `moderation_status = ANY('{approved,auto_published}')` iki değerli koşulu
+> Postgres'e **355 satır** dedirtiyordu, gerçek **2934**. Yanlış tahmin yüzünden
+> planlayıcı "tara + sırala" planını seçiyor, `listing_stops` lateral join'ini
+> kazanan 200 satır yerine eşleşen **2934 satırın hepsinde** çalıştırıyordu.
+> **Kanıt:** aynı sorgu tek değerli eşitlikle (`moderation_status = 'approved'`)
+> **9,6ms**'de bitiyordu — index eksikliği değil, saf istatistik sorunu.
+> **Düzeltme:** `create statistics listings_aktiflik_korelasyon (dependencies,
+> ndistinct) on moderation_status, is_shadow_banned, status` + `analyze`.
+> **Sonuç:** 1711ms (soğuk) → 307ms → **4ms (sıcak, kararlı) — 400 kat.**
+>
+> ### Bulgu 2 — `listings` hiç manuel VACUUM edilmemişti
+>
+> `n_dead_tup` 30.559/255.880 (%12) — varsayılan autovacuum eşiği %20, bu yazma
+> hacminde (toplu expire/reject cron'ları) 7+ gündür hiç tetiklenmemiş.
+> Visibility map bayat olduğu için sayım sorgusu Index-Only-Scan'de **6219 Heap
+> Fetch**'e düşüyordu. **Düzeltme:** `vacuum (analyze) listings` +
+> `autovacuum_vacuum_scale_factor` %20 → **%5**'e çekildi (tekrarlamasın diye).
+> **Sonuç:** 1269ms → **8ms — 158 kat.**
+>
+> ### Bulgu 3 — `/ilan/[id]` her açılışta AYNI ilanı 2 kez sorguluyordu
+>
+> Next.js `generateMetadata` ile sayfa bileşenini AYRI ayrı çalıştırır; ikisi de
+> kendi `.eq('id', id).single()` sorgusunu atıyordu (dar/geniş iki farklı select
+> ile) — her ilan açılışında **iki DB gidiş-gelişi**, tek satır için. Ayrıca auth
+> kontrolü (`getUser()`) ilan sorgusunu **bekledikten sonra** başlıyordu; ikisi
+> birbirinden bağımsız olduğu hâlde ardışıktı. **Düzeltme:** `React.cache()` ile
+> tek sorguya indirildi (Next.js'in resmî generateMetadata+page dedup deseni),
+> alan kümesi ikisinin ihtiyacının birleşimi yapıldı; ilan sorgusu + auth kontrolü
+> `Promise.all` ile paralel atılmaya başlandı. Sonrasındaki iki bağımsız `users`
+> sorgusu (profil tamamlanmışlık + ilan sahibi rozeti) da paralelleştirildi.
+>
+> ### Dokunulmayan yerler — kod değişikliği GEREKMEDİ
+>
+> `/api/listings/ara` (il filtresi) ve `HomeClient.tsx`'in istemci "yenile"
+> sorgusu **aynı tabloyu aynı filtrelerle** sorguluyor — Bulgu 1/2'nin DB
+> düzeltmeleri onlara da otomatik yansıdı, ayrı bir kod değişikliği gerekmedi.
+>
+> **Kayıt:** `docs/20260807_performans_listings.sql` (ölçüm + uygulama +
+> doğrulama + geri alma birlikte, proje kalıbı). **Doğrulama:** `tsc --noEmit`
+> temiz, gerçek `next build` temiz. Geriye alınabilirlik: `CREATE STATISTICS` ve
+> autovacuum ayarı `DROP`/`RESET` ile geri alınabilir; `VACUUM`/`ANALYZE` zaten
+> geri alınacak bir "değişiklik" değil, bakım işlemi.
+
 > ## ✅ 7 AĞU 2026 — "YAZARAK İLAN EKLE" ARTIK ÖNCE REGEX, SONRA CLAUDE
 >
 > **İstek:** yazarak ilan eklerken her seferinde Claude'a sormak yerine kendi

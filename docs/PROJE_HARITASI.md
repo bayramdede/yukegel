@@ -1,6 +1,20 @@
 # Yükegel — Proje Haritası
 > **Kullanım:** Her sohbet başında sadece bu dosyayı oku. Kaynak dosyaları sadece o dosyada değişiklik yapacaksan oku.  
 >
+> ✅ **7 AĞU 2026 — PERFORMANS: ANA SAYFA 400 KAT, SAYAÇ 158 KAT HIZLANDI.**
+> Ölçüldü (`pg_stat_statements`, tahmin değil): ana sayfa sorgusu ort. 1026ms/
+> maks 21,4sn, sayım sorgusu 1269ms. İki kök sebep: (1) planlayıcı `moderation_
+> status = ANY(...)` iki değerli koşulda satır sayısını 8 kat yanlış tahmin
+> ediyordu → `create statistics` + `analyze` ile düzeldi, 1711ms→**4ms**.
+> (2) `listings` hiç manuel VACUUM edilmemişti (%12 dead tuple, autovacuum eşiği
+> %20'de hiç tetiklenmemiş) → `vacuum analyze` + eşik %5'e çekildi, 1269ms→**8ms**.
+> Ayrıca `app/ilan/[id]/page.tsx` her açılışta aynı ilanı 2 kez sorguluyordu
+> (`generateMetadata` + sayfa ayrı sorgu) — `React.cache()` ile tekleştirildi,
+> auth kontrolü ilan sorgusuyla paralel atılmaya başlandı. `/api/listings/ara`
+> ve `HomeClient.tsx` kod değişikliği gerektirmedi (aynı tabloyu aynı filtreyle
+> sorguluyorlar, DB düzeltmesi otomatik yansıdı). Kayıt: `docs/20260807_
+> performans_listings.sql`. Ayrıntı: `docs/YAPILACAKLAR.md` başı.
+>
 > ✅ **7 AĞU 2026 — #93 KAPANDI: `detectAdType` "yuklenecek" DÜZELTMESİ, CANLI v91.**
 > Ölçüm: `raw_text`'te tam "yuklenecek" geçen 1350 `arac`-etiketli ilandan 25'i
 > elle okundu, **25'i de** gerçekte yük simsarı kalıbıydı ("X'ten büyük balya

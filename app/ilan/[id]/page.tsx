@@ -1,3 +1,4 @@
+import { cache } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { notFound } from 'next/navigation';
 import { Metadata } from 'next';
@@ -14,27 +15,43 @@ const supabase = createClient(
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://yukegel.com';
 
-// ── Ortak veri çekici (generateMetadata + page paylaşır)
-async function fetchIlanTemel(id: string) {
+// ── Ortak veri çekici — `generateMetadata` VE sayfa bileşeni paylaşır.
+//
+// 🚨 7 Ağu 2026 (performans): Next.js her `/ilan/[id]` isteğinde `generateMetadata`
+// ile sayfa bileşenini AYRI AYRI çalıştırır. Bu fonksiyon eskiden `fetchIlanTemel`
+// adıyla dar bir alan kümesiyle SADECE `generateMetadata` içindeydi; sayfa bileşeni
+// KENDİ (daha geniş alanlı) sorgusunu ayrıca atıyordu — yani her sayfa açılışında
+// AYNI satır için İKİ ayrı DB gidip-gelmesi oluyordu. `React.cache()` bunu tek
+// istek içinde (aynı `id` argümanıyla) TEK çağrıya indiriyor — Next.js'in kendi
+// önerdiği "generateMetadata + page dedup" deseni. Alan kümesi ikisinin
+// İHTİYACININ BİRLEŞİMİ: `status` yalnız `generateMetadata`nın robots kuralında,
+// `contact_phone`/`price_negotiable`/vb. yalnız sayfa gövdesinde kullanılıyor.
+const getIlan = cache(async (id: string) => {
   const { data } = await supabase
     .from('listings')
     .select(`
       id, listing_type, origin_province_id, origin_district,
-      vehicle_type, body_type, price_offer, available_date,
-      notes, audit_score, moderation_status, is_shadow_banned, status,
-      listing_stops ( stop_order, province_id, district, weight_ton, cargo_type )
+      contact_phone, price_offer, price_negotiable,
+      available_date, date_flexible, notes, source,
+      created_at, moderation_status, is_shadow_banned, status,
+      trust_level, user_id, audit_score,
+      vehicle_type, body_type,
+      listing_stops (
+        stop_order, province_id, district,
+        vehicle_count, cargo_type, weight_ton, pallet_count, notes
+      )
     `)
     .eq('id', id)
     .single();
   return data;
-}
+});
 
 // ── Adım 1: Dinamik Metadata
 export async function generateMetadata(
   { params }: { params: Promise<{ id: string }> }
 ): Promise<Metadata> {
   const { id } = await params;
-  const ilan = await fetchIlanTemel(id);
+  const ilan = await getIlan(id);
   if (!ilan || ilan.moderation_status === 'rejected' || ilan.is_shadow_banned) {
     return { title: 'İlan Bulunamadı | Yükegel' };
   }
@@ -116,47 +133,44 @@ function chipStyle(bg: string, color: string): React.CSSProperties {
 export default async function IlanDetay({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
 
-  const { data: ilan } = await supabase
-    .from('listings')
-    .select(`
-      id, listing_type, origin_province_id, origin_district,
-      contact_phone, price_offer, price_negotiable,
-      available_date, date_flexible, notes, source,
-      created_at, moderation_status, is_shadow_banned,
-      trust_level, user_id, audit_score,
-      vehicle_type, body_type,
-      listing_stops (
-        stop_order, province_id, district,
-        vehicle_count, cargo_type, weight_ton, pallet_count, notes
-      )
-    `)
-    .eq('id', id)
-    .single();
-
-  if (!ilan || ilan.moderation_status === 'rejected') return notFound();
-
-  // ── Auth: kullanıcıyı erken çek (shadow ban kontrolü için gerekli)
+  // ── Auth istemcisi kurulumu ilan sorgusundan bağımsız — ikisi PARALEL atılır.
   const cookieStore = await cookies();
   const supabaseAuth = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     { cookies: { getAll() { return cookieStore.getAll(); }, setAll() {} } }
   );
-  const { data: { user } } = await supabaseAuth.auth.getUser();
 
-  // ── Profil tamamlanmış mı? (telefon numarası gösterimi için)
-  let profilTamamlandi = false;
-  if (user) {
-    const { data: mevcutProfil } = await supabase
-      .from('users')
-      .select('user_type')
-      .eq('id', user.id)
-      .maybeSingle();
-    profilTamamlandi = !!mevcutProfil?.user_type;
-  }
+  // 🚨 7 Ağu 2026 (performans): `getIlan(id)` `generateMetadata` ile PAYLAŞILIYOR
+  // (`React.cache()` — bkz. yukarıdaki tanım), yani bu çağrı ikinci bir DB
+  // gidiş-gelişi DEĞİL, aynı isteğin önbelleğinden dönüyor. Ayrıca auth kontrolü
+  // ilanı beklemeden AYNI ANDA başlıyor — ikisi de birbirinden bağımsız,
+  // ardışık `await` iki ayrı ağ turu demekti.
+  const [ilan, { data: { user } }] = await Promise.all([
+    getIlan(id),
+    supabaseAuth.auth.getUser(),
+  ]);
+
+  if (!ilan || ilan.moderation_status === 'rejected') return notFound();
+
+  // ── Profil tamamlanmış mı (telefon gösterimi) + ilan sahibinin rozet bilgisi —
+  // ikisi de BAĞIMSIZ satırlar (biri `user.id`, biri `ilan.user_id` sorguluyor),
+  // aynı anda atılır.
+  const [profilSonuc, kullaniciBilgiSonuc] = await Promise.all([
+    user
+      ? supabase.from('users').select('user_type').eq('id', user.id).maybeSingle()
+      : Promise.resolve({ data: null as { user_type: string | null } | null }),
+    ilan.user_id
+      ? supabase.from('users').select('phone_verified, created_at').eq('id', ilan.user_id).single()
+      : Promise.resolve({ data: null as { phone_verified: boolean; created_at: string } | null }),
+  ]);
+  const profilTamamlandi = !!profilSonuc.data?.user_type;
+  const kullaniciBilgi = kullaniciBilgiSonuc.data as { phone_verified: boolean; created_at: string } | null;
 
   // ── Sprint 1: Shadow ban kontrolü
   // Shadow banned ilan sadece ilan sahibi, moderatör ve admin tarafından görülebilir.
+  // Nadir yol — yukarıdaki iki sorguyla paralelleştirilmedi: `user` yoksa zaten
+  // hemen `notFound()` dönüyor, paralel atılan sorgular boşa gitmiş olurdu.
   if (ilan.is_shadow_banned) {
     if (!user) return notFound();
     const { data: profil } = await supabase
@@ -168,13 +182,6 @@ export default async function IlanDetay({ params }: { params: Promise<{ id: stri
     const isOwner = ilan.user_id === user.id;
     const isMod   = role === 'moderator' || role === 'admin';
     if (!isOwner && !isMod) return notFound();
-  }
-
-  let kullaniciBilgi: { phone_verified: boolean; created_at: string } | null = null;
-  if (ilan.user_id) {
-    const { data: kb } = await supabase
-      .from('users').select('phone_verified, created_at').eq('id', ilan.user_id).single();
-    kullaniciBilgi = kb;
   }
 
   const stops = (ilan.listing_stops || []).sort((a: any, b: any) => a.stop_order - b.stop_order);
