@@ -102,9 +102,13 @@ ok('"3 üstü yüklenir" dolgusu',
   ['Manisa/Kula→Van']);
 
 console.log('\n── #88-B: yer içermeyen boşluksuz-tire satırı bloğu BOZMAMALI ──');
+// 📌 #89-A: beklenen eskiden `Manisa→Konya/Akşehir` idi — yani kaynak metinde AÇIKÇA
+//    yazan "TURGUTLU" ilçesi düşüyordu. `findPlaces` dedup'ı yalnız İL ile
+//    anahtarlandığı için "MANİSA" isabetinden sonra gelen "TURGUTLU" hiç kaydedilmiyordu.
+//    Doğru cevap Manisa/Turgutlu; eski beklenti hatayı belgeliyordu.
 ok('"(KISA-UZUN) DORSE" araya girer',
   'MANİSA TURGUTLU  YÜKLEMELİ\n(KISA-UZUN) DORSE\nAKŞEHİR TIR\nHEVES NAKLİYAT',
-  ['Manisa→Konya/Akşehir']);
+  ['Manisa/Turgutlu→Konya/Akşehir']);
 
 ok('yersiz tireli tarif satırı (PEŞİN-VADELİ)',
   'SİLİVRİ YÜKLEME\nPEŞİN-VADELİ ÖDEME\nANKARA',

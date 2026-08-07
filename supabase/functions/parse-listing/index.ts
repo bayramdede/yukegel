@@ -309,12 +309,22 @@ const DEN_RE = /(.+?)\s+(?:'?\s*)?(?:den|dan|ten|tan)\b\s+(.+)/i
 
 function splitByRelation(line: string): { left: string, right: string, rel: string } | null {
   // Ok
+  // 🚨 #87 (6 Ağu 2026): ESKİDEN buradaki şart `if (left && right)` idi. Solu boş ok
+  //    satırı ("➡️SAMSUN" → "->samsun") bu yüzden `null` dönüyordu ve parseMessage:646'daki
+  //    "ok solunda şehir yoksa contextFrom kullan" yedeği ULAŞILAMAZ ÖLÜ KODDU.
+  //    Satır ilişkisiz sayılıp Pass 2/Pass 3/fallback'e düşüyor, orada sıra bağımlı
+  //    olarak ya varış DÜŞÜYOR ya da UYDURMA şerit doğuyordu. Gerçek örnekler:
+  //      685877e4  "ADANA OSB YÜKLEMELİ / ->MERSİN AYAŞ / ->URFA MERKEZ"
+  //                → fallback "Mersin→Ankara/Ayaş" üretiyordu (Adana hiç geçmiyor).
+  //      e8843b11  "UŞAK YÜKLEME / ->MERSİN / ->TRABZON + RİZE" → Mersin kayıp.
+  //      99183fb8  "...bartin / ->samsun" → Samsun hiçbir şeritte yok.
+  //    ARTIK: sol boşsa da ok ilişkisi döner; kökeni çağıran taraf contextFrom'dan alır.
   if (ARROW_RE.test(line)) {
     const parts = line.split(ARROW_RE)
     if (parts.length >= 2) {
       const left = parts[0].trim()
       const right = parts.slice(1).join('').replace(ARROW_RE, '').trim()
-      if (left && right) return { left, right, rel: 'arrow' }
+      if (right) return { left, right, rel: 'arrow' }
     }
   }
 
@@ -476,9 +486,44 @@ function findPlaces(text: string, aliases: Alias[]): PlaceHit[] {
   const hits: PlaceHit[] = []
   // 🚨 W5/D4 — Eskiden `seen.add(match.normalized)` HAM değerle anahtarlanıyordu;
   // "Istanbul" ve "İstanbul" iki ayrı giriş oluyordu. Artık katlanmış anahtar.
-  const seen = new Set<string>()
+  //
+  // 🚨 #89-A (6 Ağu 2026) — `seen` artık Set DEĞİL Map: aynı ilin İKİNCİ isabetini
+  //    sessizce ATMAK yerine, ilçesi varsa mevcut isabeti YÜKSELTİYORUZ.
+  //    Sorun: dedup anahtarı SADECE il ("Ankara"). "Ankara Gölbaşı" metninde önce
+  //    `ankara` (il, district=null, öncelik 90) isabet ediyor, sonra gelen
+  //    `gölbaşı` (Ankara/Gölbaşı, öncelik 60) `seen.has('ankara')` yüzünden
+  //    hits'e HİÇ GİRMİYORDU. Sıralama sorunu değil, DEDUP sorunuydu — öncelikleri
+  //    değiştirmek bu yüzden hiçbir şeyi çözmezdi.
+  //    Ölçek: 948 aktif ilçe alias'ının 912'si kendi ilinin bare alias'ından
+  //    düşük/eşit öncelikte, yani "İl İlçe" yazılan her satırda ilçe düşüyordu.
+  //    Varış ilçe doluluğu 7 günde %25,5 (3.363/13.183).
+  //    🔒 Yükseltme kuralı KATI: il ASLA değişmez, öncelik ASLA değişmez, sadece
+  //       `district` null iken doluyor. Yeni yer EKLEMEZ, yer SİLMEZ, sıra bozmaz.
+  //    ⚠️ Yan etki (İSTENEN): blok kaynağıyla aynı ilçeye çözülen satırlar artık
+  //       `ayniIlce` ile eşleşip ELENİYOR (bkz. satır ~811, ~716). Yani sahte
+  //       "kendine şerit" kayıtları DÜŞÜYOR. `olc` KAYIP sütunu bu yüzden 0
+  //       çıkmayabilir; bu bir gerileme değil, düzeltmenin ta kendisidir.
+  const seen = new Map<string, PlaceHit>()
 
   const cityAliases = aliasIndeksi(aliases).sehir
+
+  const ekleVeyaYukselt = (match: Alias, matched: string) => {
+    const key = yerKey(match.normalized)
+    const mevcut = seen.get(key)
+    if (!mevcut) {
+      const hit: PlaceHit = {
+        normalized: match.normalized,
+        priority: match.priority || 50,
+        matched,
+        district: match.district || null,
+      }
+      hits.push(hit)
+      seen.set(key, hit)
+      return
+    }
+    // #89-A: yalnız BOŞ ilçeyi doldur. Dolu ilçenin üzerine YAZMA (ilk kazanır).
+    if (!mevcut.district && match.district) mevcut.district = match.district
+  }
 
   // Bigram
   for (let i = 0; i < tokens.length - 1; i++) {
@@ -486,10 +531,7 @@ function findPlaces(text: string, aliases: Alias[]): PlaceHit[] {
     const bigram2 = stripSuffix(tokens[i]) + ' ' + stripSuffix(tokens[i + 1])
     for (const bg of [bigram, bigram2]) {
       const match = cityAliases.get(bg)
-      if (match && !seen.has(yerKey(match.normalized))) {
-        hits.push({ normalized: match.normalized, priority: match.priority || 50, matched: bg, district: match.district || null })
-        seen.add(yerKey(match.normalized))
-      }
+      if (match) ekleVeyaYukselt(match, bg)
     }
   }
 
@@ -500,10 +542,7 @@ function findPlaces(text: string, aliases: Alias[]): PlaceHit[] {
     const candidates = [...new Set([token, stripped1, strippedFull])]
     for (const cand of candidates) {
       const match = cityAliases.get(cand)
-      if (match && !seen.has(yerKey(match.normalized))) {
-        hits.push({ normalized: match.normalized, priority: match.priority || 50, matched: cand, district: match.district || null })
-        seen.add(yerKey(match.normalized))
-      }
+      if (match) ekleVeyaYukselt(match, cand)
     }
   }
 
@@ -609,7 +648,15 @@ function parseMessage(message: string, aliases: Alias[]): {
       // + var mı? Çoklu varış satırı olabilir
       if (line.includes('+')) {
         const parts = line.split(/[+\/]/).map(p => p.trim()).filter(p => p.length > 2)
-        if (parts.length > 1) {
+        // 🚨 #87-B (6 Ağu 2026): `+` TEK BAŞINA "çoklu varış" demek DEĞİL. Fiyat
+        //    satırları da `+` içeriyor: "duzce 1200+kdv" → parts ["duzce 1200","kdv"].
+        //    Eskiden bu satır çoklu varış sayılıyor, köken ÖNCEKİ satırdan alınıyor ve
+        //    `99183fb8`de "Düzce→Sakarya/Akyazı" + "Düzce→Bartın" gibi İKİ UYDURMA
+        //    şerit doğuyordu — üstelik satır `processed` olduğu için kimse görmüyordu.
+        //    ARTIK: en az İKİ parça tanınan bir yere çözülmeli ("TRABZON + RİZE" evet,
+        //    "duzce 1200 + kdv" hayır).
+        const yerliParca = parts.filter(p => bestPlace(findPlaces(p, aliases)) !== null)
+        if (parts.length > 1 && yerliParca.length >= 2) {
           // Önceki satırlardan kalkış şehri bul
           let fromCity: PlaceHit | null = null
           for (const prevLine of lines) {
@@ -644,16 +691,75 @@ function parseMessage(message: string, aliases: Alias[]): {
     }
 
     // Ok solunda şehir yoksa ("->DİYARBAKIR" gibi) önceki bağlamı kullan
-    const from = rel.left.trim()
-      ? bestPlace(findPlaces(rel.left, aliases))
-      : contextFrom
+    // 🚨 #87: eski hâli `rel.left.trim() ? ... : contextFrom` idi ve `splitByRelation`
+    //    boş sol döndüremediği için `contextFrom` kolu HİÇ ÇALIŞMIYORDU. Ayrıca sol
+    //    dolu ama içinde tanınan yer yoksa ("13.60 TIR -> ANKARA") satır sessizce
+    //    düşüyordu. `||` her iki boşluğu da kapatır; yorumun hep iddia ettiği davranış.
+    const from = bestPlace(findPlaces(rel.left, aliases)) || contextFrom
 
     const toHits = findPlaces(rel.right, aliases)
 
     // + veya / ile ayrılmış çoklu varış
     const rightParts = rel.right.split(/[+\/]/).map(p => p.trim()).filter(p => p.length > 2)
 
-    if (!from) continue
+    // 🚨 #87-E (6 Ağu 2026) — #87-A'NIN YAN HASARI. BU KOLU SİLME.
+    //    #87-A sol boş oku artık ilişki saydığı için satır BURADA TÜKETİLİYOR. Ama
+    //    contextFrom da yoksa `from` null kalır ve eski `continue` satırı TAMAMEN
+    //    düşürürdü. #87 ÖNCESİ bu satırlar `splitByRelation`'dan null dönüp TİRE
+    //    kuralına düşüyor ve DOĞRU çözülüyordu:
+    //      e5ba7700 · 1d640d19  "EYSAN TAŞIMACILIK / -> AVCILAR LİMAN - TUZLA"
+    //        #87 öncesi: İstanbul/Avcılar→İstanbul/Tuzla · #87-A sonrası: HİÇ ŞERİT YOK
+    //    `npm run olc:87` bunu "≥1→0 (KAYIP) = 2" olarak yakaladı; o sütun SIFIR OLMALI.
+    //    ARTIK: kökeni bulunamayan sol-boş ok satırında okun SAĞINI tek başına yeniden
+    //    ilişkiye sokuyoruz — yani #87 öncesi tire davranışı geri geliyor.
+    // 🔒 YÖN GÜVENLİĞİ: bu kol YALNIZ `from` null iken, yani satırın zaten DÜŞTÜĞÜ
+    //    durumda çalışır. Şerit EKLEYEBİLİR, asla SİLEMEZ. Bu yüzden #87-A/B/D'nin
+    //    ölçülmüş kazançlarını geri almaz.
+    // 🚨 #87-F (6 Ağu 2026) — BU KOL `contextFrom` YAZMAZ. SAKIN EKLEME.
+    //    İlk hâlinde burada `contextFrom = altFrom` vardı ve "yalnız ekler" güvencesini
+    //    KENDİ ELİYLE BOZUYORDU: kolun kurtardığı satır contextFrom'u doldurunca, ondan
+    //    SONRAKİ sol-boş ok satırlarında `from` artık null olmuyor, bu kol devreye
+    //    giremiyor ve satır normal yola düşüp KENDİ KENDİNE ŞERİT üretiyordu:
+    //      6c75aeea "-> GEBZE - SİLİVRİ / ->GEBZE - MANİSA"
+    //        #87 öncesi: Gebze→Silivri · Gebze→Manisa
+    //        contextFrom yazan hâl: Gebze→Silivri · Gebze→GEBZE  (Manisa KAYIP)
+    //      9cbb76e1 "->DİNAR-İSKENDERUN / ->DİNAR-İSTANBUL / ->DİNAR-ERZURUM / ->ESKİŞEHİR-MERSİN"
+    //        4 doğru şerit → Dinar→İskenderun · Dinar→DİNAR · Dinar→Eskişehir
+    //    `olc:87` bunları "KAYIP" saymadı (satırda hâlâ ≥1 şerit var), "changed" saydı.
+    //    📌 Ders: KAYIP=0 aklama belgesi değildir; "şerit EKLENDİ ≠ şerit DOĞRU".
+    //    contextFrom yazmayınca her sol-boş ok satırı kendi sağını yeniden çözer —
+    //    #87 öncesi tire davranışının aynısı.
+    // 📌 Ders: bir kolu "ulaşılabilir" yapmak, o kolun ele geçirdiği satırların ESKİ
+    //    yolunu da kapatır. #87-A'da kazanç sayıldı, kaybedilen yol sayılmadı.
+    if (!from) {
+      if (rel.rel === 'arrow' && !rel.left.trim()) {
+        const alt = splitByRelation(rel.right)
+        if (alt && alt.left.trim()) {
+          const altFrom = bestPlace(findPlaces(alt.left, aliases))
+          const altTo = bestPlace(findPlaces(alt.right, aliases))
+          // ⚠️ Burada YALNIZ `ayniSehir` kullanmak KAYBIN AYNISINI TEKRARLARDI:
+          //    kurtarmaya çalıştığımız iki vaka da İSTANBUL İÇİ (Avcılar→Tuzla).
+          //    Şart :792'deki blok kuralıyla aynı olmalı — şehir FARKLI *veya* İLÇE farklı.
+          if (altFrom && altTo &&
+              (!ayniSehir(altTo.normalized, altFrom.normalized) ||
+               !ayniIlce(altTo.district, altFrom.district))) {
+            // ⚠️ #87-F: burada `contextFrom` GÜNCELLENMEZ — gerekçe yukarıda.
+            lanes.push({
+              from: altFrom.normalized,
+              fromDistrict: altFrom.district || null,
+              to: altTo.normalized,
+              toDistrict: altTo.district || null,
+              vehicle: findVehicle(line, aliases),
+              body_type: findBodyType(line, aliases),
+              weight_ton: extractWeight(line),
+              pallet: extractPallet(line),
+              raw_line: line
+            })
+          }
+        }
+      }
+      continue
+    }
     // Başarılı from → contextFrom güncelle
     contextFrom = from
 
@@ -766,6 +872,16 @@ function parseMessage(message: string, aliases: Alias[]): {
       //    Manisa→Konya/Akşehir şeridi bu yüzden hiç doğmuyordu (alias'ların ikisi de var).
       //    ARTIK: ilişkili satır ancak İÇİNDE TANINAN YER VARSA resetler. Yersiz satır
       //    (dorse/ödeme/ölçü tarifi) bloğu bozmaz. Gerçek güzergâh satırını Pass 1 zaten alır.
+      // 📌 #87 NOTU (6 Ağu 2026) — BİLEREK DEĞİŞMEDİ, tekrar "düzeltmeye" kalkma.
+      //    #87-A'dan sonra `splitByRelation` SOLU BOŞ oku da ilişki sayıyor
+      //    ("➡️SAMSUN" → rel:'arrow', left:''), yani bu satırlar burada hâlâ
+      //    resetliyor. İlk refleks "solu boş ok bloğun varışıdır, resetlememeli"
+      //    demek oldu; öyle bir `!solBos` muafiyeti yazıldı ve ÖLÇÜLDÜ: 8 gerçek
+      //    vaka + test:87 + test:pass2 çıktısı BİT BİT AYNI kaldı. Sebep: bu
+      //    satırların kökenini Pass 1 zaten sahipleniyor — `YÜKLEME` satırı
+      //    ilişkisiz olduğu için 617'de `contextFrom`u kuruyor, ok satırı da onu
+      //    kullanıyor. Muafiyet sıfır kazanç, artı blok sınırını gevşetme riski
+      //    getiriyordu; geri alındı. Diff küçük kalsın.
       if (blockOrigin && (
         ARROW_RE.test(line) || BLOCK_RESET_RE.test(line) ||
         (splitByRelation(line) !== null && findPlaces(line, aliases).length > 0)

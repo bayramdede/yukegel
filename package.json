@@ -15,8 +15,11 @@
     "test:alias": "npx tsx scripts/test-alias-detektor.mts",
     "test:clean": "npx tsx scripts/test-clean-message.mts",
     "test:pass2": "npx tsx scripts/test-pass2.mts",
+    "test:87": "npx tsx scripts/test-87.mts",
     "olc:86": "npx tsx scripts/olc-86.mts",
-    "olc:88": "npx tsx scripts/olc-88.mts"
+    "olc:88": "npx tsx scripts/olc-88.mts",
+    "olc:87": "npx tsx scripts/olc-87.mts",
+    "olc:89": "npx tsx scripts/olc89-karsilastir.mts"
   },
   "dependencies": {
     "@next/third-parties": "^16.2.6",

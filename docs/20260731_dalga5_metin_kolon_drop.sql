@@ -1,8 +1,16 @@
 -- ============================================================================
 -- DALGA 5 — METİN İL KOLONLARINI DÜŞÜR
--- Yazım tarihi: 31 Tem 2026 · Çalıştırma tarihi: EN ERKEN 7 Ağu 2026
+-- Yazım tarihi: 31 Tem 2026 · ✅ ÇALIŞTIRILDI: 6 Ağu 2026
 --
--- 🚫 BU DOSYA HENÜZ ÇALIŞTIRILMAZ. Yazılma sebebi çalıştırmak değil, bir hafta
+-- ✅ 6 AĞU 2026 — BU RUNBOOK BAŞTAN SONA UYGULANDI VE DOĞRULANDI.
+--    BÖLÜM 0'ın sekiz önkoşulu canlıda ölçüldü → BÖLÜM 7 yedek (234.840 / 245.086
+--    satır) → BÖLÜM 4'ün yedi indeksi birer birer → BÖLÜM 5'in iki `drop column`'u
+--    → BÖLÜM 6'nın altı doğrulaması. `ilan_olustur` drop sonrası `begin; … rollback;`
+--    içinde ÇALIŞTIRILARAK kanıtlandı. Tam kayıt: `docs/YAPILACAKLAR.md` başı.
+--    ⚠️ Aşağıdaki "henüz çalıştırılmaz" uyarısı yazıldığı günün kaydıdır, tarihsel
+--    olarak duruyor; artık geçerli değildir.
+--
+-- 🚫 (31 TEM 2026 KAYDI) BU DOSYA HENÜZ ÇALIŞTIRILMAZ. Yazılma sebebi çalıştırmak değil, bir hafta
 --    önceden GÖZDEN KAÇAN BAĞIMLILIKLARI ÇIKARMAK. Aşağıdaki BÖLÜM 1 ve BÖLÜM 3
 --    tam olarak böyle çıktı: `docs/COGRAFI_GECIS.md` satır 214-224'teki Dalga 5
 --    maddesi sadece "kolonları ve indeksleri düşür" diyor; ikisinden de söz
@@ -792,17 +800,27 @@ group by 1 order by 2 desc limit 50;
 --   4. İndeksler `create index concurrently` ile yeniden kurulur (~72 MB, uzun sürer).
 --
 -- ✅ BU YÜZDEN BÖLÜM 5'TEN ÖNCE YEDEK:
---   create table public.dalga5_yedek_20260807 as
+--   ✅ ÇALIŞTIRILDI 6 AĞU 2026. Tablo adları burada `_20260807` yazıyordu; gerçek
+--      çalıştırma tarihiyle `_20260806` olarak alındı ve bu blok ona göre düzeltildi.
+--      Yanlış tarihli bir yedek, 30 gün sonra "bu silinebilir mi" kararını veren
+--      kişiyi yanıltır — runbook'taki tahmini tarih değil, GERÇEK tarih kullanılır.
+--
+--   create table public.dalga5_yedek_20260806 as
 --   select l.id, l.origin_city, l.origin_province_id
 --     from public.listings l
---    where l.origin_city is not null;
+--    where l.origin_city is not null;          -- ➜ 234.840 satır
 --   (⬅️ `destination_city` çıkarıldı — kolon yok, 42703 verirdi.)
 --
---   create table public.dalga5_yedek_stops_20260807 as
+--   create table public.dalga5_yedek_stops_20260806 as
 --   select s.id, s.listing_id, s.stop_order, s.city, s.province_id
 --     from public.listing_stops s
---    where s.city is not null;
+--    where s.city is not null;                 -- ➜ 245.086 satır
 --
---   ⚠️ Yedek tabloları en az 30 gün tutulur. Silme kararı ayrı bir görevdir,
---      "drop başarılı görünüyor" o kararın gerekçesi değildir — bozulmalar
---      genelde ilk günde değil, aylık raporlar çalışınca fark edilir.
+--   📌 `where ... is not null` FİLTRESİNE DİKKAT: yedek satır sayısı kaynak tablonun
+--      TOPLAMINDAN AZDIR (234.840 < 243.644). Fark = metin kolonu boş satırlar, yani
+--      `ilan_olustur` v4'ün 3 Ağu'dan sonra yazdıkları. Bu bir eksiklik değil, ama
+--      ileride biri sayıları karşılaştırırsa paniğe kapılmasın diye buraya yazıldı.
+--
+--   ⚠️ Yedek tabloları en az 30 gün tutulur → **6 EYL 2026'DAN ÖNCE SİLİNMEZ.**
+--      Silme kararı ayrı bir görevdir, "drop başarılı görünüyor" o kararın gerekçesi
+--      değildir — bozulmalar genelde ilk günde değil, aylık raporlar çalışınca fark edilir.

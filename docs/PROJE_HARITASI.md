@@ -1,5 +1,99 @@
 # Yükegel — Proje Haritası
 > **Kullanım:** Her sohbet başında sadece bu dosyayı oku. Kaynak dosyaları sadece o dosyada değişiklik yapacaksan oku.  
+>
+> ✅ **6 AĞU 2026 — DALGA 5 BİTTİ. METİN KOLONLARI DÜŞTÜ, CANLI DOĞRULANDI.**
+> `listings.origin_city` ve `listing_stops.city` **artık yok**. Coğrafi standardizasyon
+> Dalga 1→5 tamamlandı; il artık **yalnız** `province_id` (plaka kodu 1-81).
+> Sıra: BÖLÜM 7 yedek → BÖLÜM 4 yedi `drop index concurrently` (birer birer) →
+> BÖLÜM 5 iki `drop column` (tek transaction) → BÖLÜM 6 altı doğrulama. Hepsi geçti.
+> 💾 **Yedekler — 30 GÜN SAKLANACAK, 6 EYL 2026'DAN ÖNCE SİLİNMEZ:**
+> `public.dalga5_yedek_20260806` (`id, origin_city, origin_province_id`) **234.840 satır** ·
+> `public.dalga5_yedek_stops_20260806` (`id, listing_id, stop_order, city, province_id`)
+> **245.086 satır**. Her ikisi de metin kolonu **dolu olan** satırları içerir; bu yüzden
+> `listings` toplamından (243.644) **8.804 az**. O 8.804 satırın hepsi 3-6 Ağu arası
+> yazıldı ve hepsinde `origin_province_id` dolu — yani fark, `ilan_olustur` v4'ün
+> 3 Ağu'dan beri metne yazmadığının **kanıtı**, eksik yedek değil.
+> 🔬 **BÖLÜM 6 sonuçları:** kalan metin kolonu 0 (tanık: iki `*_province_id` kolonu yerinde) ·
+> `pg_proc`'ta 21 eşleşme **tek tek gözle** okundu (runbook sınıflandırma regex'ini yasaklıyor —
+> 31 Tem'de o kestirme dört fonksiyonu yanlışlıkla temize çıkarmıştı), hepsi zararsız ·
+> düşen kolona bakan view / matview / RLS politikası **0** ·
+> **çalışma zamanı kanıtı (YAZMA):** `ilan_olustur` `begin; … rollback;` içinde çalıştırıldı ve
+> `{"id":"2e51066f-…","moderation_status":"pending"}` döndü → yazma yolu drop sonrası sağlam.
+> Rollback artığı da ayrıca arandı: **0 satır**.
+> **çalışma zamanı kanıtı (OKUMA):** gövdesinde `city` geçen üç fonksiyonun üçü de
+> çalıştırıldı — `get_radar_city_overview(30)` 1 satır · `get_radar_city_detail(34,'giden',30,null)`
+> 1 satır · `get_nearby_listings_by_province(34,null,5)` 5 satır. Hiçbiri hata vermedi.
+> 📌 **Ders:** plpgsql gövdeleri DDL anında doğrulanmaz. Bir fonksiyonun kolon drop'undan
+> sağ çıktığının tek kanıtı onu **çalıştırmaktır** — `create function`'ın hata vermemesi değil.
+> 📌 **Runbook sapması (bilerek):** yedek tabloları runbook'taki `_20260807` yerine gerçek
+> tarihle `_20260806` adlandırıldı. Yanlış tarihli yedek, 30 gün sonra "silinebilir mi"
+> kararını veren kişiyi yanıltır. Runbook BÖLÜM 7 da bu ada güncellendi.
+>
+> <s>🟢 **6 AĞU 2026 — DALGA 5 DROP'A HAZIR. BÖLÜM 0 ÖNKOŞULLARININ SEKİZİ DE YEŞİL.**</s>
+> *(aşağısı drop öncesi kayıttır, tarihsel olarak duruyor)*
+> `#21` kapandı (yedi metin indeksi 1g22s pencerede **tam sıfır**, tanık trafiği 864 bin) ·
+> `#24` kapandı ve bugün tüm kod tabanı taranarak **kanıtlandı** (kalan `origin_city`
+> eşleşmelerinin hepsi RPC jsonb **girdi** anahtarı, LLM JSON şeması veya `provinces.name`
+> takma adı) · `0.3` son 24 saatte **5.631 ilan, il çözülemeyen 0, metne yazılan 0** ·
+> `0.5` metin dolu/id boş satır **0** · `0.8` `pg_proc` gövde taraması: `city` geçen dört
+> fonksiyonun **hiçbiri** düşen kolona dokunmuyor · **ek olarak** `pg_depend` ile view /
+> kısıt / RLS / trigger / default bağımlılığı arandı → **sıfır**, yani `drop column`
+> `CASCADE`siz de geçer, yedi indeks otomatik düşer.
+> ✅ **DROP ÇALIŞTIRILDI (yukarı bak).** Runbook: `docs/20260731_dalga5_metin_kolon_drop.sql`
+> BÖLÜM 7 yedek → BÖLÜM 4'ün yedi `drop index concurrently`'si **BİRER BİRER** (tek Run'da
+> hepsi = `25001`) → BÖLÜM 5'in iki `drop column`'u → BÖLÜM 6 doğrulama.
+> 📊 Ölçek: `listings` 243.644 · `listing_stops` 254.909 satır.
+>
+> 🚨 **6 AĞU 2026 — #87 KAPANDI (parser).** Solu boş `->` satırı `splitByRelation`'da
+> NULL dönüyordu; `contextFrom` yedeği **ulaşılamaz ölü koddu**. 30 günde `processed`
+> 6.724 satırın **293**'ü bu kalıbı içeriyor, **133**'ünde okta geçen varış hiçbir şeride
+> girmemiş. Üç düzeltme (A/B/D) yazıldı ve **6 Ağu 15:49 UTC'de canlıya çıktı**:
+> `parse-listing` **v79 → v85**, #86 + #88 + #87 birlikte gitti.
+> 🚨 **AMA `npm run olc:87` CANLIDA BİR REGRESYON BULDU — #87-E AÇIK.**
+> Ölçüm (7.299 satır) **"≥1→0 KAYIP = 2"** verdi; o sütun sıfır olmak zorundadır.
+> `e5ba7700` · `1d640d19` → `"EYSAN TAŞIMACILIK / -> AVCILAR LİMAN - TUZLA"`.
+> #87-A sol boş oku ilişki saydığı için satır Pass 1'de **tüketiliyor**, `contextFrom`
+> yoksa `if (!from) continue` satırı **tamamen düşürüyor**. #87 öncesi bu satır tire
+> kuralına düşüp doğru çözülüyordu.
+> 📌 **DERS: bir kolu "ulaşılabilir" yapmak, o satırların ESKİ yolunu da kapatır.**
+> #87-A'nın kazancı sayıldı, kapattığı yol sayılmadı. **Mutasyon testi bunu gösteremezdi** —
+> yalnız gerçek veri üzerinde eski/yeni kıyası gösterdi. `olc:*` scriptlerinin KAYIP
+> sütunu, birim testlerin koruyamadığı "yazmadığın davranışı" korur.
+> ✅ **Düzeltme yazıldı** (`index.ts` Pass 1 `if (!from)` bloğu): kökensiz sol-boş ok
+> satırında okun SAĞI tek başına yeniden ilişkiye sokuluyor. Yalnız satırın zaten
+> düştüğü yerde çalışır → **şerit ekler, silemez**. Şart `!ayniSehir || !ayniIlce`
+> (iki vaka da İstanbul içi; tek başına `ayniSehir` kaybı tekrarlardı).
+> `test:87` **20/20** · mutasyonda **tam 2 test düştü** · dört regresyon suite'i yeşil.
+>
+> 🚨 **6 AĞU 2026 — #87-F: #87-E'NİN KENDİ YAN HASARI. KAYIP=0 AKLAMA BELGESİ DEĞİLMİŞ.**
+> #87-E sonrası ölçüm (7.621 satır) **KAYIP = 0** verdi — ama örnekleri elle okuyunca
+> iki satırda **kendine şerit** çıktı ve şerit **kaybı** vardı; script bunları "kayıp"
+> değil **"changed"** saydığı için alarm çalmadı:
+> `6c75aeea` `"-> GEBZE - SİLİVRİ / ->GEBZE - MANİSA"` → Gebze→Silivri · **Gebze→GEBZE** (Manisa yok)
+> `9cbb76e1` `"->DİNAR-İSKENDERUN / ->DİNAR-İSTANBUL / ->DİNAR-ERZURUM / ->ESKİŞEHİR-MERSİN"`
+> → 4 doğru şerit yerine Dinar→İskenderun · **Dinar→DİNAR** · Dinar→Eskişehir.
+> **Kök sebep:** #87-E kolu kurtardığı satırda `contextFrom = altFrom` yazıyordu.
+> Böylece **kendi güvencesini kendi bozuyordu** — sonraki sol-boş ok satırında `from`
+> artık null olmadığı için kol devreye giremiyor, satır normal yola düşüp okun sağındaki
+> **ilk yeri varış sanıyordu**. Düzeltme: o atama kaldırıldı; kol artık **hiçbir duruma
+> yazmaz**, yalnız şerit ekler. Her sol-boş ok satırı kendi sağını çözer (#87 öncesi davranış).
+> `test:87` **22/22** · mutasyonda (`contextFrom = altFrom` geri kondu) **tam 2 yeni test
+> düştü** ve mutant çıktısı **canlı veriyle bit bit aynı** (`Gebze→Gebze`, `Dinar→Dinar`).
+> ⚠️ Testin ayırt edici olması için sentetik alias önceliği düzeltildi: `findPlaces`
+> isabetleri **önceliğe göre** sıralar, ilçe<il koyarsak sıra tersine döner ve mutant
+> yakalanmaz. `Gebze`/`Dinar` → 95.
+> 📌 **DERS: KAYIP=0 "temiz" demek değildir.** Yanlış şerit satırda şerit sayısını
+> düşürmez → KAYIP sütununa hiç yansımaz. **"Şerit eklendi ≠ şerit doğru"** uyarısını
+> scriptin kendisi yazıyor; örnekleri elle okumanın yerini ölçüm tutmuyor.
+>
+> ⚠️ **DEPLOY EDİLMEDİ — canlı v85 ne #87-E ne #87-F içeriyor.** Deploy sonrası `olc:87`
+> tekrar koşulmalı; KAYIP = 0 **ve** örnekler elle okunmalı.
+> ⚠️ Ölçümün geri kalanı (413 satır değişti, 1.477 eklendi / 899 silindi) **elle
+> denetlenmedi**; "eklendi" doğru demek değil, "silindi" alarm demek değil.
+> ✅ **Dalga 5 gerçek trafikle doğrulandı:** deploy sonrası WhatsApp dosyası işlendi →
+> **303 ilan · 424 durak · il id boş 0 · duraksız ilan 0.**
+> Ayrıntı: `docs/YAPILACAKLAR.md` başı.
+
 > Son güncelleme: 30 Temmuz 2026 — **COĞRAFİ STANDARDİZASYON Dalga 1 CANLIDA, Dalga 2 KODU HAZIR.**
 > İl artık **metin değil `province_id` (plaka kodu, 1-81)**. Üç yeni dosya: `lib/constants/locations.json`
 > (81 il + **973 resmî ilçe**), `lib/lokasyon.ts` (`ilId`/`ilAdi`/`ilceler`/`ilceNormalize`/`ilCiftYazim`),
@@ -692,6 +786,60 @@ yukegel/
 │                                         #    Sayfalama + env ilk-geçen-kazanır + alias sertifikası olc-86'dan aynen.
 │                                         #    🚨 KİMLİK BİLGİSİ İSTER — Bayram elle çalıştırır (kum havuzu erişemez).
 │                                         #    ⚠️ `KAYIP (≥1 → 0)` 0 DEĞİLSE düzeltme çalışan satırı bozuyor.
+├── scripts/test-87.mts                    # `npm run test:87` (6 Ağu 2026, #87) — 16 kontrol.
+│                                         #    SOLU BOŞ `->` satırı ("➡️SAMSUN") + `+` fiyat satırı koruması.
+│                                         #    🚨 #87-A: splitByRelation'ın ok kolu `if (left && right)` istiyordu →
+│                                         #      solu boş ok NULL dönüyor, parseMessage:646'daki "sol yoksa
+│                                         #      contextFrom kullan" yedeği ULAŞILAMAZ ÖLÜ KODDU.
+│                                         #    🚨 #87-B: sol DOLU ama yersizse ("13.60 TIR -> ANKARA") satır
+│                                         #      sessizce düşüyordu → `bestPlace(...) || contextFrom`.
+│                                         #    🚨 #87-D: `+` tek başına çoklu varış DEĞİL — "duzce 1200+kdv"
+│                                         #      fiyat satırı da `+` içeriyor → en az İKİ parçada yer şartı.
+│                                         #    ⚠️ TEST FONKSİYONU ELLE KOPYALANMAZ — kaynaktan sökülür (#86 dersi).
+│                                         #    🧪 MUTASYONLA DOĞRULANDI: A→5 düşer, B→1, D→1.
+│                                         #    🚨🚨 EN ÖNEMLİ TUZAK — PASS 3 MUTANTI DA MASKELER.
+│                                         #      Pass 3 yalnız `lanes.length === 0` iken koşar. Testte önce bir
+│                                         #      şerit doğurmazsan düzeltmeyi geri alsan bile Pass 3 kurtarır ve
+│                                         #      test YEŞİL kalır — hiçbir şey korumadan. #87-B testinin İLK HÂLİ
+│                                         #      tam bu yüzden mutasyondan sağ çıktı; başına gerçek bir Pass 1
+│                                         #      şeridi eklenerek düzeltildi.
+│                                         #    📌 "➡️ANKARA\n➡️KONYA" → Ankara→Konya BEKLENEN davranış (Pass 3),
+│                                         #      #87 öncesinden beri böyle. Uydurma yok vakası: "➡️ANKARA\nTENTELİ TIR".
+├── scripts/olc-87.mts                     # `npm run olc:87` (6 Ağu 2026, #87) — ÖLÇÜM, test değil.
+│                                         #    🚨 olc-86/88'DEN YAPICA FARKLI, ÇIKTISI ONLARLA KIYASLANAMAZ.
+│                                         #      Onlar "şeritsiz satır şerit kazandı mı" (0→≥1) soruyordu.
+│                                         #      #87'nin hasarı BAŞARILI GÖRÜNEN `processed` satırlarda: şerit var
+│                                         #      ama YANLIŞ. Bu yüzden `processed` + `no_lane` BİRLİKTE taranır ve
+│                                         #      şerit KÜMELERİ karşılaştırılır → eklenen / silinen / değişen.
+│                                         #    📌 Değişim sayısı bir "kazanç" rakamı DEĞİL. `KAYIP (≥1→0)` yine 0 olmalı.
+│                                         #    📌 SİLİNEN şerit alarm değil (uydurma da silinir) ama her biri elle bakılmalı.
+│                                         #    5 varyant string değişimiyle üretilir; tutmazsa PATLAR (sessiz eski=yeni yok).
+│                                         #    Sayfalama + alias/satır sertifikası + `solBosOkVar()` imza kontrolü.
+│                                         #    🚨 KİMLİK BİLGİSİ İSTER — Bayram elle çalıştırır (kum havuzu erişemez).
+├── scripts/olc89-karsilastir.mts          # `npm run olc:89` (6 Ağu 2026, #89-Ö) — ÖLÇÜM, test değil.
+│                                         #    🚨 olc-86/87/88'DEN FARKLI: CANLIYA VURMAZ, tamamen ÇEVRİMDIŞI.
+│                                         #      Sebep: kum havuzundan supabase.co'ya ağ YOK (curl → 000;
+│                                         #      registry.npmjs.org → 200, yani ağ var ama bu host kapalı).
+│                                         #      Ham metin + alias `execute_sql` ile dışa aktarıldı, iki parser
+│                                         #      YEREL koşuluyor. Kimlik bilgisi İSTEMEZ, herkes çalıştırabilir.
+│                                         #    ÜÇ KOŞUM: ESKİ(mutant+eski alias) → #89-B(mutant+yeni alias)
+│                                         #      → YENİ(index.ts+yeni alias). Ortadaki→son fark SADECE #89-A kodu;
+│                                         #      deploy kapısı o sütuna bakar, #89-B'nin etkisi karışmaz.
+│                                         #    Parser iki index.ts'ten de ÇALIŞMA ANINDA sökülür (#86 dersi).
+│                                         #    Mutant yolu: MUTANT=/tmp/mut-89a/index.ts (öntanımlı).
+│                                         #    🚨 KAYIP SINIFLANDIRMASI ÜÇ AYRI ŞEY — karıştırma:
+│                                         #      YÜKSELTME  = il çifti aynı, ilçe null→dolu. Kayıp DEĞİL, düzeltme.
+│                                         #      BİRLEŞME   = aynı il çiftinde şerit SAYISI düştü (iki laneKey birleşti).
+│                                         #      AÇIKLANAMAYAN = il çifti tamamen kayboldu → DEPLOY'U DURDURUR.
+│                                         #    ⚠️ İlk sürüm yükseltmeyi "dedup birleşmesi" diye ETİKETLİYORDU; yanlıştı.
+├── scripts/olc89-ornek-a.json             # #89-Ö sabit örneği — son 36 saatten 35 gerçek çok-satırlı ilan.
+│                                         #    📌 `public.olc89_ornek` tablosundan alındı; o tablo sonra DÜŞÜRÜLDÜ.
+├── scripts/olc89-alias.json               # #89-Ö alias kümesi — örneğe DOKUNAN 362 aktif alias.
+│                                         #    biçim: ["type", alias, normalized, priority, district, bayrak]
+│                                         #    bayrak 0=değişmedi · 1=#89-B ilçesini doldurdu · 2=#89-B yeni ekledi
+│                                         #    Bayrak sayesinde ESKİ alias durumu geri kurulabiliyor (2'ler atılır,
+│                                         #    1'lerin district'i null'lanır) — ölçüm bu yüzden iki tabloya ihtiyaç duymaz.
+├── scripts/sonda-87.mts                   # 🧹 SİLİNECEK — geçici teşhis sondası (#87). `test-87.mts` yerini aldı.
 ├── lib/ilan-yaz.ts                       # 🚨 ILAN_VER_ANALIZ W0/W1 (29 Tem 2026) — `listings` yazan TEK YOL.
 │                                         #    `server-only`. ilanYaz(userId, girdi, kaynak) → ayrık birlik.
 │                                         #    Doğrulama + beyaz liste + sınırlar (MAX_DURAK=10, MAX_ARAC_ADET=50,
@@ -777,6 +925,24 @@ yukegel/
 │                                         #    📌 BLOCK_RESET_RE boşluksuz tireyi BİLEREK dışarıda bırakır;
 │                                         #      splitByRelation ise bırakmaz — ikisini "veya"lamak tuzaktı.
 │                                         #    Koruma: `npm run test:pass2` · Ölçüm: `npm run olc:88`
+│                                         # 🚨 parseMessage PASS 1 — SOLU BOŞ OK (#87, 6 Ağu 2026).
+│                                         #    splitByRelation'ın ok kolu `if (left && right)` istiyordu; "➡️SAMSUN"
+│                                         #    gibi satır NULL dönüyordu. Sonuç: parseMessage:646'daki "ok solunda
+│                                         #    şehir yoksa contextFrom kullan" YEDEĞİ HİÇ ÇALIŞMADI — ölü koddu.
+│                                         #    Satırlar Pass 2 / Pass 3 / iki-şehir fallback'ine düşüp KAZARA ve
+│                                         #    SIRAYA BAĞLI kurtarılıyordu; sonuç uydurma veya eksik şerit.
+│                                         #    #87-A: `if (right)` — solu boş ok artık ilişki sayılır.
+│                                         #    #87-B: `bestPlace(findPlaces(rel.left)) || contextFrom` — sol DOLU
+│                                         #      ama yersizse de ("13.60 TIR -> ANKARA") satır düşmez.
+│                                         #    #87-D: `+` kolu artık İKİ parçada tanınan yer ister; "1200+kdv"
+│                                         #      fiyat satırı çoklu varış sayılmaz (99183fb8'de 2 uydurma şerit).
+│                                         #    📌 #87-C (Pass 2'ye "solu boş ok resetlemesin" muafiyeti) YAZILDI,
+│                                         #      ÖLÇÜLDÜ, GERİ ALINDI — çıktı bit bit aynı kaldı. Sebep: Pass 1:617
+│                                         #      (`if (nonRelHits.length > 0) contextFrom = …`) kökeni zaten kurar.
+│                                         #      index.ts'te `📌 #87 NOTU` yorumu var; TEKRAR DÜZELTMEYE KALKMA.
+│                                         #    🏷️ index.ts'te `+` kolu yorumu kendini "#87-B" diye etiketliyor;
+│                                         #      kanonik ad #87-D (test ve dokümanlarda böyle).
+│                                         #    Koruma: `npm run test:87` · Ölçüm: `npm run olc:87`
 ├── proxy.ts
 │   └── api/ilanlar/[id]/route.ts       # Public AI-readable API ✅
 ├── public/robots.txt                   # 🔍 SPRINT_01 S4 — 4 blok (*, GoogleBot, GPTBot, ClaudeBot),
@@ -850,14 +1016,21 @@ shadow_profile_id (nullable FK → shadow_profiles.id) — kayıtsız kullanıc�
 vehicle_id (nullable FK → vehicles.id, on delete set null) — ILAN_VER_ANALIZ B3 (29 Tem 2026)
 contact_phone — 🔒 anon/authenticated için REVOKE edildi (SPRINT_01 L1e). Yalnız service-role.
 origin_province_id (nullable FK → provinces.id) — 30 Tem 2026, backfill %100 (234.229 satır).
-                    origin_city'nin YERİNİ ALACAK. ✅ YENİ satırlarda da DOLU — dört yazma
-                    yolunun dördü de 31 Tem 2026'da ölçüldü (form/excel/whatsapp/moderatör).
+                    ✅ 6 Ağu 2026'dan beri KALKIŞ İLİNİN TEK KAYNAĞI. Dört yazma yolunun
+                    dördü de ölçüldü (form/excel/whatsapp/moderatör).
 origin_district_official (nullable bool) — true=resmî ilçe, false=serbest giriş (İkitelli, İSTOÇ)
+
+🚫 origin_city — DÜŞTÜ (6 Ağu 2026, Dalga 5). Bu kolon ARTIK YOK.
+   Yedeği: public.dalga5_yedek_20260806 (234.840 satır, ≥6 Eyl 2026'ya kadar saklanır).
+   ⚠️ `origin_city` ADI KODDA HÂLÂ GEÇER ve bu DOĞRUDUR: `ilan_olustur` jsonb GİRDİ
+      anahtarı, LLM JSON şema alanı ve bazı RPC'lerin `provinces.name as origin_city`
+      ÇIKTI takma adı. Bunları "kalıntı" sanıp temizlemeye kalkma — ilan oluşturma kırılır.
 ```
-> 🗺️ **İL ARTIK ID (30 Tem 2026, `docs/COGRAFI_GECIS.md`).** `origin_city` metin kolonu
-> **çift yazım** döneminde YERİNDE — hem id hem metin yazılıyor. Yalnız id yazan bir yol,
-> metne bakan okuma yollarında (HomeClient varış filtresi, radar RPC'leri) ilanı **görünmez**
-> yapar. Her yazma yolu `lib/lokasyon.ts::ilCiftYazim()` kullanmalı.
+> 🗺️ **İL ARTIK YALNIZ ID (Dalga 1→5 tamam, `docs/COGRAFI_GECIS.md`).** Çift yazım dönemi
+> **bitti**; `lib/lokasyon.ts::ilCiftYazim()` çağrısı artık gerekmiyor. Okuma yollarının
+> hepsi (`HomeClient` varış filtresi, radar RPC'leri) `province_id` üzerinden çalışıyor.
+> 📌 Geçmiş kayıt: bu dönemde metne bakan filtreler yüzünden `origin_city='istanbul'`
+> yazımlı **22.474 ilan** ana sayfa filtresinde görünmez kalmıştı — geçişin asıl sebebi buydu.
 > 🚨 Yeni iki kolona GRANT **elle verildi** (migration Adım 4) — L1e sonrası her yeni kolon
 > `anon`/`authenticated` için yetkisiz doğuyor.
 
@@ -974,12 +1147,17 @@ id smallint PK (1-81, plaka kodu) · plate char(2) · name text
 ### `listing_stops` — 🚨 GÜZERGÂH ŞEMASI (varışlar burada)
 ```
 listing_id (FK → listings.id), stop_order (1..n)
-city, district (district nullable)
-province_id (nullable FK → provinces.id) — 30 Tem 2026, city'nin yerini alacak
+district (nullable) — ⚠️ HÂLÂ SERBEST METİN, ilçe tarafında yazım tuzağı sürüyor
+province_id (nullable FK → provinces.id) — ✅ 6 Ağu 2026'dan beri DURAK İLİNİN TEK KAYNAĞI
 district_official (nullable bool) — true=resmî ilçe, false=serbest giriş
 cargo_type, weight_ton, pallet_count, vehicle_count, notes
+
+🚫 city — DÜŞTÜ (6 Ağu 2026, Dalga 5). Bu kolon ARTIK YOK.
+   Yedeği: public.dalga5_yedek_stops_20260806 (245.086 satır, ≥6 Eyl 2026'ya kadar saklanır).
+   ⚠️ `city` ADI KODDA HÂLÂ GEÇER ve DOĞRUDUR: `ilan_olustur`ın `p_stops` jsonb GİRDİ
+      anahtarı (`t.s->>'city'`) ve radar RPC'lerinin `p.name as city` ÇIKTI takma adı.
 ```
-> 🚨 **Çıkış tek, varış çok.** Kalkış `listings.origin_city` / `origin_district`'te tek satır
+> 🚨 **Çıkış tek, varış çok.** Kalkış `listings.origin_province_id` / `origin_district`'te tek satır
 > olarak durur; **uğrama/varış noktalarının hepsi `listing_stops` satırlarıdır.** Bir güzergâhı
 > tek tabloda aramak yanlış sonuç verir.
 > - Yazan: `supabase/functions/parse-listing/index.ts` (`ilan_olustur` RPC'si, lane grubu → `p_stops`),
@@ -990,8 +1168,11 @@ cargo_type, weight_ton, pallet_count, vehicle_count, notes
 >   `includes` büyük/küçük harfe duyarlı olduğu için `ÇORLU` yazılmış bir durak "Çorlu"
 >   aramasında hiç çıkmıyordu. **Artık yazım bozulması varış filtresini etkilemez** —
 >   `province_id` metinden bağımsız. Durak İLÇESİ hâlâ serbest metin, o tarafta tuzak sürüyor.
-> - `get_nearby_listings_by_city` RPC varışı `listing_stops`'un **son durağından**
->   `DISTINCT ON` ile alıyor.
+> - `get_nearby_listings_by_province(p_province_id int, p_district text, p_limit int)` RPC
+>   varışı `listing_stops`'un **son durağından** `DISTINCT ON` ile alıyor.
+>   ⚠️ Burada 6 Ağu 2026'ya kadar **`get_nearby_listings_by_city`** yazıyordu — öyle bir
+>   fonksiyon **yok** (`42883` ile öğrenildi). Ad Dalga 1'de değişmiş, harita güncellenmemiş.
+>   İmza da üç parametreli; iki parametreyle çağırmak yine `42883` verir.
 >
 > 🚫 **`listings.destination_city` DİYE BİR KOLON YOK** (31 Tem 2026'da 42703 ile öğrenildi).
 > Burada 29 Tem'den beri "ÖLÜ KOLON" yazıyordu — yanlıştı. Ölü değil, **hiç var olmamış**.
@@ -1723,6 +1904,7 @@ Açık rotalar: /giris, /auth/, /profil-tamamla, /nasil-calisir, /hakkimizda,
 - 🚨 **LLM prompt'unun ÖRNEKLERİ kuraldan güçlüdür — bozuk örnek bozuk veri üretir** (29 Tem 2026, `SPRINT_01` W5/D1). `learn-aliases` prompt'unda kurallar Türkçe doğru yazımı istiyordu ama JSON **örnekleri** ASCII'ye indirgenmişti (`"Eskisehir"`, `"Istanbul"`, `"Tekirdag"`). Model kuralı değil örneği taklit etti; `aliases.normalized` aylarca iki yazımla doldu (`Istanbul` 13 satır / `İstanbul` 154 satır). **Kural:** prompt'a örnek yazarken örneğin kendisi üretmek istediğin çıktının birebir doğru hali olmalı. Ayrıca prompt'a mevcut kayıtlar bağlam olarak veriliyorsa "listede eski/bozuk kayıtlar olabilir, onları örnek alma" satırı şart — yoksa bozulma kendi kendini besler.
 - 🚨 **Karşılaştırma anahtarı ile SAKLANAN değer aynı şey değildir** (29 Tem 2026, `SPRINT_01` W5/D2+D4). `Istanbul` ve `İstanbul` **aynı şehir** ama string eşitliği bunu göremez. `parse-listing/findPlaces`'teki `seen` seti ham `normalized` üzerinde çalıştığı için iki yazım İKİ AYRI ŞEHİR sayılıyordu; `sameCity` koruması devreye girmiyor ve **sahte `İstanbul→İstanbul` ilanı** kaydediliyordu (aynı sebeple şehir filtresi de ilanların bir kısmını hiç göstermiyordu). Düzeltme: her karşılaştırma/dedup anahtarı katlanmış formdan geçer (`aliasKey` / `yerKey`), **saklanan değer Türkçe kalır**. ⚠️ Katlama fonksiyonu (`lib/alias-normalize.ts::aliasKey`) ile DB indeks ifadesi (`docs/20260729_alias_normalize_trigger.sql`) BİREBİR aynı olmalı: `translate(lower(replace(alias,'İ','i')),'ıçğöşü','icgosu')`. Sıra kritik — `İ` (U+0130) **önce** düz `i`ye çevrilmeli, yoksa Postgres `lower()` onu `i` + U+0307 olarak iki karaktere açar ve JS `toLowerCase()` ile ayrışır → uygulama "çakışma yok" derken DB 23505 atar. 📏 **Ölçüldü (4 Ağu 2026):** `lower('İSTANBUL')` = `i̇stanbul`, **length 9**, `='istanbul'` **false**. Yani Postgres `lower()` ile JS `.toLowerCase()` **aynı** davranıyor; ayrışan taraf `replace`'i öne alan `aliasKey`/indeks ifadesi. 🚨 **Ve `lib/alias-normalize.ts`:82 `normalizeAliasFields` bu kurala UYMUYOR** — düz `.toLowerCase()` kullanıyor. `İ` içeren alias DB'ye `i`+U+0307 olarak yazılıyor; dahası `trNorm`'un `[^a-z0-9\s]`→`' '` kuralı U+0307'yi **boşluğa** çevirdiği için (`i kitelli` ≠ `ikitelli`) o alias hiçbir mesajla eşleşemiyor → **sessiz ölü kayıt**. Görev #45. ✅ **DÜZELTİLDİ + ONARILDI (4 Ağu):** kod :82'ye `.replace(/İ/g,'i')` eklendi (deploy bekliyor); veri tarafında 34 bozuk satır bulundu — **24'ü gölge kopya** (pasifleştirildi, kapsama kaybı yok), **9'u gerçek kayıp** (`nizip` · `istoç` · `ivedik` · `kdz ereğli` · `delice` · `iskendurun` · `iscehisardan` · `ş.kochisar` · `yeni mahalle` — onarıldı, `trNorm` eşleşme testi 9/9). 🚨 İkinci hasar daha sinsiydi: bu satırlar `aliases_katlanmis_anahtar_uniq`i **baypas ediyordu** (indeks `replace(alias,'İ','i')` ile başlıyor, saklanan değerde büyük `İ` yok, U+0307 hayatta kalıyor, anahtar ayrışıyor) — 24 gölge kopya bu delikten girdi. Ayrıntı: `docs/20260804_u0307_alias_onarimi.sql`.
 - 🚨 **SIFIR GENİŞLİKLİ KARAKTER = SESSİZ İL KAYBI. VE BU BİR SALDIRI, KAZA DEĞİL** (4 Ağu 2026, canlı veride bulundu). `raw_posts` içinde `S‌apanca` (U+200C, ZWNJ) ve `⁠Sarar` (U+2060) yazan mesajlar var — bir gönderici aynı ilanı tekrar tekrar atabilmek için metne görünmez karakter serpiyor, `clean_hash` her seferinde değişiyor ve **tekilleştirme delinmiş oluyor**. Yan hasar daha pahalı: `app/api/whatsapp-parse/route.ts::trNorm`'un `[^a-z0-9\s\.>-]` → `' '` kuralı bilinmeyen karakteri **boşluğa** çevirir → `s apanca`; `:180` token'lara ayırır, `t.length < 2` filtresi `s`yi atar, geriye `apanca` kalır. Hiçbir alias'la eşleşmez → ilanın ili **sessizce kaybolur**, hata da log da yok. 🔁 Mekanizma U+0307 hatasıyla **birebir aynı** (bkz. bir alt madde): görünmez karakter → boşluk → kelime bölünmesi. ✅ Düzeltme (4 Ağu): `gorunmezleriSil()` `trNorm`'un **en başına** eklendi (siler, boşluğa çevirmez). Ölçüldü: önce `["apanca"]`, sonra `["sapanca"]`; `Sapanca`/`Sarar`/`Kadıköy` etkilenmedi. ✅ **VE TEKİLLEŞTİRME DELİĞİ DE KAPANDI (4 Ağu, #61) — ama AYRI bir düzeltmeyle.** `trNorm` düzeltmesi yalnız YER EŞLEŞTİRMESİNİ onarmıştı; `cleanHash()` görünmez karakteri hash'e sokmaya devam ediyordu. 🚨 **Ders: aynı kök sebebin İKİ AYRI zararı vardı, birini düzeltince öteki düzelmiş SANILDI.** Kök sebep bulunduğunda "bu karakter başka nereye giriyor" diye ayrıca aranmalı. Düzeltme: `cleanHash` artık `chatParser::gorunmezleriSil`'i (`cfKarakterleriSil` adıyla) çağırıyor. 📏 Ölçüldü: eski hash'te `S`+ZWNJ+`apanca` ≠ `Sapanca` (delik), yenide **eşit**; U+2060 ve U+200B varyantları da eşit; emoji (`➡️ ✅`) içeren mesajın hash'i **değişmedi**. Yedek alınmadı (Bayram kararı) — `text` zaten `satiriTemizle`'den geçtiği için canlı satırların hash'i pratikte değişmiyor, bu çağrı ikinci savunma hattı. ✅ `lib/whatsapp/chatParser.ts` de düzeltildi: liste `GORUNMEZ_CF` sabitine alındı, eksik U+200C/U+200D/U+2060 eklendi, ham karakterler `\u` kaçışına çevrildi. ⚠️ Regex `\u` **kaçışıyla** yazılmalı, ham karakterle değil — editör/formatter ham görünmezleri sessizce silerse koruma da görünmeden ölür. 🚨 **U+FE0F iki listede de aynı DEĞİL, bu KASITLI.** FE0F `Cf` değil `Mn` ve `➡️ ⚠️ ✅` emojilerinin parçası. SAKLANAN metne ve hash'e dokunan yerler (`chatParser`, `cleanHash`) onu **silmez** — silse binlerce eski mesajın hash'i değişir, yeniden içe aktarımda kopya seli olur. Yalnız EŞLEŞTİRME tarafı (`whatsapp-parse`:153, `parse-listing`:74) siler; orada ne saklanan değer ne hash var. **Üç kopya artık iki farklı listeye ayrıldı; hangisinin nerede kullanıldığı kod yorumlarında yazılı.**
+- 🚨 **DEDUP ANAHTARI, ATILAN İSABETİN TAŞIDIĞI BİLGİYİ DE ATAR** (6 Ağu 2026, #89-A). `findPlaces`'teki `seen` **sadece il** ile anahtarlanmış bir `Set`ti. "Ankara Gölbaşı" metninde önce `ankara` isabet ediyor (`district=null`), sonra gelen `gölbaşı` (Ankara/Gölbaşı) `seen.has('ankara')` yüzünden **`hits`e hiç girmiyordu** — yani ilçe bilgisi sıralamaya bile ulaşamadan yok oluyordu. Metinde AÇIKÇA yazan ilçe sessizce düşüyor, ne hata ne log. 🚨 **BU MADDE ÖNCEDEN YANLIŞ TEŞHİS EDİLMİŞTİ:** hem burada hem `index.ts` yorumlarında bu davranış "öncelik sıralaması sorunu" diye açıklanıyordu. Değildi. Kanıt: `Denizli(90)` / `Kale(90)` — **öncelikler EŞİTken bile** ilçe düşüyor, çünkü sorun `sort` değil ondan önceki `seen` kontrolü. Önceliklerle oynamak hiçbir şeyi çözmezdi. ✅ Düzeltme: `seen` artık `Map<string, PlaceHit>`; ikinci isabeti atmak yerine **mevcut isabetin boş ilçesini dolduruyor** (`ekleVeyaYukselt`). Kural katı — il ASLA değişmez, öncelik ASLA değişmez, yer EKLENMEZ/SİLİNMEZ, sıra bozulmaz, dolu ilçenin üstüne YAZILMAZ (ilk kazanır). 📏 **Ölçek:** 948 aktif ilçe alias'ının **912'si** (%96) kendi ilinin bare alias'ından düşük/eşit öncelikte — yani "İl İlçe" yazan neredeyse her satır etkileniyordu; varış ilçe doluluğu 7 günde %25,5. 35 gerçek ilanda ilçeli şerit **%54,7 → %81,2**, net **+6** şerit, açıklanamayan kayıp **0** (`npm run olc:89`). 📌 Yan etki İSTENEN: iki uç aynı ile ama FARKLI ilçeye çözülünce `ayniIlce` artık ayırt ediyor, sahte "kendine şerit" kayıtları düşüyor. ⚠️ Genel ders: bir dedup anahtarı, tekilleştirdiği kaydın **tüm alanlarını** kapsamıyorsa, dar anahtar geniş bilgiyi sessizce çöpe atar. Anahtar dar tutulacaksa atma değil **birleştirme** yapılmalı.
 - ⚠️ **`normalized` her zaman şehir DEĞİL — otomatik yazım düzeltmesi yapma** (29 Tem 2026, W5/D2). `type='vehicle'` satırlarında `normalized` doğrudan `vehicle_type` olarak ilana yazılıyor; "tir" → "Tir" yapmak eşleşmeyi bozar. Bu yüzden ne `normalizeAliasFields` ne de DB trigger'ı `normalized`/`district` üzerinde büyük harfe çevirme / ASCII katlama yapıyor — yalnız boşluk temizliği. Yanlış yazım sessizce düzeltilmez, `aliasCakismaBul` **409 ile admine sorar** (öneri: çoğunluk yazımı — 154 satır `İstanbul` varken 13 satırlık `Istanbul` kazanmasın).
 - 🚨 **`alias` kolonundaki UNIQUE kısıtı HAM string üzerinde — katlanmış kopyaları engellemez** (29 Tem 2026, W5/D3). `Gebze`/`GEBZE`/`gebze`, `Çorlu`/`çorlu`/`corlu`, `Torbali`/`torbali`/`torbalı` üç ayrı satır olarak duruyor ve hepsi tek katlanmış anahtara düşüyor. Sonucu: planlanan tam UNIQUE indeks **kurulamaz** (23505). Ayrıca temizlik script'i bu satırları silmiyor, yalnız `normalized`/`district`'i tutarlı yapıyor — yani veri temizliği tamamlansa bile önkoşul karşılanmıyor. Çözüm iki parçalı: önce fazlalıkları `is_active = false` yap (runbook Adım 9; `row_number() OVER (PARTITION BY type, katlanmış ORDER BY id) > 1` — **silme yok**, `findPlaces` zaten `.order('id')` ile küçük id'yi seçtiği için bugünkü davranış değişmez), sonra indeksi **kısmi** kur (`WHERE is_active = true`) — pasifleştirilmiş kopyalar tabloda durduğu için tam indeks onları da ihlal sayardı.
 - **PostgREST tek sorguda EN FAZLA 1000 satır döndürür — ve bunu SÖYLEMEZ** (28 Tem 2026). Supabase'in `db.max-rows` ayarı. Sınırı aşan `select()` hata vermez, sessizce kesilir. `aliases` tablosu 1887 aktif satıra çıkmıştı; hem `app/api/whatsapp-parse` gatekeeper'ı hem `supabase/functions/parse-listing` şehir/araç tespitini alias'ların **%47'sini hiç görmeden** yapıyordu. Üstelik `ORDER BY` olmadığı için hangi 887 satırın düştüğü belirsizdi → aynı mesaj farklı zamanlarda farklı ayrıştırılabiliyordu. Düzeltme: `.range()` ile sayfalama + `.order('id')` (sıralama olmadan sayfalar çakışır/atlar). **Kural: bir tabloyu "hepsini çek" niyetiyle okuyan her sorgu sayfalanmalı.**
