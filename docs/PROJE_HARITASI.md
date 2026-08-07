@@ -962,9 +962,10 @@ yukegel/
 │                                         #    📌 Bilinen miras kusur (bilerek dokunulmadı): `detectAdType`'ın
 │                                         #      "yuklenecek" anahtar kelimesi yük ilanlarını "arac" sanabilir —
 │                                         #      Deno kaynağından birebir kopya, ayrı görev gerektirir.
-│                                         #    📌 Yan bulgu (kod değil VERİ): `aliases`'ta frigo/frigorifik/frigolu
-│                                         #      `type='vehicle'` etiketli ama değer üstyapı — Bayram kararı bekliyor.
-│                                         #      Ayrıntı: `docs/YAPILACAKLAR.md` başı.
+│                                         #    ✅ Yan bulgu KAPANDI (7 Ağu 2026) — `aliases`'ta frigo/frigorifik/frigolu
+│                                         #      `type='vehicle'→'body'` taşındı (`docs/20260807_frigo_body_tasima.sql`,
+│                                         #      id 230/231/232), öncelik 80→70 (body tavanına eşitlendi). Kod deploy'u
+│                                         #      GEREKMEDİ — Deno worker'ı 60 sn TTL'li önbellekten okuyor (#73).
 ├── lib/ilan-limit.ts                     # 🚨 V6 (7 Ağu 2026) — ilan tavanı + 24 saatlik mükerrer tespiti.
 │                                         #    ilanLimitOku() → system_config['rate_limit']['spam_threshold']
 │                                         #      (max_listings_per_hour/day), hata → 20/60 fallback.

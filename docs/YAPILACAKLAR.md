@@ -64,20 +64,25 @@
 >    yakındığı hata sınıfı. Düşük risk: `listing_type` formun İLK alanı,
 >    kullanıcı önizlemede bir tık ile düzeltir. **Ayrı görev önerilir.**
 >
-> ### 🔍 Yan bulgu — `aliases` tablosunda veri kalitesi sorunu (kod DEĞİL, veri)
+> ### ✅ 7 AĞU 2026 — `aliases` veri kalitesi düzeltildi: frigo/frigorifik/frigolu artık `body`
 >
-> Gerçek alias verisiyle test ederken çıktı: `frigo` / `frigorifik` / `frigolu`
-> alias'ları `type='vehicle'` olarak etiketlenmiş, ama `normalized='Frigorifik'`
-> — bu açıkça bir ÜSTYAPI (body) değeri, araç TİPİ değil (`TIR`/`Kamyon`/...
-> enum'unda yok). Sonuç: `findVehicle` bunu "araç tipi" sanıp döndürüyor, form
-> tarafındaki `ARAC_TIPLERI` beyaz listesi tanımadığı için SESSİZCE atıyor —
-> zararsız ama üstyapı bilgisi kayboluyor (`findBodyType` de yakalamıyor, çünkü
-> `body` tipli tek eşleşen alias "frigo tır" iki kelime, yalnız "frigo" değil).
-> **Bu satırı DEĞİŞTİRMEDİM** — `aliases` verisi hem bu yeni yolu hem canlı
-> WhatsApp hattını besliyor, veri değişikliği ayrı ölçüm+karar ister. **Yeni
-> görev: `type='vehicle'` olan frigo/frigorifik/frigolu satırları `type='body'`
-> olarak taşınmalı mı, yoksa `type='vehicle'` bilerek mi böyle (frigo TIR'ı bir
-> "araç sınıfı" sayan bir mantık olabilir)? Bayram kararı gerekiyor.**
+> Yukarıdaki bulgu için Bayram kararı geldi: taşı. `docs/20260807_frigo_body_tasima.sql`
+> çalıştırıldı — id 230/231/232, `type='vehicle'→'body'`. **Öncelik de bilerek
+> 80'den 70'e çekildi**: mevcut `body` tipi alias'ların tavanı 70 (Açık Kasa/
+> Damperli/Jumbo/Liftli/Tenteli hepsi 70); 80 kalsaydı bu üç satır TÜM body
+> alias'ları arasında en yüksek öncelikli olur, `findBodyType()` (öncelik
+> sırasına bakar, metindeki gerçek konuma değil) metinde "tenteli" daha belirgin
+> geçse bile "frigo" varsa onu seçerdi.
+> **Önce ölçüldü, sonra yazıldı:** `aliases_katlanmis_anahtar_uniq` (type,
+> katlanmış_anahtar, WHERE is_active) çakışma riski taşıyordu — kontrol 0 satır
+> döndü (aktif `body` tipinde zaten "frigo"/"frigorifik"/"frigolu" yoktu, yalnız
+> iki kelimelik "frigo tır" vardı), UPDATE güvenle çalıştı.
+> **Doğrulama:** `lib/lane-parser.ts::hizliAyristir` gerçek güncel veriyle tekrar
+> koşuldu — "10 palet meyve, frigo, 5 ton" örneği artık `vehicle_type: null`,
+> `body_type: ["Frigorifik"]` veriyor (öncesi: `vehicle_type: "Frigorifik"`
+> yanlış + `body_type: []` boş).
+> 📌 Canlı `parse-listing` (Deno) etkisi: kod deploy'u GEREKMEDİ, worker'lar
+> alias'ı 60 sn TTL'li önbellekten okuyor (#73), değişiklik kendiliğinden yayıldı.
 >
 > ⚠️ **ÖLÇÜLMEDİ — gerçek trafikte kaçta kaçı regex'le çözülüyor.** `/api/parse-
 > text` ham metni DB'ye yazmıyor, yani geçmiş trafik üzerinden "regex hit oranı"
