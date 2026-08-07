@@ -80,8 +80,17 @@ export async function getAiQuotaForUser(userId: string): Promise<number> {
 /**
  * Son 24 saatte kullanıcının AI üzerinden açtığı ilan sayısı.
  * Tanım: listings.user_id = X AND raw_text IS NOT NULL AND created_at > now() - 24h
- * (Metinden İlan akışı raw_text'i doldurur — diğer kanallar genellikle null bırakır;
- *  WhatsApp/excel ilanlarının user_id'si NULL olduğu için zaten sayıma dahil olmazlar.)
+ *
+ * ⚠️ V7 SONRASI BU ARTIK KOTANIN KAPISI DEĞİL — yalnız **taban + raporlama**.
+ * Gerçek kapı `lib/ai-kota.ts`'te ve ÇAĞRIYI sayıyor. Sebep: bu sayaç KAYDI ölçüyor,
+ * ayrıştırıp kaydetmeyen kullanıcı için hiç artmıyordu; kapı `parse` anında olduğu
+ * için Anthropic'e sınırsız ücretli çağrı yapılabiliyordu. Bellek sayacı soğuk
+ * başlangıçta sıfırlandığı için bu DB sayacı taban olarak korunuyor.
+ *
+ * 🚫 ESKİ YORUM YANLIŞTI: "WhatsApp/excel ilanlarının user_id'si NULL". Değil —
+ * `app/api/whatsapp/route.ts` gerçek bir `user_id` + `raw_text` ile yazıyor, yani
+ * WhatsApp ilanları bu sayaca dahil. V7'den sonra bu KASITLI: iki kanal aynı günlük
+ * bütçeyi paylaşıyor (ikisi de aynı Anthropic hesabından para harcıyor).
  */
 export async function countAiListingsLast24h(userId: string): Promise<number> {
   if (!userId) return 0;

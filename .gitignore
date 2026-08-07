@@ -140,3 +140,17 @@ vite.config.ts.timestamp-*
 
 # Claude AI geçici dosyaları
 .claude/
+
+# ── FUSE bağlama artıkları ────────────────────────────────────────────────
+# Depo bir FUSE mount üzerinden de açılabiliyor ve ORADA SİLME İZNİ YOK.
+# Silinmek istenen ama açık tutulan her dosya `.fuse_hidden…` adıyla geride
+# kalıyor; elle temizlenene kadar `git status`u kirletiyor ve yanlışlıkla
+# commit'e girebiliyor. Kalıbı yok saymak, temizliği ertelenebilir kılar.
+.fuse_hidden*
+
+# Alternatif build çıktıları. `next build` varsayılan `.next`i silmeye
+# çalışıyor, FUSE izin vermiyor ve build patlıyor; çözüm `distDir`i başka bir
+# klasöre almak. O klasörlerin adları burada — `.next` zaten yukarıda yok
+# sayılı ama bu türevleri kapsamıyordu.
+.next-dogrulama/
+tmp/

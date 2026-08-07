@@ -1,4 +1,5 @@
 // Server component — listings server-side fetch (ISR 30s), HomeClient + Footer
+import type { Metadata } from 'next';
 import HomeClient from './_components/HomeClient';
 import Footer from './_components/Footer';
 import { createPublicServerClient } from '../lib/supabase-server';
@@ -14,6 +15,13 @@ function createServiceClient() {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
 }
+
+/**
+ * Ana sayfanın canonical'ı ARTIK BURADA. Eskiden kök `layout.tsx`'teydi ve oradan
+ * kendi canonical'ını yazmayan HER sayfaya miras kalıyordu — yani /kvkk de kendini
+ * ana sayfa ilan ediyordu. Gerekçenin tamamı `app/layout.tsx`'te.
+ */
+export const metadata: Metadata = { alternates: { canonical: '/' } };
 
 // 30 saniyede bir arka planda yenilenir (stale-while-revalidate)
 export const revalidate = 30;

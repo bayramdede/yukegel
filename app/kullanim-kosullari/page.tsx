@@ -1,6 +1,15 @@
+import type { Metadata } from 'next';
 import { getConfigs } from '../../lib/config';
 
 export const dynamic = 'force-dynamic';
+
+// ⚠️ Gerekçe `app/kvkk/page.tsx` ile aynı: canonical yazılmazsa kök layout'un
+// canonical'ı miras alınır ve sayfa ana sayfanın kopyası sayılır.
+export const metadata: Metadata = {
+  title: 'Kullanım Koşulları — Yükegel',
+  description: 'Yükegel platformu kullanım koşulları ve üyelik kuralları.',
+  alternates: { canonical: '/kullanim-kosullari' },
+};
 
 const GUNCELLEME = '6 Mayıs 2026';
 

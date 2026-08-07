@@ -7,12 +7,15 @@ export const metadata: Metadata = {
   openGraph: {
     title: 'Hakkımızda | Yükegel',
     description: 'Yük sahipleri ile nakliyecileri doğrudan buluşturan, Türkiye\'nin yeni nesil nakliye ve iş takip platformu.',
-    url: 'https://yukegel.com/hakkimizda',
+    // Göreli — `metadataBase` (app/layout.tsx) mutlaklaştırır. Sabit alan adı
+    // yazmak, NEXT_PUBLIC_SITE_URL değiştiğinde (staging/preview) sessizce
+    // yanlış alan adını yayınlar.
+    url: '/hakkimizda',
     siteName: 'Yükegel',
     locale: 'tr_TR',
     type: 'website',
   },
-  alternates: { canonical: 'https://yukegel.com/hakkimizda' },
+  alternates: { canonical: '/hakkimizda' },
 };
 
 const jsonLd = {

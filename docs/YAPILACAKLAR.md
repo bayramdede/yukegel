@@ -1,5 +1,188 @@
 # Yükegel — Yapılacaklar Listesi
 
+> ## ✅ 7 AĞU 2026 — GÜVENLİK + VERİ BÜTÜNLÜĞÜ: #29 · #30 · V7 · V6
+>
+> ### #29 ve #30 ZATEN KAPALIYMIŞ — önce ÖLÇ, sonra yaz (#91 dersi)
+>
+> `shadow_profile_summary` RLS bypass'ı ve alias veri hataları canlıda kontrol
+> edildi: ikisi de düzeltilmişti. Madde açıldığı gün doğru olan şey bugün doğru
+> olmayabilir; **her maddeye ölçümle başlıyoruz.**
+>
+> ### ✅ V7 — AI kotası: kapı ile sayaç artık AYNI olayı ölçüyor
+>
+> `lib/ai-kota.ts` (yeni). Eski hâlde kapı `parse` anındaydı ama sayaç `kayıt`
+> üzerindeydi (`countAiListingsLast24h` → `listings.raw_text IS NOT NULL`).
+> **Ayrıştırıp formu göndermeyen kullanıcının sayacı hiç artmıyordu** — ücretli
+> Anthropic endpoint'i sınırsız çağrılabiliyordu.
+>
+> - **Tek bütçe, iki kanal.** `/api/parse-text` + `/api/whatsapp` aynı kovayı
+>   KASITLI paylaşır: ikisi de aynı kullanıcı adına aynı hesaptan para harcıyor.
+>   V7 notu bunu "kirli sayaç" diye işaretlemişti — kirli olan sayacın **DB
+>   tarafıydı**; kanalların bütçeyi paylaşması doğru davranış.
+> - **§9:** `bak()` kaydetmez, `isle()` yalnız çağrı **başarılı** dönünce işler.
+>   Sağlayıcı arızası kullanıcının kotasını yakmaz.
+>
+> ### ✅ V6 — ilan tavanı + mükerrer tespiti (`lib/ilan-limit.ts`, yeni)
+>
+> V7'nin "kapı ve sayaç aynı olayı ölçmeli" kuralı V6'da **bedava geliyor**:
+> kabul edilen her ilan `listings`'e bir satır bırakıyor, yani **DB'nin kendisi
+> sayaç**. Ayrı bir sayaç tutulmadı.
+>
+> **Tasarım kararlı ÜÇ nokta — hepsi canlı veriyle ölçülerek verildi:**
+>
+> | karar | gerekçe |
+> |---|---|
+> | `max(DB, bellek)` — asla `sum` | bellek sayacı süreç-yerel, soğuk başlangıçta sıfırlanır; DB otoriter ama eşzamanlı yarışı kaçırır. Toplamak yazılmış ilanı **iki kez** sayardı. |
+> | tek sorgu, `count` değil `created_at` damgaları | iki `count` sorgusunun maliyeti excel'de satır başına çarpılır. Bekleme mesajı da bu damgalardan üretiliyor. |
+> | excel tavanında `MAX_ILAN` **tabanı** | yalnız çarpan olsaydı admin `spam_threshold`u kısınca (5×5=25 < 50) meşru 50'lik dosya ortadan bölünür, **yarım import** kalırdı. |
+>
+> **🔬 excel muafiyeti VARSAYIM DEĞİL, ÖLÇÜM.** 24 saatlik mükerrer semantiği
+> 90 günlük gerçek veriye kanal kanal uygulandı:
+>
+> | kanal | ilan | engellenecekti |
+> |---|---|---|
+> | excel | 133 | **81** |
+> | form | 6 | **0** |
+> | whatsapp | 0 satır | — |
+>
+> Nakliyeci aynı gün İstanbul→Ankara 10 tır ilanı veriyor; hepsi tek mükerrer
+> anahtarına çöküyor. Form kanalında ise **tek bir hatalı pozitif yok**.
+> Zirve hacim: excel 43/saat · 55/gün, form 2/saat · 2/gün. excel'in etkin
+> tavanı (12×5=60, taban 50) gözlenen zirveyi geçiyor.
+>
+> 📌 **Dalga 5 sonucu:** mükerrer anahtarı `province_id` ile kurulmak ZORUNDA —
+> `listings.origin_city` ve `listing_stops.city` düşürüldü. `stop_order` **1**'den
+> başlıyor (`with ordinality`).
+>
+> **3 mutasyonla doğrulandı** (excel tabanı sıfırlandı · `sayma:true` kaldırıldı ·
+> saatlik kapı `>=`→`>`), üçü de yakalandı; `npm run test:ilan-limit` 11/11.
+> Kullanıcı tarafında mükerrer uyarısı "Mevcut ilanı görüntüle →" bağlantısı veriyor.
+>
+> ---
+>
+> ## ✅ 7 AĞU 2026 — #33 SEO: ASIL HATA CANONICAL MİRASI. 12 DOSYA. DEPLOY BEKLİYOR.
+>
+> **TEK CÜMLE:** Kök `app/layout.tsx` `alternates: { canonical: '/' }` taşıyordu ve
+> **kendi canonical'ını yazmayan HER sayfa bunu miras alıyordu** — yani `/kvkk`,
+> `/nasil-calisir`, `/kullanim-kosullari`, `/yol-rehberi`, `/u/{id}` hepsi
+> `<link rel="canonical" href="https://yukegel.com/">` yayınlıyor, Google'a
+> "ben ana sayfanın kopyasıyım" diyordu.
+>
+> ### Bu maddenin %80'i zaten yapılmıştı — ölçmeden başlamayın
+>
+> #91 dersi yine tuttu. `#33` "canonical, noindex, sitemap, robots, OG" diye
+> açılmıştı; denetim şunu gösterdi:
+>
+> | bileşen | durum |
+> |---|---|
+> | `app/sitemap.ts` | ✅ vardı (ilanlar + `/u/{id}` + 6 statik, limit 5000) |
+> | `public/robots.txt` | ✅ vardı (4 blok: `*`, GoogleBot, GPTBot, ClaudeBot) |
+> | `app/opengraph-image.tsx` | ✅ vardı |
+> | kök `metadataBase` + OG + Twitter | ✅ vardı |
+> | `/ilan/[id]` canonical + robots + OG | ✅ vardı |
+> | **canonical mirası** | 🔴 **BOZUKTU** |
+>
+> Yani madde açılırken sanılan iş yoktu; asıl iş, hiç şüphelenilmeyen yerdeydi.
+>
+> ### Yanlış yorum, koddan daha tehlikeliydi
+>
+> `app/layout.tsx`teki yorum aynen şunu diyordu: *"alt sayfalar kendi
+> `alternates`'ini vermezse Next bunu MİRAS ALMAZ."* **Yanlıştı.** Next 16'nın
+> birleştiricisi okundu (`node_modules/next/dist/lib/metadata/resolve-metadata.js:166`):
+>
+> ```js
+> const newResolvedMetadata = structuredClone(resolvedMetadata);
+> for (const key_ in metadata) { switch (key) { case 'alternates': … } }
+> ```
+>
+> Üst katmanın **çözülmüş** metadata'sı klonlanıp başlangıç alınıyor; yalnızca
+> çocuğun KENDİ nesnesinde bulunan anahtarlar eziliyor. `alternates` vermeyen
+> her sayfa üsttekini aynen devralıyor.
+>
+> 📌 **Ders — bu projede üçüncü kez:** bir davranışı yorumdan öğrenmeyin, kaynaktan
+> doğrulayın. (`destination_city` #28, `get_nearby_…` #40, `processed_at` — hepsi
+> "şemada/yorumda öyle yazıyordu" ile başlamıştı.)
+>
+> ### Yapılan
+>
+> **Kökten çekildi, sahibine verildi.** `app/layout.tsx`ten `alternates` tamamen
+> kaldırıldı; ana sayfanın canonical'ı artık `app/page.tsx`te. Kökten çekilince
+> varsayılan "canonical yok" olur ve Google sayfayı KENDİ URL'ine self-canonical
+> sayar — yani yanlış cevap yerine güvenli sessizlik.
+>
+> **Sunucu sayfalarına kendi canonical'ı:** `kvkk` · `kullanim-kosullari` ·
+> `yol-rehberi` · `hakkimizda` (mutlak `https://yukegel.com/hakkimizda` → göreli
+> `/hakkimizda`; mutlak yazmak `metadataBase`i devre dışı bırakıp staging'de canlı
+> alan adını canonical ilan ediyordu).
+>
+> **`'use client'` sayfaları `metadata` EXPORT EDEMEZ** — bunlara kardeş sunucu
+> layout'u açıldı (`app/auth/layout.tsx` kalıbı): `ilan-ver/` · `nasil-calisir/` ·
+> `araclarim/` (noindex) · `u/[username]/` (`generateMetadata` + await'li `params`).
+>
+> ⚠️ `u/[username]` rota parametresinin adı `username` **ama taşıdığı değer
+> `user_id`.** `app/sitemap.ts` bu URL'leri `listings.user_id`den türetiyor.
+> canonical gelen değeri AYNEN kullanıyor ki sitemap'le birebir aynı olsun.
+>
+> **Yönetim yüzeyleri noindex:** `app/admin/layout.tsx` (10 sayfayı birden kapatır) ·
+> `app/moderator/layout.tsx` · `app/panel/page.tsx` · `app/ilan/[id]/sahiplen/layout.tsx`.
+> Segment layout'u bilinçli — kuralı sayfa başına yazmak, listelerin zamanla
+> ayrışmasına davetiye.
+>
+> 📌 **robots.txt `Disallow` ≠ noindex.** İki farkı var: (1) yalnızca o kuralı okuyan
+> crawler'ı bağlar, (2) *taramayı* engeller, *indekslemeyi* değil — dış bağlantı
+> varsa Google URL'i taramadan da indeksleyebilir. Ayrıca `Disallow: /panel/`
+> yalnızca alt yolları kapatıyordu, **çıplak `/panel` kapsam dışıydı**.
+>
+> ### 🐛 Yolda çıkan tuzak: yorum içindeki `*/`
+>
+> `app/ilan/[id]/sahiplen/layout.tsx` yorumuna robots.txt kalıbı birebir yazılınca
+> içindeki yıldız-eğik çizgi ikilisi **blok yorumu erken kapattı**; `tsc` 5 hata
+> verdi (`TS1443`, `Unterminated template literal`). Kalıp artık kelimeyle anlatılıyor.
+>
+> ### Bekçi: `npm run test:seo` — 72 kontrol
+>
+> `scripts/test-seo-canonical.mts`. Hatayı değil **hatanın sınıfını** kilitler:
+> her rota ya kendi canonical'ını yazacak ya noindex olacak. Kaynağı statik okur
+> (sandbox'ta `next build` Google Fonts'a çıkamıyor). Yorumları söküyor — çünkü
+> `alternates` kelimesi bu dosyalarda açıklama metninde de geçiyor ve ayıklanmazsa
+> "yorumda anlatmış" ile "kodda yazmış" ayırt edilemezdi.
+>
+> **4 mutasyonla doğrulandı**, hepsi yakalandı:
+>
+> | mutasyon | sonuç |
+> |---|---|
+> | köke `alternates` geri kondu (asıl hata) | ❌ 1 kaldı |
+> | `kvkk` canonical'ı silindi | ❌ 1 kaldı |
+> | `admin` noindex → `index: true` | ❌ **11 kaldı** (10 alt sayfa + segment) |
+> | `hakkimizda` canonical'ı mutlaklaştırıldı | ❌ 1 kaldı |
+>
+> Geri yükleme sonrası **72/72 yeşil**. `tsc --noEmit` temiz. 9 test paketi yeşil.
+>
+> ⏳ **DEPLOY BEKLİYOR** — sandbox `next build` tamamlayamıyor (`next/font` Google
+> Fonts'a çıkamıyor; kod kusuru değil, ağ kısıtı). Bayram'ın makinesinde gerçek
+> build şart.
+>
+> ---
+>
+> ## 🧹 7 AĞU 2026 — #34 TEMİZLİK: ENVANTER TAZELENDİ
+>
+> - ✅ **`scripts/sonda-87.mts` ZATEN SİLİNMİŞ.** Aşağıda iki yerde "silinmeli"
+>   diye duruyordu; ikisi de artık bayat. Dosya ne diskte ne git takibinde.
+> - 🔴 **Sandbox'ta `rm` HİÇ çalışmıyor** (FUSE `Operation not permitted`) — bu
+>   yüzden silme borcu birikiyor. **Bayram'ın makinesinde silinecek:**
+>   `.next-dogrulama/` · `tmp/next-dogrulama/` · 8 adet `.fuse_hidden*`
+>   (`app/`, `app/admin/`, `app/kvkk/`, `app/hakkimizda/`, `docs/`, `.next/`,
+>   `tmp/next-dogrulama/`, `.next-dogrulama/` altında).
+> - ✅ **`.gitignore` genişletildi** — silemediğimiz için hiç değilse commit'e
+>   girmelerini engelliyoruz: `.fuse_hidden*` · `.next-dogrulama/` · `tmp/`.
+> - ⚠️ **`poi işleme.xlsx` — Unicode normalizasyon ikizi.** `git ls-files` dosyayı
+>   **takipli** (NFC, `ş` = U+015F) gösteriyor; `git status` ise **takipsiz**
+>   (NFD, `s` + U+0327) diyor. Aynı isim iki farklı kodlamada. Depoda `.xlsx`
+>   tutulması ayrı bir tartışma; bu ikizlik ondan önce çözülmeli. **Bayram'da.**
+> - ⚠️ `.git/index.lock` yine kalmış; `git` yazma denemesi uyarı basıyor.
+>
+> ---
+>
 > ## 🔴 7 AĞU 2026 — #92: CANLIDA GERİLEME VAR. DÜZELTİLDİ, DEPLOY BEKLİYOR.
 >
 > **v89 sahada şerit katlediyor.** Bayram'ın koşturduğu `npm run olc:87` çıktısı
@@ -456,7 +639,8 @@
 > yerine gerçek tarihle `_20260806` adlandırıldı. Yanlış tarihli bir yedek 30 gün sonra
 > "bu silinebilir mi" kararını veren kişiyi yanıltır. Runbook BÖLÜM 7 da bu ada güncellendi.
 >
-> ⚠️ **AÇIK KALAN:** `scripts/sonda-87.mts` silinmeli (benim silme iznim yok, Bayram'da).
+> ~~⚠️ **AÇIK KALAN:** `scripts/sonda-87.mts` silinmeli~~ → ✅ **KAPANDI (7 Ağu 2026, #34).**
+> Dosya ne diskte ne git takibinde; silinmiş.
 >
 > ---
 >
@@ -610,8 +794,8 @@
 > ✅ Deploy tarafı kapandı: #86 + #88 + #87(A–F) birlikte gitti, canlı **v89**
 > (7 Ağu 2026 05:41:56 UTC). "Canlı hâlâ v79" satırı 6 Ağu'da doğruydu, artık değil.
 >
-> 🧹 **SİLİNMELİ:** `scripts/sonda-87.mts` — geçici teşhis sondası, `test-87.mts`
-> onun yerini aldı. Bu oturumda silinemedi (izin yok), elle silinmeli.
+> ~~🧹 **SİLİNMELİ:** `scripts/sonda-87.mts`~~ → ✅ **KAPANDI (7 Ağu 2026, #34).**
+> Geçici teşhis sondasıydı, `test-87.mts` yerini aldı; dosya artık yok.
 > 🏷️ **KÜÇÜK TUTARSIZLIK:** `index.ts`teki `+` kolu yorumu kendini `#87-B` diye
 > etiketliyor; testlerde ve burada kullanılan kanonik ad **#87-D**.
 > ℹ️ `app/api/whatsapp-parse/route.ts` **aynalama gerektirmedi** — içinde `parseMessage`

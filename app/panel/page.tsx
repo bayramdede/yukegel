@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import { createClient as createSupabase } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 import { createServerClient } from '@supabase/ssr';
@@ -6,6 +7,20 @@ import { girisAdresi } from '../../lib/redirect';
 import PanelClient from './PanelClient';
 
 export const dynamic = 'force-dynamic';
+
+/**
+ * Oturum zorunlu sayfa; crawler burada yalnızca `/giris`'e yönlendirilir.
+ * `index:false` bunu açıkça söylüyor — robots.txt'teki `Disallow: /panel/`
+ * SADECE alt yolları kapatıyordu, çıplak `/panel` kapsam dışıydı.
+ *
+ * `canonical: null` bilinçli: kök layout'tan miras alınan `/` değeri bu sayfayı
+ * ana sayfanın kopyası ilan ediyordu. Miras artık kaldırıldı (bkz. app/layout.tsx)
+ * ama açık `null` niyeti kayda geçiriyor — canonical YOK, self-canonical yeter.
+ */
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+  alternates: { canonical: null },
+};
 
 export default async function Panel() {
   const cookieStore = await cookies();

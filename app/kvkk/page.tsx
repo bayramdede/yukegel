@@ -1,6 +1,19 @@
+import type { Metadata } from 'next';
 import { getConfigs } from '../../lib/config';
 
 export const dynamic = 'force-dynamic';
+
+/**
+ * ⚠️ `alternates` KÖK LAYOUT'TAN MİRAS ALINIR. Kanıt `app/layout.tsx`'te:
+ * Next'in birleştiricisi üst katmanın çözülmüş metadata'sını klonlayıp
+ * yalnızca çocukta BULUNAN anahtarları eziyor. Bu sayfa kendi canonical'ını
+ * yazmadığı sürece "ana sayfanın kopyası" ilan ediliyordu.
+ */
+export const metadata: Metadata = {
+  title: 'KVKK Aydınlatma Metni — Yükegel',
+  description: 'Yükegel kişisel verilerin korunması aydınlatma metni.',
+  alternates: { canonical: '/kvkk' },
+};
 
 const GUNCELLEME = '6 Mayıs 2026';
 

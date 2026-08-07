@@ -877,7 +877,21 @@ yukegel/
 │                                         #    bayrak 0=değişmedi · 1=#89-B ilçesini doldurdu · 2=#89-B yeni ekledi
 │                                         #    Bayrak sayesinde ESKİ alias durumu geri kurulabiliyor (2'ler atılır,
 │                                         #    1'lerin district'i null'lanır) — ölçüm bu yüzden iki tabloya ihtiyaç duymaz.
-├── scripts/sonda-87.mts                   # 🧹 SİLİNECEK — geçici teşhis sondası (#87). `test-87.mts` yerini aldı.
+│                                         # (scripts/sonda-87.mts ✅ SİLİNDİ — 7 Ağu 2026, #34. `test-87.mts` yerini almıştı.)
+├── scripts/test-seo-canonical.mts         # `npm run test:seo` (7 Ağu 2026, #33) — 72 kontrol, METADATA BEKÇİSİ.
+│                                         #    Hatayı değil HATANIN SINIFINI kilitler: her rota ya kendi
+│                                         #    canonical'ını yazacak ya noindex olacak. Kök layout canonical
+│                                         #    TAŞIMAYACAK (asıl #33 hatası buydu). canonical GÖRELİ olacak.
+│                                         #    🚨 Kaynağı STATİK okur, derleme/ağ İSTEMEZ — kum havuzunda
+│                                         #      `next build` `next/font` yüzünden Google Fonts'a çıkamıyor.
+│                                         #    🚨 Yorumları SÖKER (`yorumsuz()`): `alternates` kelimesi bu
+│                                         #      dosyalarda açıklama metninde de geçiyor (tuzağı yazıya döktük);
+│                                         #      ayıklanmazsa "yorumda anlatmış" ile "kodda yazmış" ayırt edilemez
+│                                         #      ve bekçi her şeyi yeşil sanardı.
+│                                         #    📌 `canonical:` değeri değişken olabilir (`/ilan/[id]` şablon dizesi);
+│                                         #      `null`/`undefined` KABUL EDİLMEZ (`/panel` bilerek öyle, onu
+│                                         #      noindex kurtarıyor).
+│                                         #    4 mutasyonla doğrulandı; `admin` noindex'i bozunca 11 kontrol düşer.
 ├── lib/ilan-yaz.ts                       # 🚨 ILAN_VER_ANALIZ W0/W1 (29 Tem 2026) — `listings` yazan TEK YOL.
 │                                         #    `server-only`. ilanYaz(userId, girdi, kaynak) → ayrık birlik.
 │                                         #    Doğrulama + beyaz liste + sınırlar (MAX_DURAK=10, MAX_ARAC_ADET=50,
@@ -887,7 +901,46 @@ yukegel/
 │                                         #    V3: audit_score geri okunup getAuditThresholds() ile karar ·
 │                                         #    B3: arac_id sahipliği (user_id + is_active) doğrulanır ·
 │                                         #    B4: durak bazlı yuk_cinsi, boşsa ilan geneli · bugunISO() (+03:00)
+│                                         #    V6 (7 Ağu 2026): tavan + mükerrer kapısı — `lib/ilan-limit.ts` çağrılır.
+│                                         #      KANAL_POLITIKA{daimaIncele, tavanCarpani, mukerrerKontrol} ·
+│                                         #      kanalTavani() · sonuç tipi `mukerrer?: {id}` ile genişledi.
+│                                         #      🚨 Sıra ÖNEMLİ: kapı tarih doğrulamasından SONRA, RPC'den ÖNCE;
+│                                         #        sayaç (`ilanTavanIsle`) RPC BAŞARILI olduktan sonra işlenir.
 │                                         #    🚨 YENİ İLAN KANALI EKLERKEN INSERT KOPYALAMA, BUNU ÇAĞIR.
+├── lib/ai-kota.ts                        # 🚨 V7 (7 Ağu 2026) — ÜCRETLİ LLM çağrısının kotası.
+│                                         #    🚨 KAPI İLE SAYAÇ AYNI OLAYI ÖLÇER. Eski hâlde kapı `parse`
+│                                         #      anındaydı, sayaç `kayıt` üzerindeydi (`raw_text IS NOT NULL`):
+│                                         #      ayrıştırıp KAYDETMEYEN kullanıcı Anthropic'i sınırsız çağırıyordu.
+│                                         #    TEK BÜTÇE İKİ KANAL: `/api/parse-text` + `/api/whatsapp` aynı
+│                                         #      `ai-parse-kullanici` kovasını KASITLI paylaşır — ikisi de aynı
+│                                         #      Anthropic hesabından para harcıyor; ayrı kova limiti ikiye katlardı.
+│                                         #    `max(DB, bellek)` — `lib/ilan-limit.ts` ile aynı gerekçe.
+│                                         #    §9: `bak()` kaydetmez; `isle()` yalnız çağrı BAŞARILI dönünce.
+│                                         #      Sağlayıcı arızası kullanıcının kotasını yakmaz.
+├── lib/ilan-limit.ts                     # 🚨 V6 (7 Ağu 2026) — ilan tavanı + 24 saatlik mükerrer tespiti.
+│                                         #    ilanLimitOku() → system_config['rate_limit']['spam_threshold']
+│                                         #      (max_listings_per_hour/day), hata → 20/60 fallback.
+│                                         #    ilanTavanBak(userId, ayar) · ilanTavanIsle() · mukerrerBul()
+│                                         #    🚨 `max(DB, bellek)` — ASLA `sum`. Bellek sayacı (`lib/kota.ts`)
+│                                         #      süreç-yerel, soğuk başlangıçta sıfırlanır; DB otoriter ama
+│                                         #      eşzamanlı yarışı kaçırır. Toplamak yazılmış ilanı iki kez sayardı.
+│                                         #    🚨 TEK DB sorgusu, `count` DEĞİL: son 24 saatin `created_at`
+│                                         #      damgaları çekilip saatlik/günlük JS'te sayılır. İki `count`
+│                                         #      sorgusunun maliyeti excel'de satır başına çarpılırdı.
+│                                         #    📌 §9: bakmak sayacı TÜKETMEZ (`kotaDene({sayma:true})`); sayaç
+│                                         #      ancak olay GERÇEKLEŞTİKTEN sonra işlenir.
+│                                         #    📌 Mükerrer anahtarı `province_id` ile kurulur — Dalga 5
+│                                         #      `listings.origin_city` ve `listing_stops.city` kolonlarını DÜŞÜRDÜ.
+│                                         #      `listing_stops.stop_order` 1'DEN başlar (`with ordinality`).
+│                                         #    📌 PostgREST `!inner` embed KULLANILMAZ; iki düz sorgu.
+│                                         #    ⚠️ excel MUAF (ölçüldü: 90 günde 133 ilanın 81'i haksız engellenirdi —
+│                                         #      aynı gün İstanbul→Ankara 10 tır tek anahtara çöküyor). form: 0 hatalı.
+│                                         #    ⚠️ excel tavanında `MAX_ILAN` TABANI var: yalnız çarpan olsaydı admin
+│                                         #      `spam_threshold`u kısınca (5×5=25 < 50) meşru 50'lik dosya
+│                                         #      ortadan bölünür ve yarım import kalırdı.
+├── scripts/test-ilan-limit.mts            # `npm run test:ilan-limit` — V6, 11 kontrol. DB İSTEMEZ
+│                                         #    (`getServiceSupabase()` env'siz patlar → bellek yoluna düşer).
+│                                         #    3 mutasyonla doğrulandı: excel tabanı · §9 · saatlik `>=` kapısı.
 ├── lib/toplu-yukle-sozlesme.ts           # 🚨 ILAN_VER_ANALIZ B1 (29 Tem 2026) — toplu yükleme
 │                                         #    istemci↔route SÖZLEŞMESİ. HamSatir · OnizlemeSatiri ·
 │                                         #    OnaySatiri · TopluYukleIstek/Yanit · AlanDurumu ·
@@ -1971,7 +2024,9 @@ Açık rotalar: /giris, /auth/, /profil-tamamla, /nasil-calisir, /hakkimizda,
 - 🚨 **`/u/[username]` KLASÖR ADI YALAN SÖYLÜYOR — param `username` değil, kullanıcı `id`'si** (29 Tem 2026, `SPRINT_01` S3). `app/u/[username]/page.tsx` param'ı `.eq('id', userId)` ile kullanıyor, panel de linki `/u/${userId}` üretiyor. `users.username` kolonu **routing'de hiç kullanılmıyor**. Bu rotaya URL üreten her yer (sitemap, paylaş butonu, e-posta şablonu) **id** yazmak zorunda; `username` yazan toptan 404 basar. Klasörü yeniden adlandırmak isterse `[id]` olmalı.
 - 🚨 **`'use client'` sayfası `metadata` EXPORT EDEMEZ** (29 Tem 2026, `SPRINT_01` S2). Next bunu **hata vermeden yok sayar** — yazdığın `robots`/`title` hiçbir zaman HTML'e girmez, fark etmen aylar sürer. Tek çözüm: aynı route segmentinde sunucu tarafı bir `layout.tsx`. Mümkünse **segment seviyesine** koy (`app/auth/layout.tsx`), sayfa başına değil; yoksa yeni eklenen kardeş rotalar sessizce dışarıda kalır.
 - **OG görseli: aynı segmentte TEK dosya olabilir** (29 Tem 2026, `SPRINT_01` S1). `app/opengraph-image.{tsx,png,jpg}` bir arada bulunamaz — Next hangisini seçeceğini bilemez. Statik görsele geçerken `.tsx` üreteci **silinmek zorunda**. Alt metin ayrı dosyadan gelir: `app/opengraph-image.alt.txt`. ⚠️ **Dosya boyutu:** WhatsApp büyük görsellerde kartı sessizce göstermez; 1200×630 JPEG ~130 KB güvenli, aynı kadraj PNG olarak 650 KB'a çıkıyordu. ⚠️ Karttaki sayı/rozet (ör. "519 aktif ilan", "BETA") **donmuş** metindir; güncellenmesi elle yapılır.
-- 🚨 **`metadataBase` olmadan göreli OG/canonical URL'leri ÜRETİLMEZ** (29 Tem 2026, `SPRINT_01` S1). Next build'de uyarı verip sessizce atlar. WhatsApp/LinkedIn paylaşım kartının hiç görünmemesinin en sık sebebi budur. Ayrıca **canonical MİRAS ALINMAZ**: kök layout'un `alternates.canonical`'ı alt sayfalara geçmez, her sayfa kendi canonical'ından sorumludur.
+- 🚨 **`metadataBase` olmadan göreli OG/canonical URL'leri ÜRETİLMEZ** (29 Tem 2026, `SPRINT_01` S1). Next build'de uyarı verip sessizce atlar. WhatsApp/LinkedIn paylaşım kartının hiç görünmemesinin en sık sebebi budur. ~~Ayrıca **canonical MİRAS ALINMAZ**~~ 🚨 **BU CÜMLE YANLIŞTI, 7 Ağu 2026'da düzeltildi (#33) — aşağıdaki maddeye bakın.**
+- 🚨 **`alternates` (canonical) ÜST LAYOUT'TAN MİRAS ALINIR** (7 Ağu 2026, #33). Buraya 29 Tem'de "miras alınmaz" diye yazılmıştı; **kaynak okunarak yanlışlandı**: Next 16'nın birleştiricisi (`node_modules/next/dist/lib/metadata/resolve-metadata.js:166`) üst katmanın çözülmüş metadata'sını `structuredClone` ile klonlayıp başlangıç alıyor, sonra YALNIZCA çocuğun kendi nesnesinde bulunan anahtarları eziyor. Sonuç: kök `layout.tsx` `canonical: '/'` taşıdığı sürece kendi canonical'ını yazmayan HER sayfa kendini ana sayfa ilan ediyordu — Google için "kopya sayfa", indeksten düşme sebebi. **Kural:** kök layout canonical TAŞIMAZ (varsayılan "canonical yok" güvenlidir, Google self-canonical sayar); her rota ya kendi canonical'ını yazar ya `noindex` olur. `npm run test:seo` bunu 72 kontrolle kilitliyor. 📌 **Ders:** bir davranışı yorumdan/dokümandan öğrenmeyin — bu satırın kendisi üç ay boyunca yanlış yol gösterdi. Miras zinciri LAYOUT'lardan + yaprak sayfadan oluşur; kardeş bir `page.tsx` zincirde YER ALMAZ.
+- ⚠️ **Blok yorumunun içine `robots.txt` joker kalıbı YAZMAYIN** (7 Ağu 2026, #33). `/ilan/*/sahiplen` içindeki yıldız-eğik çizgi ikilisi `/* … */` yorumunu **erken kapatır**; `tsc` beş alakasız hata verir (`TS1443`, `Unterminated template literal`) ve sebebi görünmez. Kalıbı kelimeyle anlatın.
 - 🚨 **robots.txt'te isimli blok, `*` bloğunun YERİNE GEÇER — birleşmez** (29 Tem 2026, `SPRINT_01` S4). GoogleBot/GPTBot/ClaudeBot kendi adını taşıyan bir blok görünce `User-agent: *` bloğunu **tamamen yok sayar**. Bu yüzden `public/robots.txt`'teki dört bloğun disallow listesi birebir aynı olmak zorunda; yeni bir özel alan eklerken dördünü birden güncelle. (Eski halinde `*` bloğu düpedüz `Allow: /` diyordu → `/panel/`, `/admin/`, `/api/` genel taramaya açıktı.) ⚠️ robots.txt bir güvenlik sınırı değildir; asıl sınır `proxy.ts` + `requireStaff()` + RLS.
 - 🚨 **Kota, KAPININ olduğu yerde sayılmalı** (29 Tem 2026, `ILAN_VER_ANALIZ` V7). `parse-text` ücretli Anthropic çağrısını istek başında kotayla kapatıyor ama sayaç (`countAiListingsLast24h`) `listings.raw_text IS NOT NULL` satırlarını sayıyor — yani **kayıt** anını. Ayrıştırıp formu göndermeyen kullanıcının sayacı hiç artmaz; ücretli endpoint sınırsız çağrılabilir. Aynı sayaç `whatsapp/route.ts:191,204` tarafından da besleniyor, yani kanallar birbirinin kotasını yiyor. **Kural:** ücretli/kaba-kuvvete açık her çağrıda kapı ile sayaç **aynı olayı** ölçer; `lib/kota.ts` ile önce `sayma: true` peek, işlem **başarılıysa** sayaç işlenir.
 - 🚨 **`moderation_status`'u uygulamada sabitlemek trigger'ın kararını ezer** (29 Tem 2026, `ILAN_VER_ANALIZ` V3 — ✅ W0'da giderildi). `ilanKaydet` INSERT'te `moderation_status: 'auto_published'` yazıyordu; `audit_listing_fn` yalnızca `score >= reject_min` (71) dalında bu alana dokunuyor. Sonuç: 31–70 puanlık **orta bant fiilen yoktu** — şüpheli ilan doğrudan yayına giriyordu. **Yerleşen kalıp:** INSERT `.select('id, audit_score, moderation_status, is_shadow_banned')` ile geri okunur, sonra `getAuditThresholds()` eşikleriyle **tek bir yerde** karar verilir; `>= rejectScoreMin` veya `is_shadow_banned` ise trigger'ın kararına DOKUNULMAZ (sadece kullanıcıya dürüst mesaj), `>= autoPublishScoreMax` ise `pending`+`passive`, altındaysa yayında. `/api/ilan/duzelt` ve `ilanKaydet` bu mantığı **birebir aynı** yazar — ikisi ayrışırsa aynı skor iki farklı sonuç verir. Ek olarak, trigger sessizce `is_shadow_banned` yapabildiği için **başarı ekranı INSERT sonucunu okumadan "yayında" diyemez**.
@@ -2041,9 +2096,13 @@ Açık rotalar: /giris, /auth/, /profil-tamamla, /nasil-calisir, /hakkimizda,
 | 4 | `public/robots.txt` | 4 blok, birebir aynı disallow listeleri + Sitemap path (S4) |
 | 5 | `app/api/ilanlar/[id]/route.ts` | Public JSON API (hassas veri yok, 5dk cache) |
 | 6 | `app/ilan/[id]/page.tsx` | `audit_score` → metadata + `data-quality-score` + görsel rozet |
-| 7 | `app/layout.tsx` | `metadataBase` + OG + Twitter card + `alternates.canonical` (S1) |
+| 7 | `app/layout.tsx` | `metadataBase` + OG + Twitter card (S1). ⚠️ `alternates` **BİLEREK YOK** — bkz. #33 |
 | 8 | `app/opengraph-image.jpg` (+ `.alt.txt`) | 1200×630 paylaşım kartı, statik görsel (S1) |
 | 9 | `app/{giris,moderator-giris,profil-tamamla,auth}/layout.tsx` | Auth yüzeylerinde `noindex` (S2) |
+| 10 | `app/page.tsx` | Ana sayfanın canonical'ı — kökten buraya taşındı (#33, 7 Ağu 2026) |
+| 11 | `app/{admin,moderator,araclarim,ilan/[id]/sahiplen}/layout.tsx` + `app/panel/page.tsx` | Yönetim yüzeylerinde `noindex` (#33) |
+| 12 | `app/{ilan-ver,nasil-calisir,u/[username]}/layout.tsx` | `'use client'` sayfalarına canonical taşıyıcı kardeş layout (#33) |
+| 13 | `scripts/test-seo-canonical.mts` | `npm run test:seo` — 72 kontrol, metadata bekçisi (#33) |
 
 **Sitemap**: `app/sitemap.ts` ✅ — statik sayfalar (`/yol-rehberi` dahil) + aktif/onaylı ilanlar
 (5000 limit) + **yayında ilanı olan kullanıcıların profilleri** (`/u/{id}`, aynı sorgudan türetilir).
@@ -2052,8 +2111,34 @@ Açık rotalar: /giris, /auth/, /profil-tamamla, /nasil-calisir, /hakkimizda,
 `app/layout.tsx` ve `app/sitemap.ts` **aynı** değişkeni + **aynı** fallback'i kullanır; ayrışırlarsa
 canonical ile sitemap farklı alan adı gösterir ve Google ikisini ayrı site sanar.
 
-⏭️ **Açık:** `/ilan/[id]` kendi `alternates.canonical`'ını vermiyor — Next canonical'ı alt
-sayfalara **miras bırakmaz**. Dinamik OG görseli de yok (kök karta düşüyor).
+🚨 **BURADA YANLIŞ BİR CÜMLE VARDI — 7 Ağu 2026'da düzeltildi (#33).** Eski metin
+*"Next canonical'ı alt sayfalara miras bırakmaz"* diyordu. **TERSİ DOĞRU.** Next 16'nın
+birleştiricisi okundu (`node_modules/next/dist/lib/metadata/resolve-metadata.js:166`):
+üst katmanın **çözülmüş** metadata'sı `structuredClone` ile klonlanıp başlangıç alınıyor,
+sonra YALNIZCA çocuğun kendi nesnesinde bulunan anahtarlar eziliyor. Yani `alternates`
+vermeyen her sayfa üsttekini **aynen devralır**.
+
+Bu yanlış cümlenin bedeli: kök `app/layout.tsx` `canonical: '/'` taşıdığı sürece
+`/kvkk`, `/nasil-calisir`, `/kullanim-kosullari`, `/yol-rehberi`, `/u/{id}` hepsi
+`<link rel="canonical" href="https://yukegel.com/">` yayınlıyordu — Google için
+"ana sayfanın kopyası", yani indeksten düşme. Sitemap'e koymak bunu kurtarmaz.
+
+**Kural (artık `npm run test:seo` ile kilitli):** her rota ya kendi canonical'ını
+yazar ya `noindex` olur. Kök layout canonical TAŞIMAZ; kökten çekilince varsayılan
+"canonical yok" olur ve Google sayfayı kendi URL'ine self-canonical sayar — yanlış
+cevap yerine güvenli sessizlik.
+
+📌 **canonical GÖRELİ yazılır.** Mutlak alan adı `metadataBase`i devre dışı bırakır;
+staging/preview ortamı canlı alan adını canonical ilan edip kendi sayfalarını gömer.
+(`app/hakkimizda/page.tsx` tam bunu yapıyordu, düzeltildi.)
+
+📌 **`robots.txt` `Disallow` ≠ `noindex`.** (1) Yalnızca o kuralı okuyan crawler'ı bağlar.
+(2) *Taramayı* engeller, *indekslemeyi* değil — dış bağlantı varsa Google URL'i taramadan
+da indeksleyebilir. Ayrıca `Disallow: /panel/` yalnızca ALT yolları kapatıyordu,
+çıplak `/panel` kapsam dışıydı.
+
+⏭️ **Açık:** `/ilan/[id]` için dinamik OG görseli yok (kök karta düşüyor).
+canonical'ı ise VAR (`SITE_URL` üzerinden kurulu) — eski "vermiyor" notu bayattı.
 
 ---
 

@@ -398,7 +398,16 @@ where table_name='users' and grantee in ('authenticated','anon') order by grante
 - 🚨 **`metadataBase` OLMADAN** Next göreli OG/canonical URL'lerini SESSİZCE üretmez — paylaşım kartının hiç görünmemesinin en sık sebebi budur.
 - 🚨 **`openGraph.images` BİLEREK yazılmadı:** `opengraph-image.tsx` dosya konvansiyonu `og:image`'ı kendisi ekliyor; iki kaynak olursa hangisinin kazandığı sürüme bağlı.
 - ⚠️ `SITE_URL` fallback'i `sitemap.ts` ile **birebir aynı** olmalı; ayrışırlarsa sitemap bir alan adını, canonical başkasını gösterir ve Google ikisini ayrı site sanar.
-- ⏭️ `/ilan/[id]` için dinamik OG + kendi `alternates.canonical`'ı hâlâ AÇIK (ayrı ticket) — Next alt sayfalara canonical'ı **miras bırakmaz**.
+- ~~⏭️ `/ilan/[id]` için dinamik OG + kendi `alternates.canonical`'ı hâlâ AÇIK — Next alt sayfalara canonical'ı **miras bırakmaz**.~~
+  🚨 **BU SATIRIN İKİ PARÇASI DA YANLIŞTI — 7 Ağu 2026, #33.**
+  (1) `/ilan/[id]` canonical'ını **veriyor** (`SITE_URL` üzerinden), yani "açık" değildi.
+  (2) Next canonical'ı **MİRAS BIRAKIR** — kaynak okunarak doğrulandı
+  (`node_modules/next/dist/lib/metadata/resolve-metadata.js:166`): üst katmanın çözülmüş
+  metadata'sı `structuredClone` ile klonlanıp yalnızca çocuğun kendi anahtarları eziliyor.
+  Bu yanlış inanç yüzünden kök layout'un `canonical: '/'` değeri, canonical yazmayan TÜM
+  sayfalara miras kalıyor ve onları "ana sayfanın kopyası" ilan ediyordu.
+  Ayrıntı: `docs/YAPILACAKLAR.md` → #33. Bekçi: `npm run test:seo`.
+  ⏭️ Gerçekten açık kalan tek şey: `/ilan/[id]` için **dinamik OG görseli** (kök karta düşüyor).
 
 ### S2 · Auth sayfaları indekslenebilir — `noindex` yok 🟡 ✅
 - `/giris`, `/profil-tamamla`, `/moderator-giris`, `/auth/reset` için `robots: { index: false }` metadata yok (client component oldukları için `layout.tsx` veya route segment metadata'sı gerekiyor).

@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSupabase } from '../../../lib/auth';
 import { getAiQuotaForUser, countAiListingsLast24h } from '../../../lib/auditLimits';
+import { istekIp } from '../../../lib/kota';
+import { aiKotaBak, aiKotaIsle, AI_IP_SAATLIK } from '../../../lib/ai-kota';
 import { structuredLog } from '../../../lib/logger';
 
 export const runtime = 'nodejs';
+
+// ── V7: KOTA ARTIK ÇAĞRI BAZINDA — gerekçe `lib/ai-kota.ts` başlığında ────────
 
 // ── URL çıkarma + arşivleme yardımcısı ──────────────────────────────────────
 const URL_REGEX = /https?:\/\/[^\s\u200b\u200c\u200d\u2060\u00A0]+/gi;
@@ -53,31 +57,50 @@ export async function POST(request: NextRequest) {
     }
 
     // ── Quota: günlük AI ilan limiti
-    const [quota, kullanim] = await Promise.all([
+    const ip = istekIp(request);
+    const [quota, dbKullanim] = await Promise.all([
       getAiQuotaForUser(user.id),
-      countAiListingsLast24h(user.id),
+      countAiListingsLast24h(user.id),   // artık yalnız TABAN + raporlama
     ]);
     if (quota === 0) {
       structuredLog('WARN', 'llm-quota', 'Günlük AI ilan kotası kapatılmış (quota=0) — 429 döndürüldü', {
         user_id: user.id,
         quota_limit: 0,
-        used_today: kullanim,
+        used_today: dbKullanim,
       });
       return NextResponse.json({
         success: false,
         error: 'AI ile ilan oluşturma özelliği hesabınız için kapalı. Lütfen tekil ilan formunu kullanın.',
-        quotaReached: true, quota, used: kullanim,
+        quotaReached: true, quota, used: dbKullanim,
       }, { status: 429 });
     }
-    if (kullanim >= quota) {
+
+    // Kotaya BAK (sayma) — kullanıcı günlük + IP saatlik.
+    const durum = aiKotaBak(user.id, quota, dbKullanim, ip);
+    const { kullanim, cagriKullanim } = durum;
+
+    if (durum.doldu) {
       structuredLog('WARN', 'llm-quota', 'Günlük AI ilan kotası aşıldı — 429 döndürüldü', {
         user_id: user.id,
         quota_limit: quota,
         used_today: kullanim,
+        db_used: dbKullanim,
+        cagri_used: cagriKullanim,
       });
       return NextResponse.json({
         success: false,
         error: `Günlük AI ilan limitiniz doldu (${kullanim}/${quota}). 24 saat sonra tekrar deneyin veya tekil ilan formunu kullanın.`,
+        quotaReached: true, quota, used: kullanim,
+      }, { status: 429 });
+    }
+
+    if (durum.ipDoldu) {
+      structuredLog('WARN', 'llm-quota', 'AI parse IP saatlik tavanı aşıldı — 429 döndürüldü', {
+        ip, user_id: user.id, limit: AI_IP_SAATLIK, bekle_sn: durum.ipBekleSn,
+      });
+      return NextResponse.json({
+        success: false,
+        error: `Çok fazla AI isteği gönderildi. ${durum.ipBekleSn} saniye sonra tekrar deneyin.`,
         quotaReached: true, quota, used: kullanim,
       }, { status: 429 });
     }
@@ -175,8 +198,12 @@ KURALLAR:
 
     if (!response.ok) {
       const errText = await response.text();
+      // Sayaç İŞLENMEDİ: sağlayıcı hatası kullanıcının kotasını yakmasın (§9).
       return NextResponse.json({ success: false, error: `AI servisi hatası (${response.status}): ${errText.slice(0, 200)}` }, { status: 502 });
     }
+
+    // ✅ Anthropic çağrısı başarılı = PARA HARCANDI. Kapı burada kapanır.
+    aiKotaIsle(user.id, quota, ip);
 
     const data = await response.json();
     const respText = data.content?.[0]?.text || '';

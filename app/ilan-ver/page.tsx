@@ -115,6 +115,12 @@ export default function IlanVer() {
   const [sonucMesaj, setSonucMesaj] = useState('');
   const [yukleniyor, setYukleniyor] = useState(false);
   const [hata, setHata] = useState('');
+  /**
+   * V6 — hata "bu sefer zaten yayında"dan geliyorsa çakışan ilanın id'si.
+   * Kullanıcıyı ÇIKMAZDA bırakmamak için: sunucu "yeni ilan açma, mevcudu tazele"
+   * diyor ama hangisini tazeleyeceğini söylemezse tavsiye boşa gider.
+   */
+  const [mukerrerId, setMukerrerId] = useState('');
 
   // SPRINT_01 L2 — `?tip=yuk` / `?tip=arac` ile ön-seçim.
   //
@@ -215,7 +221,7 @@ export default function IlanVer() {
     e.preventDefault();
     const bariyer = kaliteBariyer();
     if (bariyer) { setHata(bariyer); return; }
-    setYukleniyor(true); setHata('');
+    setYukleniyor(true); setHata(''); setMukerrerId('');
     try {
       const sonuc = await ilanKaydet({
         tip, kalkis, kalkis_ilce, tel, fiyat, fiyat_pazarlik, tarih, tarih_esnek,
@@ -228,7 +234,12 @@ export default function IlanVer() {
 
       // ILAN_VER_ANALIZ V1/V4 — action artık fırlatmıyor, SONUÇ döndürüyor.
       // Doğrulama hataları kullanıcıya olduğu gibi gösteriliyor.
-      if (!sonuc.ok) { setHata(sonuc.hata); return; }
+      if (!sonuc.ok) {
+        setHata(sonuc.hata);
+        // V6 — mükerrer ilan engellendiyse çakışan ilana bağlantı ver.
+        setMukerrerId(sonuc.mukerrer?.id ?? '');
+        return;
+      }
 
       // SPRINT_01 L2 — huninin DİBİ. `ilan_ver_giris` ile birlikte persona başına
       // dönüşüm oranı hesaplanabiliyor. Kişisel veri gönderilmez (bkz. lib/analiz.ts).
@@ -704,6 +715,13 @@ export default function IlanVer() {
         {hata && (
           <div style={{ background: '#1a0a0a', border: '1px solid #ef4444', borderRadius: 8, padding: '12px 16px', marginBottom: 16, color: '#ef4444', fontSize: '0.85rem' }}>
             ⚠️ {hata}
+            {mukerrerId && (
+              <div style={{ marginTop: 8 }}>
+                <a href={`/ilan/${mukerrerId}`} style={{ color: '#fca5a5', fontWeight: 700, textDecoration: 'underline' }}>
+                  Mevcut ilanı görüntüle →
+                </a>
+              </div>
+            )}
           </div>
         )}
 

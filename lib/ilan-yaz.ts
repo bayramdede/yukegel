@@ -18,6 +18,10 @@ import { getServiceSupabase } from './auth';
 import { getAuditThresholds } from './auditLimits';
 import { structuredLog } from './logger';
 import { ARAC_TIPI_SETI, UTSYAPI_SETI } from './ilan-sabitler';
+import { ilanLimitOku, ilanTavanBak, ilanTavanIsle, mukerrerBul, type IlanLimitAyar } from './ilan-limit';
+// Excel'in tek istekte açabildiği ilan sayısı. V6 tavanının Excel katsayısı buna
+// yaslanıyor: tek meşru dosya asla kendi tavanına takılmamalı.
+import { MAX_ILAN } from './toplu-yukle-sozlesme';
 // Çift yazım kaynağı. `ilNormalize` (ilan-sabitler) ile AYNI katlamayı kullanır
 // ama id'yi de döndürür — bu yüzden burada onun yerine geçti.
 // `docs/COGRAFI_GECIS.md` Dalga 2.
@@ -36,7 +40,16 @@ export type IlanDurumu = 'yayinda' | 'incelemede' | 'reddedildi';
 
 export type IlanYazSonuc =
   | { ok: true; id: string; durum: IlanDurumu; mesaj: string }
-  | { ok: false; hata: string };
+  /**
+   * `mukerrer` — V6. Hata "aynı sefer zaten yayında"dan geliyorsa çakışan ilanın
+   * id'si buraya konur; arayüz kullanıcıya "tazele/düzenle" bağlantısı verebilir.
+   *
+   * ⚠️ ÜÇÜNCÜ BİR ARM AÇILMADI, var olan `ok:false` arm'ı GENİŞLETİLDİ. `sonuc.ok`
+   * üzerinden ayrıştıran tüm çağıranlar (`app/ilan-ver/page.tsx:220`,
+   * `app/api/excel-import`, `app/api/whatsapp`) hiç değişmeden çalışmaya devam eder;
+   * yeni alan isteyen okur, istemeyen görmez.
+   */
+  | { ok: false; hata: string; mukerrer?: { id: string } };
 
 /** Bir durağın ham hâli. Şehir serbest metin gelebilir; `ilCiftYazim` süzer. */
 export interface DurakGirdi {
@@ -120,18 +133,49 @@ export type IlanKaynak = 'form' | 'excel' | 'whatsapp' | 'facebook';
  * geliyor ve LLM'in yorumu doğrulanmamış; skorlayıcı "temiz" dese bile insan gözü
  * görmeli. Form ve Excel'de kullanıcı ne yazdığını ekranda görüp onaylıyor.
  *
+ * `tavanCarpani`: V6 saatlik/günlük ilan tavanı bu katsayıyla çarpılır. Excel için
+ * 1 OLAMAZ — toplu yükleme TEK istekte `MAX_ILAN`(=50) ilan yazar, düz 12/saat
+ * tavanı meşru bir dosyayı 12. satırda kesip GERİYE YARIM İMPORT bırakırdı.
+ *
+ * `mukerrerKontrol`: 24 saatlik "aynı sefer zaten var mı" kontrolü.
+ * 🚨 Excel'de KAPALI ve bu bir eksiklik değil, zorunluluk: mükerrer anahtarı
+ * `(tip, kalkış ili, ilk durak ili, tarih)`. Aynı gün İstanbul→Ankara'ya 10 araç
+ * kaldıran bir nakliyecinin dosyasında bu dörtlü 10 kez TEKRARLANIR ve hepsi
+ * meşrudur (ilçe/yük/tonaj farklı). Kontrolü açmak o dosyanın ilk satırı dışındaki
+ * her şeyi "mükerrer" diye reddederdi. Tekil kanallarda ise kullanıcı ekranda
+ * uyarıyı görüp karar verebiliyor.
+ *
  * `Record<IlanKaynak, …>` bilerek — birleşime kanal eklenince burası derleme
  * hatası verir ve politikayı yazmayı unutamazsın.
  */
-const KANAL_POLITIKA: Record<IlanKaynak, { daimaIncele: boolean }> = {
-  form:      { daimaIncele: false },
-  excel:     { daimaIncele: false },
-  whatsapp:  { daimaIncele: true  },
+const KANAL_POLITIKA: Record<IlanKaynak, {
+  daimaIncele: boolean;
+  tavanCarpani: number;
+  mukerrerKontrol: boolean;
+}> = {
+  form:      { daimaIncele: false, tavanCarpani: 1, mukerrerKontrol: true  },
+  excel:     { daimaIncele: false, tavanCarpani: 5, mukerrerKontrol: false },
+  whatsapp:  { daimaIncele: true,  tavanCarpani: 1, mukerrerKontrol: true  },
   // WhatsApp ile aynı gerekçe: serbest metinden LLM ile çıkarılıyor, form yok.
   // Bugün çağıranı yok ama DB kısıtı bu değeri kabul ediyor; kanal açılırsa
   // varsayılanı "incelemesiz yayına çıksın" OLMAMALI.
-  facebook:  { daimaIncele: true  },
+  facebook:  { daimaIncele: true,  tavanCarpani: 1, mukerrerKontrol: true  },
 };
+
+/**
+ * Kanalın efektif tavanı = ayar × katsayı, ama Excel için ASLA tek dosyalık
+ * `MAX_ILAN`'ın altına düşmez. Katsayı tek başına yetmez: admin `spam_threshold`'u
+ * 5'e çekerse 5×5=25 < 50 olur ve 50 ilanlık meşru bir dosya yine ortadan bölünür.
+ * Taban, katsayının admin ayarına bağımlılığını keser.
+ */
+export function kanalTavani(ayar: IlanLimitAyar, kaynak: IlanKaynak): IlanLimitAyar {
+  const { tavanCarpani } = KANAL_POLITIKA[kaynak];
+  const taban = kaynak === 'excel' ? MAX_ILAN : 0;
+  return {
+    saatlik: Math.max(ayar.saatlik * tavanCarpani, taban),
+    gunluk: Math.max(ayar.gunluk * tavanCarpani, taban * 2),
+  };
+}
 
 // ── Yardımcılar ────────────────────────────────────────────────────────────
 
@@ -294,6 +338,50 @@ export async function ilanYaz(
   if (!tarih) return { ok: false, hata: 'Geçerli bir tarih seçin.' };
   if (tarih < bugunISO()) return { ok: false, hata: 'Geçmiş bir tarih seçilemez.' };
 
+  // ── V6: TAVAN + MÜKERRER ──────────────────────────────────────────────────
+  // Konum kasıtlı: BEDAVA (senkron) doğrulamalardan SONRA, DB'ye dokunan
+  // araç/telefon/RPC adımlarından ÖNCE. Çöp girdi tek bir sorguya bile mal olmaz;
+  // geçerli ama fazla ilan da yazma yoluna hiç girmez.
+  const tavan = kanalTavani(await ilanLimitOku(), kaynak);
+  const tavanSonuc = await ilanTavanBak(userId, tavan);
+  if (tavanSonuc.asildi) {
+    structuredLog('WARN', 'db-transaction', 'İlan tavanı aşıldı — ilan yazılmadı', {
+      user_id: userId,
+      source: kaynak,
+      pencere: tavanSonuc.pencere,
+      kullanim: tavanSonuc.kullanim,
+      limit: tavanSonuc.limit,
+    });
+    return { ok: false, hata: tavanSonuc.hata };
+  }
+
+  // Mükerrer anahtarı `province_id` üzerinden — metin kolonları Dalga 5'te düştü.
+  // Gerekçe ve kanal politikası `lib/ilan-limit.ts` / `KANAL_POLITIKA` içinde.
+  if (KANAL_POLITIKA[kaynak].mukerrerKontrol) {
+    const mukerrer = await mukerrerBul({
+      userId,
+      tip,
+      kalkisIlId: kalkisIl.id,
+      ilkDurakIlId: duraklar[0].province_id,
+      tarih,
+    });
+    if (mukerrer) {
+      structuredLog('INFO', 'db-transaction', 'Mükerrer ilan engellendi', {
+        user_id: userId,
+        source: kaynak,
+        mevcut_listing_id: mukerrer.id,
+        listing_type: tip,
+        origin_province_id: kalkisIl.id,
+        available_date: tarih,
+      });
+      return {
+        ok: false,
+        hata: 'Bu sefer için son 24 saatte zaten bir ilanınız var. Yeni ilan açmak yerine mevcut ilanınızı panelinizden düzenleyip tazeleyebilirsiniz.',
+        mukerrer: { id: mukerrer.id },
+      };
+    }
+  }
+
   const fiyat = sayiAralik(girdi.fiyat, 0, MAX_FIYAT);
   if (girdi.fiyat && fiyat === null) {
     return { ok: false, hata: 'Geçersiz fiyat.' };
@@ -421,6 +509,12 @@ export async function ilanYaz(
         : 'İlan kaydedilemedi. Lütfen tekrar deneyin.',
     };
   }
+
+  // ✅ Satır oluştu = tavan tüketildi. Bellek sayacı BURADA işlenir, `ilanTavanBak`
+  // içinde değil (§9): RPC patlayan bir istek kullanıcının hakkını yakmamalı.
+  // Aşağıdaki moderasyon adımı ilanı kuyruğa alsa bile ilan YAZILMIŞTIR — kuyruğa
+  // alınmak sayacı geri vermez, aksi hâlde tavan "yayına çıkan ilan tavanı" olurdu.
+  ilanTavanIsle(userId, tavan);
 
   // ── V3: moderasyon kararı ─────────────────────────────────────────────────
   // Eşikler `system_config`'ten; `/api/ilan/duzelt` ile BİREBİR aynı mantık.

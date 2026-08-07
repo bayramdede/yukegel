@@ -36,10 +36,27 @@ export async function generateMetadata(): Promise<Metadata> {
     title: cfg.site_basligi,
     description: cfg.site_aciklamasi,
     icons: { icon: cfg.favicon_url },
-    // Ana sayfanın canonical'ı. Alt sayfalar kendi `alternates`'ini vermezse
-    // Next bunu MİRAS ALMAZ — her sayfa kendi canonical'ından sorumludur
-    // (`/ilan/[id]` için ayrı ticket).
-    alternates: { canonical: '/' },
+    // 🚨 BURADA `alternates` YOK VE OLMAYACAK — eskiden `{ canonical: '/' }` vardı.
+    //
+    // Yanındaki yorum "alt sayfalar kendi `alternates`'ini vermezse Next bunu
+    // MİRAS ALMAZ" diyordu. YANLIŞTI. Next'in birleştiricisi (6 Ağu 2026'da
+    // `node_modules/next/dist/lib/metadata/resolve-metadata.js:166` okundu):
+    //
+    //     const newResolvedMetadata = structuredClone(resolvedMetadata);
+    //     for (const key_ in metadata) { switch (key) { case 'alternates': … } }
+    //
+    // Yani ÜST katmanın çözülmüş metadata'sı klonlanıp başlangıç alınıyor ve
+    // YALNIZCA çocuğun kendi nesnesinde bulunan anahtarlar eziliyor. `alternates`
+    // vermeyen her sayfa üsttekini AYNEN devralır.
+    //
+    // Sonuç: kendi canonical'ını yazmayan /kvkk, /nasil-calisir, /u/… gibi TÜM
+    // sayfalar `<link rel="canonical" href="https://yukegel.com/">` yayınlıyordu.
+    // Google bunu "bu sayfa aslında ana sayfanın kopyası" diye okur ve sayfayı
+    // indeksten düşürür — sitemap'e koymak da bunu kurtarmaz.
+    //
+    // Kök katmandan çekilince varsayılan "canonical yok" olur; Google o durumda
+    // sayfayı KENDİ URL'ine self-canonical sayar. Yani yanlış cevap yerine
+    // güvenli sessizlik. Ana sayfanın canonical'ı artık `app/page.tsx`'te.
     openGraph: {
       type: 'website',
       // Nakliye sektöründe paylaşım WhatsApp üzerinden yürüyor; WhatsApp

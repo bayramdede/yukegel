@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createHmac } from 'crypto';
 import { getServiceSupabase } from '../../../lib/auth';
 import { getAiQuotaForUser, countAiListingsLast24h } from '../../../lib/auditLimits';
+import { aiKotaBak, aiKotaIsle } from '../../../lib/ai-kota';
 import { structuredLog } from '../../../lib/logger';
 import { ilanYaz, bugunISO, type DurakGirdi } from '../../../lib/ilan-yaz';
 
@@ -58,9 +59,16 @@ function normalizePhone(from: string): string {
 //
 // `province_id` AI'dan İSTENMİYOR (plaka kodu saydırmak katlamadan kırılgan);
 // `ilanYaz()` metinden türetiyor.
-async function parseWithLLM(text: string): Promise<any | null> {
+//
+// ── V7 — DÖNÜŞ TİPİ NEDEN `{ sonuc, ucretli }` ───────────────────────────────
+// Eskiden yalnız `any | null` dönüyordu ve çağıran taraf "null" ile üç ayrı şeyi
+// birbirinden ayıramıyordu: (a) API anahtarı yok / ağ koptu — PARA HARCANMADI,
+// (b) Anthropic 4xx/5xx — PARA HARCANMADI, (c) yanıt geldi ama JSON ayrıştırılamadı
+// — PARA HARCANDI. Kota sayacı (c)'yi saymalı, (a)/(b)'yi saymamalı; yoksa sağlayıcı
+// arızası kullanıcının günlük hakkını yakar. `ucretli` bayrağı bu ayrımı taşır.
+async function parseWithLLM(text: string): Promise<{ sonuc: any | null; ucretli: boolean }> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return null;
+  if (!apiKey) return { sonuc: null, ucretli: false };
 
   const bugun = new Date().toISOString().split('T')[0];
 
@@ -121,13 +129,18 @@ KURALLAR:
         messages: [{ role: 'user', content: prompt }],
       }),
     });
-    if (!res.ok) return null;
+    if (!res.ok) return { sonuc: null, ucretli: false };
+    // Buradan sonrası ÜCRETLİ: yanıt geldi, token yakıldı.
     const data = await res.json();
     const raw = data.content?.[0]?.text || '';
     const clean = raw.replace(/```json|```/g, '').trim();
-    try { return JSON.parse(clean); }
-    catch { const m = clean.match(/\{[\s\S]*\}/); return m ? JSON.parse(m[0]) : null; }
-  } catch { return null; }
+    try { return { sonuc: JSON.parse(clean), ucretli: true }; }
+    catch {
+      const m = clean.match(/\{[\s\S]*\}/);
+      try { return { sonuc: m ? JSON.parse(m[0]) : null, ucretli: true }; }
+      catch { return { sonuc: null, ucretli: true }; }
+    }
+  } catch { return { sonuc: null, ucretli: false }; }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -173,24 +186,36 @@ export async function POST(req: NextRequest) {
 
   // ── 2. AI kota kontrolü (LLM'den önce) ────────────────────────────────────
   const userId = userRow.id;
-  const [quota, kullanim] = await Promise.all([
+  const [quota, dbKullanim] = await Promise.all([
     getAiQuotaForUser(userId),
-    countAiListingsLast24h(userId),
+    countAiListingsLast24h(userId),   // V7 sonrası yalnız TABAN + raporlama
   ]);
 
   if (quota === 0) {
     return twiml('AI ile ilan oluşturma özelliği hesabınız için kapalı. İlan oluşturmak için: https://www.yukegel.com/ilan-ver');
   }
 
-  if (kullanim >= quota) {
-    structuredLog('WARN', 'whatsapp-webhook', 'WhatsApp AI kota aşıldı', { user_id: userId, quota, kullanim });
+  // ── V7: kapı `parse`, sayaç `kayıt` idi → LLM sınırsız çağrılabiliyordu.
+  // Bu kanal `/api/parse-text` ile AYNI kovayı paylaşır (gerekçe `lib/ai-kota.ts`).
+  // ⚠️ IP kovası BURADA KULLANILMAZ: istek Twilio'nun IP'sinden gelir, IP anahtarı
+  // tüm WhatsApp kullanıcılarını tek kovaya toplayıp topluca kilitlerdi.
+  const durum = aiKotaBak(userId, quota, dbKullanim);
+  const kullanim = durum.kullanim;
+
+  if (durum.doldu) {
+    structuredLog('WARN', 'whatsapp-webhook', 'WhatsApp AI kota aşıldı', {
+      user_id: userId, quota, kullanim, db_used: dbKullanim, cagri_used: durum.cagriKullanim,
+    });
     return twiml(
       `Günlük AI ilan limitinize ulaştınız (${kullanim}/${quota}). ⏰\n\n24 saat sonra tekrar deneyebilir veya ilanlarınızı buradan oluşturabilirsiniz: https://www.yukegel.com/ilan-ver`
     );
   }
 
   // ── 3. LLM parse ──────────────────────────────────────────────────────────
-  const parsed = await parseWithLLM(messageBody);
+  const { sonuc: parsed, ucretli } = await parseWithLLM(messageBody);
+  // ✅ Yalnız gerçekten para harcandıysa say. Ayrıştırma hatası sayılır ("kötü çıktı"
+  // bedava tekrar hakkı değil); sağlayıcı arızası/anahtar yokluğu SAYILMAZ.
+  if (ucretli) aiKotaIsle(userId, quota);
 
   if (!parsed) {
     return twiml('Mesajınızdan ilan bilgileri çıkarılamadı. Lütfen şu şekilde yazın:\n"Konya\'dan İstanbul\'a, 20 ton buğday, yarın, tır lazım"');
