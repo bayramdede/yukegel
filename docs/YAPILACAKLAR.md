@@ -1,5 +1,42 @@
 # Yükegel — Yapılacaklar Listesi
 
+> ## ✅ 8 AĞU 2026 — COĞRAFİ GEÇİŞ TAMAMLANDI (`poi_stay_events` son parçaydı)
+>
+> **Bayram:** "O tablolar boş. Onu da hallet."
+>
+> Gerçek satır sayıları alındı (`n_live_tup` tahminî, `count(*)` kesin). Boş üç
+> tablo, üçü de POI ailesinden:
+> - `poi_reviews` (0) — coğrafi kolonu yok, **kodda kullanılıyor**
+>   (`api/poi/[id]` + `.../review`), sadece henüz satır yok → dokunulmadı
+> - `poi_visit_logs` (0) — coğrafi kolonu yok (`user_location` = geography point)
+>   → standartlaştıracak şey yok
+> - `poi_stay_events` (0) — **`poi_city text` vardı** ← iş buradaydı
+>
+> `poi_stay_events` **ölü şema değil**: TS'ten referans edilmiyor ama
+> `get_parked_drivers_for_notification()` okuyor (POI'de 3+ saat park eden
+> sürücüye bildirim). O fonksiyonu çağıran route/cron da yok (`cron.job` tarandı,
+> sıfır) → yarım kalmış özellik. Silmedik, standarda uydurduk.
+>
+> **Karar: `province_id` EKLEMEK değil, `poi_city`yi KALDIRMAK.** Fonksiyon zaten
+> `JOIN pois` yapıyordu — yani şehir her çağrıda erişilebilirken tabloda ikinci
+> bir metin kopyası tutuluyordu. O kopya kaçınılmaz ayrışırdı: bugün 9.178 POI'nin
+> şehri kanonikleştirildi, olay kaydı eski şehirde kalırdı. `pois.province_id`
+> artık kanonik kaynak → kolon düştü. Fonksiyon şehri `provinces`ten türetiyor ve
+> `province_id`yi de döndürüyor. `and se.poi_city is not null` filtresi de kalktı;
+> aynı işi `join provinces` yapıyor (iki yerde iki "şehri bilinmeyen" tanımı
+> bırakmıyoruz).
+>
+> **Doğrulama:** tablo boş olduğu için fonksiyon bugüne kadar hiç gerçek veriyle
+> çalışmamıştı. Üç vaka uydurulup `ROLLBACK`'li denendi: 4 saatlik bildirilmemiş
+> olay **döndü** (`province_id=34`, `poi_city='İstanbul'` — provinces'ten kanonik);
+> 1 saatlik (<3 saat) ve zaten bildirilmiş olanlar **doğru şekilde elendi**.
+>
+> 🎯 **Şema genelinde doğrulandı: `province_id` karşılığı olmayan metin şehir
+> kolonu KALMADI (0).** Kalan metin İLÇE kolonları bilinçli — spec md.7 serbest
+> ilçe girişine izin veriyor, resmîlik `district_official`/`ilceResmiMi()` ile
+> işaretleniyor; bunlar standardın ihlali değil standardın kendisi.
+> Ayrıntı: `docs/20260808_poi_stay_events_standart.sql`.
+>
 > ## ✅ 8 AĞU 2026 — RADAR + ANALİTİK HIZLANDIRMA & `aliases`E COĞRAFİ STANDART
 >
 > **A) Radar/analitik hız.** Önce YANLIŞ ölçtüm: aynı fonksiyon 11.364 → 1.348 →

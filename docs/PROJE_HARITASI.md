@@ -1,6 +1,17 @@
 # Yükegel — Proje Haritası
 > **Kullanım:** Her sohbet başında sadece bu dosyayı oku. Kaynak dosyaları sadece o dosyada değişiklik yapacaksan oku.  
 >
+> 🎯 **8 AĞU 2026 — COĞRAFİ GEÇİŞ TAMAMLANDI.** Son parça `poi_stay_events.poi_city`
+> idi (tablo boş, TS'ten referanssız ama `get_parked_drivers_for_notification()`
+> okuyor — yarım kalmış özellik, ölü şema değil). Çözüm `province_id` eklemek
+> DEĞİL, kolonu KALDIRMAK oldu: fonksiyon zaten `JOIN pois` yapıyordu, yani
+> denormalize metin kopyası gereksizdi ve POI'nin şehri düzeltilince ayrışacaktı.
+> Şehir artık `provinces`ten türetiliyor, `province_id` de dönüyor.
+> **Şema genelinde doğrulandı: `province_id` karşılığı olmayan metin şehir kolonu
+> KALMADI (0).** Kalan metin ilçe kolonları bilinçli (spec md.7 serbest giriş +
+> `district_official`). `poi_reviews`/`poi_visit_logs` de boş ama coğrafi kolonu
+> yok. Ayrıntı: `docs/20260808_poi_stay_events_standart.sql`.
+>
 > ⚡ **8 AĞU 2026 — Radar/analitik hızlandırma + `aliases`e coğrafi standart.**
 > Radar'da ölçüm tuzağı: aynı fonksiyon 11.364→233 ms okudu (buffer cache).
 > Gerçek: **her YENİ rota 2.9–7.3 sn, tekrar 45–250 ms** → "sıcak" ölçüm
