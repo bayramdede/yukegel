@@ -1,6 +1,20 @@
 # Yükegel — Proje Haritası
 > **Kullanım:** Her sohbet başında sadece bu dosyayı oku. Kaynak dosyaları sadece o dosyada değişiklik yapacaksan oku.  
 >
+> 🔴 **9 AĞU 2026 — `JobPosting` UYGULANMADI (bilinçli ret).** Rich Results Test
+> "öğe algılanmadı" dedi; öneri `Service`→`JobPosting` idi. Google dokümanı:
+> JobPosting *yalnız gerçek iş ilanları* içindir, zorunlu alanları
+> (`hiringOrganization`, `title`) yük ilanında uydurmak gerekirdi ve yaptırımı
+> **manuel işlem**. Yük ilanı istihdam ilanı değil. ✅ Asıl sebep: `Service`
+> Google'ın zengin sonuç tipleri listesinde yok — uyarı "JSON-LD bozuk" demek
+> DEĞİL; LLM'ler ham JSON-LD'yi zaten okuyor. Çözüm: **`BreadcrumbList` eklendi**
+> (desteklenen tip; kırıntı URL'leri uydurulmadı, test hepsine istek atıp
+> doğruluyor), `Service` korundu, `PostalAddress` (ilçe) eklendi.
+> 🐛 Ayrıca gizli bir kırılma bulundu: JSON-LD ham `JSON.stringify` ile
+> basılıyordu; `cargo_type`/`district` serbest metin olduğu için `</script>`
+> içeren bir değer hem JSON-LD'yi bozar hem XSS açardı → `jsonLdGuvenli()`.
+> Self test: `npm run test:jsonld` 23/23.
+>
 > 🤖 **8 AĞU 2026 — AI-readiness denetimi: 6 maddenin 5'i zaten vardı.** Semantik
 > HTML, makine-okunur API (5 dk CDN önbelleği dahil), sitemap, robots.txt (GPTBot/
 > ClaudeBot) tamdı. 🚨 **Listede olmayan asıl kusur: kanonik host.** `yukegel.com`

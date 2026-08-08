@@ -1,5 +1,64 @@
 # Yükegel — Yapılacaklar Listesi
 
+> ## 🔴 9 AĞU 2026 — "ZENGİN SONUÇ: ÖĞE ALGILANMADI" · JobPosting UYGULANMADI
+>
+> Bayram Rich Results Test'te "hiçbir öğe algılanmadı" alıp şemayı
+> `Service` → **`JobPosting`** yapmayı önerdi. **Uygulamadım** — Google'ın kendi
+> dokümanını okudum:
+> - *"The JobPosting markup must only be used on pages that contain a single
+>   **job posting**"* — yalnız GERÇEK İŞ İLANLARI.
+> - Zorunlu: `datePosted`, `description`, `hiringOrganization`, `title`
+>   (+`jobLocation`). Yük ilanında `hiringOrganization`/`title` **uydurulurdu**.
+> - Yaptırım: *"may include taking **manual action** and removing the job
+>   posting(s)"*.
+> Yük taşıma ilanı bir **istihdam** ilanı değildir; bunu JobPosting işaretlemek
+> spam yapılandırılmış veridir. Kısa vadeli zengin sonuç, alan adının Google
+> güvenilirliğini riske atmaya değmez.
+>
+> ✅ **Teşhis kısmen doğruydu ama sebep başkaydı:** `Service`, Google'ın zengin
+> sonuç ürettiği tipler listesinde **YOK** (search-gallery: Article, Breadcrumb,
+> Event, JobPosting, Product, Review… — Service yok). Yani o uyarı JSON-LD'nin
+> **bozuk olduğunu değil**, aracın bu tipi raporlamadığını söylüyordu. Şema
+> geçerliydi; ayrıca **LLM/AI tarayıcıları ham JSON-LD'yi Google'ın zengin sonuç
+> uygunluğundan bağımsız okuyor** — projenin birincil hedefi buydu.
+>
+> **Yapılan (dürüst + Google'ın desteklediği):**
+> 1. **`BreadcrumbList` eklendi** — desteklenen tip; araç artık "öğe" görecek.
+>    ⚠️ Kırıntı URL'leri **uydurulmadı**: il bazlı ilan listesi rotası YOK
+>    (`HomeClient` URL'den yalnız `tip` okuyor), o yüzden "Konya ilanları" gibi
+>    bir kırıntı yazılmadı. `tip=yuk` varsayılan → `/`ye normalize oluyor (kod
+>    bunu bilerek yapıyor), dolayısıyla yükte 2 / araçta 3 kırıntı.
+>    Test her kırıntı URL'ine **gerçekten istek atıp** 2xx doğruluyor.
+> 2. **`Service` korundu** — semantik doğru olan ve AI hedefine hizmet eden bu.
+> 3. **`PostalAddress`** (Bayram'ın 3. maddesi): `areaServed`'daki her şehre
+>    `addressLocality`=ilçe, `addressRegion`=il, `addressCountry`=TR. İlçe DB'de
+>    vardı ama JSON-LD'ye hiç girmiyordu.
+> 4. 🐛 **4. madde gerçek bir bug ortaya çıkardı:** JSON-LD `JSON.stringify` ile
+>    **ham** basılıyordu. İçeri giren `cargo_type`/`district` serbest metin ve
+>    WhatsApp'tan geliyor — biri `</script>` içerseydi tarayıcı script'i orada
+>    kapatır → JSON-LD bozulur (**tam da "öğe algılanmadı"**) ve kalan metin
+>    sayfaya HTML olarak enjekte edilir (**XSS**). Canlı veride şu an `<`/`>`/`&`
+>    yok (4 alan sorgulandı, dördü 0) — yani henüz patlamamış gizli bir kırılma.
+>    `jsonLdGuvenli()` ile `<`→`\u003c`: JSON anlamı değişmez, HTML ayrıştırıcısı
+>    script sonunu erken görmez.
+> 5. **2. madde canlıda doğrulandı:** canonical + sitemap `<loc>` →
+>    `https://www.yukegel.com` (8 Ağu düzeltmesi yayında).
+>
+> **SELF TEST — `npm run test:jsonld` (23/23):** blokların ayrıştırılabilirliği ·
+> Service alanları · `offers.price`/TRY · `availability`↔`status` tutarlılığı ·
+> from_city/to_city · PostalAddress · **tonajın TOPLAM olduğu** (çok duraklıda ilk
+> durağın değeri değil — bu hata sınıfı metadata'da bir kez yaşanmıştı) ·
+> BreadcrumbList biçimi · **her kırıntı URL'inin gerçekten çalıştığı** ·
+> `</script>` kaçışı (hem fonksiyon hem sayfa çıktısı) · **JobPosting
+> kullanılmadığı**. Ayrıca araç dalı elle doğrulandı (3 kırıntı, `/?tip=arac`→200);
+> `test:seo` 74/74; tsc + build temiz.
+>
+> ⏳ **Bayram'a:** Rich Results Test'i tekrar çalıştır — artık **Breadcrumb**
+> algılanmalı. `Service` bloğu orada görünmeyecek (beklenen), ama Schema.org
+> Validator (validator.schema.org) ikisini de gösterir; LLM'ler de onu okuyor.
+> Ayrıntı: `docs/20260808_ai_readiness_denetimi.sql` (EK bölümü).
+
+
 > ## ✅ 8 AĞU 2026 — AI-READINESS DENETİMİ: 6 MADDENİN 5'İ ZATEN VARDI
 >
 > Bayram 6 maddelik liste verdi (dinamik metadata/OG, JSON-LD, semantik HTML,

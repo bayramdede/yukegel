@@ -23,6 +23,7 @@
     "test:poi-senkron": "npx tsx scripts/test-poi-senkron.mts",
     "test:ilan-duzelt": "npx tsx scripts/test-ilan-duzelt.mts",
     "test:toplu-duzenle": "npx tsx scripts/test-toplu-duzenle.mts",
+    "test:jsonld": "npx tsx scripts/test-jsonld.mts",
     "olc:86": "npx tsx scripts/olc-86.mts",
     "olc:88": "npx tsx scripts/olc-88.mts",
     "olc:87": "npx tsx scripts/olc-87.mts",

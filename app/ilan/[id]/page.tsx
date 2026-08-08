@@ -159,6 +159,50 @@ function chipStyle(bg: string, color: string): React.CSSProperties {
   return { background: bg, color, fontSize: '0.78rem', fontWeight: 600, padding: '3px 10px', borderRadius: 4 };
 }
 
+/** schema.org `City` düğümü; ilçe varsa `PostalAddress` ile zenginleştirir. */
+function sehirDugumu(il: string, ilce: string | null | undefined) {
+  return {
+    '@type': 'City',
+    name: il,
+    ...(ilce
+      ? {
+          address: {
+            '@type': 'PostalAddress',
+            addressLocality: ilce,   // ilçe
+            addressRegion: il,       // il
+            addressCountry: 'TR',
+          },
+        }
+      : {}),
+  };
+}
+
+/**
+ * JSON-LD'yi `<script>` içine GÜVENLE gömer.
+ *
+ * 🚨 9 Ağu 2026 — GİZLİ KIRILMA: `dangerouslySetInnerHTML` ile ham
+ * `JSON.stringify` basılıyordu. JSON-LD'ye giren alanların bir kısmı SERBEST
+ * METİN ve WhatsApp'tan geliyor (`cargo_type`, `district`). İçlerinden biri
+ * `</script>` içerseydi tarayıcı script etiketini ORADA kapatır; JSON-LD
+ * bozulur (Google "öğe algılanmadı" der) ve kalan metin SAYFAYA HTML olarak
+ * enjekte edilir — yani aynı anda hem SEO hem XSS sorunu.
+ *
+ * ⚠️ Bugün veride `<`/`>`/`&` YOK (canlıda sorguladım: 4 alanın dördü de 0
+ *    satır) — yani bu bug HENÜZ PATLAMAMIŞ. Düzeltmenin sebebi mevcut bir
+ *    arıza değil, girdinin serbest olması: bir moderatör yük cinsine
+ *    `</script>` yazdığı gün patlardı ve sebebi hiçbir testte görünmezdi.
+ *
+ * `<` → `<` kaçışı JSON içinde GEÇERLİDİR (aynı stringi üretir), yani
+ * ayrıştırıcı için hiçbir şey değişmez; yalnız HTML ayrıştırıcısı script
+ * sonunu erken görmez.
+ */
+function jsonLdGuvenli(veri: unknown): string {
+  return JSON.stringify(veri)
+    .replace(/</g, '\\u003c')
+    .replace(/>/g, '\\u003e')
+    .replace(/&/g, '\\u0026');
+}
+
 export default async function IlanDetay({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
 
@@ -244,9 +288,15 @@ export default async function IlanDetay({ params }: { params: Promise<{ id: stri
     provider: { '@type': 'Organization', name: 'Yükegel', url: SITE_URL },
     // ⚠️ schema.org `City` `name` alanı METİN bekler — id basılamaz. Bu yüzden
     //    JSON-LD, metin kolonunun düşmesinden sonra da `ilAdi()`'ye muhtaç.
+    //
+    // 9 Ağu 2026 — her şehre `PostalAddress` EKLENDİ. Önceden yalnız il ADI
+    // vardı; ilçe bilgisi (`origin_district` / `stops[].district`) JSON-LD'ye
+    // hiç girmiyordu, oysa DB'de duruyor. `addressRegion` = il, `addressLocality`
+    // = ilçe, `addressCountry` = TR: bot "Konya'nın Kulu ilçesi" ayrımını
+    // artık yapabiliyor.
     areaServed: [
-      { '@type': 'City', name: kalkis },
-      ...stops.map((s: any) => ({ '@type': 'City', name: ilAdi(s.province_id) ?? '' })),
+      sehirDugumu(kalkis, ilan.origin_district),
+      ...stops.map((s: any) => sehirDugumu(ilAdi(s.province_id) ?? '', s.district)),
     ],
     datePosted: ilan.created_at,
     ...(ilan.available_date && { availabilityStarts: ilan.available_date }),
@@ -291,12 +341,51 @@ export default async function IlanDetay({ params }: { params: Promise<{ id: stri
     ].filter(p => p.value !== '' && p.value !== null && p.value !== 0),
   };
 
+  // ── BreadcrumbList — Google'ın ZENGİN SONUÇ ÜRETTİĞİ tipler arasında.
+  //
+  // 🚨 9 Ağu 2026, "hiçbir öğe algılanmadı" teşhisi: `Service` Google'ın
+  //    desteklenen zengin sonuç tipleri listesinde YOK (developers.google.com/
+  //    search/docs/appearance/structured-data/search-gallery). Yani o uyarı
+  //    JSON-LD'nin BOZUK olduğunu değil, TİPİN o araç için uygun olmadığını
+  //    söylüyordu — şema geçerliydi ve LLM/AI tarayıcıları onu zaten okuyor.
+  //    `Breadcrumb` ise DESTEKLENEN bir tip; hem dürüst hem de araca "öğe"
+  //    gösterecek olan bu.
+  //
+  // ⚠️ URL'LER GERÇEK OLMAK ZORUNDA — uydurma kırıntı, olmayan bir sayfaya
+  //    işaret eden yapılandırılmış veridir. Bu sitede il bazlı ilan listesi
+  //    rotası YOK (`HomeClient` URL'den yalnız `tip` okuyor), o yüzden
+  //    "Konya ilanları" gibi bir kırıntı UYDURULMADI.
+  //    `tip=yuk` VARSAYILAN olduğu için `/`ye normalize ediliyor (kod bunu
+  //    bilerek yapıyor: aynı liste için iki URL oluşmasın). Bu yüzden yük
+  //    ilanında ara kırıntı yok, araç ilanında `/?tip=arac` var.
+  const kirintilar = [
+    { name: 'Ana Sayfa', url: SITE_URL },
+    ...(isYuk ? [] : [{ name: 'Araç İlanları', url: `${SITE_URL}/?tip=arac` }]),
+    { name: `${kalkis} → ${ilAdi(stops.at(-1)?.province_id) ?? ''}`, url: `${SITE_URL}/ilan/${id}` },
+  ];
+  const breadcrumbLd = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: kirintilar.map((k, i) => ({
+      '@type': 'ListItem',
+      position: i + 1,
+      name: k.name,
+      item: k.url,
+    })),
+  };
+
   return (
     <div style={{ minHeight: '100vh', background: '#0d1117', fontFamily: "'IBM Plex Sans', system-ui, sans-serif" }}>
-      {/* Adım 2: JSON-LD Script */}
+      {/* Adım 2: JSON-LD — iki AYRI script.
+          Tek bir dizi/`@graph` de geçerli ama ayrı etiketler her ayrıştırıcıda
+          en güvenli okunan biçim; biri bozulsa diğeri ayakta kalır. */}
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        dangerouslySetInnerHTML={{ __html: jsonLdGuvenli(jsonLd) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: jsonLdGuvenli(breadcrumbLd) }}
       />
 
       <nav style={{ background: '#161b22', borderBottom: '1px solid #30363d', position: 'sticky', top: 0, zIndex: 50 }}>

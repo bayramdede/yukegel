@@ -130,3 +130,73 @@
 -- ⚠️ AYRICA: `NEXT_PUBLIC_SITE_URL` Vercel'de `https://www.yukegel.com` olarak
 --    TANIMLANMALI. Kod artık doğru fallback'e sahip, ama ortam değişkenini açıkça
 --    ayarlamak preview/staging dağıtımlarında da doğru host'u garanti eder.
+
+
+-- =============================================================================
+-- EK — 9 AĞU 2026: "Zengin Sonuçlar Testi: hiçbir öğe algılanmadı" TEŞHİSİ
+-- =============================================================================
+-- Bayram canlı URL'de Rich Results Test çalıştırıp "hiçbir öğe algılanmadı"
+-- aldı ve şema tipini `Service` → `JobPosting` yapmayı önerdi.
+--
+-- 🔴 `JobPosting` UYGULANMADI. Gerekçe, Google'ın KENDİ dokümanı (okundu):
+--   developers.google.com/search/docs/appearance/structured-data/job-posting
+--   · "The JobPosting markup must only be used on pages that contain a single
+--      job posting." — yalnız GERÇEK İŞ İLANLARI.
+--   · Zorunlu alanlar: datePosted, description, hiringOrganization, title
+--     (+ jobLocation). Bir yük ilanında "hiringOrganization" ve "title" ne olacak?
+--     Uydurulmuş değerlerle doldurmak gerekirdi.
+--   · Yaptırım: "we'll respond appropriately, which may include taking manual
+--      action and removing the job posting(s)."
+--   Yük taşıma ilanı bir İSTİHDAM ilanı DEĞİLDİR. Bunu JobPosting olarak
+--   işaretlemek spam yapılandırılmış veridir ve siteye manuel işlem riski
+--   getirir. Kısa vadeli zengin sonuç kazancı, alan adının Google'daki
+--   güvenilirliğini riske atmaya değmez.
+--
+-- ✅ ASIL SEBEP BAŞKAYDI (ve teşhis kısmen doğruydu): `Service`, Google'ın
+--    ZENGİN SONUÇ ÜRETTİĞİ tipler listesinde YOK.
+--    developers.google.com/search/docs/appearance/structured-data/search-gallery
+--    Desteklenenler: Article, Breadcrumb, Carousel, Course, Dataset, Event,
+--    JobPosting, LocalBusiness, Organization, Product, Profile, Q&A, Recipe,
+--    Review, Software app, Video… — `Service` YOK.
+--    Yani "öğe algılanmadı" JSON-LD'nin BOZUK olduğunu DEĞİL, o aracın bu tipi
+--    raporlamadığını söylüyordu. Şema geçerliydi; ayrıca LLM/AI tarayıcıları
+--    ham JSON-LD'yi Google'ın zengin sonuç uygunluğundan BAĞIMSIZ okuyor —
+--    ki bu projenin BİRİNCİL hedefiydi.
+--
+-- YAPILAN (dürüst + destekli):
+--   1. `BreadcrumbList` EKLENDİ — desteklenen bir tip, gerçekten uygulanabilir
+--      ve araç artık "öğe" görecek.
+--      ⚠️ Kırıntı URL'leri UYDURULMADI: bu sitede il bazlı ilan listesi rotası
+--         YOK (`HomeClient` URL'den yalnız `tip` okuyor), o yüzden "Konya
+--         ilanları" gibi bir kırıntı yazılmadı. `tip=yuk` varsayılan olduğu için
+--         `/`ye normalize ediliyor (kod bunu bilerek yapıyor: aynı liste için iki
+--         URL oluşmasın) → yük ilanında 2, araç ilanında 3 kırıntı.
+--         Test her kırıntı URL'ine GERÇEKTEN istek atıp 2xx/3xx doğruluyor.
+--   2. `Service` KORUNDU — semantik olarak doğru olan bu; AI hedefine hizmet
+--      eden de bu. İki şema ayrı `<script>` etiketlerinde.
+--   3. `PostalAddress` eklendi (Bayram'ın 3. maddesi, dürüst hâliyle):
+--      areaServed'daki her şehre addressLocality=ilçe, addressRegion=il,
+--      addressCountry=TR. İlçe verisi DB'de vardı ama JSON-LD'ye hiç girmiyordu.
+--   4. 🐛 GERÇEK BULGU (Bayram'ın 4. maddesi — syntax kontrolü):
+--      `dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}` HAM
+--      basıyordu. JSON-LD'ye giren `cargo_type`/`district` SERBEST METİN ve
+--      WhatsApp'tan geliyor. Biri `</script>` içerseydi tarayıcı script'i ORADA
+--      kapatır → JSON-LD bozulur (tam da "öğe algılanmadı") VE kalan metin
+--      sayfaya HTML olarak enjekte edilir (XSS).
+--      Canlı veride şu an `<`/`>`/`&` YOK (4 alan sorgulandı, dördü de 0) — yani
+--      bug HENÜZ PATLAMAMIŞ; düzeltmenin sebebi girdinin serbest olması.
+--      `jsonLdGuvenli()` ile `<`→\u003c kaçışı: JSON anlamı DEĞİŞMEZ, HTML
+--      ayrıştırıcısı script sonunu erken görmez.
+--   5. Bayram'ın 2. maddesi (Vercel değişkeni) CANLIDA DOĞRULANDI:
+--      curl https://www.yukegel.com → <link rel="canonical" href="https://www.yukegel.com"/>
+--      sitemap <loc> → https://www.yukegel.com ✅ (8 Ağu düzeltmesi yayında)
+--
+-- SELF TEST: `npm run test:jsonld` (23 kontrol, dev sunucusu açıkken)
+--   Kapsam: blokların ayrıştırılabilirliği · Service alanları · offers.price/TRY ·
+--   availability↔status tutarlılığı · from_city/to_city · PostalAddress ·
+--   TONAJ TOPLAM MI (çok duraklı ilanda ilk durağın değeri değil — bu hata sınıfı
+--   metadata tarafında bir kez yaşanmıştı) · BreadcrumbList biçimi ·
+--   HER KIRINTI URL'İNİN GERÇEKTEN ÇALIŞTIĞI · `</script>` kaçışı hem
+--   fonksiyon hem sayfa çıktısı üzerinde · JobPosting KULLANILMADIĞI.
+--   Sonuç: 23/23 ✅ · ayrıca araç ilanı dalı elle doğrulandı (3 kırıntı,
+--   /?tip=arac → 200) · test:seo 74/74 · tsc + next build temiz.
