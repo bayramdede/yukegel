@@ -1,6 +1,19 @@
 # Yükegel — Proje Haritası
 > **Kullanım:** Her sohbet başında sadece bu dosyayı oku. Kaynak dosyaları sadece o dosyada değişiklik yapacaksan oku.  
 >
+> 🔴 **8 AĞU 2026 — İkinci PII/iç-veri sızıntısı: `listings.internal_audit_logs`.**
+> `public.users` olayıyla AYNI hata sınıfı (satır RLS `using(true)` + dar
+> olmayan kolon GRANT'ı) `listings`te de vardı: anti-spam motorunun
+> `fired_rules`/`thresholds` (`reject_min`, `auto_publish_max`) alanları
+> `anon`+`authenticated`'a açıktı — kayıtsız herkes ham PostgREST çağrısıyla
+> motorun tam eşiklerini okuyabiliyordu (canlıda doğrulandı). Kolon revoke
+> edildi (`audit_score` yalnız `anon`'dan — `authenticated` moderatör
+> panelinin WHERE filtresi için kaldı); panel tarafı SPRINT_01 L1e'nin
+> (`contact_phone`) deseniyle yeni `ilanAuditGetir()` server action'ına
+> (`requireStaff` + service role) taşındı. Bu kez TÜM tüketiciler grep'lenip
+> tek tek doğrulandı (7-8 Ağu'nun "eksik tarama" dersi baştan uygulandı) —
+> hiçbiri kırılmadı. Ayrıntı: `docs/20260808_listings_audit_kolon.sql`.
+>
 > ✅ **8 AĞU 2026 — Moderatör paneli backlog'u kapandı (4/4).** `user_id` eksikti
 > (`getIlanlar()` seçmiyordu, "ilan sahibi" paneli muhtemelen hiç çalışmamıştı)
 > → eklendi. no_lane düzenleme state'i (`'no_lane_'+id` string-prefix hilesi)

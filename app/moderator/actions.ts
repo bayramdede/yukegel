@@ -78,6 +78,48 @@ export async function ilanTelefonlariGetir(
 }
 
 /**
+ * 8 Ağu 2026 — `internal_audit_logs` için `ilanTelefonlariGetir`'in AYNI deseni.
+ *
+ * NEDEN: bu kolon anti-spam motorunun `fired_rules` (hangi kural, hangi ağırlıkla
+ * ateşlendi) ve `thresholds` (`reject_min`/`auto_publish_max`) alanlarını içeriyor.
+ * `listings` satır RLS'i `using(true)` — HERKES her satırı okuyabiliyor — ve kolon
+ * `anon`/`authenticated`'a GRANT'lıydı. Yani düz bir `fetch('/rest/v1/listings?
+ * select=internal_audit_logs')` (kayıt bile gerekmeden) motorun tam eşik/ağırlık
+ * tablosunu döküyordu — kural atlatmayı kolaylaştıran bir sızıntı. `docs/
+ * 20260808_listings_audit_kolon.sql`'e bakınız.
+ *
+ * Kolon artık `anon`+`authenticated`'dan tamamen revoke edildi; yalnız
+ * `getServiceSupabase()` (staff doğrulandıktan sonra, `requireStaff` ile) okuyor.
+ */
+export async function ilanAuditGetir(
+  ids: string[]
+): Promise<ModSonuc<Record<string, any>>> {
+  const yetki = await requireStaff()
+  if (!yetki.ok) return { ok: false, hata: yetki.error }
+
+  const temiz = Array.from(new Set((ids ?? []).filter(id => typeof id === 'string' && id.length > 0)))
+  if (temiz.length === 0) return { ok: true, veri: {} }
+  if (temiz.length > 300) return { ok: false, hata: 'Çok fazla kayıt istendi.' }
+
+  const service = getServiceSupabase()
+  const { data, error } = await service
+    .from('listings')
+    .select('id, internal_audit_logs')
+    .in('id', temiz)
+
+  if (error) {
+    structuredLog('ERROR', 'audit-engine', 'Moderatör audit-log toplu okuma hatası', {
+      supabase_error: error.message,
+    })
+    return { ok: false, hata: 'Audit kayıtları yüklenemedi.' }
+  }
+
+  const harita: Record<string, any> = {}
+  for (const satir of data ?? []) harita[satir.id] = satir.internal_audit_logs ?? null
+  return { ok: true, veri: harita }
+}
+
+/**
  * Tek ilanın numarasını günceller. `contact_phone` DIŞINDA hiçbir kolona dokunmaz —
  * moderatörün diğer alanları (durum, notlar, moderation_status…) mevcut akışıyla,
  * anon istemci + RLS üzerinden yazılmaya devam ediyor.

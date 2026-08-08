@@ -3,7 +3,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { createClient } from '../../lib/supabase';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ilanTelefonlariGetir, ilanTelefonGuncelle, moderatorIlanOlustur } from './actions';
+import { ilanTelefonlariGetir, ilanTelefonGuncelle, ilanAuditGetir, moderatorIlanOlustur } from './actions';
 // ⚠️ `ILLER` = `IL_ADLARI`. Buradaki il filtresi Dalga 5'ten sonra
 //    `ilAdi(id) === filtreKalkis` diye TAM EŞİTLİK karşılaştırıyor; `ilAdi()`
 //    `locations.json`'dan okuyor. Dropdown eskiden AYRI bir elle yazılmış
@@ -255,6 +255,13 @@ export default function Moderator() {
     // Bu istemci anon key kullanıyor ve o kolonun yetkisi anon/authenticated'dan
     // revoke edildi. Numaralar aşağıda `ilanTelefonlariGetir()` ile, rolü sunucuda
     // doğrulandıktan sonra ayrıca çekilip listeye birleştiriliyor.
+    // 8 Ağu 2026 — `internal_audit_logs` de AYNI sebeple burada ÇEKİLMEZ (bkz.
+    // `docs/20260808_listings_audit_kolon.sql`): kolon anon+authenticated'dan
+    // tamamen revoke edildi (fired_rules/thresholds anti-spam motorunun iç
+    // ayarlarını döküyordu, RLS satır bazında `using(true)` olduğu için herkes
+    // her satırı okuyabiliyordu). Aşağıda `ilanAuditGetir()` ile birleştiriliyor.
+    // `audit_score` İSTİSNA — o `authenticated`'da granted KALDI çünkü aşağıda
+    // `.gt('audit_score', 30)` WHERE filtresi onu görmeden çalışamaz.
     // Dalga 5 (3 Ağu 2026): metin kolonları düştü. Satırlar `ilanlar` state'ine
     // HAM giriyor, yani `origin_province_id` / `stops[].province_id` adları
     // bileşenin her yerinde aynen görünür; çeviri gösterim anında `ilAdi()` ile.
@@ -262,7 +269,7 @@ export default function Moderator() {
       id, listing_type, origin_province_id, origin_district, price_offer,
       source, created_at, moderation_status, status, notes, trust_level,
       raw_text, raw_post_id, vehicle_type, body_type, user_id,
-      audit_score, is_shadow_banned, internal_audit_logs,
+      audit_score, is_shadow_banned,
       listing_stops ( id, stop_order, province_id, district, vehicle_count, cargo_type, weight_ton, pallet_count, notes )
     `).order('created_at', { ascending: false }).limit(200);
 
@@ -296,14 +303,25 @@ export default function Moderator() {
 
     // SPRINT_01 L1e — numaraları server action'dan al ve birleştir.
     // Hata olursa liste yine gösterilir; sadece telefon sütunu boş kalır.
+    // 8 Ağu 2026 — `internal_audit_logs` de aynı şekilde `ilanAuditGetir()`'den.
     let telefonlar: Record<string, string | null> = {};
+    let auditLoglar: Record<string, any> = {};
     if (sorted.length > 0) {
-      const tel = await ilanTelefonlariGetir(sorted.map((i: any) => i.id));
+      const [tel, audit] = await Promise.all([
+        ilanTelefonlariGetir(sorted.map((i: any) => i.id)),
+        ilanAuditGetir(sorted.map((i: any) => i.id)),
+      ]);
       if (tel.ok) telefonlar = tel.veri;
       else console.warn('Telefonlar alınamadı:', tel.hata);
+      if (audit.ok) auditLoglar = audit.veri;
+      else console.warn('Audit kayıtları alınamadı:', audit.hata);
     }
 
-    setIlanlar(sorted.map((i: any) => ({ ...i, contact_phone: telefonlar[i.id] ?? null })));
+    setIlanlar(sorted.map((i: any) => ({
+      ...i,
+      contact_phone: telefonlar[i.id] ?? null,
+      internal_audit_logs: auditLoglar[i.id] ?? null,
+    })));
     setYukleniyor(false);
   }
 

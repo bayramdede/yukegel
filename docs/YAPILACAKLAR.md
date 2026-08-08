@@ -1,5 +1,29 @@
 # Yükegel — Yapılacaklar Listesi
 
+> ## 🚨 8 AĞU 2026 — İKİNCİ PII/İÇ-VERİ SIZINTISI: `listings.internal_audit_logs`
+>
+> Moderatör panelindeki "bir sonraki iyileştirme ne olabilir" taramasında,
+> 7-8 Ağu'daki `public.users` olayıyla AYNI hata sınıfı `public.listings`'te de
+> bulundu: satır RLS'i `using(true)` (herkes her satırı okuyabilir) + kolon
+> GRANT'ı dar değildi. `internal_audit_logs` (anti-spam motorunun `fired_rules`
+> + `thresholds.reject_min`/`auto_publish_max`'i) hem `anon` hem `authenticated`'a
+> table-level SELECT ile açıktı — yani kayıtsız, oturumsuz herkes doğrudan
+> `GET /rest/v1/listings?select=internal_audit_logs` ile motorun TAM eşik/ağırlık
+> tablosunu okuyabiliyordu (canlıda doğrulandı, gerçek satır: score 70,
+> `reject_min:71`, hangi ifadenin kaç puan getirdiği dâhil).
+>
+> **Düzeltme:** kolon `anon`+`authenticated`'dan tamamen revoke edildi (`audit_score`
+> yalnız `anon`'dan — `authenticated` moderatör panelinin `.gt('audit_score',30)`
+> WHERE filtresi için gerekli, kaldı). Panel tarafında SPRINT_01 L1e'nin
+> (`contact_phone`) BİREBİR AYNI deseni tekrarlandı: yeni `ilanAuditGetir()`
+> server action'ı (`requireStaff` + service role), `getIlanlar()` artık listeyi
+> çektikten sonra bunu PARALEL çağırıp birleştiriyor. Diğer tüketiciler
+> (`app/panel/page.tsx`, `toplu-islem`, `duzelt`, `/ilan/[id]`, `/api/ilanlar/[id]`)
+> zaten service role kullandığı için etkilenmedi — hepsi tek tek grep'lenip
+> doğrulandı (7-8 Ağu'nun "eksik tarama" dersi bu kez baştan uygulandı).
+> Detay + canlı doğrulama: `docs/20260808_listings_audit_kolon.sql`.
+> `tsc --noEmit` + `next build` temiz.
+
 > ## ✅ 8 AĞU 2026 — MODERATÖR PANELİ BACKLOG'U KAPANDI (4/4 madde)
 >
 > Önceki oturumda bırakılan dört maddenin hepsi bugün ele alındı:
