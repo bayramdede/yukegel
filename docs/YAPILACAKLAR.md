@@ -1,5 +1,57 @@
 # Yükegel — Yapılacaklar Listesi
 
+> ## ✅ 8 AĞU 2026 — RADAR + ANALİTİK HIZLANDIRMA & `aliases`E COĞRAFİ STANDART
+>
+> **A) Radar/analitik hız.** Önce YANLIŞ ölçtüm: aynı fonksiyon 11.364 → 1.348 →
+> 7.062 → 233 ms okudu (buffer cache; `listings` 495 MB). Tekrarlı ölçüm gerçeği
+> verdi: **her YENİ rota 2.9–7.3 sn, aynı rotanın tekrarı 45–250 ms.**
+> 📌 Ders: bu sayfalarda "sıcak" ölçüm yanıltıcı — gerçek kullanım her seferinde
+> farklı rota, yani her seferinde soğuk sayfa.
+> - **Kapsayıcı indeksler** (karar süreye değil, önbellekten bağımsız SAYFA
+>   sayısına dayandırıldı): `listing_stops(province_id, listing_id)` → dest_ids
+>   3.444 → **194 sayfa**; `listings(created_at) include (origin_province_id,
+>   contact_phone, id)` → analitik özeti 8.974 → **3.061 sayfa, Heap Fetches 0**,
+>   1.137 → 306 ms. + `VACUUM` (bayat görünürlük haritası 12.804 heap fetch
+>   üretiyordu).
+> - **Denendi ve GERİ ALINDI:** `get_radar_intelligence`ı iki fazlı yaptım
+>   (önce ID kümesi index-only, sonra yalnız hayatta kalan ~1.8k satır).
+>   Hipotez sağlamdı (okunan verinin %93'ü çöp) ama kontrollü ölçüm
+>   desteklemedi; bazı rotalarda daha kötüydü. Ölçüm zorluğu: aynı rotayı iki kez
+>   ölçemiyorsun ve rota YÖNÜ simetrik değil. Kanıt olmadığı için canlıda
+>   kanıtlanmamış karmaşıklık bırakmadım. 📌 "Mantıklı" yeterli değil.
+> - **Asıl çözüm `lib/radar-cache.ts`** (90 sn, süreç-içi, `lib/kota.ts` deseni):
+>   kullanım deseni tekrarlı (aynı rotayı ileri-geri açmak, `days` değiştirip geri
+>   almak, tümü/kontrat sekmesi). `mode` anahtarın DIŞINDA → sekme değişimi yeni
+>   sorgu tetiklemiyor. Hata önbelleklenmez.
+>   ⚠️ **Tazelik gizlenmiyor:** "⚡ N sn önce hesaplandı" + "↻ Yenile"; Yenile
+>   `taze=1` gönderip önbelleği ATLIYOR — göndermeseydi buton aynı yanıtı geri
+>   alıp kullanıcıya yalan söylerdi.
+>
+> **B) Coğrafi standart `aliases`e taşındı.** Radar'ın DB katmanı ZATEN
+> `province_id` tabanlıydı (Dalga 3; üç fonksiyonda da `origin_city` yok,
+> `city ILIKE` yok) — orada taşınacak şey kalmamıştı. Şema tarandı: metin coğrafi
+> kolonu olup `province_id` karşılığı olmayan iki yer kaldı ve önemlisi
+> **`aliases`**: `normalized` bir İL ADI ama sadece metin — ve bu projede aynı
+> hata sınıfı tam orada ÜÇ KEZ yaşandı (W5/D1 ASCII yazım, u0307 onarımı, #51
+> ilçe/il çelişkisi). Hepsinin kökü: il kimliği doğrulanmayan bir metindi.
+> - `aliases.province_id smallint references provinces(id)` eklendi.
+> - 🚨 **Türetme TRIGGER'da, uygulamada değil** — tabloya yazan 4 ayrı yol var
+>   (W5/D2); uygulamaya koysam dördünü de doğru yazmam ve gelecekteki 5.'nin de
+>   hatırlaması gerekirdi. Trigger'ı hiçbir yol atlayamaz.
+> - Trigger'ın izlediği kolon listesine **`type` eklendi**: yoksa
+>   "vehicle → city" güncellemesi province_id'yi tazelemez, sessizce NULL kalırdı.
+> - **Veri onarımı DEĞİL:** 1.829 city alias'ının 1.828'i zaten çözülüyordu. Bu
+>   yapısal bir kapı. Doğrulandı: `Istanbul`/`ISTANBUL`/`istanbul`/`İstanbul`
+>   dördü de → **34**; `vehicle` tipi → NULL; `Erbil` (Türkiye dışı) → NULL
+>   (reddedilmiyor). `vehicle→city` sonrası → 16.
+> - ⏳ **Kalan tek yer: `poi_stay_events.poi_city`** — `pois.city`nin olay anındaki
+>   kopyası (tarihsel kayıt, canlı alan değil). Doğru çözüm `poi_province_id` ile
+>   ikizlemek ya da düşürüp `pois`e JOIN. Bu turun kapsamı dışı.
+>
+> Ayrıntı: `docs/20260808_radar_hizlandirma.sql`,
+> `docs/20260808_aliases_cografi_standart.sql`. `test:alias`/`test:lokasyon`/
+> `test:districts` geçti, `tsc` + `next build` temiz.
+>
 > ## ✅ 8 AĞU 2026 — "İLANLARIM GEÇ YÜKLENİYOR": EKSİK İNDEKS (~49×)
 >
 > **Bildirim:** "İlanlarım vb sayfalar biraz geç yükleniyor."

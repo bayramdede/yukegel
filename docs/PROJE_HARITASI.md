@@ -1,6 +1,21 @@
 # Yükegel — Proje Haritası
 > **Kullanım:** Her sohbet başında sadece bu dosyayı oku. Kaynak dosyaları sadece o dosyada değişiklik yapacaksan oku.  
 >
+> ⚡ **8 AĞU 2026 — Radar/analitik hızlandırma + `aliases`e coğrafi standart.**
+> Radar'da ölçüm tuzağı: aynı fonksiyon 11.364→233 ms okudu (buffer cache).
+> Gerçek: **her YENİ rota 2.9–7.3 sn, tekrar 45–250 ms** → "sıcak" ölçüm
+> yanıltıcı. Kapsayıcı indekslerle analitik özeti 8.974 → **3.061 sayfa**
+> (Heap Fetches 0), dest_ids 3.444 → **194 sayfa**. İki fazlı RPC denendi,
+> kontrollü ölçüm desteklemediği için **GERİ ALINDI** (📌 "mantıklı" yeterli
+> değil). Asıl çözüm `lib/radar-cache.ts` — 90 sn süreç-içi önbellek; tazelik
+> ekranda ("⚡ N sn önce" + "↻ Yenile" → `taze=1` ile önbelleği atlar).
+> **Coğrafi standart:** radar DB'si zaten `province_id` tabanlıydı; standart
+> `aliases`e taşındı (`province_id` FK, türetme **trigger'da** çünkü tabloya
+> yazan 4 yol var). W5/D1 + u0307 + #51'in kökü olan "il kimliği doğrulanmayan
+> metin" hata sınıfı kapandı: `Istanbul`/`ISTANBUL`/`istanbul`/`İstanbul` → 34.
+> ⏳ Kalan: `poi_stay_events.poi_city`. Ayrıntı:
+> `docs/20260808_radar_hizlandirma.sql` + `..._aliases_cografi_standart.sql`.
+>
 > ⚡ **8 AĞU 2026 — "İlanlarım geç yükleniyor" → eksik indeks (~49×).**
 > `listings.user_id` İNDEKSLİ DEĞİLDİ (`vehicles.user_id` indeksliydi — aynı
 > desende biri atlanmış). Panel sorgusu 256.175 satırı Parallel Seq Scan'liyordu:
