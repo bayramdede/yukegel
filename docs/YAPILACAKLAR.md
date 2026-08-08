@@ -1,5 +1,46 @@
 # Yükegel — Yapılacaklar Listesi
 
+> ## ✅ 8 AĞU 2026 — MODERATÖR PANELİ BACKLOG'U KAPANDI (4/4 madde)
+>
+> Önceki oturumda bırakılan dört maddenin hepsi bugün ele alındı:
+>
+> **1. `ilan.user_id` eksikti — "ilan sahibi" paneli muhtemelen hiç
+> çalışmamıştı.** `getIlanlar()`'ın seçtiği kolonlar arasında `user_id` yoktu;
+> `duzenleAc()`teki "kullanıcı bilgisi" çağrısı bu yüzden hep `undefined`la
+> tetiklenip hiçbir şey getirmiyordu — bugünkü olaydan BAĞIMSIZ, önceden var
+> olan bir eksiklik. Select'e eklendi, artık `/api/moderator/kullanici-ara`
+> gerçek veriyle çalışıyor.
+>
+> **2. "Çözümsüz" (no_lane) düzenleme state'i ayrıştırıldı.** İncelemede
+> beklenenden AZ kırılgan çıktı (yalnız 2 kullanım noktası, sekmeler birbirini
+> hiç etkilemiyordu) ama yine de string-prefix (`'no_lane_'+id`) yerine ayrı
+> bir `noLaneDuzenleId` state'i verildi — daha açık, sıfır risk.
+>
+> **3. Filtre/sıralama artık `useMemo`.** 200 satırlık liste eskiden arama
+> kutusuna HER TUŞ VURUŞUNDA yeniden filtreleniyor + sıralanıyordu. Bağımlılık
+> dizisi filtre fonksiyonlarının okuduğu her state'i kapsıyor.
+>
+> **4. `duzenleKaydet`'in N+1 yazma deseni → tek atomik RPC.** Yeni
+> `moderator_ilan_duzenle(p_listing_id, p_listing, p_stops)` — `listings`
+> UPDATE + duraklar tek transaction'da. Duraklar artık UPDATE değil
+> SİL+YENİDEN-EKLE: bu, incelemede ORTAYA ÇIKAN İKİNCİ bir bugu da kapattı —
+> eski kod formda SİLİNEN bir durağı DB'de hiç silmiyordu (döngü yalnız
+> update/insert biliyordu), yani "sil" butonu ekranda çalışıp kaydedince eski
+> durak DB'de hayalet kalıyordu. RPC `SECURITY DEFINER`, kendi içinde
+> `auth.uid()`nin rolünü kontrol ediyor — istemci tarafındaki `yetkiKontrol`e
+> güvenmiyor. **Doğrulama (gerçekten çalıştırıldı, `ROLLBACK`lı):** moderator
+> kimliğiyle güncelleme başarılı + durak sayısı doğru güncellendi ✅; sıradan
+> `user` rolüyle çağrı `42501 yetkisiz` ile reddedildi ✅.
+>
+> **Bonus — klavye kısayolları.** Kuyruğun BAŞINDAKİ karta uygulanıyor
+> (`siralanmis[0]` — "sonrakine kaydır" zaten bu varsayımla çalışıyordu):
+> `A` onayla, `R` reddet, `S`/boşluk sonra, `E` düzenle. Yazı kutusunda
+> odaklıyken, düzenleme modundayken veya arşiv/çözümsüz sekmelerinde (farklı
+> buton kümeleri) devre dışı. Keşfedilebilirlik için listenin üstünde küçük
+> bir ipucu satırı eklendi.
+>
+> **Doğrulama:** `tsc --noEmit` temiz, gerçek `next build` temiz.
+
 > ## 🔴 8 AĞU 2026 — OLAY: 7 AĞU GÜVENLİK DÜZELTMESİ LOGIN'İ KIRDI, AYNI GÜN DÜZELTİLDİ
 >
 > **Bildirim (Bayram):** "Login olamıyorum. Profil tamamlamaya yönlendiriyor.

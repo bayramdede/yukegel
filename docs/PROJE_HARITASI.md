@@ -1,6 +1,19 @@
 # Yükegel — Proje Haritası
 > **Kullanım:** Her sohbet başında sadece bu dosyayı oku. Kaynak dosyaları sadece o dosyada değişiklik yapacaksan oku.  
 >
+> ✅ **8 AĞU 2026 — Moderatör paneli backlog'u kapandı (4/4).** `user_id` eksikti
+> (`getIlanlar()` seçmiyordu, "ilan sahibi" paneli muhtemelen hiç çalışmamıştı)
+> → eklendi. no_lane düzenleme state'i (`'no_lane_'+id` string-prefix hilesi)
+> ayrı `noLaneDuzenleId`'ye alındı. Filtre/sıralama `useMemo`'ya taşındı (200
+> satır artık her tuş vuruşunda yeniden hesaplanmıyor). `duzenleKaydet`'in N+1
+> yazma deseni yeni **`moderator_ilan_duzenle` RPC**'sine taşındı (tek
+> transaction, `SECURITY DEFINER` + kendi rol kontrolü) — bu arada ikinci bir
+> bug da bulundu ve kapandı: eski kod formda silinen bir durağı DB'de hiç
+> silmiyordu (yalnız update/insert biliyordu, delete yoktu). Doğrulandı
+> (`ROLLBACK`lı gerçek çağrı: moderator başarılı, `user` rolü `42501` ile
+> reddedildi). Bonus: klavye kısayolları (A/R/S/E, kuyruğun başındaki karta).
+> `tsc`/`next build` temiz. Ayrıntı: `docs/YAPILACAKLAR.md` başı.
+>
 > 🔴 **8 AĞU 2026 — OLAY (kendi hatam, aynı gün düzeltildi): 7 Ağu güvenlik
 > düzeltmesi login'i kırdı.** `public.users`teki `REVOKE ALL`+dar `GRANT`
 > yalnız 2 bilinen tüketiciyi (rozet, herkese açık profil) taradı; `role`/

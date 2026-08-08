@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { createClient } from '../../lib/supabase';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -134,6 +134,14 @@ export default function Moderator() {
   const [noLaneListesi, setNoLaneListesi] = useState<any[]>([]);
   const [islem, setIslem] = useState<string>('');
   const [duzenleId, setDuzenleId] = useState<string>('');
+  // 8 Ağu 2026 (pratiklik) — "Çözümsüz" (no_lane) manuel ilan girişi eskiden
+  // `duzenleId`yi `'no_lane_' + raw.id` string-prefix'iyle paylaşıyordu; aynı
+  // state iki farklı iş akışını (gerçek ilan düzenleme vs. ham mesajdan yeni
+  // ilan oluşturma) ayırt etmek için bir metin kalıbına bel bağlıyordu. Pratikte
+  // çakışma riski düşüktü (`no_lane` tab'ı kendi ayrı listesini render ediyor,
+  // gerçek ilan id'leri asla bu önekle başlamıyor) ama bir string kalıbına bağlı
+  // olmak gereksiz bir kırılganlıktı — ayrı bir state daha açık ve ucuz.
+  const [noLaneDuzenleId, setNoLaneDuzenleId] = useState<string>('');
   const [duzenleData, setDuzenleData] = useState<any>({});
   // 8 Ağu 2026 (pratiklik) — `docs/YAPILACAKLAR.md`'de açık bir madde olarak
   // duran gap: bu liste bellekteydi, sayfa yenilenince sıfırlanıyordu. Moderatör
@@ -253,7 +261,7 @@ export default function Moderator() {
     let query = supabase.from('listings').select(`
       id, listing_type, origin_province_id, origin_district, price_offer,
       source, created_at, moderation_status, status, notes, trust_level,
-      raw_text, raw_post_id, vehicle_type, body_type,
+      raw_text, raw_post_id, vehicle_type, body_type, user_id,
       audit_score, is_shadow_banned, internal_audit_logs,
       listing_stops ( id, stop_order, province_id, district, vehicle_count, cargo_type, weight_ton, pallet_count, notes )
     `).order('created_at', { ascending: false }).limit(200);
@@ -300,7 +308,15 @@ export default function Moderator() {
   }
 
   // ── Client-side filtre + sıralama
-  const filtrelenmis = ilanlar.filter(ilan => {
+  //
+  // 8 Ağu 2026 (pratiklik) — `useMemo` YOKTU: 200 satırlık `ilanlar` her
+  // render'da (ör. arama kutusuna TEK harf yazınca, ki `aramaMetni` her tuş
+  // vuruşunda değişiyor) baştan filtreleniyor VE sıralanıyordu. Listenin
+  // kendisi değişmediği sürece (ör. sadece `duzenleId` değiştiği için render
+  // olduğunda) bu iş boşa tekrarlanıyordu. Bağımlılık dizisi filtre/sıralama
+  // fonksiyonlarının okuduğu HER state'i kapsıyor — biri eksik kalırsa o
+  // filtre "yapışık" görünür (değiştirince liste güncellenmez).
+  const filtrelenmis = useMemo(() => ilanlar.filter(ilan => {
     const stops = ilan.listing_stops || [];
     if (!sonraBakGoster && sonraBak.has(ilan.id)) return false;
     if (aramaMetni) {
@@ -326,10 +342,10 @@ export default function Moderator() {
       if (filtreSkor === 'kirmizi' && r.badge !== '🔴') return false;
     }
     return true;
-  });
+  }), [ilanlar, sonraBakGoster, sonraBak, aramaMetni, filtreTelefon, filtreKalkis, filtreVaris, filtreAracTipi, filtreIlanTipi, filtreSkor]);
 
   // Sıralama uygula
-  const siralanmis = [...filtrelenmis].sort((a, b) => {
+  const siralanmis = useMemo(() => [...filtrelenmis].sort((a, b) => {
     if (siralama === 'tarih_yeni') return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
     if (siralama === 'tarih_eski') return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
     if (siralama === 'audit_yuksek') return (b.audit_score ?? 0) - (a.audit_score ?? 0);
@@ -337,7 +353,7 @@ export default function Moderator() {
     if (siralama === 'kalite_yuksek') return skorRenk(b).puan - skorRenk(a).puan;
     if (siralama === 'kalite_dusuk') return skorRenk(a).puan - skorRenk(b).puan;
     return 0;
-  });
+  }), [filtrelenmis, siralama]);
 
   const sonraBakSayisi = ilanlar.filter(i => sonraBak.has(i.id)).length;
   const yesil   = siralanmis.filter(i => skorRenk(i).badge === '🟢').length;
@@ -578,6 +594,39 @@ export default function Moderator() {
     siradakineGec(id, duzenlemeModundaydı);
   }
 
+  // ── 8 Ağu 2026 (pratiklik) — Klavye kısayolları ─────────────────────────
+  //
+  // Yoğun triyaj yapan bir moderatör için fareyle her ilanda ayrı ayrı
+  // "Onayla"ya tıklamak gereksiz bir sürtünme. Kısayollar KUYRUĞUN BAŞINDAKİ
+  // karta uygulanır (`siralanmis[0]`) — "sonrakine kaydır" davranışı zaten bu
+  // varsayımla çalışıyor (bkz. `siradakineGec`), yani liste zaten yukarıdan
+  // aşağıya sırayla işlenmek üzere tasarlı.
+  //
+  // Kasıtlı olarak SINIRLI kapsam: yalnız standart moderasyon sekmelerinde
+  // (arşiv/çözümsüz/riskli hariç — oradaki buton kümesi farklı) VE düzenleme
+  // modunda DEĞİLKEN VE odak bir input/textarea/select'te DEĞİLKEN çalışır.
+  // Aksi hâlde arama kutusuna "ara" yazan bir moderatör kazara ilan
+  // onaylayabilirdi.
+  useEffect(() => {
+    function tusa(e: KeyboardEvent) {
+      const hedef = e.target as HTMLElement | null;
+      const yaziAlaninda = !!hedef && ['INPUT', 'TEXTAREA', 'SELECT'].includes(hedef.tagName);
+      if (yaziAlaninda || duzenleId || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (filtre === 'arsiv' || filtre === 'no_lane') return;
+      const ilkKart = siralanmis[0];
+      if (!ilkKart) return;
+
+      const tus = e.key.toLowerCase();
+      if (tus === 'a') { e.preventDefault(); aksiyon(ilkKart.id, 'approved', 'active'); }
+      else if (tus === 'r') { e.preventDefault(); aksiyon(ilkKart.id, 'rejected', 'passive'); }
+      else if (tus === 's' || e.key === ' ') { e.preventDefault(); sonraBakEkleVeGec(ilkKart.id); }
+      else if (tus === 'e') { e.preventDefault(); duzenleAc(ilkKart); }
+    }
+    window.addEventListener('keydown', tusa);
+    return () => window.removeEventListener('keydown', tusa);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [siralanmis, duzenleId, filtre]);
+
   function duzenleAc(ilan: any) {
     setDuzenleId(ilan.id);
     setDuzenleData({
@@ -652,17 +701,22 @@ export default function Moderator() {
       });
     }
 
-    // ⚠️ SPRINT_01 L1e — `contact_phone` bu update'te YOK.
-    // Anon istemcinin o kolon üzerinde artık yetkisi yok; numara aşağıda
-    // ilanTelefonGuncelle() server action'ıyla ayrıca yazılıyor.
+    // ⚠️ SPRINT_01 L1e — `contact_phone` burada YOK, ayrı çağrılıyor (aşağıda) —
+    // service-role'lü `ilanTelefonGuncelle()` zaten kendi başına atomik, tek
+    // UPDATE; onu bu RPC'ye katmak fayda sağlamıyordu.
+    //
+    // 🚨 8 Ağu 2026 (pratiklik) — burası eskiden `listings` UPDATE'ini VE her
+    // durak için ayrı ayrı (transaction'sız) update/insert atıyordu. İki sorun
+    // vardı: (1) yarıda hata olursa ilan kendi duraklarıyla çelişirdi, (2)
+    // formda SİLİNEN bir durak DB'de hiç silinmiyordu (döngü yalnız update/
+    // insert biliyordu). Tek RPC çağrısına taşındı — `moderator_ilan_duzenle`
+    // duraklarda SİL+YENİDEN-EKLE yapıyor (bkz. migration'daki not), ikisini
+    // birden kapatıyor. RPC kendi içinde de rol kontrolü yapıyor — istemci
+    // tarafındaki `yetkiKontrol`e güvenmiyor.
     const updateData: any = {
       listing_type: duzenleData.listing_type,
       // 🚨 DALGA 5 / KOVA D — `origin_city: kalkisIl.ad` BURADAN SİLİNDİ.
-      //    Bu yol RPC'den GEÇMEZ, doğrudan tarayıcıdan UPDATE atar; yani v4
-      //    (`ilan_olustur` artık metne yazmıyor) bu satırı kapsamıyordu. BÖLÜM
-      //    5 kolonu düşürdüğü an PostgREST 42703 ile REDDEDER ve moderatörün
-      //    "Kaydet"i tamamen çalışmaz hale gelirdi — kısmi kayıp değil, tam
-      //    blokaj. `kalkisIl` çözümü DURUYOR; yalnız yazılan alan `.id`.
+      //    `kalkisIl` çözümü DURUYOR; yalnız yazılan alan `.id`.
       origin_province_id: kalkisIl.id,
       origin_district: kalkisIlce?.ad ?? null,
       origin_district_official: kalkisIlce?.resmi ?? null,
@@ -676,29 +730,27 @@ export default function Moderator() {
       // Moderatör onaylıyorsa shadow ban'ı da kaldır
       updateData.is_shadow_banned = false;
     }
-    await supabase.from('listings').update(updateData).eq('id', id);
+
+    const { error: rpcHata } = await supabase.rpc('moderator_ilan_duzenle', {
+      p_listing_id: id,
+      p_listing: updateData,
+      p_stops: cozulmusDuraklar.map(d => ({
+        province_id: d.ilId, district: d.ilceAd, district_official: d.ilceResmi,
+        weight_ton: d.kaynak.weight_ton || null, pallet_count: d.kaynak.pallet_count || null,
+        vehicle_count: d.kaynak.vehicle_count || 1, cargo_type: d.kaynak.cargo_type || null,
+        notes: d.kaynak.notes || null,
+      })),
+    });
+    if (rpcHata) {
+      alert('Kaydedilemedi: ' + rpcHata.message);
+      setIslem('');
+      return;
+    }
 
     const telSonuc = await ilanTelefonGuncelle(id, duzenleData.contact_phone || null);
     if (!telSonuc.ok) {
       // Numara kaydedilemedi — moderatör bunu bilmeli, diğer alanlar kaydedildi.
       alert('Telefon kaydedilemedi: ' + telSonuc.hata);
-    }
-    for (let i = 0; i < cozulmusDuraklar.length; i++) {
-      const d = cozulmusDuraklar[i];
-      const stop = d.kaynak;
-      // 🚨 DALGA 5 / KOVA D — çift yazım BİTTİ, `city: d.ad` silindi.
-      //    `konum` hem UPDATE hem INSERT dalında kullanılıyor (aşağıda), yani
-      //    tek satırlık bu silme iki yazma yolunu birden kapatıyor.
-      //    `d.ad` artık yalnız hata mesajlarında/alias öğrenmede yaşıyor.
-      const konum = {
-        province_id: d.ilId,
-        district: d.ilceAd, district_official: d.ilceResmi,
-      };
-      if (d.id) {
-        await supabase.from('listing_stops').update({ ...konum, weight_ton: stop.weight_ton || null, pallet_count: stop.pallet_count || null, vehicle_count: stop.vehicle_count, cargo_type: stop.cargo_type, notes: stop.notes || null }).eq('id', d.id);
-      } else {
-        await supabase.from('listing_stops').insert({ listing_id: id, stop_order: i + 1, ...konum, weight_ton: stop.weight_ton || null, pallet_count: stop.pallet_count || null, vehicle_count: stop.vehicle_count || 1, cargo_type: stop.cargo_type || null, notes: stop.notes || null });
-      }
     }
     if (mod === 'onayla') await aliasOgren(duzenleData);
     setDuzenleId(''); setIslem('');
@@ -982,6 +1034,19 @@ export default function Moderator() {
         </div>
       )}
 
+      {/* 8 Ağu 2026 (pratiklik) — klavye kısayolu ipucu. Yalnız kısayolların
+          gerçekten aktif olduğu sekmelerde gösterilir (bkz. yukarıdaki `tusa`
+          handler'ının filtre kontrolü) — keşfedilebilirlik olmadan bir
+          kısayol yok sayılır. */}
+      {filtre !== 'arsiv' && filtre !== 'no_lane' && !duzenleId && siralanmis.length > 0 && (
+        <div style={{ background: '#0d1117', borderBottom: '1px solid #1f2937', padding: '4px 16px', textAlign: 'center' }}>
+          <span style={{ color: '#6b7280', fontSize: '0.68rem' }}>
+            ⌨️ Kısayollar: <b style={{ color: '#9ca3af' }}>A</b> onayla · <b style={{ color: '#9ca3af' }}>R</b> reddet ·{' '}
+            <b style={{ color: '#9ca3af' }}>S</b>/boşluk sonra · <b style={{ color: '#9ca3af' }}>E</b> düzenle (en üstteki karta uygulanır)
+          </span>
+        </div>
+      )}
+
       {/* FİLTRE ÇUBUĞU */}
       <div style={{ background: '#161b22', borderBottom: '1px solid #30363d', position: 'sticky', top: 52, zIndex: 40 }}>
         <div style={{ maxWidth: 1400, margin: '0 auto', padding: '8px 16px' }}>
@@ -1125,12 +1190,12 @@ export default function Moderator() {
                 <div style={{ display: 'flex', gap: 8 }}>
                   <button onClick={() => {
                     setDuzenleData({ listing_type: 'yuk', origin_city: 'İstanbul', origin_district: '', contact_phone: '', price_offer: '', notes: temizNotes(raw.raw_text), vehicle_type: [], body_type: [], raw_post_id: raw.id, raw_text: raw.raw_text, stops: [{ id: null, city: 'İstanbul', district: '', weight_ton: '', pallet_count: '', vehicle_count: 1, cargo_type: '', notes: '' }] });
-                    setDuzenleId('no_lane_' + raw.id);
+                    setNoLaneDuzenleId(raw.id);
                   }} style={{ padding: '6px 14px', borderRadius: 6, border: '1px solid #1e3a5f', background: '#1e3a5f', color: '#60a5fa', fontWeight: 700, fontSize: '0.82rem', cursor: 'pointer' }}>✏️ Manuel Gir</button>
                   <button onClick={async () => { await supabase.from('raw_posts').update({ processing_status: 'rejected' }).eq('id', raw.id); setNoLaneListesi(prev => prev.filter(r => r.id !== raw.id)); }}
                     style={{ padding: '6px 14px', borderRadius: 6, border: 'none', background: '#450a0a', color: '#f87171', fontWeight: 700, fontSize: '0.82rem', cursor: 'pointer' }}>❌ Reddet</button>
                 </div>
-                {duzenleId === 'no_lane_' + raw.id && (
+                {noLaneDuzenleId === raw.id && (
                   <div style={{ marginTop: 12, borderTop: '1px solid #1f2937', paddingTop: 12 }}>
                     {EditForm({ rawForLlm: raw.raw_text })}
                     <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
@@ -1166,11 +1231,11 @@ export default function Moderator() {
                         });
                         if (!sonuc.ok) { alert('İlan oluşturulamadı: ' + sonuc.hata); return; }
                         await aliasOgren(duzenleData);
-                        setDuzenleId('');
+                        setNoLaneDuzenleId('');
                         setNoLaneListesi(prev => prev.filter(r => r.id !== raw.id));
                         getIstatistik();
                       }} style={{ padding: '7px 16px', borderRadius: 6, border: 'none', background: '#22c55e', color: '#000', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer' }}>✅ Kaydet ve Onayla</button>
-                      <button onClick={() => setDuzenleId('')} style={{ padding: '7px 16px', borderRadius: 6, border: '1px solid #374151', background: '#1f2937', color: '#9ca3af', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer' }}>✕ İptal</button>
+                      <button onClick={() => setNoLaneDuzenleId('')} style={{ padding: '7px 16px', borderRadius: 6, border: '1px solid #374151', background: '#1f2937', color: '#9ca3af', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer' }}>✕ İptal</button>
                     </div>
                   </div>
                 )}
