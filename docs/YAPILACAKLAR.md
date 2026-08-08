@@ -1,5 +1,37 @@
 # Yükegel — Yapılacaklar Listesi
 
+> ## ✅ 8 AĞU 2026 — ÖĞRENME MERKEZİ (`/admin/ogrenme-merkezi`) İNCELENDİ
+>
+> `app/api/admin/learn-aliases/route.ts` + `OgrenmeMerkeziClient.tsx` (zaten
+> `requireAdmin` + service role ile korunan, önceki oturumlarda ağır belgelenmiş
+> bir dosya) satır satır okundu, 3 gerçek bug bulundu ve düzeltildi:
+>
+> 1. **GET `?sekme=no_lane`: ikinci sorgunun hatası hiç okunmuyordu.**
+>    `listings` sorgusu (`origin_province_id IS NULL`) patlarsa `noOrigin`
+>    `null` olur, `?? []` bunu sessizce "0 çözülemeyen ilan" gösterirdi —
+>    panelin VAR OLUŞ SEBEBİ olan backlog sayısını yanlış raporlardı. `noOrgErr`
+>    artık kontrol ediliyor.
+> 2. **`discover` action'ında kopyala-yapıştır artığı: aynı `slh_scanned_at`
+>    güncellemesi art arda iki kez atılıyordu** (`rawPosts.map(r=>r.id)` ve
+>    `rawPostIds` — ikisi de aynı liste). Zararsız ama gereksiz bir DB turu;
+>    tekille indirildi.
+> 3. **`topluOnayla()` (Onay Bekleyen sekmesi, toplu onay): N adet öneri için
+>    N ayrı SIRALI `await fetch`, sonuç HİÇ kontrol edilmiyordu.** 50 önerilik
+>    bir toplu onayda saniyelerce sürer VE bir PATCH 409/500 dönse admin
+>    bilemezdi. `reparseBaslat`'taki 4'lü paralel-batch deseniyle 5'li paralel
+>    batch'e çevrildi, başarısız sayısı toplanıp `alert` ile raporlanıyor.
+>
+> **Ayrıca kontrol edildi, SORUN ÇIKMADI:** `raw_posts` ve `aliases`
+> tablolarının `anon`/`authenticated` GRANT'ı table-level ve son derece geniş
+> (SELECT+INSERT+UPDATE, tüm kolonlar — `raw_posts.contact_phone`,
+> `raw_text`, `sender_name` dâhil) — ilk bakışta `listings.internal_audit_logs`
+> ile aynı sınıf sızıntı gibi göründü. Ama ikisinde de RLS **enabled + SIFIR
+> policy** var, ki Postgres'te bu "hiçbir role hiçbir satır" demek —
+> `SET LOCAL ROLE anon` ile hem SELECT (0 satır) hem INSERT (`42501`) canlıda
+> doğrulandı. GRANT geniş ama RLS'in kendisi zaten kilitli; ek işlem GEREKMEDİ.
+>
+> `tsc --noEmit` + `next build` temiz.
+>
 > ## 🚨 8 AĞU 2026 — İKİNCİ PII/İÇ-VERİ SIZINTISI: `listings.internal_audit_logs`
 >
 > Moderatör panelindeki "bir sonraki iyileştirme ne olabilir" taramasında,

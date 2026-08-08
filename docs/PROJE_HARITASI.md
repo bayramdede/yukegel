@@ -1,6 +1,16 @@
 # Yükegel — Proje Haritası
 > **Kullanım:** Her sohbet başında sadece bu dosyayı oku. Kaynak dosyaları sadece o dosyada değişiklik yapacaksan oku.  
 >
+> ✅ **8 AĞU 2026 — Öğrenme Merkezi (`/admin/ogrenme-merkezi`) incelendi, 3 bug
+> düzeltildi:** GET no_lane'de ikinci sorgunun hatası okunmuyordu (backlog
+> sayısını yanlış raporlardı), `discover`'da aynı DB yazması kopyala-yapıştırla
+> iki kez atılıyordu, toplu-onayla sıralı N ayrı `fetch` + sonuçsuz hataydı →
+> 5'li paralel batch + başarısız raporu. Ayrıca `raw_posts`/`aliases`'ın çok
+> geniş `anon`/`authenticated` GRANT'ı kontrol edildi — RLS enabled+sıfır
+> policy olduğu için (Postgres'te "kimseye hiçbir satır" demek) canlıda
+> doğrulanarak SORUN OLMADIĞI kanıtlandı, ek işlem gerekmedi. Ayrıntı:
+> `docs/YAPILACAKLAR.md` başı.
+>
 > 🔴 **8 AĞU 2026 — İkinci PII/iç-veri sızıntısı: `listings.internal_audit_logs`.**
 > `public.users` olayıyla AYNI hata sınıfı (satır RLS `using(true)` + dar
 > olmayan kolon GRANT'ı) `listings`te de vardı: anti-spam motorunun

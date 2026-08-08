@@ -703,13 +703,25 @@ function OnaySekme() {
   const topluOnayla = async () => {
     if (!confirm(`${pending.length} alias onerisi toplu onaylansin mi?`)) return;
     setIslem('bulk');
-    for (const p of pending) {
-      await fetch('/api/admin/learn-aliases', {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: p.id, action: 'approve' }),
-      });
+    // 8 Ağu 2026 — eskiden `for...of` içinde TEK TEK sıralı `await fetch` (N ayrı
+    // round-trip, 50 önerilik bir sekmede saniyeler sürer) ve sonuç HİÇ
+    // kontrol edilmiyordu — bir PATCH 409/500 dönse bile döngü sessizce devam
+    // ederdi, admin hangisinin gerçekten onaylandığını bilemezdi.
+    // `reparseBaslat`'taki 4'lü paralel-batch deseniyle aynı yaklaşım.
+    let basarisiz = 0;
+    for (let i = 0; i < pending.length; i += 5) {
+      const parca = pending.slice(i, i + 5);
+      const sonuclar = await Promise.all(parca.map(p =>
+        fetch('/api/admin/learn-aliases', {
+          method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: p.id, action: 'approve' }),
+        }).then(r => r.ok).catch(() => false)
+      ));
+      basarisiz += sonuclar.filter(ok => !ok).length;
     }
-    setIslem(null); yukle();
+    setIslem(null);
+    if (basarisiz > 0) alert(`${basarisiz} öneri onaylanamadı (çakışma/hata) — liste yenilenince onlar hâlâ bekleyenlerde görünecek.`);
+    yukle();
   };
 
   const eskileriTemizle = async () => {

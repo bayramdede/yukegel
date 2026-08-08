@@ -113,6 +113,11 @@ export async function GET(req: NextRequest) {
       .limit(Math.floor(limit * 0.3));
 
     if (rawErr) return NextResponse.json({ error: rawErr.message }, { status: 500 });
+    // 8 Ağu 2026 — `noOrgErr` yakalanıyordu ama HİÇ okunmuyordu: ikinci sorgu
+    // patlarsa `noOrigin` `null` olur, `?? []` bunu sessizce "0 çözülemeyen ilan"
+    // gibi gösterirdi — panelin tek var oluş sebebi olan backlog sayısını yanlış
+    // raporlar. Diğer üç sekme zaten kendi hatasını kontrol ediyordu, bu atlanmıştı.
+    if (noOrgErr) return NextResponse.json({ error: noOrgErr.message }, { status: 500 });
 
     return NextResponse.json({
       raw_posts: rawPosts ?? [],
@@ -436,10 +441,10 @@ KURALLAR:
     const kayitlar = adaylar.filter((a: any) => !onayliKatlanmis.has(aliasKey(a.alias)));
 
     if (kayitlar.length === 0) {
-      await svc
-        .from('raw_posts')
-        .update({ slh_scanned_at: new Date().toISOString() })
-        .in('id', rawPosts.map((r: any) => r.id));
+      // 8 Ağu 2026 — burada AYNI güncelleme iki kez atılıyordu (kopyala-yapıştır
+      // artığı): ilki `rawPosts.map(r=>r.id)`, ikincisi `rawPostIds` — ikisi de
+      // :370'te tanımlı AYNI id listesi. Zararsız (idempotent) ama gereksiz bir
+      // DB turuydu; tek çağrıya indirildi.
       await svc.from('raw_posts').update({ slh_scanned_at: now }).in('id', rawPostIds);
       return NextResponse.json({
         success: true,
