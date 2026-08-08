@@ -1,5 +1,67 @@
 # Yükegel — Yapılacaklar Listesi
 
+> ## 🔴 8 AĞU 2026 — OLAY: 7 AĞU GÜVENLİK DÜZELTMESİ LOGIN'İ KIRDI, AYNI GÜN DÜZELTİLDİ
+>
+> **Bildirim (Bayram):** "Login olamıyorum. Profil tamamlamaya yönlendiriyor.
+> Orada da telefon eksik sıfır ile başlamalı diyor."
+>
+> **Kök sebep — kendi hatam.** 7 Ağu'da `public.users`teki kritik açığı (herkes
+> TCKN/VKN/email/telefon okuyabiliyordu, herkes kendini admin yapabiliyordu)
+> kapatırken `REVOKE ALL` + dar `GRANT` uyguladım. Taramam YALNIZ İKİ bilinen
+> tüketiciyi (`RozetBilgi`, `u/[username]`) kapsadı — ama `role`/`merged_into`/
+> `is_active`/`phone`/`email`/`tckn`/`vkn`/`company_name` kolonlarının PROJE
+> GENELİNDE (giriş akışı, moderatör paneli, `getCurrentUser()`) `authenticated`
+> client'ıyla doğrudan okunduğu **20'den fazla yer** taramaya hiç girmedi.
+> **Ders (bu projenin kendi tekrarlanan dersi, bir kez daha): "bulduğum
+> ihtiyaçlar" ile "var olan ihtiyaçlar" aynı şey değildir — kolon kısıtlaması
+> gibi tablo-geneli bir değişiklik, o tabloya dokunan HERKESİ etkiler.**
+>
+> **Kırılanlar (kod okunarak bulundu, hepsi doğrulandı):**
+> 1. `proxy.ts` — her navigasyonda çalışan "aynı telefon/email'le canlı hesap
+>    var mı" araması `phone`/`email` filtre kolonlarını okuyamayınca sessizce
+>    patlıyordu → HER kullanıcı (canlı hesabı olsa bile) boş profil-tamamla'ya
+>    düşüyordu. **Bu, "login olamıyorum" şikayetinin doğrudan sebebiydi.**
+> 2. `app/profil-tamamla/page.tsx` — kendi profilini ön-dolduran sorgu
+>    `phone`/`tckn`/`vkn`/`company_name` okuyamayınca TAMAMEN boş dönüyordu
+>    (Postgres izin hatasında kısmi sonuç YOK) → form boş açılıyor, telefonu
+>    zaten kayıtlı kullanıcı bile "telefon eksik" hatası alıyordu. **Bu,
+>    ikinci şikayetin doğrudan sebebiydi.**
+> 3. `app/auth/callback/route.ts` (Google girişi) — aynı sınıf hata.
+> 4. `lib/auth.ts::getCurrentUser()` — `email` okuması kırıktı; bu fonksiyon
+>    `requireAdmin`/`requireStaff`in temeli, yani ETKİ ALANI GENİŞTİ.
+> 5. `app/moderator/page.tsx` — omnisearch + "ilan sahibi" paneli `phone`/
+>    `email` okuyamıyordu (moderatörler de etkilendi, ayrı bir şikayet gelmeden
+>    aynı taramada bulunup düzeltildi).
+> 6. `app/_components/HomeClient.tsx::profilCek()` — `email` okuması kırıktı
+>    (navbar'da sessizce bozuk davranış, kritik değil ama aynı kökten).
+>
+> **Düzeltme — iki farklı yöntem, duruma göre:**
+> - **Düşük hassasiyetli 3 kolon** (`role`, `merged_into`, `is_active` —
+>   TCKN/VKN/email/telefon kadar hassas değil, rol YÜKSELTME riski taşımıyor
+>   çünkü UPDATE tarafı hâlâ kapalı) → tekrar `GRANT SELECT` ile herkese açıldı.
+> - **Gerçekten hassas kolonlar** (`phone`, `email`, `tckn`, `vkn`,
+>   `company_name`) → GERİ AÇILMADI (asıl açığı yeniden açardı). Bunlara
+>   ihtiyaç duyan HER yer servis rolüne taşındı: `proxy.ts` ve `auth/callback`
+>   (zaten sunucu tarafı, doğrudan service role), `getCurrentUser()` (aynı),
+>   `giris/page.tsx` (yeni `POST /api/auth/hesap-eslesme` — arama kriteri
+>   İSTEMCİDEN değil çağıranın doğrulanmış oturumundan), `profil-tamamla/
+>   page.tsx` (yeni `profilOnDoldur()` server action), `moderator/page.tsx`
+>   (yeni `POST /api/moderator/kullanici-ara` — CLAUDE.md'nin "RLS bypass →
+>   sadece admin/mod doğrulandıktan sonra `getServiceSupabase()`" kuralı
+>   moderatör paneline BU OLAYDA ilk kez tam uygulandı).
+>
+> **Doğrulama (aynı gün, gerçekten çalıştırıldı):** `SET LOCAL ROLE
+> authenticated` ile kendi-profil sorgusu artık hatasız dönüyor ✅; `SET LOCAL
+> ROLE anon` ile `email`/`tckn`/`phone` okuması HÂLÂ `42501 permission denied`
+> ✅ (7 Ağu'nun kapattığı açık bozulmadı). `tsc --noEmit` temiz, gerçek `next
+> build` temiz. Kayıt: `docs/20260808_giris_regresyonu.sql`.
+>
+> 📌 **Bilerek yapılmayan bir şey:** `app/moderator/page.tsx::duzenleAc()`teki
+> "ilan sahibi bilgisi" çağrısı `ilan.user_id`ye bakıyor ama `getIlanlar()`'ın
+> seçtiği kolonlar arasında `user_id` YOK — yani bu panel muhtemelen BUGÜNDEN
+> ÖNCE de hiç çalışmıyordu (bugünkü olaydan bağımsız, önceden var olan bir
+> eksiklik). Bu acil düzeltmenin kapsamı dışında bırakıldı, ayrı görev.
+
 > ## ✅ 8 AĞU 2026 — MODERATÖR PANELİ: 13 AKSİYON İYİMSER YEREL GÜNCELLEMEYE GEÇTİ
 >
 > **İstek:** "Moderatörü daha pratik yap. Bu şekilde olmak zorunda değil."

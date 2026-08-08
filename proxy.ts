@@ -1,4 +1,5 @@
 import { createServerClient } from '@supabase/ssr'
+import { createClient } from '@supabase/supabase-js'
 import { NextResponse, type NextRequest } from 'next/server'
 import { logPhoneAccess } from './lib/logger'
 import { REDIRECT_COOKIE, REDIRECT_COOKIE_MAX_AGE, guvenliRedirect } from './lib/redirect'
@@ -160,7 +161,24 @@ export async function proxy(request: NextRequest) {
         for (const t of new Set([p, `+${p}`, yerel, kisa])) eslesmeKosullari.push(`phone.eq.${t}`);
       }
       if (eslesmeKosullari.length > 0) {
-        const { data: canliHesaplar } = await supabase
+        // 🚨 8 Ağu 2026 — SERVİS ROLÜ ZORUNLU. `phone`/`email` 7 Ağu'daki güvenlik
+        // düzeltmesinden sonra `authenticated`'in SELECT yetkisinde değil — bu
+        // sütunlar bir `.or()` FİLTRESİNDE geçse bile (hiç SELECT listesinde
+        // olmasalar da) Postgres değerlendirme için okuma yetkisi ister ve
+        // `authenticated` client'ıyla `42501 permission denied` ile patlardı.
+        // Sonuç canlıda GERÇEKTEN yaşandı: bu sorgu sessizce hata verip
+        // `canliHesaplar` boş kaldığı için HER kullanıcı (eşleşen canlı hesabı
+        // olsa bile) "gerçekten yeni profil" dalına düşüp profil-tamamla'ya
+        // yönlendiriliyordu — giriş tamamen kilitlendi.
+        // Servis rolü burada güvenli: yalnız BU oturumun kendi email/telefonuyla
+        // eşleşen (`user.email`/`user.phone` zaten Supabase Auth'un doğruladığı
+        // değerler) başka bir hesabı arıyor, sonucu istemciye asla göstermiyor —
+        // yalnız yönlendirme kararı için `user_type` boolean'a indirgeniyor.
+        const svc = createClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.SUPABASE_SERVICE_ROLE_KEY!
+        );
+        const { data: canliHesaplar } = await svc
           .from('users')
           .select('user_type')
           .or(eslesmeKosullari.join(','))

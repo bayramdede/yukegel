@@ -82,7 +82,13 @@ export async function getCurrentUser(): Promise<{ id: string; email: string | nu
   }
   if (!user) return null;
 
-  const { data: profil } = await supabase
+  // 🚨 8 Ağu 2026 — servis rolü zorunlu: `email` 7 Ağu güvenlik düzeltmesinden
+  // sonra `authenticated`'in SELECT yetkisinde değil (bkz. docs/20260807_
+  // guvenlik_kayit_giris.sql). Bu fonksiyon yaygın kullanılan bir sunucu-yalnız
+  // yardımcı (`requireAdmin`/`requireStaff` bunun üzerine kurulu); servis rolü
+  // burada RLS bypass değil, ZATEN doğrulanmış tek bir kullanıcının kendi
+  // satırını okuyor.
+  const { data: profil } = await getServiceSupabase()
     .from('users')
     .select('role, email')
     .eq('id', user.id)

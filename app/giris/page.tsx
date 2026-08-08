@@ -418,33 +418,22 @@ function GirisIci() {
       return;
     }
 
-    // 4. DB'de 05xx / 5xx formatında ya da aynı e-postayla başka profil var mı? (ilk kez merge)
-    // Telefon DB'de farklı formatlarda saklanmış olabilir:
-    //   +905xxxxxxxxx (E.164 — Supabase auth & WhatsApp normalize),
-    //   905xxxxxxxxx, 05xxxxxxxxx (profil-tamamla 0'lı saklıyor), 5xxxxxxxxx
-    // Sadece 0'lı ve kısa formatı aramak, kayıt E.164 ile durduğunda eşleşmeyi kaçırıyordu →
-    // mevcut hesap bulunamıyor, merge tetiklenmiyor, kullanıcı boş profil-tamamla'ya düşüyordu.
-    const telefonTemiz = fmt.startsWith('+90') ? '0' + fmt.slice(3) : fmt;   // 05xx...
-    const telefonKisa  = fmt.startsWith('+90') ? fmt.slice(3) : fmt;          // 5xx...
-    const telefon90    = fmt.replace(/^\+/, '');                              // 905xx...
-    const eposta = data.user?.email;
-
-    const telFormatlari = [...new Set([fmt, telefon90, telefonTemiz, telefonKisa])];
-    const esleseceKosullar = telFormatlari.map(t => `phone.eq.${t}`);
-    if (eposta) esleseceKosullar.push(`email.eq.${eposta}`);
-
-    // Bu telefon ya da e-posta başka bir users kaydında var mı?
-    // is_active yerine merged_into kullanıyoruz: eski hesaplarda is_active hiç set edilmemiş
-    // olabilir (NULL) — asıl önemli olan bu satırın daha önce başka bir hesaba merge edilmemiş olması.
-    // (Not: eposta kontrolü eklenmeden önce, telefon eşleşmesi olmayan ama aynı e-postayla zaten
-    // kayıtlı hesaplar burada yakalanamıyordu — profil-tamamla'ya düşüp email unique constraint'e çarpıyorlardı.)
-    const { data: eskiProfil } = await supabase
-      .from('users')
-      .select('id, email, display_name')
-      .or(esleseceKosullar.join(','))
-      .is('merged_into', null)
-      .neq('id', mevcutUserId)
-      .maybeSingle();
+    // 4. Aynı telefon/e-postayla başka (canlı) bir profil var mı? (ilk kez merge)
+    //
+    // 🚨 8 Ağu 2026 — bu arama artık İSTEMCİDEN DOĞRUDAN DEĞİL, sunucudaki
+    // `/api/auth/hesap-eslesme` üzerinden yapılıyor. Eskiden `supabase.from
+    // ('users').or('phone.eq...,email.eq...')` doğrudan tarayıcıdan atılıyordu;
+    // 7 Ağu güvenlik düzeltmesi `phone`/`email` kolonlarının `authenticated`
+    // SELECT yetkisini kaldırdığı için (bkz. `docs/20260807_guvenlik_kayit_
+    // giris.sql`) bu sorgu `42501` ile patlıyordu — filtrede geçen bir kolon
+    // SELECT listesinde olmasa bile okuma yetkisi gerektirir. Sonuç canlıda
+    // GERÇEKTEN yaşandı: telefon OTP ile giren HERKES mevcut hesabıyla
+    // eşleştirilemeyip boş profil-tamamla ekranına düşüyordu (giriş kilitlendi).
+    // Yeni route servis rolüyle arıyor ve arama kriterini istemciden almıyor —
+    // çağıranın KENDİ doğrulanmış oturumundan (`auth.getUser()`) okuyor.
+    const eslesmeSonuc = await fetch('/api/auth/hesap-eslesme', { method: 'POST' })
+      .then(r => r.json()).catch(() => ({ eslesme: null }));
+    const eskiProfil: { id: string; email: string | null; display_name: string | null } | null = eslesmeSonuc?.eslesme ?? null;
 
     if (eskiProfil) {
       const res = await fetch('/api/auth/merge', {

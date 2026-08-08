@@ -24,6 +24,46 @@ import { tcknGecerli, vknGecerli } from '../../lib/kimlik'
  * satırını hedeflemek mümkün değil.
  */
 
+// 🚨 8 Ağu 2026 — YENİ. `app/profil-tamamla/page.tsx` eskiden formu ön doldurmak
+// için istemciden doğrudan `supabase.from('users').select('...phone, tckn, vkn,
+// company_name...')` çağırıyordu. 7 Ağu güvenlik düzeltmesi bu kolonların
+// `authenticated` SELECT yetkisini kaldırdığı için (bkz. docs/20260807_guvenlik_
+// kayit_giris.sql) sorgu TAMAMEN patlıyordu — form boş açılıyor, kullanıcı
+// (telefonu DB'de kayıtlı olsa bile) "telefon eksik" hatası alıyordu. Bu,
+// `profilKaydet`in zaten kurduğu güvenli örüntü: sunucu tarafında, oturumdan
+// alınan `user.id` ile SADECE ÇAĞIRANIN KENDİ satırı okunuyor.
+export type ProfilOnDoldurma = {
+  userType: string | null
+  displayName: string | null
+  telefon: string | null
+  telefonDogrulandi: boolean
+  sirketAdi: string | null
+  tckn: string | null
+  vkn: string | null
+}
+
+export async function profilOnDoldur(): Promise<ProfilOnDoldurma | null> {
+  const supabase = await getServerSupabase()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return null
+
+  const { data: profil } = await getServiceSupabase()
+    .from('users')
+    .select('user_type, display_name, phone, phone_verified, company_name, tckn, vkn')
+    .eq('id', user.id)
+    .maybeSingle()
+
+  return {
+    userType: profil?.user_type ?? null,
+    displayName: profil?.display_name ?? null,
+    telefon: profil?.phone ?? null,
+    telefonDogrulandi: profil?.phone_verified === true,
+    sirketAdi: profil?.company_name ?? null,
+    tckn: profil?.tckn ?? null,
+    vkn: profil?.vkn ?? null,
+  }
+}
+
 export type ProfilGirdi = {
   displayName: string
   userType: string

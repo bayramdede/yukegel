@@ -1,4 +1,5 @@
 import { createServerClient } from '@supabase/ssr'
+import { createClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { structuredLog } from '../../../lib/logger'
@@ -39,8 +40,19 @@ export async function GET(request: Request) {
 
     const { data: { user } } = await supabase.auth.getUser()
     if (user) {
+      // 🚨 8 Ağu 2026 — SERVİS ROLÜ ZORUNLU. `email`/`phone` 7 Ağu güvenlik
+      // düzeltmesinden sonra `authenticated`'in SELECT yetkisinde değil (bkz.
+      // `docs/20260807_guvenlik_kayit_giris.sql`). Bu route sunucuda çalışıyor,
+      // oturum zaten `exchangeCodeForSession`ile doğrulanmış — servis rolü
+      // burada RLS bypass DEĞİL, doğrulanmış tek bir kullanıcının kendi kaydını
+      // ve (aşağıda) aynı e-postayla eşleşen başka bir hesabı arıyor, sonucu
+      // istemciye asla ham göstermiyor.
+      const svc = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
+      )
       // maybeSingle() — yeni kayıtta users tablosunda henüz satır olmayabilir
-      const { data: profil } = await supabase
+      const { data: profil } = await svc
         .from('users')
         .select('user_type, role, email')
         .eq('id', user.id)
@@ -64,7 +76,7 @@ export async function GET(request: Request) {
       // constraint'ine çarpıyordu (users_email_key).
       // is_active yerine merged_into kullanıyoruz: eski hesaplarda is_active hiç set edilmemiş olabilir (NULL).
       if (user.email) {
-        const { data: eskiProfil } = await supabase
+        const { data: eskiProfil } = await svc
           .from('users')
           .select('id, display_name, phone')
           .eq('email', user.email)

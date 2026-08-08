@@ -1,6 +1,21 @@
 # Yükegel — Proje Haritası
 > **Kullanım:** Her sohbet başında sadece bu dosyayı oku. Kaynak dosyaları sadece o dosyada değişiklik yapacaksan oku.  
 >
+> 🔴 **8 AĞU 2026 — OLAY (kendi hatam, aynı gün düzeltildi): 7 Ağu güvenlik
+> düzeltmesi login'i kırdı.** `public.users`teki `REVOKE ALL`+dar `GRANT`
+> yalnız 2 bilinen tüketiciyi (rozet, herkese açık profil) taradı; `role`/
+> `merged_into`/`is_active`/`phone`/`email`/`tckn`/`vkn` kolonlarının proje
+> genelinde (proxy.ts'in "canlı hesap var mı" araması, profil-tamamla'nın
+> kendi-profil ön-doldurması, `getCurrentUser()`, moderatör omnisearch)
+> `authenticated` client'ıyla okunduğu 20+ yer atlandı — login TAMAMEN
+> kilitlendi. Düşük hassasiyetli 3 kolon (`role`/`merged_into`/`is_active`)
+> tekrar herkese açıldı; gerçekten hassas olanlar (`phone`/`email`/`tckn`/
+> `vkn`) GERİ AÇILMADI, ihtiyaç duyan her yer servis rolüne taşındı (yeni:
+> `/api/auth/hesap-eslesme`, `profilOnDoldur()`, `/api/moderator/kullanici-
+> ara`). Doğrulama: `authenticated` kendi-profil sorgusu artık çalışıyor,
+> `anon` hâlâ PII okuyamıyor (asıl açık bozulmadı). `tsc`/`next build` temiz.
+> Kayıt: `docs/20260808_giris_regresyonu.sql`. Ayrıntı: `docs/YAPILACAKLAR.md` başı.
+>
 > ✅ **8 AĞU 2026 — Moderatör paneli: 13 aksiyon iyimser yerel güncellemeye geçti.**
 > Onayla/reddet/arşivle/shadow-ban/düzeltme-iste — hepsi her tıktan sonra TAM
 > `getIlanlar()` (200 satır) + `getIstatistik()` çekiyordu; bu, "sonrakine

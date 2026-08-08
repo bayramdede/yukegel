@@ -533,9 +533,15 @@ export default function HomeClient({ initialIlanlar = [], totalCount = 0 }: { in
   }
 
   async function profilCek(userId: string) {
+    // 🚨 8 Ağu 2026 — `email` select'ten ÇIKARILDI: 7 Ağu güvenlik düzeltmesinden
+    // sonra `authenticated`'in bu kolonda SELECT yetkisi yok (bkz. docs/20260807_
+    // guvenlik_kayit_giris.sql), sorgu tek bir kolon yüzünden TAMAMEN patlıyordu
+    // (`display_name`/`user_type` da boş kalıyordu — Postgres izin hatasında
+    // kısmi sonuç döndürmez). Zaten gereksizdi: çağıran taraf `session.user.email`i
+    // (Supabase Auth oturumu, DB'ye hiç gitmeden) fallback olarak kullanıyor.
     const { data: profil } = await supabase
       .from('users')
-      .select('display_name, email, user_type')
+      .select('display_name, user_type')
       .eq('id', userId)
       .maybeSingle();
     return profil;
@@ -583,7 +589,8 @@ export default function HomeClient({ initialIlanlar = [], totalCount = 0 }: { in
       try {
         const profil = await profilCek(session.user.id);
         if (cancelled) return;
-        if (profil) setKullanici(profil);
+        // `email` artık `profil`de yok (yukarıdaki nota bak) — oturumdaki değer korunur.
+        if (profil) setKullanici({ ...profil, email: session.user.email ?? null });
       } catch { /* profil okunamadı — oturum yine de geçerli */ }
       // `authHazir` hero'ları açar; user_type belli olmadan açarsak nakliyeciye
       // bir an müşteri hero'su görünür. Bu yüzden profil çözüldükten SONRA.

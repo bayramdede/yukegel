@@ -6,7 +6,7 @@ import { REDIRECT_COOKIE, guvenliRedirect, girisAdresi } from '../../lib/redirec
 // SPRINT_01 K2b — aynı doğrulayıcılar sunucuda da çalışıyor (`actions.ts`).
 // Buradaki kontrol yalnız UX; güvenlik sınırı sunucudaki.
 import { tcknGecerli, vknGecerli } from '../../lib/kimlik';
-import { profilKaydet } from './actions';
+import { profilKaydet, profilOnDoldur } from './actions';
 
 const supabase = createClient();
 
@@ -110,14 +110,18 @@ function ProfilTamamlaIci() {
       if (!user) { router.push(girisAdresi(guvenliRedirect(redirect) ?? '/profil-tamamla')); return; }
       setMevcutId(user.id);
 
-      const { data: profil } = await supabase
-        .from('users')
-        .select('user_type, display_name, phone, phone_verified, company_name, tckn, vkn')
-        .eq('id', user.id)
-        .maybeSingle();
+      // 🚨 8 Ağu 2026 — istemciden doğrudan `users` sorgusu YERİNE sunucu action'ı.
+      // `phone`/`tckn`/`vkn`/`company_name` 7 Ağu güvenlik düzeltmesinden sonra
+      // `authenticated`'in SELECT yetkisinde değil (bkz. docs/20260807_guvenlik_
+      // kayit_giris.sql); eski sorgu TAMAMEN patlıyordu (Postgres izin hatasında
+      // kısmi sonuç dönmez) — form boş açılıyor, telefonu kayıtlı kullanıcı bile
+      // "telefon eksik" hatası alıyordu. `profilOnDoldur()` `profilKaydet()` ile
+      // aynı güvenli örüntüyü kullanıyor: sunucuda, oturumdan alınan id ile
+      // SADECE çağıranın kendi satırı okunuyor.
+      const profil = await profilOnDoldur();
 
       // Profil zaten tamamsa formu hiç göstermeden hedefe (son bulunulan yer veya panel) gönder
-      if (profil?.user_type) {
+      if (profil?.userType) {
         // 🚨 29 Tem 2026 — burada `redirect` HAM haliyle kullanılıyordu:
         // `/profil-tamamla?redirect=https://kotu.site` açık yönlendirme demekti.
         // Aynı dosyanın 314. satırı zaten `guvenliRedirect`ten geçiriyordu; bu dal
@@ -127,17 +131,17 @@ function ProfilTamamlaIci() {
       }
 
       // Eksik alan varsa — bilinen bilgileri prefill et, sadece eksik olanı doldursun
-      const fullName = profil?.display_name || user.user_metadata?.full_name || '';
+      const fullName = profil?.displayName || user.user_metadata?.full_name || '';
       if (fullName) setDisplayName(fullName);
 
-      const bilinenTelefon = user.phone || (profil?.phone_verified ? profil.phone : '');
+      const bilinenTelefon = user.phone || (profil?.telefonDogrulandi ? profil.telefon : '');
       if (bilinenTelefon) {
         const yerel = bilinenTelefon.startsWith('+90') ? '0' + bilinenTelefon.slice(3) : bilinenTelefon;
         setTelefon(yerel);
         setTelefonKilitli(true);
       }
 
-      if (profil?.company_name) setSirketAdi(profil.company_name);
+      if (profil?.sirketAdi) setSirketAdi(profil.sirketAdi);
       if (profil?.tckn) setTckn(profil.tckn);
       if (profil?.vkn) setVkn(profil.vkn);
     }

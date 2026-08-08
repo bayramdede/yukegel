@@ -207,15 +207,12 @@ export default function Moderator() {
     if (!tip) { setKullaniciBulguList([]); return; }
     setKullaniciAramaYukleniyor(true);
     const timer = setTimeout(async () => {
-      let query = supabase.from('users').select('id, display_name, phone, email, role, is_active, user_type, created_at');
-      if (tip === 'phone') {
-        const digits = aramaMetni.trim().replace(/\D/g, '').slice(-10);
-        query = (query as any).ilike('phone', `%${digits}`);
-      } else {
-        query = (query as any).ilike('email', `%${aramaMetni.trim()}%`);
-      }
-      const { data } = await (query as any).limit(5);
-      setKullaniciBulguList(data || []);
+      const res = await fetch('/api/moderator/kullanici-ara', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ arama: aramaMetni.trim(), tip }),
+      }).then(r => r.json()).catch(() => ({ kullanicilar: [] }));
+      setKullaniciBulguList(res.kullanicilar || []);
       setKullaniciAramaYukleniyor(false);
     }, 500);
     return () => clearTimeout(timer);
@@ -605,9 +602,11 @@ export default function Moderator() {
     // Kullanıcı bilgisini ayrı çek
     setDuzenleKullanici(null);
     if (ilan.user_id) {
-      supabase.from('users').select('id, display_name, phone, email, is_active, role, user_type')
-        .eq('id', ilan.user_id).single()
-        .then(({ data }: { data: any }) => setDuzenleKullanici(data));
+      fetch('/api/moderator/kullanici-ara', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: ilan.user_id }),
+      }).then(r => r.json()).then(res => setDuzenleKullanici(res.kullanici ?? null)).catch(() => {});
     }
   }
 
