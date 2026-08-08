@@ -35,7 +35,8 @@ import { structuredLog } from '../../../../lib/logger'
  *    yapılmaz, kullanıcı "linke tıkladım ama yine giremiyorum" der.
  *    `request.url` KULLANILMIYOR: Vercel'de proxy arkasındaki iç adres olabilir.
  */
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://yukegel.com'
+// 8 Ağu 2026 — tek kaynak. E-postadaki doğrulama linki de yönlenmesin.
+import { SITE_URL } from '../../../../lib/site'
 
 const ADRES_BEKLEME_MS = 60_000
 const SAAT_MS = 60 * 60 * 1000

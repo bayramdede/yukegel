@@ -13,7 +13,8 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://yukegel.com';
+// 8 Ağu 2026 — tek kaynak; canonical/og:url artık yönlenmeyen host (bkz. lib/site.ts).
+import { SITE_URL } from '../../../lib/site';
 
 // ── Ortak veri çekici — `generateMetadata` VE sayfa bileşeni paylaşır.
 //
@@ -77,14 +78,29 @@ export async function generateMetadata(
   const agirlik = durakToplami(stops, ['weight_ton']);
   const kargoTip = stops.find((s: any) => s.cargo_type)?.cargo_type;
 
+  // 8 Ağu 2026 — açıklama yeniden yazıldı. Eskisi virgülle dizilmiş bir liste
+  // üretiyordu ("Tekirdağ (Çorlu), → İzmir, TIR aranıyor.") — okun önündeki virgül
+  // bozuk duruyordu ve DURAK SAYISI hiç yoktu (çok duraklı ilanın en ayırt edici
+  // bilgisi). Artık cümle kuruyor.
+  //
+  // ⚠️ TÜRKÇE HÂL EKİ (İzmir'DEN İstanbul'A) BİLEREK ÜRETİLMİYOR: özel adlarda
+  //    ek seçimi ünlü uyumu + son ünsüzün sertliği + `Kırklareli`/`Çanakkale`
+  //    gibi düzensiz biçimlerle birlikte güvenilir biçimde türetilemiyor.
+  //    Yanlış ek ("İzmir'a") indekslenmiş metinde okla yazmaktan DAHA kötü
+  //    görünür. "X → Y rotasında" hem eksiz hem doğru hem de arama sorgusuyla
+  //    ("İzmir'den İstanbul'a") aynı iki il adını taşıyor.
+  const rota = `${kalkis}${ilan.origin_district ? ` (${ilan.origin_district})` : ''}` +
+    (varis ? ` → ${varis}` : '');
+  const yuk = [agirlik ? `${agirlik} ton` : null, kargoTip]
+    .filter(Boolean).join(' ');
   const description = [
-    `${kalkis}${ilan.origin_district ? ` (${ilan.origin_district})` : ''}`,
-    varis ? `→ ${varis}` : null,
-    kargoTip ? `${kargoTip} yükü` : null,
-    agirlik ? `${agirlik} ton` : null,
-    aracTip ? `${aracTip} aranıyor` : null,
-    ilan.audit_score ? `Kalite Skoru: ${ilan.audit_score}/100` : null,
-  ].filter(Boolean).join(', ') + '. Yükegel\'de nakliye ilanları.';
+    isYuk
+      ? `${rota} rotasında ${yuk ? `${yuk} yükü` : 'yük'} için ${aracTip || 'araç'} aranıyor.`
+      : `${rota} rotasında ${aracTip || 'araç'} müsait.`,
+    stops.length > 1 ? `${stops.length} duraklı rota.` : null,
+    ilan.audit_score ? `Kalite Skoru: ${ilan.audit_score}/100.` : null,
+    'Yükegel\'de nakliye ilanları.',
+  ].filter(Boolean).join(' ');
 
   const url = `${SITE_URL}/ilan/${id}`;
 
@@ -98,6 +114,19 @@ export async function generateMetadata(
       siteName: 'Yükegel',
       locale: 'tr_TR',
       type: 'website',
+      // ⚠️ `images` BURADA YOK — `opengraph-image.tsx` dosya kuralı onu kendisi
+      //    ekliyor (og:image + width/height/alt). Elle yazmak ikinci, ayrışabilir
+      //    bir kaynak olurdu.
+    },
+    // 🚨 8 Ağu 2026 — `twitter` BLOĞU EKLENDİ. Yoksa kök layout'un site geneli
+    //    başlığı/açıklaması miras alınıyordu: canlıda ölçüldü, ilan sayfasında
+    //    twitter:title = "Yükegel - Türkiye'nin Nakliye İlan Platformu" çıkıyordu.
+    //    Yani X/Twitter kartı ROTAYI DEĞİL genel sloganı gösteriyordu — og
+    //    tarafı doğruyken twitter tarafı sessizce yanlıştı.
+    twitter: {
+      card: 'summary_large_image',
+      title: baslik,
+      description,
     },
     alternates: { canonical: url },
     robots: ilan.status === 'passive'
@@ -221,13 +250,45 @@ export default async function IlanDetay({ params }: { params: Promise<{ id: stri
     ],
     datePosted: ilan.created_at,
     ...(ilan.available_date && { availabilityStarts: ilan.available_date }),
+
+    // 🚨 8 Ağu 2026 — FİYAT `offers` OLARAK EKLENDİ. Eskiden JSON-LD'de fiyat
+    //    HİÇ YOKTU (ne `offers` ne `PropertyValue`) — yani botun en çok işine
+    //    yarayacak iki alandan biri dışarıda kalıyordu.
+    //    `PropertyValue` yerine `offers` seçildi: schema.org'un fiyat için
+    //    KANONİK yolu bu; Google zengin sonuçlarda `Offer.price`i tanıyor,
+    //    isimsiz bir PropertyValue'yu tanımıyor.
+    //    ⚠️ `priceCurrency` ZORUNLU: para birimsiz `price` Rich Results
+    //    testinde uyarı üretir ve "1400" hangi para birimi belirsiz kalır.
+    ...(ilan.price_offer
+      ? {
+          offers: {
+            '@type': 'Offer',
+            price: Number(ilan.price_offer),
+            priceCurrency: 'TRY',
+            availability: ilan.status === 'active'
+              ? 'https://schema.org/InStock'
+              : 'https://schema.org/OutOfStock',
+          },
+        }
+      : {}),
+
     additionalProperty: [
+      // Rota uçlarını AÇIKÇA da veriyoruz: `areaServed` sıralı bir yapı gibi
+      // durmuyor (bir dizi şehir), oysa bot için "nereden/nereye" ayrımı kritik.
+      { '@type': 'PropertyValue', name: 'from_city', value: kalkis },
+      { '@type': 'PropertyValue', name: 'to_city', value: ilAdi(stops.at(-1)?.province_id) ?? '' },
+      // TONAJ — spesifikasyonun istediği ikinci alan; bu da eksikti.
+      // ⚠️ TOPLAM (`durakToplami`), tek durağın değeri DEĞİL: 12 duraklı bir
+      //    ilanda ilk durağın tonajını yayınlamak yanlış veri indekslemek olur.
+      { '@type': 'PropertyValue', name: 'total_weight_ton', value: durakToplami(stops, ['weight_ton']), unitText: 'TON' },
+      { '@type': 'PropertyValue', name: 'total_pallet_count', value: durakToplami(stops, ['pallet_count']) },
+      { '@type': 'PropertyValue', name: 'cargo_type', value: stops.find((s: any) => s.cargo_type)?.cargo_type ?? '' },
       { '@type': 'PropertyValue', name: 'vehicle_type', value: (ilan.vehicle_type as string[] | null)?.join(', ') ?? '' },
       { '@type': 'PropertyValue', name: 'body_type', value: (ilan.body_type as string[] | null)?.join(', ') ?? '' },
       { '@type': 'PropertyValue', name: 'stops_count', value: stops.length },
       { '@type': 'PropertyValue', name: 'quality_score', value: ilan.audit_score ?? null },
       { '@type': 'PropertyValue', name: 'source', value: ilan.source },
-    ].filter(p => p.value !== '' && p.value !== null),
+    ].filter(p => p.value !== '' && p.value !== null && p.value !== 0),
   };
 
   return (
@@ -272,7 +333,7 @@ export default async function IlanDetay({ params }: { params: Promise<{ id: stri
             const stops = (ilan.listing_stops as { stop_order: number; province_id: number | null }[] | null) ?? [];
             const varis = ilAdi(stops.sort((a, b) => a.stop_order - b.stop_order).at(-1)?.province_id);
             const ilanOzet = [kalkis, varis, ilan.vehicle_type].filter(Boolean).join('-');
-            const mesaj = encodeURIComponent(`Merhaba, "${ilanOzet || 'yük'}" ilanınızı Yükegel'de gördüm.\nYükegel'de sahiplenerek yönetebilirsiniz: ${process.env.NEXT_PUBLIC_SITE_URL || 'https://yukegel.com'}/ilan/${ilan.id}/sahiplen`);
+            const mesaj = encodeURIComponent(`Merhaba, "${ilanOzet || 'yük'}" ilanınızı Yükegel'de gördüm.\nYükegel'de sahiplenerek yönetebilirsiniz: ${SITE_URL}/ilan/${ilan.id}/sahiplen`);
             return waNumara ? (
               <a href={`https://wa.me/${waNumara}?text=${mesaj}`} target="_blank" rel="noopener noreferrer"
                 title="WhatsApp üzerinden ilan sahibinden doğrulamasını isteyin"

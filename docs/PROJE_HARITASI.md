@@ -1,6 +1,19 @@
 # Yükegel — Proje Haritası
 > **Kullanım:** Her sohbet başında sadece bu dosyayı oku. Kaynak dosyaları sadece o dosyada değişiklik yapacaksan oku.  
 >
+> 🤖 **8 AĞU 2026 — AI-readiness denetimi: 6 maddenin 5'i zaten vardı.** Semantik
+> HTML, makine-okunur API (5 dk CDN önbelleği dahil), sitemap, robots.txt (GPTBot/
+> ClaudeBot) tamdı. 🚨 **Listede olmayan asıl kusur: kanonik host.** `yukegel.com`
+> **307** ile `www.yukegel.com`'a yönleniyor ama canonical/og:url/sitemap'in tüm
+> 5000 URL'i apex'i gösteriyordu (canonical'ın yönlendiren URL'i işaret etmesi
+> Google'a çelişkili sinyal). Aynı fallback 5 dosyada elle yazılmıştı → **yeni
+> `lib/site.ts` tek kaynağı** + robots.txt www. Eklenenler: ilan başına **dinamik
+> OG görseli** (`app/ilan/[id]/opengraph-image.tsx` — rota+tonaj; `₺` glifi
+> ImageResponse fontunda olmadığı için "TL", tarayıcıda render edip gözle
+> bulundu), ilana özel **`twitter` bloğu** (site geneli değer miras alınıyordu),
+> açıklamaya **durak sayısı**, JSON-LD'ye **`offers{price,TRY}` + tonaj +
+> from_city/to_city**. Ayrıntı: `docs/20260808_ai_readiness_denetimi.sql`.
+>
 > 🎯 **8 AĞU 2026 — COĞRAFİ GEÇİŞ TAMAMLANDI.** Son parça `poi_stay_events.poi_city`
 > idi (tablo boş, TS'ten referanssız ama `get_parked_drivers_for_notification()`
 > okuyor — yarım kalmış özellik, ölü şema değil). Çözüm `province_id` eklemek

@@ -6,7 +6,9 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://yukegel.com';
+// 8 Ağu 2026 — tek kaynak; eskiden apex'e düşüyordu ve TÜM sitemap URL'leri
+// 307 ile yönleniyordu (bkz. lib/site.ts).
+import { SITE_URL } from '../lib/site';
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // Aktif, onaylı, shadow-ban'sız ilanlar

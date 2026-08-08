@@ -1,5 +1,64 @@
 # Yükegel — Yapılacaklar Listesi
 
+> ## ✅ 8 AĞU 2026 — AI-READINESS DENETİMİ: 6 MADDENİN 5'İ ZATEN VARDI
+>
+> Bayram 6 maddelik liste verdi (dinamik metadata/OG, JSON-LD, semantik HTML,
+> robots.txt, makine-okunur API, dinamik sitemap). **İlk iş uygulamak değil
+> DENETLEMEK oldu** — beşi zaten büyük ölçüde yapılmıştı (SPRINT_01 S1-S4 + 7 Ağu
+> SEO turu); körlemesine yeniden yazmak çalışan kodu bozardı.
+>
+> **Zaten tam olanlar (değişiklik YOK):** semantik HTML (`<article>`, `<ol>`,
+> 9 `data-ai-label`), makine-okunur API (`api/ilanlar/[id]` — telefon/user_id
+> döndürmüyor + `s-maxage=300` yani istenen 5 dk CDN önbelleği yerindeydi),
+> dinamik sitemap (aktif+onaylı, limit 5000), robots.txt (GPTBot/ClaudeBot →
+> `/ilan/` + `/u/` açık, admin/panel/api kapalı).
+>
+> 🚨 **LİSTEDE OLMAYAN AMA EN ÖNEMLİ BULGU — KANONİK HOST YANLIŞTI.** Canlıda
+> ölçtüm: `yukegel.com` → **307** → `www.yukegel.com` (200). Ama
+> `NEXT_PUBLIC_SITE_URL` üretimde tanımsız olduğu için kod apex'e düşüyordu ve
+> canonical + og:url + sitemap'in TÜM 5000 `<loc>`'u **yönlenen** adresi
+> gösteriyordu. Canonical'ın yönlendiren bir URL'i işaret etmesi Google'a
+> çelişkili sinyaldir ("Yönlendirmeli sayfa" uyarısı + her URL'de gereksiz
+> sıçrama). Bayram'ın listesindeki `www` doğruymuş, kod yanlıştı.
+> Çözüm: **`lib/site.ts` tek kaynak** — aynı fallback 5 dosyada elle yazılmıştı
+> (projede tekrarlayan "aynı sabit N yerde" hata sınıfı), hepsi import'a çevrildi
+> + `robots.txt` www'ye alındı.
+>
+> **Kapatılan diğer eksikler:**
+> - **`app/ilan/[id]/opengraph-image.tsx` (YENİ)** — ilan başına dinamik OG kartı:
+>   "Kalkış → Varış" (92px) + ilçeler + çipler (ton/palet/araç/yük cinsi/N duraklı)
+>   + fiyat. Önceden yalnız statik site görseli vardı, yani WhatsApp'ta paylaşılan
+>   ilanda **rota ve tonaj görünmüyordu**.
+>   🐛 **Tarayıcıda render edip gözle bulduğum hata:** `₺` (U+20BA) ImageResponse
+>   fontunda YOK, tofu kutusu (▯) çıkıyordu → "25.000 TL". `tsc`/`build` bunu
+>   yakalamaz; yalnız görseli açıp bakmak yakaladı.
+> - **`twitter` bloğu** — ilan sayfasında yoktu, kök layout'un site geneli değeri
+>   miras alınıyordu: canlıda `twitter:title = "Yükegel - Türkiye'nin Nakliye İlan
+>   Platformu"` çıkıyordu. og doğruyken twitter sessizce yanlıştı.
+> - **`description`** yeniden yazıldı; **durak sayısı** hiç yoktu, artık var
+>   ("… 12 duraklı rota. Kalite Skoru: 70/100.").
+>   ⚠️ Türkçe hâl eki ("İzmir'den İstanbul'a") bilerek üretilmedi: özel adlarda
+>   ek seçimi düzensiz (`Kırklareli`, `Çanakkale`) ve yanlış ek indekslenmiş
+>   metinde oktan daha kötü görünür.
+> - **JSON-LD'ye fiyat + tonaj** eklendi (spesifikasyonun "altın tepside" dediği
+>   iki alan eksikti): `offers{price, priceCurrency:'TRY', availability}` +
+>   `from_city`/`to_city`/`total_weight_ton`/`total_pallet_count`/`cargo_type`.
+>   `PropertyValue` değil `offers` seçildi — Google `Offer.price`i tanır.
+>   Tonaj `durakToplami()` ile TOPLAM (12 duraklıda ilk durağı yayınlamak yanlış
+>   veri indekslemek olurdu).
+>
+> **Doğrulama:** OG görseli 3 vaka için render edilip gözle incelendi; JSON-LD
+> `json.loads` ile ayrıştırılıp alanları listelendi; canonical/og:url/sitemap host
+> curl ile teyit edildi; `test:seo` 74/74; tsc + build temiz.
+>
+> ⏳ **Bayram'a kalan (koddan yapılamaz):** (1) deploy sonrası Search Console
+> "Zengin Sonuçlar Testi" ile bir ilan URL'i denenmeli — JSON-LD burada
+> programatik doğrulandı ama Google'ın doğrulayıcısı canlı URL istiyor.
+> (2) Vercel'de `NEXT_PUBLIC_SITE_URL=https://www.yukegel.com` tanımlanmalı
+> (kod artık doğru fallback'e sahip, ama preview dağıtımları için açık ayar iyi).
+> Ayrıntı: `docs/20260808_ai_readiness_denetimi.sql`.
+
+
 > ## ✅ 8 AĞU 2026 — COĞRAFİ GEÇİŞ TAMAMLANDI (`poi_stay_events` son parçaydı)
 >
 > **Bayram:** "O tablolar boş. Onu da hallet."

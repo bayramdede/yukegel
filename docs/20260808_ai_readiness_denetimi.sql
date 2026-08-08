@@ -1,0 +1,132 @@
+-- =============================================================================
+-- AI-Readiness & İndeksleme — DENETİM + EKSİK KAPATMA · 8 Ağustos 2026
+-- =============================================================================
+--
+-- Bayram 6 maddelik bir görev listesi verdi (dinamik metadata/OG, JSON-LD,
+-- semantik HTML, robots.txt, makine-okunur API, dinamik sitemap).
+--
+-- ⚠️ İLK İŞ LİSTEYİ UYGULAMAK DEĞİL, MEVCUT DURUMU DENETLEMEK OLDU: altı
+-- maddenin BEŞİ zaten büyük ölçüde yapılmıştı (SPRINT_01 S1-S4 + 7 Ağu SEO
+-- turu). Körlemesine yeniden yazmak çalışan kodu bozma riski taşırdı. Denetim
+-- sonucu ve gerçek eksikler aşağıda.
+--
+-- =============================================================================
+-- DENETİM SONUCU — MADDE MADDE
+-- =============================================================================
+-- 1. Dinamik metadata + OG   → KISMEN vardı. `generateMetadata` + openGraph
+--                              mevcuttu; OG GÖRSELİ ve twitter bloğu YOKTU. ✏️
+-- 2. JSON-LD                 → VARDI (`Service`, çok duraklı rota dizi olarak).
+--                              FİYAT ve TONAJ YOKTU. ✏️
+-- 3. Semantik HTML           → VARDI. `<article>`, `<ol aria-label>`, `<li>`,
+--                              9 adet `data-ai-label`, `itemType=schema.org/Service`.
+--                              Değişiklik gerekmedi. ✅
+-- 4. robots.txt              → VARDI. GPTBot + ClaudeBot blokları `/ilan/` ve
+--                              `/u/` için Allow, admin/panel/api Disallow,
+--                              `Sitemap:` satırı mevcut. Yalnız HOST yanlıştı. ✏️
+-- 5. Makine-okunur API       → VARDI ve TAMDI: `api/ilanlar/[id]` telefon/user_id
+--                              döndürmüyor + `Cache-Control: public, s-maxage=300,
+--                              stale-while-revalidate=600` (istenen 5 dk CDN
+--                              önbelleği zaten yerindeydi). Değişiklik yok. ✅
+-- 6. Dinamik sitemap         → VARDI: aktif+onaylı ilanlar, `limit 5000`, statik
+--                              sayfalar + profiller. Yalnız HOST yanlıştı. ✏️
+--
+-- =============================================================================
+-- 🚨 EN ÖNEMLİ BULGU (listede YOKTU, canlıda ölçülerek bulundu): KANONİK HOST
+-- =============================================================================
+--   curl -sI https://yukegel.com      → 307, location: https://www.yukegel.com/
+--   curl -sI https://www.yukegel.com  → 200
+-- Sitenin gerçek adresi `www`; apex ona yönleniyor. Ama `NEXT_PUBLIC_SITE_URL`
+-- üretimde tanımsız olduğu için kod apex'e düşüyordu ve CANLIDA şunlar
+-- yayınlanıyordu (curl ile teyit edildi):
+--   <link rel="canonical" href="https://yukegel.com"/>
+--   <meta property="og:url" content="https://yukegel.com"/>
+--   sitemap.xml → TÜM <loc> değerleri https://yukegel.com
+--   robots.txt  → Sitemap: https://yukegel.com/sitemap.xml
+--
+-- NEDEN ÖNEMLİ: canonical, YÖNLENDİREN bir URL'i işaret ediyordu. Google'a "bu
+-- sayfanın kanoniği X" deyip X'i 307 ile Y'ye göndermek çelişkili sinyaldir;
+-- Search Console bunu "Yönlendirmeli sayfa" diye işaretler ve sitemap'teki 5000
+-- URL'in her biri gereksiz bir sıçrama harcar. Bayram'ın listesindeki
+-- `www.yukegel.com` DOĞRUYDU — kod yanlıştı.
+--
+-- ÇÖZÜM: `lib/site.ts` (TEK KAYNAK). Aynı fallback BEŞ dosyada elle yazılmıştı
+-- (`layout.tsx`, `sitemap.ts`, `ilan/[id]/page.tsx`, `api/auth/dogrulama-tekrar`,
+-- `hakkimizda/page.tsx`) ve beşi de yanlış host'u gösteriyordu — tam olarak bu
+-- projede tekrarlayan "aynı sabit N yerde" hata sınıfı. Hepsi import'a çevrildi;
+-- `robots.txt` de `www`ye alındı.
+-- DOĞRULAMA: canonical + og:url + sitemap <loc> → https://www.yukegel.com ✅
+--
+-- =============================================================================
+-- KAPATILAN DİĞER EKSİKLER
+-- =============================================================================
+-- A) `app/ilan/[id]/opengraph-image.tsx` (YENİ) — ilan başına DİNAMİK OG görseli.
+--    Önceden yalnız kök `app/opengraph-image.jpg` (tek, statik) vardı: bir ilan
+--    WhatsApp'ta paylaşıldığında önizlemede genel Yükegel görseli çıkıyor, ROTA
+--    ve TONAJ görünmüyordu. Yeni kart: marka + ilan tipi + "Kalkış → Varış"
+--    (92px) + ilçeler + çipler (ton / palet / araç / yük cinsi / N duraklı) + fiyat.
+--    ⚠️ Veri `page.tsx`'in `getIlan()`'ıyla PAYLAŞILMIYOR: OG görseli ayrı bir
+--       istekle çekiliyor, `React.cache()` istek-içi çalışır. Bu yüzden kendi
+--       DAR sorgusu var (`contact_phone` YOK — herkese açık, önbelleklenebilir).
+--    ⚠️ Bulunamayan/reddedilmiş ilanda HATA FIRLATILMIYOR, nötr marka kartı
+--       dönüyor: patlarsa kart görselsiz kalır ve sebebi hiçbir yerde görünmez.
+--    🐛 TARAYICIDA RENDER EDİP GÖZLE BULDUĞUM HATA: `₺` (U+20BA) ImageResponse'un
+--       varsayılan fontunda YOK — görselde tofu kutusu (▯) çıkıyordu ("▯25.000").
+--       "25.000 TL" yazımına çevrildi. tsc/build bunu YAKALAMAZDI; yalnız
+--       görseli açıp bakmak yakaladı.
+--
+-- B) `twitter` metadata bloğu — ilan sayfasında YOKTU, kök layout'un site geneli
+--    değerleri miras alınıyordu. Canlıda ölçüldü:
+--      twitter:title = "Yükegel - Türkiye'nin Nakliye İlan Platformu"
+--    Yani X/Twitter kartı ROTAYI değil genel sloganı gösteriyordu — og tarafı
+--    doğruyken twitter tarafı sessizce yanlıştı. Artık ilana özel.
+--
+-- C) `description` yeniden yazıldı. Eskisi virgülle dizilmiş listeydi
+--    ("Tekirdağ (Çorlu), → İzmir, TIR aranıyor.") — okun önünde virgül vardı ve
+--    DURAK SAYISI hiç yoktu. Yenisi:
+--      "Konya (Kulu) → Çanakkale rotasında 25 ton PRESLİ ÇUVALLI SAMAN yükü için
+--       TIR aranıyor. 12 duraklı rota. Kalite Skoru: 70/100. ..."
+--    ⚠️ TÜRKÇE HÂL EKİ ("İzmir'DEN İstanbul'A") BİLEREK ÜRETİLMEDİ: özel adlarda
+--       ek seçimi ünlü uyumu + son ünsüz sertliği + `Kırklareli`/`Çanakkale` gibi
+--       düzensiz biçimlerle güvenilir türetilemiyor. Yanlış ek ("İzmir'a")
+--       indekslenmiş metinde oktan DAHA kötü görünür. "X → Y rotasında" hem eksiz
+--       hem doğru, hem de arama sorgusuyla aynı iki il adını taşıyor.
+--
+-- D) JSON-LD'ye FİYAT + TONAJ eklendi (spesifikasyonun "altın tepside" dediği
+--    iki alan eksikti):
+--      offers: { @type: Offer, price, priceCurrency: 'TRY', availability }
+--    ⚠️ `PropertyValue` yerine `offers` seçildi: schema.org'un fiyat için kanonik
+--       yolu bu, Google `Offer.price`i tanır, isimsiz PropertyValue'yu tanımaz.
+--       `priceCurrency` zorunlu — para birimsiz "1400" belirsiz kalır ve Rich
+--       Results uyarısı üretir. `availability` ilanın `status`una bağlı.
+--    + additionalProperty: from_city, to_city (rota uçları AÇIKÇA — `areaServed`
+--      sıralı bir yapı gibi durmuyor), total_weight_ton (unitText TON),
+--      total_pallet_count, cargo_type.
+--    ⚠️ Tonaj/palet `durakToplami()` ile TOPLAM: 12 duraklı ilanda ilk durağın
+--       değerini yayınlamak yanlış veri indekslemek olur (aynı hata metadata
+--       tarafında daha önce yaşanıp düzeltilmişti; burada tekrarlanmadı).
+--
+-- =============================================================================
+-- DOĞRULAMA (hepsi gerçekten çalıştırıldı)
+-- =============================================================================
+-- · OG görseli 3 vaka için tarayıcıda RENDER EDİLDİ ve GÖZLE incelendi:
+--     Çorlu/fiyatlı (200, image/png, 41 kB) · Kulu/12 duraklı/25 ton (49 kB) ·
+--     olmayan id → marka kartı (29 kB). Türkçe karakterler (ğ, İ, Ç, ş) doğru.
+-- · Sayfa HTML'inde og:image + og:image:width/height/alt + twitter:image
+--   etiketleri dosya kuralından otomatik üretiliyor (curl ile teyit).
+-- · JSON-LD `json.loads` ile AYRIŞTIRILDI (geçerli JSON) ve alanları listelendi:
+--   offers.price=1400/TRY, from_city=Konya, to_city=Çanakkale,
+--   total_weight_ton=25 TON, stops_count=12, quality_score=70 ✅
+-- · canonical/og:url/sitemap host → www ✅
+-- · `npm run test:seo` → 74 geçti, 0 kaldı · tsc + next build temiz.
+--   Build çıktısında `ƒ /ilan/-/opengraph-image` rotası görünüyor.
+--
+-- =============================================================================
+-- BAYRAM İÇİN KALAN TEK ADIM (koddan yapılamaz)
+-- =============================================================================
+-- Deploy sonrası Google Search Console → "Zengin Sonuçlar Testi" (Rich Results
+-- Test) ile bir ilan URL'i denenmeli. JSON-LD burada programatik olarak
+-- doğrulandı (geçerli JSON + zorunlu alanlar) ama Google'ın kendi doğrulayıcısı
+-- yalnız canlı URL ile çalışıyor.
+-- ⚠️ AYRICA: `NEXT_PUBLIC_SITE_URL` Vercel'de `https://www.yukegel.com` olarak
+--    TANIMLANMALI. Kod artık doğru fallback'e sahip, ama ortam değişkenini açıkça
+--    ayarlamak preview/staging dağıtımlarında da doğru host'u garanti eder.

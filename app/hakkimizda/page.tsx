@@ -1,5 +1,7 @@
 import type { Metadata } from 'next';
 import GirisLink from '../_components/GirisLink';
+// 8 Ağu 2026 — Organization şeması kanonik host'u kullanmalı (bkz. lib/site.ts).
+import { SITE_URL } from '../../lib/site';
 
 export const metadata: Metadata = {
   title: 'Hakkımızda | Yükegel — Türkiye\'nin Nakliye Platformu',
@@ -22,13 +24,13 @@ const jsonLd = {
   '@context': 'https://schema.org',
   '@type': 'Organization',
   name: 'Yükegel',
-  url: 'https://yukegel.com',
-  logo: 'https://yukegel.com/logo.svg',
+  url: SITE_URL,
+  logo: `${SITE_URL}/logo.svg`,
   description: 'Türkiye karayolu taşımacılığını dijitalleştiren, yük sahipleri ile nakliyecileri buluşturan nakliye ve iş takip platformu.',
   foundingDate: '2024',
   areaServed: 'TR',
   contactPoint: { '@type': 'ContactPoint', email: 'merhaba@yukegel.com', contactType: 'customer support' },
-  sameAs: ['https://yukegel.com'],
+  sameAs: [SITE_URL],
 };
 
 export default function Hakkimizda() {

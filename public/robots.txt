@@ -87,4 +87,7 @@ Disallow: /giris
 Disallow: /cikis
 Disallow: /ilan/*/sahiplen
 
-Sitemap: https://yukegel.com/sitemap.xml
+# ⚠️ 8 Ağu 2026 — HOST `www` OLMAK ZORUNDA. Apex (yukegel.com) 307 ile buraya
+# yönleniyor; sitemap'i yönlenen adresle vermek crawler'a gereksiz bir sıçrama
+# ve Search Console'da "Yönlendirmeli sayfa" uyarısı üretiyordu.
+Sitemap: https://www.yukegel.com/sitemap.xml

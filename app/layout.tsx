@@ -17,7 +17,8 @@ const ibmPlexSans = IBM_Plex_Sans({
  * ikisi ayrışırsa sitemap bir alan adını, canonical başka bir alan adını işaret eder
  * ve Google ikisini farklı site sanar.
  */
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://yukegel.com';
+// 8 Ağu 2026 — tek kaynak; kanonik host `www` (bkz. lib/site.ts).
+import { SITE_URL } from '../lib/site';
 
 export async function generateMetadata(): Promise<Metadata> {
   const cfg = await getConfigs(
