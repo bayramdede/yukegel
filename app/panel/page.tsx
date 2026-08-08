@@ -50,8 +50,14 @@ export default async function Panel() {
       // ⚠️ Bu ilanlar PanelClient'a HAM gidiyor (normalize edilmeden), yani
       //    `origin_province_id` adı tüketicide de aynen görünür. Çeviri
       //    PanelClient/IlanYonetim içinde, gösterim anında yapılıyor.
+      // ⚠️ 8 Ağu 2026 — `price_negotiable` ve `date_flexible` BURAYA EKLENDİ.
+      //    Panel'deki düzenleme formu bu iki alanı da gönderiyor; select'te
+      //    olmasalar form onları hep `false` görür ve KAYDEDERKEN kullanıcının
+      //    gerçek değerini sessizce ezerdi (moderatör panelindeki `user_id`
+      //    eksikliğiyle aynı hata sınıfı).
       .select(`id, listing_type, origin_province_id, origin_district, status, moderation_status, created_at,
-        expires_at, price_offer, completed_at, vehicle_type, body_type, available_date, notes, contact_phone,
+        expires_at, price_offer, price_negotiable, completed_at, vehicle_type, body_type,
+        available_date, date_flexible, notes, contact_phone,
         internal_audit_logs,
         listing_stops ( id, stop_order, province_id, district, cargo_type, weight_ton, pallet_count, vehicle_count )`)
       .eq('user_id', user.id)

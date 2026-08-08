@@ -163,13 +163,33 @@ function IlanlarSekmesi({ ilanlar: ilk, userId }: { ilanlar: any[]; userId: stri
   const [kopyalandi, setKopyalandi] = useState(false);
   const [publicUrl, setPublicUrl] = useState('');
 
-  // Düzeltme formu state'leri
+  // Düzeltme/düzenleme formu state'leri
+  // 8 Ağu 2026 — bu form eskiden YALNIZ `correction_needed` ilanlar için açılıyordu.
+  // Artık kullanıcı kendi ilanını (yayındakiler dâhil) düzenleyebiliyor; fiyat ve
+  // tarih alanları da eklendi.
   const [duzeltId, setDuzeltId] = useState('');
   const [duzeltNotes, setDuzeltNotes] = useState('');
   const [duzeltVehicle, setDuzeltVehicle] = useState<string[]>([]);
   const [duzeltBody, setDuzeltBody] = useState<string[]>([]);
+  const [duzeltFiyat, setDuzeltFiyat] = useState('');
+  const [duzeltPazarlik, setDuzeltPazarlik] = useState(false);
+  const [duzeltTarih, setDuzeltTarih] = useState('');
+  const [duzeltTarihEsnek, setDuzeltTarihEsnek] = useState(false);
   const [duzeltYukleniyor, setDuzeltYukleniyor] = useState(false);
   const [duzeltSonuc, setDuzeltSonuc] = useState<{ ok: boolean; mesaj: string; firedRules?: any[] } | null>(null);
+
+  /** Formu bir ilanın MEVCUT değerleriyle doldurup açar. */
+  function duzeltAc(ilan: any) {
+    setDuzeltId(ilan.id);
+    setDuzeltNotes(ilan.notes || '');
+    setDuzeltVehicle(ilan.vehicle_type || []);
+    setDuzeltBody(ilan.body_type || []);
+    setDuzeltFiyat(ilan.price_offer == null ? '' : String(ilan.price_offer));
+    setDuzeltPazarlik(ilan.price_negotiable === true);
+    setDuzeltTarih(ilan.available_date || '');
+    setDuzeltTarihEsnek(ilan.date_flexible === true);
+    setDuzeltSonuc(null);
+  }
 
   // Arama/filtre state'leri
   const [aramaKalkis, setAramaKalkis] = useState('');
@@ -392,6 +412,12 @@ function IlanlarSekmesi({ ilanlar: ilk, userId }: { ilanlar: any[]; userId: stri
                   const isPending = durum === 'pending';
                   const isRejected = durum === 'rejected';
                   const isEditable = !isPending && !isRejected;
+                  // ⚠️ SUNUCUNUN İZİN LİSTESİNİN AYNASI (`api/ilan/duzelt`
+                  //    ::DUZENLENEBILIR_MODERASYON). Burada göstermek yetki
+                  //    VERMEZ — sunucu her istekte sahiplik + durum kontrolü
+                  //    yapıyor; bu yalnız kullanıcıya boşa buton göstermemek için.
+                  //    İkisi ayrışırsa buton çıkar ama kaydetme 400 döner.
+                  const duzenlenebilir = !tamamlandi && !isRejected && durum !== 'archived';
 
                   return (
                     <React.Fragment key={ilan.id}>
@@ -444,17 +470,16 @@ function IlanlarSekmesi({ ilanlar: ilk, userId }: { ilanlar: any[]; userId: stri
                             style={{ padding: '5px 10px', borderRadius: 5, border: `1px solid ${C.border}`, color: C.muted, fontSize: '0.78rem', textDecoration: 'none', fontWeight: 500 }}>
                             Detay
                           </a>
-                          {/* Düzeltme gerekiyorsa "İlanı Düzelt" butonu önce göster */}
-                          {durum === 'correction_needed' && (
-                            <button onClick={() => {
-                              setDuzeltId(ilan.id);
-                              setDuzeltNotes(ilan.notes || '');
-                              setDuzeltVehicle(ilan.vehicle_type || []);
-                              setDuzeltBody(ilan.body_type || []);
-                              setDuzeltSonuc(null);
-                            }}
-                              style={{ padding: '5px 10px', borderRadius: 5, border: '1px solid #854d0e', background: '#2a1d00', color: '#fbbf24', fontSize: '0.78rem', cursor: 'pointer', fontWeight: 700 }}>
-                              ✏️ İlanı Düzelt
+                          {/* Düzenle — 8 Ağu 2026: artık yalnız `correction_needed`
+                              değil, kullanıcının düzenlemesine izin verilen her
+                              durumda. `correction_needed` olanda vurgulu (amber)
+                              görünüyor çünkü orada AKSİYON BEKLENİYOR. */}
+                          {duzenlenebilir && (
+                            <button onClick={() => duzeltAc(ilan)}
+                              style={durum === 'correction_needed'
+                                ? { padding: '5px 10px', borderRadius: 5, border: '1px solid #854d0e', background: '#2a1d00', color: '#fbbf24', fontSize: '0.78rem', cursor: 'pointer', fontWeight: 700 }
+                                : { padding: '5px 10px', borderRadius: 5, border: `1px solid ${C.border}`, background: 'none', color: C.muted, fontSize: '0.78rem', cursor: 'pointer', fontWeight: 500 }}>
+                              {durum === 'correction_needed' ? '✏️ İlanı Düzelt' : '✏️ Düzenle'}
                             </button>
                           )}
                           {isEditable && !tamamlandi && (
@@ -496,13 +521,20 @@ function IlanlarSekmesi({ ilanlar: ilk, userId }: { ilanlar: any[]; userId: stri
                         </div>
                       </td>
                     </tr>
-                    {/* Düzeltme formu — correction_needed ve bu ilan seçiliyse */}
-                    {duzeltId === ilan.id && (
+                    {/* Düzenleme formu — bu ilan seçiliyse.
+                        `correction_needed` ise amber (aksiyon bekleniyor),
+                        normal düzenlemede nötr çerçeve. */}
+                    {duzeltId === ilan.id && (() => {
+                      const duzeltmeModu = durum === 'correction_needed';
+                      const cerceve = duzeltmeModu ? '#854d0e' : C.border;
+                      const zemin   = duzeltmeModu ? '#12100a' : C.surface;
+                      const baslikRenk = duzeltmeModu ? '#fbbf24' : C.text;
+                      return (
                       <tr>
                         <td colSpan={6} style={{ padding: '0 12px 16px', background: '#0a0d11' }}>
-                          <div style={{ border: '1px solid #854d0e', borderRadius: 8, padding: 16, background: '#12100a' }}>
-                            <div style={{ color: '#fbbf24', fontWeight: 700, fontSize: '0.85rem', marginBottom: 12 }}>
-                              ✏️ İlanı Düzelt — {kalkisAd} → {ilAdi((ilan.listing_stops||[])[0]?.province_id) ?? ''}
+                          <div style={{ border: `1px solid ${cerceve}`, borderRadius: 8, padding: 16, background: zemin }}>
+                            <div style={{ color: baslikRenk, fontWeight: 700, fontSize: '0.85rem', marginBottom: 12 }}>
+                              ✏️ {duzeltmeModu ? 'İlanı Düzelt' : 'İlanı Düzenle'} — {kalkisAd} → {ilAdi((ilan.listing_stops||[])[0]?.province_id) ?? ''}
                             </div>
                             {/* Modératör mesajı */}
                             {(() => {
@@ -534,11 +566,38 @@ function IlanlarSekmesi({ ilanlar: ilk, userId }: { ilanlar: any[]; userId: stri
                                 </div>
                               ) : null;
                             })()}
+                            {/* Fiyat + Tarih — 8 Ağu 2026'da eklendi. En sık
+                                düzeltme ihtiyacı bu iki alan. */}
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 10 }}>
+                              <div>
+                                <label style={lbl}>{isYuk ? 'Ücret Teklifi (TL)' : 'Hedef Navlun (TL)'}</label>
+                                <input type="number" min={0} value={duzeltFiyat}
+                                  onChange={e => setDuzeltFiyat(e.target.value)}
+                                  placeholder="Opsiyonel" style={inp} />
+                                <label style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6, cursor: 'pointer' }}>
+                                  <input type="checkbox" checked={duzeltPazarlik} onChange={e => setDuzeltPazarlik(e.target.checked)} />
+                                  <span style={{ color: C.muted, fontSize: '0.78rem' }}>Pazarlık payı var</span>
+                                </label>
+                              </div>
+                              <div>
+                                <label style={lbl}>{isYuk ? 'Yükleme Tarihi' : 'Müsaitlik Tarihi'}</label>
+                                {/* `min` YOK: mevcut tarih geçmişte olabilir ve
+                                    kullanıcı yalnız notunu düzeltiyor olabilir.
+                                    Sunucu "geçmiş tarih" kuralını YALNIZ tarih
+                                    DEĞİŞTİYSE uyguluyor. */}
+                                <input type="date" value={duzeltTarih}
+                                  onChange={e => setDuzeltTarih(e.target.value)} style={inp} />
+                                <label style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6, cursor: 'pointer' }}>
+                                  <input type="checkbox" checked={duzeltTarihEsnek} onChange={e => setDuzeltTarihEsnek(e.target.checked)} />
+                                  <span style={{ color: C.muted, fontSize: '0.78rem' }}>Tarih esnek</span>
+                                </label>
+                              </div>
+                            </div>
                             {/* Not alanı */}
                             <div style={{ marginBottom: 10 }}>
                               <label style={lbl}>Not / Açıklama</label>
                               <textarea value={duzeltNotes} onChange={e => setDuzeltNotes(e.target.value)}
-                                rows={3} placeholder="Sorunlu ifadeleri kaldırın..."
+                                rows={3} placeholder={duzeltmeModu ? 'Sorunlu ifadeleri kaldırın...' : 'Özel şartlar, dikkat edilmesi gerekenler...'}
                                 style={{ ...inp, resize: 'vertical' as const }} />
                             </div>
                             {/* Araç tipi */}
@@ -589,13 +648,34 @@ function IlanlarSekmesi({ ilanlar: ilk, userId }: { ilanlar: any[]; userId: stri
                                   const res = await fetch('/api/ilan/duzelt', {
                                     method: 'POST',
                                     headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ id: ilan.id, notes: duzeltNotes, vehicle_type: duzeltVehicle, body_type: duzeltBody }),
+                                    body: JSON.stringify({
+                                      id: ilan.id,
+                                      notes: duzeltNotes,
+                                      vehicle_type: duzeltVehicle,
+                                      body_type: duzeltBody,
+                                      price_offer: duzeltFiyat === '' ? null : duzeltFiyat,
+                                      price_negotiable: duzeltPazarlik,
+                                      // Boş tarih GÖNDERİLMEZ (undefined) — sunucu
+                                      // "gönderilmeyen alan mevcut değerini korur"
+                                      // sözleşmesiyle çalışıyor; boş string yollamak
+                                      // "geçerli tarih seçin" hatası verirdi.
+                                      ...(duzeltTarih ? { available_date: duzeltTarih } : {}),
+                                      date_flexible: duzeltTarihEsnek,
+                                    }),
                                   });
                                   const d = await res.json();
                                   if (res.ok) {
-                                    setDuzeltSonuc({ ok: d.moderation_status === 'approved', mesaj: d.mesaj, firedRules: d.fired_rules });
-                                    ilanGuncelle(ilan.id, { moderation_status: d.moderation_status, status: d.status, is_shadow_banned: d.is_shadow_banned, notes: duzeltNotes });
-                                    if (d.moderation_status === 'approved') { setTimeout(() => setDuzeltId(''), 2000); }
+                                    const yayinda = d.moderation_status === 'approved';
+                                    setDuzeltSonuc({ ok: yayinda, mesaj: d.mesaj, firedRules: d.fired_rules });
+                                    // Sunucunun GERÇEKTEN yazdığı değerlerle tazele —
+                                    // beyaz listeden düşen bir tip ekranda kalmasın.
+                                    ilanGuncelle(ilan.id, {
+                                      moderation_status: d.moderation_status,
+                                      status: d.status,
+                                      is_shadow_banned: d.is_shadow_banned,
+                                      ...(d.alanlar ?? {}),
+                                    });
+                                    if (yayinda) { setTimeout(() => setDuzeltId(''), 1500); }
                                   } else {
                                     setDuzeltSonuc({ ok: false, mesaj: d.error || 'Hata oluştu' });
                                   }
@@ -605,17 +685,27 @@ function IlanlarSekmesi({ ilanlar: ilk, userId }: { ilanlar: any[]; userId: stri
                                 setDuzeltYukleniyor(false);
                               }}
                                 style={{ background: C.green, color: '#000', border: 'none', borderRadius: 6, padding: '7px 18px', fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer', opacity: duzeltYukleniyor ? 0.6 : 1 }}>
-                                {duzeltYukleniyor ? '⏳ Gönderiliyor...' : '✓ Kaydedip Gönder'}
+                                {duzeltYukleniyor ? '⏳ Kaydediliyor...' : (duzeltmeModu ? '✓ Kaydedip Gönder' : '✓ Kaydet')}
                               </button>
                               <button onClick={() => { setDuzeltId(''); setDuzeltSonuc(null); }}
                                 style={{ background: 'none', border: `1px solid ${C.border}`, color: C.muted, borderRadius: 6, padding: '7px 14px', fontSize: '0.85rem', cursor: 'pointer' }}>
                                 İptal
                               </button>
                             </div>
+                            {/* Konum/durak düzenleme BİLEREK YOK: rota değişimi
+                                durakların silinip yeniden yazılmasını gerektiriyor
+                                (moderatör tarafındaki `moderator_ilan_duzenle`
+                                RPC'sinin işi). Kullanıcıya açılacaksa ayrı bir
+                                kullanıcı RPC'si gerekir — bu turun kapsamı dışı. */}
+                            <div style={{ color: C.dim, fontSize: '0.72rem', marginTop: 10 }}>
+                              Güzergâh, il/ilçe ve durak bilgisi buradan değiştirilemez — değişmesi
+                              gerekiyorsa ilanı silip yeniden oluşturun.
+                            </div>
                           </div>
                         </td>
                       </tr>
-                    )}
+                      );
+                    })()}
                     </React.Fragment>
                   );
                 })}

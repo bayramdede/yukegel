@@ -1,5 +1,52 @@
 # Yükegel — Yapılacaklar Listesi
 
+> ## ✅ 8 AĞU 2026 — İLANLARIM'DA İLAN DÜZENLEME AÇILDI
+>
+> **İstek:** "İlanlarım sayfasında ilan düzeltme şansı olsun."
+>
+> Düzenleme formu ZATEN vardı ama yalnız `correction_needed` (moderatör
+> düzeltme istedi) ilanlarda açılıyordu; `POST /api/ilan/duzelt` de
+> `moderation_status !== 'correction_needed'` ise 400 dönüyordu. Artık kullanıcı
+> kendi ilanını düzenleyebiliyor.
+>
+> **Düzenlenebilir durumlar (bilinçli olarak dar):** `correction_needed`,
+> `pending`, `approved`, `auto_published`.
+> **Düzenlenemez:** `rejected` (moderatör kararını istemciden delmek olur),
+> `archived`, ve `completed_at` dolu olanlar. Sunucu üçünü de 400 ile kesiyor.
+>
+> **Eklenen alanlar:** fiyat + pazarlık payı, tarih + tarih esnek (mevcut not /
+> araç tipi / üst yapının yanına). **Güzergâh/durak düzenleme YOK** — rota
+> değişimi durakların silinip yeniden yazılmasını gerektiriyor (moderatör
+> tarafındaki `moderator_ilan_duzenle` RPC'sinin işi); kullanıcıya açılacaksa
+> ayrı bir RPC gerekir. Formda bu açıkça yazıyor.
+>
+> **Yolda bulunan 3 gerçek bug:**
+> 1. `app/panel/page.tsx` SELECT'inde `price_negotiable` ve `date_flexible`
+>    YOKTU. Form bu iki alanı gönderiyor; select'te olmadıkları için hep `false`
+>    görünüp KAYDEDERKEN kullanıcının gerçek değerini sessizce ezerlerdi —
+>    moderatör panelindeki `user_id` eksikliğiyle aynı hata sınıfı.
+> 2. `vehicle_type`/`body_type` DOĞRULANMADAN yazılıyordu
+>    (`vehicle_type ?? ilan.vehicle_type`). İstemci bu dizilere herhangi bir
+>    metni, herhangi bir uzunlukta koyabiliyordu. `lib/ilan-yaz.ts` yazma
+>    yolunda `ARAC_TIPI_SETI`/`UTSYAPI_SETI` ile beyaz listeliyor; burada
+>    atlanmıştı. Artık beyaz liste + tavan var.
+> 3. Temiz bir düzenleme körlemesine `status='active'` yazıyordu — kullanıcı
+>    ilanını BİLEREK "Pasif Yap" demişse bu kararı sessizce geri alıp ilanı
+>    yayına döndürürdü. Artık zaten yayına girmiş ilanlarda `status` KORUNUYOR;
+>    `correction_needed`/`pending`'de (orada `passive` moderasyonun koyduğu bir
+>    durum) `active`e çıkmaya devam ediyor.
+>
+> **Doğrulama — `npm run test:ilan-duzelt` (22/22, GERÇEK HTTP + gerçek oturum):**
+> geçici kullanıcı oluşturup @supabase/ssr'a çerezi kendisine yazdırıyor, rotayı
+> HTTP üzerinden çağırıyor, sonunda kullanıcıyı+ilanı siliyor (test ilanı daima
+> `status='passive'`, hiçbir aşamada feed'e düşmüyor; DB'de kalıntı olmadığı
+> ayrıca sorgulandı). Kapsanan: oturumsuz→401, başkasının ilanı→403,
+> rejected→400 (+notun değişmediği), completed→400, beyaz liste dışı tiplerin
+> atılması, geçmiş tarihe değiştirme→400 ama DEĞİŞMEYEN geçmiş tarihin
+> engellenmemesi, gönderilmeyen alanların korunması, pasif kararının korunması.
+> Ayrıca panel Playwright'la görsel olarak doğrulandı (iki buton varyantı +
+> formun mevcut değerlerle dolması). `tsc` + `next build` temiz.
+>
 > ## ✅ 8 AĞU 2026 — MOBİL HEADER TAŞMASI (yatay kaydırma) DÜZELTİLDİ
 >
 > **Bildirim:** "Mobilde üst menü ögeleri sağa doğru taşıyor; Çıkış butonu ve

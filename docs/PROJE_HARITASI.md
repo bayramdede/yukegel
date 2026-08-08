@@ -1,6 +1,18 @@
 # Yükegel — Proje Haritası
 > **Kullanım:** Her sohbet başında sadece bu dosyayı oku. Kaynak dosyaları sadece o dosyada değişiklik yapacaksan oku.  
 >
+> ✅ **8 AĞU 2026 — İlanlarım'da ilan düzenleme açıldı.** `POST /api/ilan/duzelt`
+> eskiden yalnız `correction_needed` kabul ediyordu; artık `pending`/`approved`/
+> `auto_published` da düzenlenebiliyor (`rejected` + `archived` + `completed_at`
+> dolu olanlar 400 ile kesiliyor). Fiyat/pazarlık + tarih/esneklik alanları
+> eklendi; güzergâh-durak düzenleme bilerek YOK (durak sil+yeniden-yaz gerektirir,
+> moderatör RPC'sinin işi). **3 bug bulundu:** panel SELECT'inde
+> `price_negotiable`+`date_flexible` yoktu (form onları `false` sanıp gerçek
+> değeri eziyordu), `vehicle_type`/`body_type` beyaz listesiz yazılıyordu, ve
+> temiz düzenleme kullanıcının "Pasif Yap" kararını `active` yazarak eziyordu.
+> Doğrulama: `npm run test:ilan-duzelt` — 22/22, gerçek HTTP + gerçek oturum
+> çerezi, geçici kullanıcı sonunda siliniyor. Ayrıntı: `docs/YAPILACAKLAR.md` başı.
+>
 > ✅ **8 AĞU 2026 — Mobil header taşması düzeltildi (yatay kaydırma).** Navbar
 > tek satır `height:56` + wrap/ellipsis kuralı yoktu; 375px'te `scrollWidth=668`
 > ölçüldü (aksiyon grubu ekranın 156px dışında). Mobilde iki satıra ayrıldı
