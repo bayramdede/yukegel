@@ -153,15 +153,19 @@ export default function PublicIlanListesi() {
   return (
     <div style={{ minHeight: '100vh', background: '#0d1117', fontFamily: "'IBM Plex Sans', system-ui, sans-serif" }}>
       <nav style={{ background: '#161b22', borderBottom: '1px solid #30363d', position: 'sticky', top: 0, zIndex: 50 }}>
-        <div style={{ maxWidth: 900, margin: '0 auto', padding: '0 16px', height: 52, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <a href="/" style={{ display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none' }}>
+        {/* 8 Ağu 2026 — HomeClient'taki mobil taşmanın aynı sınıfı buradaydı:
+            `display_name` sınırsız (şirket adları 40+ karakter olabiliyor) ve
+            kısalma kuralı yoktu; dar ekranda logoyu sağa itip yatay kaydırma
+            üretiyordu. `min-width:0` + ellipsis: kısalan tek öğe ad olur. */}
+        <div style={{ maxWidth: 900, margin: '0 auto', padding: '0 16px', height: 52, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+          <a href="/" style={{ display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none', flexShrink: 0 }}>
             <img src="/logo.svg" alt="Yükegel" style={{ width: 24, height: 24 }} />
-            <span style={{ fontWeight: 800, fontSize: '1.1rem' }}>
+            <span style={{ fontWeight: 800, fontSize: '1.1rem', whiteSpace: 'nowrap' }}>
               <span style={{ color: '#22c55e' }}>YÜKE</span><span style={{ color: '#e2e8f0' }}>GEL</span>
             </span>
           </a>
           {sahip && (
-            <div style={{ color: '#8b949e', fontSize: '0.82rem' }}>
+            <div style={{ color: '#8b949e', fontSize: '0.82rem', minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               <span style={{ color: '#e2e8f0', fontWeight: 600 }}>{sahip.display_name}</span> ilanları
             </div>
           )}

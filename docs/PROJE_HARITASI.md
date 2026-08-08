@@ -1,6 +1,18 @@
 # Yükegel — Proje Haritası
 > **Kullanım:** Her sohbet başında sadece bu dosyayı oku. Kaynak dosyaları sadece o dosyada değişiklik yapacaksan oku.  
 >
+> ✅ **8 AĞU 2026 — Mobil header taşması düzeltildi (yatay kaydırma).** Navbar
+> tek satır `height:56` + wrap/ellipsis kuralı yoktu; 375px'te `scrollWidth=668`
+> ölçüldü (aksiyon grubu ekranın 156px dışında). Mobilde iki satıra ayrıldı
+> (2. satır ikincil linkler, yatay kaydırılabilir — gizlenmiyor).
+> 🚨 **Yan etki:** filtre barının `sticky top:56` sabiti navbar iki satıra
+> çıkınca yalan oluyordu; media query başına sabit yazmak da yetmedi (içeriğe
+> bağlı — 320px'de 151px, 768px'te uzun şirket adıyla 113px ölçüldü). Artık
+> **ResizeObserver `--yk-nav-h`'yi ölçüyor**, CSS sabitleri yalnız fallback.
+> Aynı sınıf `u/[username]` navbar'ında da kapatıldı. `overflow-x:hidden`
+> bilerek kullanılmadı (sticky'yi bozar, sebebi gizler).
+> Playwright ile 8 genişlikte doğrulandı. Ayrıntı: `docs/YAPILACAKLAR.md` başı.
+>
 > ✅ **8 AĞU 2026 — Coğrafi standart POI tarafına da uygulandı.** `pois` hiçbir
 > dalgaya dahil değildi; artık `province_id` (smallint FK) + `district_official`
 > var. Kapsama **%99,96**, resmî ilçe **4.951 → 8.765**. İlçelerin %46'sı

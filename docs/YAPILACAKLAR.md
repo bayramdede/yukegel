@@ -1,5 +1,46 @@
 # Yükegel — Yapılacaklar Listesi
 
+> ## ✅ 8 AĞU 2026 — MOBİL HEADER TAŞMASI (yatay kaydırma) DÜZELTİLDİ
+>
+> **Bildirim:** "Mobilde üst menü ögeleri sağa doğru taşıyor; Çıkış butonu ve
+> kullanıcı adı ekran dışına kaydığı için sağda yatay boşluk oluşuyor."
+>
+> **Kök sebep:** `HomeClient.tsx` navbar'ı tek satır `height:56` +
+> `justify-content:space-between` idi; ne `flex-wrap` ne de kısalma/ellipsis
+> kuralı vardı. Sol grup (logo + BETA + 2 link) ile sağ grubun (👤 ad +
+> "+ İlan Ver" + Çıkış) doğal genişlik toplamı ~530px; 375px ekranda sığmayınca
+> öğeler container'ın sağına taşıyordu. **Tarayıcıda ölçüldü (Playwright):**
+> 375px'te `document.scrollWidth = 668` (293px dışarı), aksiyon grubunun sağ
+> kenarı 531px — yani ekranın 156px dışında.
+>
+> **Çözüm:** mobilde iki satır — 1. satır logo + aksiyonlar (birincil CTA her
+> zaman görünür), 2. satır ikincil linkler (tam genişlik, gerekirse yatay
+> kaydırılır; **gizlenmiyor**, erişilebilir kalıyor). Ad ellipsis'le kısalan tek
+> öğe; ≤420px'te BETA rozeti + ad metni düşüyor (👤 profil linki kalıyor) ve CTA
+> "+ İlan"a kısalıyor — bunlar olmadan 320px'de aksiyon grubu üçüncü satıra
+> düşüyordu.
+>
+> 🚨 **YAN ETKİ YAKALANDI:** filtre barı navbar'ın altına `sticky` yapışıyor ve
+> offset'i `top:56` **SABİT YAZILMIŞTI**. Navbar iki satıra çıkınca bu sayı yalan
+> olur. İlk denemede media query başına sabit değer yazdım, tarayıcıda ölçünce
+> İKİ ayrı durumda kaydığını gördüm (320px'de nav 151px, 768px'te 43 karakterlik
+> şirket adıyla 113px). Sayı içeriğe bağlı olduğu için **artık ResizeObserver ile
+> ölçülüyor** (`--yk-nav-h`); CSS'teki sabitler yalnız ilk boyama için fallback.
+> Bu, "içerik değişince sticky offset sessizce bozulur" hata sınıfını kapatıyor.
+>
+> Aynı sınıf hata `app/u/[username]/page.tsx` navbar'ında da vardı (sınırsız
+> `display_name`, kısalma kuralı yok) → `min-width:0` + ellipsis ile kapatıldı.
+>
+> **`overflow-x:hidden` BİLEREK KULLANILMADI:** taşmayı gizler ama sebebini
+> çözmez, ayrıca `position:sticky`yi bozma riski taşır (nav ve filtre barı
+> sticky). Yerleşim düzeltildiği için gerek de kalmadı.
+>
+> **Doğrulama (gerçek tarayıcı, 320/360/375/414/600/768/1024/1280px):** hiçbir
+> genişlikte yatay taşma yok (`scrollWidth == clientWidth`), Çıkış her zaman
+> ekran içinde, nav yüksekliği ile `--yk-nav-h` her breakpoint'te birebir
+> eşleşiyor, filtre barı navbar'a bitişik (boşluk/örtüşme yok). 6/13/43
+> karakterlik adlarla ayrıca sınandı. `tsc` + `next build` temiz.
+>
 > ## ✅ 8 AĞU 2026 — COĞRAFİ STANDART POI TARAFINA DA UYGULANDI
 >
 > `pois` tablosu `COGRAFI_GECIS.md`'nin hiçbir dalgasına dahil edilmemişti (bir

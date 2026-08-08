@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { createClient } from '../../lib/supabase';
 import { olayGonder } from '../../lib/analiz';
 import { ILAN_LIMITI, ILAN_SELECT, ilanNormalize, uyeYeniMi, durakToplami } from '../../lib/ilan-liste';
@@ -793,6 +793,32 @@ export default function HomeClient({ initialIlanlar = [], totalCount = 0 }: { in
     `${listeKirpildi ? 'en yeni ' : ''}${filtered.length.toLocaleString('tr-TR')} ${tipAdi} ilanı`;
 
 
+  // 🚨 8 Ağu 2026 — `--yk-nav-h` ARTIK ÖLÇÜLÜYOR, elle yazılmıyor.
+  //
+  // NEDEN: filtre barı navbar'ın altına `position:sticky` ile yapışıyor ve
+  // offset'i navbar yüksekliğini BİLMEK zorunda. Bunu media query başına sabit
+  // sayı olarak yazdım ve tarayıcıda ölçünce İKİ kez kaydığını gördüm:
+  //   · 320px'de aksiyon grubu kendi satırına düşüp nav 151px oluyordu (95 değil)
+  //   · 768px'de 43 karakterlik bir şirket adı navı 113px'e çıkarıyordu (57 değil)
+  // Yani sayı, içeriğin genişliğine bağlı — sabit yazıldığı her yerde yalan
+  // olmaya adaydı. ResizeObserver ile gerçek yükseklik yazılınca bu hata sınıfı
+  // (içerik değişince offset'in sessizce bozulması) tamamen kapanıyor.
+  // CSS'teki sabit değerler FALLBACK olarak duruyor: JS çalışana kadarki ilk
+  // boyamada doğru yeri veriyorlar.
+  const navRef = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    const el = navRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const uygula = () => {
+      document.documentElement.style.setProperty(
+        '--yk-nav-h', `${Math.round(el.getBoundingClientRect().height)}px`);
+    };
+    uygula();
+    const ro = new ResizeObserver(uygula);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
   const ad = kullanici?.display_name || kullanici?.email?.split('@')[0] || 'Kullanıcı';
   const isNakliyeci = kullanici?.user_type === 'arac_sahibi';
   const isMusteri = kullanici && !isNakliyeci;
@@ -801,37 +827,90 @@ export default function HomeClient({ initialIlanlar = [], totalCount = 0 }: { in
     <div style={{ minHeight: '100vh', background: '#0d1117', fontFamily: "'IBM Plex Sans', system-ui, sans-serif" }}>
       <style>{`@keyframes skshimmer{0%,100%{opacity:.5}50%{opacity:.85}}.sk{animation:skshimmer 1.5s ease-in-out infinite}`}</style>
 
-      {/* NAVBAR — misafir linkler hemen göster, auth resolve olunca kişiselleşir */}
-      <nav style={{ background: '#161b22', borderBottom: '1px solid #30363d', position: 'sticky', top: 0, zIndex: 50 }}>
-        <div style={{ maxWidth: 1280, margin: '0 auto', padding: '0 16px', height: 56, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-            <a href="/" style={{ display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none' }}>
-              <img src="/logo.svg" alt="Yükegel" style={{ width: 28, height: 28 }} />
-              <span style={{ fontWeight: 800, fontSize: '1.25rem', letterSpacing: '-0.03em' }}>
-                <span style={{ color: '#22c55e' }}>YÜKE</span><span style={{ color: '#e2e8f0' }}>GEL</span>
-              </span>
-              <span style={{ background: '#1e3a5f', color: '#60a5fa', fontSize: '0.65rem', fontWeight: 700, padding: '2px 6px', borderRadius: 4 }}>BETA</span>
-            </a>
-            <div style={{ display: 'flex', gap: 4 }}>
-              <a href="/nasil-calisir" style={{ color: '#8b949e', fontSize: '0.82rem', textDecoration: 'none', padding: '4px 8px', borderRadius: 5 }}>Nasıl Çalışır?</a>
-              <a href="/hakkimizda" style={{ color: '#8b949e', fontSize: '0.82rem', textDecoration: 'none', padding: '4px 8px', borderRadius: 5 }}>Hakkımızda</a>
-            </div>
+      {/* NAVBAR — misafir linkler hemen göster, auth resolve olunca kişiselleşir
+       *
+       * 🚨 8 Ağu 2026 (mobil taşma) — ESKİ HÂLİ NEDEN KIRILIYORDU: tek satır
+       * `height:56` + `justify-content:space-between`, ne `flex-wrap` ne de
+       * küçülme/kısalma kuralı vardı. Sol grup (logo + BETA + 2 link) ile sağ
+       * grubun (👤 ad + "+ İlan Ver" + Çıkış) doğal genişlikleri toplamı ~450px;
+       * 360px'lik bir ekranda sığmayınca öğeler container'ın SAĞINA taşıyor ve
+       * sayfa yatay kaydırma kazanıyordu.
+       *
+       * ÇÖZÜM: mobilde iki satır. 1. satır logo + aksiyonlar (birincil CTA hep
+       * görünür), 2. satır ikincil linkler (tam genişlik, gerekirse yatay
+       * kaydırılır — GİZLENMİYOR, erişilebilir kalıyor).
+       *
+       * ⚠️ `--yk-nav-h` TEK KAYNAK: aşağıdaki filtre barı `position:sticky` ile
+       * navbar'ın ALTINA yapışıyor ve eskiden `top:56` SABİT YAZILMIŞTI. Navbar
+       * mobilde iki satıra çıkınca o sabit sayı yalan olur (filtre barı navbar'ın
+       * altına girer). İkisi artık aynı değişkenden besleniyor; nav satır
+       * yükseklikleri de bu yüzden `min-height` değil SABİT.
+       */}
+      <style>{`
+        /* Değerler navbar'ın GERÇEK yüksekliği (1px border dahil) — tarayıcıda
+           ölçüldü: masaüstü 56+1=57, mobil 56+38+1=95. column-gap bilerek ayrı
+           yazıldı: kısa yol olan gap, satırlar ARASINA da 8px koyup (row-gap)
+           yüksekliği 103'e çıkarıyor ve bu değişkeni yalan hale getiriyordu. */
+        :root{--yk-nav-h:57px;}
+        .yk-nav-bar{max-width:1280px;margin:0 auto;padding:0 16px;display:flex;align-items:center;column-gap:16px;row-gap:0;flex-wrap:wrap;}
+        .yk-nav-logo{display:flex;align-items:center;gap:8px;text-decoration:none;flex:0 0 auto;height:56px;}
+        .yk-nav-linkler{display:flex;gap:4px;flex:0 0 auto;align-items:center;height:56px;}
+        .yk-nav-aksiyon{display:flex;align-items:center;gap:12px;flex:0 0 auto;margin-left:auto;height:56px;min-width:0;}
+        /* Uzun görünen ad sağdaki butonları dışarı itmesin: kısalan tek öğe bu. */
+        .yk-nav-ad{color:#e2e8f0;font-size:.85rem;text-decoration:none;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px;flex:0 1 auto;}
+        .yk-nav-linkler>a{white-space:nowrap;}
+
+        @media (max-width:760px){
+          :root{--yk-nav-h:95px;}          /* 56 (1. satır) + 38 (2. satır) + 1 border */
+          .yk-nav-bar{padding:0 12px;column-gap:8px;row-gap:0;}
+          .yk-nav-aksiyon{gap:8px;}
+          .yk-nav-ad{max-width:104px;}
+          /* İkincil linkler 2. satıra: tam genişlik + gerekirse yatay kaydırma */
+          .yk-nav-linkler{order:3;flex:1 0 100%;height:38px;margin:0 -12px;padding:0 12px;
+            border-top:1px solid #21262d;overflow-x:auto;-webkit-overflow-scrolling:touch;
+            scrollbar-width:none;}
+          .yk-nav-linkler::-webkit-scrollbar{display:none;}
+        }
+        /* En dar ekranlar: BETA rozeti ve ad METNİ düşer — 👤 ikonu link olarak
+           kalır, yani profile erişim kaybolmuyor. CTA da "+ İlan"a kısalır;
+           bunlar olmadan 320px'de aksiyon grubu ÜÇÜNCÜ bir satıra düşüyordu
+           (tarayıcıda ölçüldü: nav 151px). */
+        @media (max-width:420px){
+          .yk-nav-beta{display:none;}
+          .yk-nav-ad-metin{display:none;}
+          .yk-nav-logo-yazi{font-size:1.05rem;}
+          .yk-nav-cta-uzun{display:none;}
+          .yk-nav-cta{padding:6px 12px !important;}
+        }
+      `}</style>
+      <nav ref={navRef} style={{ background: '#161b22', borderBottom: '1px solid #30363d', position: 'sticky', top: 0, zIndex: 50 }}>
+        <div className="yk-nav-bar">
+          <a href="/" className="yk-nav-logo">
+            <img src="/logo.svg" alt="Yükegel" style={{ width: 28, height: 28, flexShrink: 0 }} />
+            <span className="yk-nav-logo-yazi" style={{ fontWeight: 800, fontSize: '1.25rem', letterSpacing: '-0.03em', whiteSpace: 'nowrap' }}>
+              <span style={{ color: '#22c55e' }}>YÜKE</span><span style={{ color: '#e2e8f0' }}>GEL</span>
+            </span>
+            <span className="yk-nav-beta" style={{ background: '#1e3a5f', color: '#60a5fa', fontSize: '0.65rem', fontWeight: 700, padding: '2px 6px', borderRadius: 4 }}>BETA</span>
+          </a>
+          <div className="yk-nav-linkler">
+            <a href="/nasil-calisir" style={{ color: '#8b949e', fontSize: '0.82rem', textDecoration: 'none', padding: '4px 8px', borderRadius: 5 }}>Nasıl Çalışır?</a>
+            <a href="/hakkimizda" style={{ color: '#8b949e', fontSize: '0.82rem', textDecoration: 'none', padding: '4px 8px', borderRadius: 5 }}>Hakkımızda</a>
           </div>
           {kullanici ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <a href="/panel?tab=profil" style={{ color: '#e2e8f0', fontSize: '0.85rem', textDecoration: 'none', fontWeight: 600 }}>👤 {ad}</a>
-              <a href="/ilan-ver" style={{ background: '#22c55e', color: '#000', fontWeight: 700, fontSize: '0.85rem', padding: '6px 16px', borderRadius: 6, textDecoration: 'none' }}>+ İlan Ver</a>
+            <div className="yk-nav-aksiyon">
+              <a href="/panel?tab=profil" className="yk-nav-ad">👤 <span className="yk-nav-ad-metin">{ad}</span></a>
+              <a href="/ilan-ver" className="yk-nav-cta" style={{ background: '#22c55e', color: '#000', fontWeight: 700, fontSize: '0.85rem', padding: '6px 16px', borderRadius: 6, textDecoration: 'none', whiteSpace: 'nowrap', flexShrink: 0 }}>+ İlan<span className="yk-nav-cta-uzun"> Ver</span></a>
               {/* SPRINT_01 C1 — çıkış yan etkili bir işlem: link değil, POST formu.
                   GET olsaydı dış sitedeki <img src="/cikis"> kullanıcıyı çıkış yaptırırdı. */}
-              <form method="post" action="/cikis" style={{ margin: 0 }}>
-                <button type="submit" style={{ background: 'none', border: '1px solid #30363d', color: '#8b949e', borderRadius: 6, padding: '5px 12px', fontSize: '0.8rem', cursor: 'pointer', fontFamily: 'inherit' }}>Çıkış</button>
+              <form method="post" action="/cikis" style={{ margin: 0, flexShrink: 0 }}>
+                <button type="submit" style={{ background: 'none', border: '1px solid #30363d', color: '#8b949e', borderRadius: 6, padding: '5px 12px', fontSize: '0.8rem', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>Çıkış</button>
               </form>
             </div>
           ) : (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div className="yk-nav-aksiyon">
               {/* 29 Tem 2026 — hedefli giriş; bkz. app/_components/GirisLink.tsx */}
-              <GirisLink style={{ color: '#8b949e', fontSize: '0.85rem', textDecoration: 'none' }}>Giriş Yap</GirisLink>
-              <GirisLink mod="kayit" style={{ background: '#22c55e', color: '#000', fontWeight: 700, fontSize: '0.85rem', padding: '6px 16px', borderRadius: 6, textDecoration: 'none' }}>Üye Ol</GirisLink>
+              <GirisLink style={{ color: '#8b949e', fontSize: '0.85rem', textDecoration: 'none', whiteSpace: 'nowrap', flexShrink: 0 }}>Giriş Yap</GirisLink>
+              <GirisLink mod="kayit" style={{ background: '#22c55e', color: '#000', fontWeight: 700, fontSize: '0.85rem', padding: '6px 16px', borderRadius: 6, textDecoration: 'none', whiteSpace: 'nowrap', flexShrink: 0 }}>Üye Ol</GirisLink>
             </div>
           )}
         </div>
@@ -853,8 +932,11 @@ export default function HomeClient({ initialIlanlar = [], totalCount = 0 }: { in
         <h2 style={{ color: '#e2e8f0', fontWeight: 800, fontSize: '1.05rem', margin: 0 }}>📋 Canlı Yük & Araç İlanları</h2>
       </div>
 
-      {/* FİLTRE BARI */}
-      <div style={{ background: '#161b22', borderBottom: '1px solid #30363d', position: 'sticky', top: 56, zIndex: 40, marginTop: 12 }}>
+      {/* FİLTRE BARI
+        * ⚠️ `top` ARTIK SABİT DEĞİL: navbar mobilde iki satıra çıkıyor, `top:56`
+        * orada yalan olurdu (filtre barı navbar'ın altına kayardı). Değer
+        * navbar'ın tanımladığı `--yk-nav-h` değişkeninden geliyor. */}
+      <div style={{ background: '#161b22', borderBottom: '1px solid #30363d', position: 'sticky', top: 'var(--yk-nav-h)', zIndex: 40, marginTop: 12 }}>
         <div style={{ maxWidth: 1280, margin: '0 auto', padding: '10px 16px', display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
           <div style={{ background: '#0d1117', borderRadius: 6, padding: 2, border: '1px solid #30363d', display: 'flex' }}>
             {/* SPRINT_01 L5 — `setTip` DEĞİL `tipDegistir`: URL de güncellenmeli. */}
