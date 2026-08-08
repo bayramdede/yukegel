@@ -1,6 +1,19 @@
 # Yükegel — Proje Haritası
 > **Kullanım:** Her sohbet başında sadece bu dosyayı oku. Kaynak dosyaları sadece o dosyada değişiklik yapacaksan oku.  
 >
+> ✅ **8 AĞU 2026 — Toplu yükleme (Excel) önizleme kartları düzenlenebilir.**
+> Eskiden yalnız 2 alan (kalkış/varış ili) ve yalnız il ÇÖZÜLEMEDİĞİNDE
+> düzenlenebiliyordu; yanlış tonaj/fiyat için tek çare dosyayı yeniden
+> yüklemekti. Artık her kartta ✏️ Düzenle: kart düzeyi (il, ilçe, araç tipi,
+> üst yapı, fiyat, not) + durak düzeyi (varış ili/ilçesi, tonaj, palet, yük
+> cinsi), "✎ düzenlendi" rozeti ve "Excel'deki hâline dön". `seferNo` bilerek
+> düzenlenemez (gruplama ona bağlı, kartlar yer değiştirirdi).
+> 🚨 Kritik yer `finalRows` birleştirmesi: eskiden yalnız 2 alanı birleştiriyordu,
+> güncellenmese ekranda düzeltilen değer sessizce kaydedilmezdi. Yan kazanç:
+> düzenleme alanlarına `aria-label` eklendi (etiketleri `<div>`, erişilebilir adı
+> yoktu). Doğrulama: `npm run test:toplu-duzenle` — 15/15, gerçek tarayıcı +
+> gerçek .xlsx + DB'den okuma. Ayrıntı: `docs/YAPILACAKLAR.md` başı.
+>
 > ✅ **8 AĞU 2026 — İlanlarım'da ilan düzenleme açıldı.** `POST /api/ilan/duzelt`
 > eskiden yalnız `correction_needed` kabul ediyordu; artık `pending`/`approved`/
 > `auto_published` da düzenlenebiliyor (`rejected` + `archived` + `completed_at`

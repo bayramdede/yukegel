@@ -25,9 +25,11 @@ interface Props {
   placeholder?: string;
   style?: React.CSSProperties;
   disabled?: boolean;
+  /** Etiketi `<label>` olmayan yerlerde erişilebilir ad (ve testler için tutamak). */
+  ariaLabel?: string;
 }
 
-export default function IlceGirisi({ il, value, onChange, placeholder, style, disabled }: Props) {
+export default function IlceGirisi({ il, value, onChange, placeholder, style, disabled, ariaLabel }: Props) {
   const listId = useId();
   const id = ilId(il ?? '');
   const secenekler = id ? ilceler(id) : [];
@@ -41,6 +43,7 @@ export default function IlceGirisi({ il, value, onChange, placeholder, style, di
         placeholder={placeholder ?? (secenekler.length ? 'İlçe seçin veya yazın' : 'İlçe (opsiyonel)')}
         style={style}
         disabled={disabled}
+        aria-label={ariaLabel}
         autoComplete="off"
       />
       {/* İl seçilmemişse datalist boş kalır — input yine de serbest yazıma açık kalır. */}

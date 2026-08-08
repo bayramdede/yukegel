@@ -1,5 +1,51 @@
 # Yükegel — Yapılacaklar Listesi
 
+> ## ✅ 8 AĞU 2026 — TOPLU YÜKLEMEDE (EXCEL) ÖNİZLEME KARTLARI DÜZENLENEBİLİR
+>
+> **İstek:** "Toplu yüklemede (excel) gelen kartları düzenleme şansımız olsun."
+>
+> Önizlemede düzenleme ZATEN vardı ama **yalnız iki alan** (`kalkisIliNorm`/
+> `varisIliNorm`) ve **yalnız il çözülemediğinde** açılan bir select'ten. Yani
+> Excel'de yanlış yazılmış bir tonaj/fiyat/ilçe/araç tipi fark edilse bile
+> kullanıcının tek çaresi dosyayı düzeltip yeniden yüklemekti.
+>
+> Artık her kartta **✏️ Düzenle** var. Kart düzeyinde: kalkış ili (alfabetik
+> select), kalkış ilçesi (`IlceGirisi` — önerili, serbest yazıma açık), araç
+> tipi, üst yapı, fiyat, not. Durak düzeyinde (her varış için ayrı): varış ili,
+> varış ilçesi, tonaj, palet, yük cinsi. Düzenlenen kart "✎ düzenlendi" rozeti
+> alıyor ve "↩ Excel'deki hâline dön" ile geri alınabiliyor.
+>
+> **Tasarım kararları:**
+> - **`seferNo` düzenlenemez** — gruplama ona göre; düzenleme sırasında değişmesi
+>   kartların yeniden gruplanıp kullanıcının gözünün önünde yer değiştirmesine
+>   yol açardı.
+> - **Kart düzeyi alanlar grubun TÜM satırlarına yazılıyor.** Route bunları
+>   grubun ilk satırından okuyor (`ilk.fiyat`, `ilk.aracTipi`…) ama `not` alanı
+>   AYRICA her durağın `notlar`ına gidiyor; tek bir "Not" kutusu gösterip yalnız
+>   ilk satıra yazmak duraklar arasında sessiz tutarsızlık bırakırdı.
+> - Araç/kasa tipi seçilince **ham VE norm alanı birlikte** yazılıyor: sunucu ham
+>   alanı okuyup `aracCoz()`/`utsCoz()`'dan geçiriyor, ekran norm'u gösteriyor.
+>
+> 🚨 **En kolay gözden kaçacak yer — `finalRows` birleştirmesi.** Düzenlemenin
+> `commit` gövdesine girmesi istemcideki tek bir `map`e bağlı ve o `map` eskiden
+> yalnız iki alanı birleştiriyordu. Güncellenmese kullanıcı ekranda düzelttiği
+> tonajın kaydedilmediğini ancak ilan oluştuktan SONRA fark ederdi (sessiz veri
+> kaybı). Artık `effectiveRows` ne ise o gönderiliyor — "gördüğün şey kaydedilen
+> şeydir" — ve bunu test DB'den okuyarak doğruluyor.
+>
+> **Yan kazanç (a11y):** düzenleme alanlarının etiketleri düz `<div>` olduğu için
+> erişilebilir adları YOKTU; hepsine `aria-label` eklendi (`IlceGirisi` de artık
+> `ariaLabel` alıyor). Hem ekran okuyucu hem kararlı test tutamağı.
+>
+> **Doğrulama — `npm run test:toplu-duzenle` (15/15):** GERÇEK tarayıcı + gerçek
+> oturum + gerçek `.xlsx`. Kasıtlı bozuk il yazımı ("Isanbul") ve Türkçe "5.000"
+> fiyat kalıbı içeren 2 ilanlık dosya yükleniyor, önizlemede il/fiyat/not/tonaj
+> düzenleniyor, onaylanıyor ve **DB'den okunarak** doğrulanıyor: düzenlenenler
+> kaydedildi, düzenlenmeyenler (2. durak tonajı, kalkış ilçesi, diğer kart)
+> Excel'deki hâliyle korundu. Geçici kullanıcı/ilan/durak sonunda siliniyor.
+> `playwright` devDependency olarak eklendi (`npx playwright install chromium`
+> bir kez gerekiyor). `tsc` + `next build` temiz.
+>
 > ## ✅ 8 AĞU 2026 — İLANLARIM'DA İLAN DÜZENLEME AÇILDI
 >
 > **İstek:** "İlanlarım sayfasında ilan düzeltme şansı olsun."

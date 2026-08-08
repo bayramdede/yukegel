@@ -9,6 +9,10 @@ import {
 } from '../../lib/toplu-yukle-sozlesme';
 // 8 Ağu 2026 — plaka sıralı `ilan-sabitler::ILLER` yerine Türkçe alfabetik liste.
 import { IL_ADLARI_ALFABETIK as ILLER } from '../../lib/lokasyon';
+// Araç/kasa listeleri SUNUCUNUN beyaz listesiyle aynı kaynaktan: `/api/excel-import`
+// bu değerleri `aracCoz()`/`utsCoz()` ile çözüyor, ayrı bir kopya tutmak ayrışırdı.
+import { ARAC_TIPLERI, UTSYAPI } from '../../lib/ilan-sabitler';
+import IlceGirisi from '../_components/IlceGirisi';
 
 type PreviewRow = OnizlemeSatiri;
 
@@ -17,7 +21,38 @@ function bugun(): string {
   return new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString().split('T')[0];
 }
 
-type Overrides = Record<number, { kalkisIliNorm?: string; varisIliNorm?: string }>;
+/**
+ * 8 Ağu 2026 — ESKİDEN yalnız iki alan vardı (`kalkisIliNorm`/`varisIliNorm`) ve
+ * yalnız il ÇÖZÜLEMEDİĞİNDE açılan bir select'ten set ediliyordu. Yani Excel'de
+ * yanlış yazılmış bir tonaj/fiyat/ilçe fark edilse bile kullanıcının tek çaresi
+ * dosyayı düzeltip yeniden yüklemekti. Artık önizlemedeki her kart düzenlenebilir.
+ *
+ * ⚠️ `seferNo` BİLEREK DÜZENLENEMEZ: gruplama ona göre yapılıyor, düzenleme
+ * sırasında değişmesi kartların yeniden gruplanıp ekranda yer değiştirmesine
+ * (kullanıcının düzenlediği kartın gözünün önünde kaybolmasına) yol açardı.
+ */
+type SatirYama = Partial<Pick<PreviewRow,
+  | 'kalkisIliNorm' | 'kalkisIlce'
+  | 'varisIliNorm' | 'varisIlce'
+  | 'aracTipi' | 'aracTipiNorm' | 'ustYapi' | 'ustYapiNorm'
+  | 'tonaj' | 'palet' | 'fiyat' | 'yukCinsi' | 'not'
+>>;
+type Overrides = Record<number, SatirYama>;
+
+/**
+ * Grup (kart) düzeyinde alanlar — `/api/excel-import` bunları grubun İLK
+ * satırından okuyor (`ilk.fiyat`, `ilk.aracTipi`, `ilk.not` …). Düzenlemeyi
+ * grubun TÜM satırlarına yazıyoruz: ekranda görünen (`first`) ile sunucunun
+ * okuduğu (`ilk`) aynı satır olsa da, `not` alanı ayrıca HER durağın
+ * `notlar`ına gidiyor — tek bir "Not" kutusu gösterip yalnız ilk satıra
+ * yazmak duraklar arasında sessiz bir tutarsızlık bırakırdı.
+ */
+const GRUP_ALANLARI = ['kalkisIliNorm', 'kalkisIlce', 'aracTipi', 'aracTipiNorm',
+  'ustYapi', 'ustYapiNorm', 'fiyat', 'not'] as const;
+
+const dLbl: React.CSSProperties = {
+  color: '#8b949e', fontSize: '0.68rem', fontWeight: 600, marginBottom: 3,
+};
 
 const inp: React.CSSProperties = {
   background: '#0d1117', color: '#e2e8f0',
@@ -37,6 +72,8 @@ export default function TopluYukle({ onGeri }: { onGeri: () => void }) {
   const [adim, setAdim] = useState<'upload' | 'preview' | 'basarili'>('upload');
   const [previewRows, setPreviewRows] = useState<PreviewRow[]>([]);
   const [overrides, setOverrides] = useState<Overrides>({});
+  /** Açık olan düzenleme kartının grup anahtarı ('' = hiçbiri). */
+  const [duzenleKey, setDuzenleKey] = useState('');
   const [yukleniyor, setYukleniyor] = useState(false);
   const [tarih, setTarih] = useState(bugun());
   const [sonuc, setSonuc] = useState<{ olusturulan: number; sonuclar: KayitSonucu[] } | null>(null);
@@ -100,6 +137,7 @@ export default function TopluYukle({ onGeri }: { onGeri: () => void }) {
 
       setPreviewRows(json.preview);
       setOverrides({});
+      setDuzenleKey('');
       setAdim('preview');
     } catch (err: any) {
       alert('❌ ' + err.message);
@@ -108,29 +146,56 @@ export default function TopluYukle({ onGeri }: { onGeri: () => void }) {
   }
 
   // ── Override uygula (preview'da anlık düzeltme) ──
-  function setOverride(rowIndex: number, field: 'kalkisIliNorm' | 'varisIliNorm', val: string) {
+  function setOverride(rowIndex: number, field: keyof SatirYama, val: string) {
     setOverrides(prev => ({
       ...prev,
-      [rowIndex]: { ...prev[rowIndex], [field]: val || undefined },
+      [rowIndex]: { ...prev[rowIndex], [field]: val === '' ? undefined : val },
     }));
+  }
+
+  /** Grup düzeyindeki alanı grubun TÜM satırlarına yazar (gerekçe: GRUP_ALANLARI). */
+  function setGrupOverride(rowIndexler: number[], yama: SatirYama) {
+    setOverrides(prev => {
+      const sonraki = { ...prev };
+      for (const ri of rowIndexler) sonraki[ri] = { ...sonraki[ri], ...yama };
+      return sonraki;
+    });
+  }
+
+  /** Araç/kasa tipi seçilince ham VE norm alanı birlikte yazılır — sunucu ham
+   *  alanı okuyor (`ilk.aracTipi` → `aracCoz()`), ekran norm'u gösteriyor. */
+  function setTip(rowIndexler: number[], hangi: 'arac' | 'uts', val: string) {
+    setGrupOverride(rowIndexler, hangi === 'arac'
+      ? { aracTipi: val || undefined, aracTipiNorm: val || undefined }
+      : { ustYapi: val || undefined, ustYapiNorm: val || undefined });
   }
 
   // ── Effective rows (preview + override birleşimi) ──
   type EffRow = PreviewRow & {
     kalkisEff: string | null; kalkisEffStatus: string;
     varisEff: string | null;  varisEffStatus: string;
+    duzenlendi: boolean;
   };
 
   const effectiveRows: EffRow[] = previewRows.map(row => {
-    const ov = overrides[row.rowIndex];
-    const kEff = ov?.kalkisIliNorm ?? row.kalkisIliNorm;
-    const vEff = ov?.varisIliNorm  ?? row.varisIliNorm;
+    const ov = overrides[row.rowIndex] ?? {};
+    // Yama TÜM alanlara uygulanıyor; `undefined` olanlar orijinali korur.
+    const temel = { ...row };
+    for (const [k, v] of Object.entries(ov)) {
+      if (v !== undefined) (temel as any)[k] = v;
+    }
+    const kEff = ov.kalkisIliNorm ?? row.kalkisIliNorm;
+    const vEff = ov.varisIliNorm  ?? row.varisIliNorm;
     return {
-      ...row,
+      ...temel,
       kalkisEff:       kEff,
-      kalkisEffStatus: ov?.kalkisIliNorm ? 'ok' : row.kalkisIliStatus,
+      kalkisEffStatus: ov.kalkisIliNorm ? 'ok' : row.kalkisIliStatus,
       varisEff:        vEff,
-      varisEffStatus:  ov?.varisIliNorm  ? 'ok' : row.varisIliStatus,
+      varisEffStatus:  ov.varisIliNorm  ? 'ok' : row.varisIliStatus,
+      // Araç/kasa tipi elle seçildiyse "warn" rozetini düşür.
+      aracTipiStatus: ov.aracTipiNorm ? 'ok' : row.aracTipiStatus,
+      ustYapiStatus:  ov.ustYapiNorm  ? 'ok' : row.ustYapiStatus,
+      duzenlendi: Object.values(ov).some(v => v !== undefined),
     };
   });
 
@@ -157,10 +222,17 @@ export default function TopluYukle({ onGeri }: { onGeri: () => void }) {
     setYukleniyor(true);
     try {
       // ⚠️ `userId` GÖNDERİLMİYOR — kimlik oturumdan okunuyor (B1).
-      const finalRows = previewRows.map(row => ({
+      // ⚠️ 8 Ağu 2026 — eskiden BURADA yalnız iki alan birleştiriliyordu
+      //    (`kalkisIliNorm`/`varisIliNorm`). Düzenleme tüm alanlara açılırken bu
+      //    satır güncellenmese kullanıcı ekranda düzelttiği tonajın/fiyatın
+      //    KAYDEDİLMEDİĞİNİ ancak ilan oluştuktan sonra fark ederdi. Artık
+      //    ekranda gösterilen `effectiveRows` neyse o gönderiliyor — "gördüğün
+      //    şey kaydedilen şeydir".
+      const finalRows = effectiveRows.map(({ kalkisEff, varisEff, kalkisEffStatus,
+                                             varisEffStatus, duzenlendi, ...row }) => ({
         ...row,
-        kalkisIliNorm: overrides[row.rowIndex]?.kalkisIliNorm ?? row.kalkisIliNorm,
-        varisIliNorm:  overrides[row.rowIndex]?.varisIliNorm  ?? row.varisIliNorm,
+        kalkisIliNorm: kalkisEff,
+        varisIliNorm:  varisEff,
       }));
 
       const istek = { action: 'commit', rows: finalRows, tarih } satisfies TopluYukleIstek;
@@ -318,6 +390,9 @@ export default function TopluYukle({ onGeri }: { onGeri: () => void }) {
           const groupHasError = rows.some(r => r.kalkisEffStatus === 'error' || r.varisEffStatus === 'error');
           const borderColor = groupHasError ? '#7f1d1d' : '#166534';
           const hasFiyat = first.fiyat?.trim();
+          const acik = duzenleKey === key;
+          const riler = rows.map(r => r.rowIndex);
+          const grupDuzenlendi = rows.some(r => r.duzenlendi);
 
           return (
             <div key={key} style={{
@@ -360,10 +435,25 @@ export default function TopluYukle({ onGeri }: { onGeri: () => void }) {
                 )}
                 {/* Not */}
                 {first.not && (
-                  <span style={{ color: '#4b5563', fontSize: '0.7rem', marginLeft: 'auto' }}>
-                    📝 {first.not.slice(0, 50)}{first.not.length > 50 ? '...' : ''}
+                  <span style={{ color: '#4b5563', fontSize: '0.7rem' }}>
+                    📝 {first.not.slice(0, 40)}{first.not.length > 40 ? '...' : ''}
                   </span>
                 )}
+                {grupDuzenlendi && (
+                  <span style={{ background: '#1e3a5f', color: '#60a5fa', fontSize: '0.65rem', fontWeight: 700, padding: '2px 6px', borderRadius: 4 }}>
+                    ✎ düzenlendi
+                  </span>
+                )}
+                <button type="button" onClick={() => setDuzenleKey(acik ? '' : key)}
+                  style={{
+                    marginLeft: 'auto', background: acik ? '#1e3a5f' : 'none',
+                    border: `1px solid ${acik ? '#60a5fa' : '#374151'}`,
+                    color: acik ? '#60a5fa' : '#8b949e', borderRadius: 6,
+                    padding: '3px 10px', fontSize: '0.72rem', cursor: 'pointer', fontWeight: 600,
+                    whiteSpace: 'nowrap', flexShrink: 0,
+                  }}>
+                  {acik ? '✕ Kapat' : '✏️ Düzenle'}
+                </button>
               </div>
 
               {/* Kalkış */}
@@ -406,6 +496,117 @@ export default function TopluYukle({ onGeri }: { onGeri: () => void }) {
                   )}
                 </div>
               ))}
+
+              {/* ── Düzenleme paneli ──────────────────────────────────────────
+                  Kart düzeyinde alanlar üstte (grubun TÜM satırlarına yazılır),
+                  durak düzeyinde alanlar altta (yalnız o satıra). Tarih burada
+                  YOK — tek yükleme tarihi alt barda, tüm dosya için ortak. */}
+              {acik && (
+                <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid #21262d' }}>
+                  <div style={{ color: '#60a5fa', fontSize: '0.7rem', fontWeight: 700, marginBottom: 8 }}>
+                    İLAN BİLGİLERİ
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 8, marginBottom: 10 }}>
+                    <div>
+                      <div style={dLbl}>Kalkış İli</div>
+                      <select value={first.kalkisEff ?? ''} style={inp} aria-label="Kalkış İli"
+                        onChange={e => setGrupOverride(riler, { kalkisIliNorm: e.target.value || undefined })}>
+                        <option value=''>Seçin</option>
+                        {ILLER.map(il => <option key={il}>{il}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <div style={dLbl}>Kalkış İlçesi</div>
+                      <IlceGirisi il={first.kalkisEff} value={first.kalkisIlce ?? ''} ariaLabel="Kalkış İlçesi"
+                        onChange={v => setGrupOverride(riler, { kalkisIlce: v })} style={inp} />
+                    </div>
+                    <div>
+                      <div style={dLbl}>Araç Tipi</div>
+                      <select value={first.aracTipiNorm ?? ''} style={inp} aria-label="Araç Tipi"
+                        onChange={e => setTip(riler, 'arac', e.target.value)}>
+                        <option value=''>—</option>
+                        {ARAC_TIPLERI.map(t => <option key={t}>{t}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <div style={dLbl}>Üst Yapı</div>
+                      <select value={first.ustYapiNorm ?? ''} style={inp} aria-label="Üst Yapı"
+                        onChange={e => setTip(riler, 'uts', e.target.value)}>
+                        <option value=''>—</option>
+                        {UTSYAPI.map(u => <option key={u}>{u}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <div style={dLbl}>Fiyat (TL)</div>
+                      <input type="number" min={0} value={first.fiyat ?? ''} placeholder="Opsiyonel" style={inp} aria-label="Fiyat"
+                        onChange={e => setGrupOverride(riler, { fiyat: e.target.value })} />
+                    </div>
+                  </div>
+                  <div style={{ marginBottom: 10 }}>
+                    <div style={dLbl}>Not</div>
+                    <input value={first.not ?? ''} placeholder="Özel şartlar..." style={inp} aria-label="Not"
+                      onChange={e => setGrupOverride(riler, { not: e.target.value })} />
+                  </div>
+
+                  <div style={{ color: '#f97316', fontSize: '0.7rem', fontWeight: 700, marginBottom: 8 }}>
+                    VARIŞ NOKTALARI ({rows.length})
+                  </div>
+                  {rows.map(row => (
+                    <div key={row.rowIndex} style={{ background: '#0d1117', border: '1px solid #21262d', borderRadius: 6, padding: 10, marginBottom: 8 }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 8 }}>
+                        <div>
+                          <div style={dLbl}>Varış İli</div>
+                          <select value={row.varisEff ?? ''} style={inp} aria-label="Varış İli"
+                            onChange={e => setOverride(row.rowIndex, 'varisIliNorm', e.target.value)}>
+                            <option value=''>Seçin</option>
+                            {ILLER.map(il => <option key={il}>{il}</option>)}
+                          </select>
+                        </div>
+                        <div>
+                          <div style={dLbl}>Varış İlçesi</div>
+                          <IlceGirisi il={row.varisEff} value={row.varisIlce ?? ''} ariaLabel="Varış İlçesi"
+                            onChange={v => setOverride(row.rowIndex, 'varisIlce', v)} style={inp} />
+                        </div>
+                        <div>
+                          <div style={dLbl}>Tonaj</div>
+                          <input type="number" step="0.1" min={0} value={row.tonaj ?? ''} placeholder="—" style={inp} aria-label="Tonaj"
+                            onChange={e => setOverride(row.rowIndex, 'tonaj', e.target.value)} />
+                        </div>
+                        <div>
+                          <div style={dLbl}>Palet</div>
+                          <input type="number" min={0} value={row.palet ?? ''} placeholder="—" style={inp} aria-label="Palet"
+                            onChange={e => setOverride(row.rowIndex, 'palet', e.target.value)} />
+                        </div>
+                        <div>
+                          <div style={dLbl}>Yük Cinsi</div>
+                          <input value={row.yukCinsi ?? ''} placeholder="—" style={inp} aria-label="Yük Cinsi"
+                            onChange={e => setOverride(row.rowIndex, 'yukCinsi', e.target.value)} />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <button type="button" onClick={() => setDuzenleKey('')}
+                      style={{ background: '#14532d', border: '1px solid #166534', color: '#22c55e', borderRadius: 6, padding: '5px 14px', fontSize: '0.78rem', cursor: 'pointer', fontWeight: 700 }}>
+                      ✓ Tamam
+                    </button>
+                    {grupDuzenlendi && (
+                      <button type="button"
+                        onClick={() => setOverrides(prev => {
+                          const s = { ...prev };
+                          for (const ri of riler) delete s[ri];
+                          return s;
+                        })}
+                        style={{ background: 'none', border: '1px solid #374151', color: '#8b949e', borderRadius: 6, padding: '5px 12px', fontSize: '0.78rem', cursor: 'pointer' }}>
+                        ↩ Excel'deki hâline dön
+                      </button>
+                    )}
+                    <span style={{ color: '#4b5563', fontSize: '0.7rem' }}>
+                      Değişiklikler yalnız bu yüklemeye ait — Excel dosyanız değişmez.
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
           );
         })}
