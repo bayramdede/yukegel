@@ -87,6 +87,8 @@ export default function AnalitikClient() {
   const [days, setDays]             = useState(30);
   const [direction, setDirection]   = useState<Direction>('departure');
   const [cities, setCities]         = useState<CityRow[]>([]);
+  /** Sunucu önbellekten döndüyse verinin yaşı; taze ise `null`. */
+  const [tazelik, setTazelik]       = useState<{ yasSn: number } | null>(null);
   const [citiesLoading, setCL]      = useState(false);
   const [citiesError, setCitiesErr] = useState('');
   const [citySearch, setCitySearch] = useState('');
@@ -103,17 +105,19 @@ export default function AnalitikClient() {
   const [routeLoading, setRouteLoading] = useState(false);
 
   // ── Şehir listesini yükle ──────────────────────────────────────────────
-  const loadCities = useCallback(async (d: number) => {
+  const loadCities = useCallback(async (d: number, taze = false) => {
     setCL(true);
     setCitiesErr('');
     setSelected(null);
     setDetail(null);
     setSubSelected(null);
     try {
-      const res  = await fetch(`/api/admin/radar/analitik?view=overview&days=${d}`);
+      const res  = await fetch(`/api/admin/radar/analitik?view=overview&days=${d}${taze ? '&taze=1' : ''}`);
       const json = await res.json();
       if (!res.ok || json.error) throw new Error(json.error || 'API hatası');
       setCities(json.cities ?? []);
+      // 8 Ağu 2026 — sunucu 90 sn önbellekliyor (lib/radar-cache.ts); yaşını göster.
+      setTazelik(json.onbellek ? { yasSn: json.yas_sn ?? 0 } : null);
     } catch (e: any) {
       setCitiesErr(e.message);
       setCities([]);
@@ -270,6 +274,18 @@ export default function AnalitikClient() {
         {cities.length > 0 && (
           <span style={{ color: '#4b5563', fontSize: '0.78rem', marginLeft: 6 }}>
             {cities.length} şehir · {cities.reduce((a, c) => a + c.listing_count, 0).toLocaleString('tr-TR')} ilan
+          </span>
+        )}
+        {/* Tazelik — sunucu 90 sn önbellekliyor; bayat veriyi sessizce göstermiyoruz */}
+        {tazelik && (
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginLeft: 'auto',
+            color: '#8b949e', fontSize: '0.74rem' }}>
+            ⚡ {tazelik.yasSn} sn önce hesaplandı
+            <button type="button" onClick={() => loadCities(days, true)}
+              style={{ background: 'none', border: '1px solid #30363d', color: '#60a5fa',
+                borderRadius: 5, padding: '2px 8px', fontSize: '0.72rem', cursor: 'pointer', fontWeight: 600 }}>
+              ↻ Yenile
+            </button>
           </span>
         )}
       </div>

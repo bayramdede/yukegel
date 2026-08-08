@@ -143,6 +143,8 @@ export default function RadarClient({
   const [loading, setLoading]       = useState(false);
   const [error, setError]           = useState('');
   const [searched, setSearched]     = useState(false);
+  /** Sunucu önbellekten döndüyse verinin yaşı; taze ise `null`. */
+  const [tazelik, setTazelik]       = useState<{ yasSn: number } | null>(null);
 
   // Genişletilmiş satır (raw_text preview)
   const [expandedRows, setExpanded] = useState<Set<string>>(new Set());
@@ -160,7 +162,7 @@ export default function RadarClient({
   const [editMsg, setEditMsg]     = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
 
   // ── Arama ──────────────────────────────────────────────────────────────
-  const search = useCallback(async (overrideMode?: 'all' | 'contract') => {
+  const search = useCallback(async (overrideMode?: 'all' | 'contract', taze = false) => {
     if (!fromCity.trim() && !toCity.trim()) {
       setError('En az kalkış veya varış ili seçmelisiniz.');
       return;
@@ -176,6 +178,8 @@ export default function RadarClient({
       to_city: toCity,
       days: String(days),
       mode: activeMode,
+      // `taze=1` yalnız "↻ Yenile" basıldığında gider; sunucu önbelleği atlar.
+      ...(taze ? { taze: '1' } : {}),
     });
 
     try {
@@ -184,6 +188,9 @@ export default function RadarClient({
       if (!res.ok) throw new Error(json.error || 'Sunucu hatası');
       setLeads(json.leads ?? []);
       setStats(json.route_stats ?? null);
+      // 8 Ağu 2026 — sunucu 90 sn'lik önbellek kullanıyor (bkz. lib/radar-cache.ts).
+      // Tazeliği GÖSTERİYORUZ: sessiz bayat veri bu projede tekrarlayan bir hata.
+      setTazelik(json.onbellek ? { yasSn: json.yas_sn ?? 0 } : null);
       setSearched(true);
     } catch (e: any) {
       setError(e.message);
@@ -398,6 +405,24 @@ export default function RadarClient({
           </div>
         )}
       </div>
+
+      {/* ── Tazelik uyarısı ──────────────────────────────────────────────────
+          Sunucu 90 sn'lik önbellek kullanıyor (lib/radar-cache.ts). Bayat veriyi
+          SESSİZCE göstermek bu projede tekrarlayan bir hata sınıfı; yaşını yaz. */}
+      {stats && tazelik && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12,
+          background: '#161b22', border: '1px solid #21262d', borderRadius: 8,
+          padding: '7px 12px', color: '#8b949e', fontSize: '0.76rem',
+        }}>
+          <span>⚡ Önbellekten geldi ({tazelik.yasSn} sn önce hesaplandı)</span>
+          <button type="button" onClick={() => search(undefined, true)}
+            style={{ background: 'none', border: '1px solid #30363d', color: '#60a5fa',
+              borderRadius: 5, padding: '2px 9px', fontSize: '0.72rem', cursor: 'pointer', fontWeight: 600 }}>
+            ↻ Yenile
+          </button>
+        </div>
+      )}
 
       {/* ── İstatistik Bandı ─────────────────────────────────────────────── */}
       {stats && (

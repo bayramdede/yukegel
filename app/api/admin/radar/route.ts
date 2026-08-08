@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin, getServiceSupabase } from '../../../../lib/auth';
 import { ilId, ilAdi } from '../../../../lib/lokasyon';
+import { onbellekli } from '../../../../lib/radar-cache';
 
 export const dynamic = 'force-dynamic';
 
@@ -34,6 +35,9 @@ export async function GET(req: NextRequest) {
   const toCity   = searchParams.get('to_city')?.trim();
   const days     = Math.min(90, Math.max(7, parseInt(searchParams.get('days') || '30')));
   const mode     = searchParams.get('mode') || 'all'; // 'all' | 'contract'
+  // `taze=1` → önbelleği ATLA. Arayüzdeki "↻ Yenile" butonu bunu gönderiyor;
+  // göndermeseydi buton aynı önbellekli yanıtı geri alıp kullanıcıya yalan söylerdi.
+  const taze     = searchParams.get('taze') === '1';
 
   if (!fromCity && !toCity) {
     return NextResponse.json(
@@ -60,15 +64,27 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: `Tanınmayan varış ili: ${toCity}` }, { status: 400 });
   }
 
-  const { data, error } = await svc.rpc('get_radar_intelligence', {
-    p_from_province_id: fromId,
-    p_to_province_id:   toId,
-    p_days:             days,
-  });
-
-  if (error) {
-    console.error('[radar] RPC hatası:', error.message);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  // 8 Ağu 2026 — 90 sn'lik bellek önbelleği; gerekçesi `lib/radar-cache.ts`
+  // başında (soğuk rota 3-7 sn, tekrar 45-250 ms). Anahtar SORGUYU tanımlayan
+  // üç değer; `mode` filtresi aşağıda ÖNBELLEKTEN SONRA uygulanıyor, böylece
+  // "tümü"/"kontrat" arasında geçiş yeni sorgu tetiklemiyor.
+  let onbellekBilgi = { onbellek: false, yasSn: 0 };
+  let data: unknown;
+  try {
+    const s = await onbellekli(`rota:${fromId ?? '-'}:${toId ?? '-'}:${days}`, async () => {
+      const { data: d, error } = await svc.rpc('get_radar_intelligence', {
+        p_from_province_id: fromId,
+        p_to_province_id:   toId,
+        p_days:             days,
+      });
+      if (error) throw new Error(error.message);
+      return d;
+    }, taze);
+    data = s.veri;
+    onbellekBilgi = { onbellek: s.onbellek, yasSn: s.yasSn };
+  } catch (e: any) {
+    console.error('[radar] RPC hatası:', e?.message);
+    return NextResponse.json({ error: e?.message ?? 'Radar sorgusu başarısız' }, { status: 500 });
   }
 
   const result = data as {
@@ -91,6 +107,10 @@ export async function GET(req: NextRequest) {
     success: true,
     route_stats: result.route_stats,
     leads,
+    // Ekranda gösteriliyor — admin baktığı verinin tazeliğini bilsin.
+    // (Sessiz bayat veri bu projede tekrarlayan bir hata sınıfı.)
+    onbellek: onbellekBilgi.onbellek,
+    yas_sn:   onbellekBilgi.yasSn,
     // Kanonik ad döndürülüyor ("istanbul" → "İstanbul"); arayüz bunu başlıkta
     // gösteriyor, kullanıcının yazdığı hali değil.
     filters: {
