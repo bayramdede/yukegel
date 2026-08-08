@@ -7,7 +7,8 @@ import {
   type HamSatir, type OnizlemeSatiri, type TopluYukleIstek, type TopluYukleYanit,
   type KayitSonucu,
 } from '../../lib/toplu-yukle-sozlesme';
-import { ILLER } from '../../lib/ilan-sabitler';
+// 8 Ağu 2026 — plaka sıralı `ilan-sabitler::ILLER` yerine Türkçe alfabetik liste.
+import { IL_ADLARI_ALFABETIK as ILLER } from '../../lib/lokasyon';
 
 type PreviewRow = OnizlemeSatiri;
 

@@ -76,6 +76,17 @@ formdan kaçırır. Serbest değerler **işaretleniyor**: `origin_district_offic
 (boolean). Böylece sık tekrar eden serbest adlar sonradan `aliases` tablosuna terfi edilebilir ve
 filtre tarafı "resmî ilçe" ile "serbest etiket"i karıştırmaz.
 
+> 🔴 **8 Ağu 2026 — bu paragraf 30 Tem'den beri UYGULANMAMIŞ bir NİYETTİ, kod
+> gerçeği değildi.** Bayram: *"İlçeler şu anda seçenek olarak çıkmıyor. Serbest
+> metin. Coğrafi veri standart sürecinde öyle konuşmadık."* — haklıydı. Her ilçe
+> alanı (`ilan-ver`, `moderator` düzenleme formu) sıfır önerili düz `<input>`
+> idi; "Searchable Select" hiç kurulmamıştı. Aynı taramada il comboboxlarının da
+> (RadarClient hariç) plaka sırasında, alfabetik OLMADIĞI görüldü. İkisi de
+> `docs/20260808_il_ilce_combobox.sql`'de kapatıldı: yeni paylaşılan
+> `app/_components/IlceGirisi.tsx` (`<input list>`+`<datalist>`, `ilceler()`'den
+> besleniyor, serbest yazıma hâlâ açık) + tüm il dropdown'ları
+> `IL_ADLARI_ALFABETIK`/`ILLER_TAM_ALFABETIK`'e çevrildi.
+
 ## Dalgalar
 
 ### Dalga 1 — şema (✅ ÇALIŞTIRILDI)

@@ -6,7 +6,8 @@ import { girisAdresi } from '../../../lib/redirect';
 // ⚠️ `ILLER` artık türetilmiş (Görev #36) — bu dosya zaten `ilAdi()` ile
 //    ekrana il adı basıyordu; dropdown'ın ayrı bir kopyadan beslenmesi
 //    ikisinin sessizce ayrışmasına açık kapı bırakıyordu.
-import { ilAdi, IL_ADLARI as ILLER } from '../../../lib/lokasyon';
+// 8 Ağu 2026 — plaka sırası yerine Türkçe alfabetik dropdown; değer yine il ADI.
+import { ilAdi, IL_ADLARI_ALFABETIK as ILLER } from '../../../lib/lokasyon';
 
 const supabase = createClient();
 

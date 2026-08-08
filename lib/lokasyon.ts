@@ -68,8 +68,21 @@ export const IL_ADLARI: readonly string[] = ILLER_TAM.map(il => il.name);
  *    satır yer değiştirir); seçilen DEĞER değişmediği için filtre davranışı
  *    aynı kalır, yalnız liste doğru Türkçe sırada görünür.
  */
+const TR_COLLATOR = new Intl.Collator('tr');
+
 export const IL_ADLARI_ALFABETIK: readonly string[] =
-  [...IL_ADLARI].sort(new Intl.Collator('tr').compare);
+  [...IL_ADLARI].sort(TR_COLLATOR.compare);
+
+/**
+ * Aynı 81 kayıt, TÜRKÇE alfabetik — ama `id`si de yanında taşınır.
+ *
+ * 8 Ağu 2026 — `IL_ADLARI_ALFABETIK` yalnız AD döndürüyor; `value`'yu index'ten
+ * türeten bir dropdown (`i+1 = province_id`, plaka sırasına bağımlı bir varsayım)
+ * bu diziye geçince YANLIŞ id üretirdi (alfabetik sırada index+1 ≠ plaka kodu).
+ * Bu dizi `id`yi korur, dropdown `il.id`yi DOĞRUDAN value yapabilir.
+ */
+export const ILLER_TAM_ALFABETIK: readonly Il[] =
+  [...ILLER_TAM].sort((a, b) => TR_COLLATOR.compare(a.name, b.name));
 
 const ID_INDEKS: ReadonlyMap<number, Il> = new Map(ILLER_TAM.map(il => [il.id, il]));
 const AD_INDEKS: ReadonlyMap<string, Il> = new Map(ILLER_TAM.map(il => [ilKey(il.name), il]));

@@ -1,0 +1,108 @@
+-- =============================================================================
+-- İl comboboxları alfabetik + gerçek ilçe seçilebilirliği — 8 Ağu 2026
+-- =============================================================================
+--
+-- İSTEK (Bayram, birebir): "İl geçen tüm comboboxlarda seçenekler alfabetik
+-- sıraya göre gelsin. İlçeler şu anda seçenek olarak çıkmıyor. Serbest metin.
+-- Coğrafi veri standart sürecinde öyle konuşmadık."
+--
+-- Bu dosya SQL değil (DB tarafında değişiklik YOK) — proje kuralı dosya adını
+-- `.sql` tutmayı gerektiriyor (`YYYYMMDD_<konu>.sql`), içerik BÖLÜM yapısını
+-- koruyor.
+--
+-- BÖLÜM 0 — ÖLÇÜM / TEŞHİS
+-- =============================================================================
+-- 1) İl comboboxları: repo genelinde `grep`lendi, 6 dosyada 11 combobox bulundu.
+--    Yalnız `admin/radar/RadarClient.tsx` (2 combobox) zaten `IL_ADLARI_ALFABETIK`
+--    kullanıyordu (Görev #36, 3 Ağu). Geri kalan 9'u `ilan-sabitler::ILLER`
+--    veya `lokasyon::IL_ADLARI` — İKİSİ DE PLAKA SIRASINDA (Adana=1...Düzce=81),
+--    alfabetik DEĞİL:
+--      - app/ilan-ver/page.tsx           (kalkış + durak, 2 combobox)
+--      - app/ilan-ver/TopluYukle.tsx     (manuel il düzeltme, 1)
+--      - app/moderator/page.tsx          (düzenle formu ×2 + filtre barı ×2, 4)
+--      - app/admin/poi-onay/PoiOnayClient.tsx (Google Places il seçici, 1)
+--      - app/u/[username]/page.tsx       (kalkış+varış filtresi, 2)
+--
+-- 2) İlçe alanları: `docs/COGRAFI_GECIS.md` "Serbest ilçe girişi" bölümü
+--    (spec md.7) baştan beri şunu söylüyordu: "İlçe alanı Searchable Select
+--    AMA serbest girişe kapalı değil." Kod tarafı bunu HİÇ kurmamıştı — Bayram'ın
+--    "öyle konuşmadık" tepkisi doğru: canlıdaki HER ilçe alanı sıfır önerili,
+--    düz bir `<input type=text>` idi:
+--      - app/ilan-ver/page.tsx           (kalkış ilçe + durak ilçe, 2)
+--      - app/moderator/page.tsx          (düzenle formu: kalkış ilçe + durak ilçe, 2)
+--      - app/admin/ogrenme-merkezi/OgrenmeMerkeziClient.tsx (alias "district", ×3
+--        form: ekle / kütüphane-düzenle / onay-bekleyen-düzenle)
+--
+--    Veri zaten VARDI — eksik olan yalnız bileşendi: `lib/lokasyon.ts::ilceler(ilId)`
+--    973 resmî ilçeyi il başına Türkçe alfabetik döndürüyor (`docs/COGRAFI_GECIS.md`
+--    Dalga 1'den beri), hiç tüketilmiyordu.
+--
+--    KAPSAM DIŞI BIRAKILAN (bilinçli): `app/admin/poi-onay/PoiOnayClient.tsx`
+--    ve `app/yol-rehberi/PoiEkleModal.tsx`'teki POI'nin KENDİ "Şehir"/"İlçe"
+--    alanları. `pois` tablosu coğrafi standardizasyonun (province_id geçişinin)
+--    HİÇBİR dalgasında yer almadı — `grep -rn "province_id"` bu iki dosyada sıfır
+--    sonuç veriyor. Bu, farklı bir tablo/farklı bir proje; "coğrafi veri
+--    standardizasyon sürecinde konuşulmayan" şey bu DEĞİL.
+--
+-- BÖLÜM 1 — UYGULA
+-- =============================================================================
+-- 1.1 `lib/lokasyon.ts`'e iki yeni export:
+--     - `ILLER_TAM_ALFABETIK`: `ILLER_TAM`'ın Türkçe alfabetik permütasyonu,
+--       her kayıt kendi `id`sini (plaka kodunu) taşıyormaya devam ediyor.
+--       NEDEN GEREKLİ: `app/_components/HomeClient.tsx`'in il dropdown'u
+--       `value = String(index + 1)` diyordu — "index+1 = plaka kodu" sözleşmesi
+--       listenin PLAKA SIRASINDA kalmasını ZORUNLU kılıyordu. Yalnız isim
+--       listesini (`IL_ADLARI_ALFABETIK`) alfabetik yapıp index'i aynen
+--       kullansaydık YANLIŞ `province_id` üretilirdi (örn. alfabetik 1. sıradaki
+--       Adana'ya değil her neyse 1. sıraya denk gelen ile plaka 1 yazılırdı).
+--       `ILLER_TAM_ALFABETIK` id'yi kayıtla birlikte taşıdığı için dropdown artık
+--       `il.id`yi DOĞRUDAN value yapıyor, index'e hiç bakmıyor.
+--     - Geri kalan 9 combobox zaten value olarak İL ADINI kullanıyordu
+--       (`<option key={il}>{il}</option>` gibi) — bunlarda sıra değişikliği
+--       DEĞERİ etkilemiyor, `IL_ADLARI_ALFABETIK`'e (Görev #36'dan beri var)
+--       geçmek yeterliydi.
+--
+-- 1.2 Yeni paylaşılan bileşen: `app/_components/IlceGirisi.tsx`.
+--     Native `<input list> + <datalist>` (üçüncü parti kütüphane yok — projenin
+--     geri kalanıyla aynı sadelik). Seçilen ile göre `ilceler(ilId)`'den öneri
+--     listesi kurulur; kullanıcı listede olmayan bir şey de yazabilir (spec'in
+--     "serbest girişe kapalı değil" şartı böylece korunuyor — bu bileşen yalnız
+--     ÖNERİR, DOĞRULAMAYI hâlâ sunucudaki `ilceNormalize()`/`district_official`
+--     yapıyor, o taraf HİÇ değişmedi).
+--
+-- 1.3 Dokunulan dosyalar:
+--     - lib/lokasyon.ts                                (+ILLER_TAM_ALFABETIK)
+--     - app/_components/IlceGirisi.tsx                 (YENİ)
+--     - app/ilan-ver/page.tsx                           (2 il-sırası + 2 ilçe)
+--     - app/ilan-ver/TopluYukle.tsx                     (1 il-sırası)
+--     - app/moderator/page.tsx                          (4 il-sırası + 2 ilçe)
+--     - app/admin/poi-onay/PoiOnayClient.tsx             (1 il-sırası — yalnız
+--       "Google Places'ten Veri Çek" aracının il seçici, POI'nin kendi
+--       şehir/ilçe alanı DEĞİL)
+--     - app/u/[username]/page.tsx                        (2 il-sırası)
+--     - app/_components/HomeClient.tsx                   (2 il-sırası, id
+--       türetme index'ten `il.id`'ye çevrildi)
+--     - app/admin/ogrenme-merkezi/OgrenmeMerkeziClient.tsx (3 yerde "Normalized"
+--       serbest metinden il-select'e, "district" serbest metinden IlceGirisi'ne
+--       çevrildi — bu ekranın TÜM işi "doğru il/ilçe yazımı öğret" olduğu için
+--       kendi formunun serbest yazıma açık olması W5/D1'in kapattığı hatayı
+--       ADMİN ELİYLE tekrar açık bırakıyordu; fırsat bulunmuşken kapatıldı)
+--
+-- BÖLÜM 2 — DOĞRULAMA
+-- =============================================================================
+-- `npx tsc --noEmit`            → temiz
+-- `npm run test:lokasyon`       → 23/23 (ILLER_TAM_ALFABETIK eklendikten SONRA
+--                                  da geçti; mevcut testler yeni exportu
+--                                  bozmadığını doğruluyor, ayrıca yeni export
+--                                  için ayrı bir assert eklenmedi çünkü
+--                                  `IL_ADLARI_ALFABETIK` zaten aynı sıralama
+--                                  mantığını test ediyor — ikisi aynı
+--                                  `TR_COLLATOR`'dan türüyor)
+-- `npm run test:districts`      → 18/18
+-- `npx next build`              → temiz, tüm route'lar derlendi
+--
+-- Kapsam dışı bırakılanlar (bu dosyada DEĞİŞMEDİ, ayrı bir konu):
+--   - `pois` tablosunun kendi "Şehir"/"İlçe" serbest metin alanları
+--     (yukarıda BÖLÜM 0'da gerekçelendirildi).
+--   - `district_official` / sunucu tarafı `ilceNormalize()` mantığı — bu
+--     PATCH öncesinden beri doğru çalışıyordu, dokunulmadı.

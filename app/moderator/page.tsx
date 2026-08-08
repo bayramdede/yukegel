@@ -4,13 +4,16 @@ import { createClient } from '../../lib/supabase';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ilanTelefonlariGetir, ilanTelefonGuncelle, ilanAuditGetir, moderatorIlanOlustur } from './actions';
-// ⚠️ `ILLER` = `IL_ADLARI`. Buradaki il filtresi Dalga 5'ten sonra
+// ⚠️ `ILLER` = `IL_ADLARI_ALFABETIK`. Buradaki il filtresi Dalga 5'ten sonra
 //    `ilAdi(id) === filtreKalkis` diye TAM EŞİTLİK karşılaştırıyor; `ilAdi()`
 //    `locations.json`'dan okuyor. Dropdown eskiden AYRI bir elle yazılmış
 //    kopyadan besleniyordu — tek harflik sapma filtreyi sessizce boşa
 //    düşürürdü. Aynı kaynaktan türetmek o hata sınıfını imkânsız kılıyor.
-import { ilAdi, ilCiftYazim, ilceNormalize, IL_ADLARI as ILLER } from '../../lib/lokasyon';
+// 8 Ağu 2026 — plaka sırası (`IL_ADLARI`) yerine Türkçe alfabetik. KARŞILAŞTIRILAN
+//    değer yine il ADI (sıra değişse de aynı), yalnız görünen liste sırası değişti.
+import { ilAdi, ilCiftYazim, ilceNormalize, IL_ADLARI_ALFABETIK as ILLER } from '../../lib/lokasyon';
 import { ilKey } from '../../lib/ilan-sabitler';
+import IlceGirisi from '../_components/IlceGirisi';
 
 const supabase = createClient();
 
@@ -856,7 +859,7 @@ export default function Moderator() {
           <div><div style={{ color: '#8b949e', fontSize: '0.68rem', marginBottom: 2 }}>İlan Tipi</div><select value={duzenleData.listing_type} onChange={e => setDuzenleData({ ...duzenleData, listing_type: e.target.value })} style={inp}><option value="yuk">Yük</option><option value="arac">Araç</option></select></div>
           <div><div style={{ color: '#8b949e', fontSize: '0.68rem', marginBottom: 2 }}>Telefon</div><input value={duzenleData.contact_phone} onChange={e => setDuzenleData({ ...duzenleData, contact_phone: e.target.value })} style={inp} /></div>
           <div><div style={{ color: '#8b949e', fontSize: '0.68rem', marginBottom: 2 }}>Kalkış İli</div><select value={duzenleData.origin_city} onChange={e => setDuzenleData({ ...duzenleData, origin_city: e.target.value })} style={inp}>{ILLER.map(il => <option key={il}>{il}</option>)}</select></div>
-          <div><div style={{ color: '#8b949e', fontSize: '0.68rem', marginBottom: 2 }}>Kalkış İlçesi</div><input value={duzenleData.origin_district} onChange={e => setDuzenleData({ ...duzenleData, origin_district: e.target.value })} style={inp} placeholder="İlçe" /></div>
+          <div><div style={{ color: '#8b949e', fontSize: '0.68rem', marginBottom: 2 }}>Kalkış İlçesi</div><IlceGirisi il={duzenleData.origin_city} value={duzenleData.origin_district} onChange={v => setDuzenleData({ ...duzenleData, origin_district: v })} style={inp} placeholder="İlçe" /></div>
           <div><div style={{ color: '#8b949e', fontSize: '0.68rem', marginBottom: 2 }}>Fiyat (TL)</div><input type="number" value={duzenleData.price_offer} onChange={e => setDuzenleData({ ...duzenleData, price_offer: e.target.value })} style={inp} placeholder="Opsiyonel" /></div>
         </div>
         <div style={{ marginBottom: 10 }}>
@@ -879,7 +882,7 @@ export default function Moderator() {
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 6 }}>
               <div><div style={{ color: '#8b949e', fontSize: '0.65rem', marginBottom: 2 }}>İl</div><select value={stop.city} onChange={e => stopGuncelle(idx, 'city', e.target.value)} style={inp}>{ILLER.map(il => <option key={il}>{il}</option>)}</select></div>
-              <div><div style={{ color: '#8b949e', fontSize: '0.65rem', marginBottom: 2 }}>İlçe</div><input value={stop.district} onChange={e => stopGuncelle(idx, 'district', e.target.value)} style={inp} placeholder="-" /></div>
+              <div><div style={{ color: '#8b949e', fontSize: '0.65rem', marginBottom: 2 }}>İlçe</div><IlceGirisi il={stop.city} value={stop.district} onChange={v => stopGuncelle(idx, 'district', v)} style={inp} placeholder="-" /></div>
               <div><div style={{ color: '#8b949e', fontSize: '0.65rem', marginBottom: 2 }}>Ton</div><input type="number" value={stop.weight_ton} onChange={e => stopGuncelle(idx, 'weight_ton', e.target.value)} style={inp} placeholder="-" /></div>
               <div><div style={{ color: '#8b949e', fontSize: '0.65rem', marginBottom: 2 }}>Palet</div><input type="number" value={stop.pallet_count} onChange={e => stopGuncelle(idx, 'pallet_count', e.target.value)} style={inp} placeholder="-" /></div>
             </div>

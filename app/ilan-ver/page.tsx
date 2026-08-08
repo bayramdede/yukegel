@@ -11,7 +11,12 @@ import TopluYukle from './TopluYukle';
 import MetindenIlan, { ParsedListingResult } from './MetindenIlan';
 // ILAN_VER_ANALIZ M2 — bu üç liste artık tek kaynaktan geliyor. Sunucu tarafı beyaz
 // liste (`./actions.ts`) da AYNI dosyayı okuyor; ayrışamazlar.
-import { ILLER, UTSYAPI, ARAC_TIPLERI, ilNormalize } from '../../lib/ilan-sabitler';
+import { UTSYAPI, ARAC_TIPLERI, ilNormalize } from '../../lib/ilan-sabitler';
+// 8 Ağu 2026 — dropdown artık `ilan-sabitler::ILLER` (plaka sırası) DEĞİL, aynı
+// 81 ilin Türkçe alfabetik hâli. Değer yine il ADI (`<option>` metni), sıralama
+// yalnız GÖRÜNÜMÜ değiştiriyor — kaydedilen veri aynı.
+import { IL_ADLARI_ALFABETIK as ILLER } from '../../lib/lokasyon';
+import IlceGirisi from '../_components/IlceGirisi';
 const supabase = createClient();
 
 // `ILAN_VER_ANALIZ` B4 — `yuk_cinsi` durak bazında.
@@ -532,7 +537,7 @@ export default function IlanVer() {
               </div>
               <div>
                 <label style={s.label}>İlçe</label>
-                <input value={kalkis_ilce} onChange={e => setKalkisIlce(e.target.value)} placeholder="İlçe (opsiyonel)" style={s.input} />
+                <IlceGirisi il={kalkis} value={kalkis_ilce} onChange={setKalkisIlce} style={s.input} />
               </div>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: tip === 'yuk' ? '1fr 1fr' : '1fr', gap: 12, marginBottom: 16 }}>
@@ -639,7 +644,7 @@ export default function IlanVer() {
                   </div>
                   <div>
                     <label style={s.label}>İlçe</label>
-                    <input value={durak.ilce} onChange={e => durakGuncelle(i, 'ilce', e.target.value)} placeholder="Opsiyonel" style={s.input} />
+                    <IlceGirisi il={durak.sehir} value={durak.ilce} onChange={v => durakGuncelle(i, 'ilce', v)} placeholder="Opsiyonel" style={s.input} />
                   </div>
                 </div>
                 {tip === 'yuk' && (

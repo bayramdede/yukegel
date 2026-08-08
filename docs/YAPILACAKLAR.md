@@ -1,5 +1,39 @@
 # Yükegel — Yapılacaklar Listesi
 
+> ## ✅ 8 AĞU 2026 — İL COMBOBOXLARI ALFABETİK + İLÇE ARTIK SEÇENEKLİ (Bayram'ın
+> ## şikâyeti üzerine)
+>
+> Bayram: *"İl geçen tüm comboboxlarda seçenekler alfabetik sıraya göre gelsin.
+> İlçeler şu anda seçenek olarak çıkmıyor. Serbest metin. Coğrafi veri standart
+> sürecinde öyle konuşmadık."* — ikisi de doğruydu, ikisi de kapatıldı.
+>
+> **1. İl comboboxları:** repo genelinde 6 dosyada 11 combobox bulundu; yalnız
+> `RadarClient.tsx` (Görev #36'dan beri) alfabetikti, geri kalan 9'u plaka
+> sırasındaydı (`ilan-sabitler::ILLER` / `lokasyon::IL_ADLARI`). Hepsi
+> `IL_ADLARI_ALFABETIK`'e çevrildi. Tek istisna `HomeClient.tsx`: dropdown
+> değeri `index+1`'den (plaka sırasına bağımlı bir varsayım) türüyordu — yeni
+> `ILLER_TAM_ALFABETIK` export'u (id'yi kayıtla birlikte taşıyan alfabetik
+> liste) ile `il.id`yi DOĞRUDAN kullanacak şekilde düzeltildi, yoksa alfabetik
+> sıraya geçince YANLIŞ `province_id` üretilirdi.
+>
+> **2. İlçe seçilebilirliği:** `docs/COGRAFI_GECIS.md`'nin "Serbest ilçe girişi"
+> bölümü (spec md.7) baştan beri "Searchable Select ama serbest girişe kapalı
+> değil" diyordu — kod tarafı bunu HİÇ kurmamıştı, her ilçe alanı sıfır önerili
+> düz `<input>`'tı. Veri zaten vardı (`lib/lokasyon.ts::ilceler()`, 973 resmî
+> ilçe); eksik olan bileşendi. Yeni paylaşılan `app/_components/IlceGirisi.tsx`
+> (native `<input list>`+`<datalist>`, seçilen ile göre filtrelenmiş öneri,
+> serbest yazıma KAPALI DEĞİL) `ilan-ver` ve `moderator` düzenleme formundaki
+> 4 ilçe alanına + `ogrenme-merkezi`'nin alias düzenleme formlarındaki 3
+> "district" alanına + aynı formların "Normalized" (il) alanlarına (artık
+> select) bağlandı.
+>
+> **Kapsam dışı (bilinçli):** POI'lerin (`admin/poi-onay`, `yol-rehberi`) KENDİ
+> şehir/ilçe alanları — `pois` tablosu coğrafi standardizasyonun hiçbir
+> dalgasında yer almadı, farklı bir sistem.
+>
+> `tsc --noEmit` + `test:lokasyon` (23/23) + `test:districts` (18/18) +
+> `next build` temiz. Ayrıntı: `docs/20260808_il_ilce_combobox.sql`.
+>
 > ## ✅ 8 AĞU 2026 — ÖĞRENME MERKEZİ (`/admin/ogrenme-merkezi`) İNCELENDİ
 >
 > `app/api/admin/learn-aliases/route.ts` + `OgrenmeMerkeziClient.tsx` (zaten

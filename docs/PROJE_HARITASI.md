@@ -1,6 +1,20 @@
 # Yükegel — Proje Haritası
 > **Kullanım:** Her sohbet başında sadece bu dosyayı oku. Kaynak dosyaları sadece o dosyada değişiklik yapacaksan oku.  
 >
+> ✅ **8 AĞU 2026 — İl comboboxları alfabetik + ilçe artık gerçekten seçenekli.**
+> Bayram'ın şikâyeti haklıydı: `COGRAFI_GECIS.md`'nin "Searchable Select"
+> sözü (spec md.7) hiç uygulanmamıştı, ilçe alanları sıfır önerili düz metindi;
+> il comboboxlarının da RadarClient hariç hepsi plaka sırasındaydı. Yeni
+> paylaşılan `app/_components/IlceGirisi.tsx` (`<input list>`+`<datalist>`,
+> `ilceler()`'den besleniyor, serbest yazıma kapalı değil) 4 listing-formu
+> alanına + 3 alias-editörü alanına bağlandı; `lib/lokasyon.ts`'e yeni
+> `ILLER_TAM_ALFABETIK` (id'yi koruyan alfabetik liste) eklendi çünkü
+> `HomeClient`'ın dropdown'u değeri `index+1`'den türetiyordu. 6 dosya, 11
+> combobox alfabetikleştirildi. POI'lerin kendi şehir/ilçe alanı bilinçli
+> olarak kapsam dışı (farklı sistem, coğrafi standardizasyona hiç girmedi).
+> `tsc`/`test:lokasyon`/`test:districts`/`next build` temiz. Ayrıntı:
+> `docs/20260808_il_ilce_combobox.sql`.
+>
 > ✅ **8 AĞU 2026 — Öğrenme Merkezi (`/admin/ogrenme-merkezi`) incelendi, 3 bug
 > düzeltildi:** GET no_lane'de ikinci sorgunun hatası okunmuyordu (backlog
 > sayısını yanlış raporlardı), `discover`'da aynı DB yazması kopyala-yapıştırla
@@ -858,6 +872,10 @@ yukegel/
 │                                         #      🚨 Dropdown ile `ilAdi()` AYNI kaynaktan gelmek ZORUNDA:
 │                                         #      moderatör filtresi tam eşitlik karşılaştırıyor, sapma
 │                                         #      hata değil SESSİZ BOŞ SONUÇ üretir.
+│                                         #    ILLER_TAM_ALFABETIK (8 Ağu 2026) — aynı liste ama `Il` NESNESİ
+│                                         #      (id dahil), `IL_ADLARI_ALFABETIK` yalnız ad döndürdüğü için
+│                                         #      `value`'yu index'ten türeten dropdown'larda (`HomeClient`)
+│                                         #      kullanılamaz — alfabetik sırada index+1 ≠ plaka kodu.
 │                                         #    ilceler(ilId) · ilceAra(ilId,q) · ilceResmiMi
 │                                         #    ilceHangiIllerde(ad) → Il[] (4 Ağu 2026, #51) — TERS ARAMA.
 │                                         #      `ilceResmiMi` false'u İKİ ZIT ŞEYİ karıştırır: (a) meşru

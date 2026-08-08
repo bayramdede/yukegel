@@ -1,6 +1,12 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+// 8 Ağu 2026 — bu ekran tam olarak "il/ilçe yazımını standartlaştır" aracı;
+// "Normalized"/"district" alanları serbest metinken kendisi (ilginç biçimde)
+// W5/D1'in kapattığı hatayı burada tekrar açık bırakıyordu: admin "Istanbul"
+// yazıp kaydedebilirdi. İl artık select, ilçe artık seçilen ile göre önerili.
+import { IL_ADLARI_ALFABETIK } from '../../../lib/lokasyon';
+import IlceGirisi from '../../_components/IlceGirisi';
 
 interface Alias {
   id: number;
@@ -251,21 +257,29 @@ function AliasSekme() {
             <div style={{ color: '#8b949e', fontSize: '0.72rem', marginBottom: 4 }}>
               {yeniType === 'city' ? 'Normalized (Il adi)' : 'Normalized (standart)'}
             </div>
-            <input
-              style={S.input()}
-              placeholder={yeniType === 'city' ? 'Orn: Antalya' : 'Orn: TIR'}
-              value={yeniNorm}
-              onChange={e => setYeniNorm(e.target.value)}
-            />
+            {yeniType === 'city' ? (
+              <select style={S.input()} value={yeniNorm} onChange={e => setYeniNorm(e.target.value)}>
+                <option value=''>Il secin</option>
+                {IL_ADLARI_ALFABETIK.map(il => <option key={il}>{il}</option>)}
+              </select>
+            ) : (
+              <input
+                style={S.input()}
+                placeholder='Orn: TIR'
+                value={yeniNorm}
+                onChange={e => setYeniNorm(e.target.value)}
+              />
+            )}
           </div>
           {yeniType === 'city' && yeniAltTip === 'ilce' && (
             <div>
               <div style={{ color: '#8b949e', fontSize: '0.72rem', marginBottom: 4 }}>Ilce adi (district)</div>
-              <input
-                style={S.input()}
-                placeholder='Orn: Finike'
+              <IlceGirisi
+                il={yeniNorm}
                 value={yeniDistrict}
-                onChange={e => setYeniDistrict(e.target.value)}
+                onChange={setYeniDistrict}
+                placeholder='Ilce secin veya yazin'
+                style={S.input()}
               />
             </div>
           )}
@@ -317,8 +331,16 @@ function AliasSekme() {
                     </div>
                     <div>
                       <div style={{ color: '#8b949e', fontSize: '0.7rem', marginBottom: 3 }}>Normalized</div>
-                      <input style={S.input()} value={duzVal.normalized}
-                        onChange={e => setDuzVal(p => ({ ...p, normalized: e.target.value }))} />
+                      {duzVal.type === 'city' ? (
+                        <select style={S.input()} value={duzVal.normalized}
+                          onChange={e => setDuzVal(p => ({ ...p, normalized: e.target.value }))}>
+                          <option value=''>Il secin</option>
+                          {IL_ADLARI_ALFABETIK.map(il => <option key={il}>{il}</option>)}
+                        </select>
+                      ) : (
+                        <input style={S.input()} value={duzVal.normalized}
+                          onChange={e => setDuzVal(p => ({ ...p, normalized: e.target.value }))} />
+                      )}
                     </div>
                     <div>
                       <div style={{ color: '#8b949e', fontSize: '0.7rem', marginBottom: 3 }}>Tip</div>
@@ -344,11 +366,12 @@ function AliasSekme() {
                         Ilce (district dolu)
                       </button>
                       {duzAltTip === 'ilce' && (
-                        <input
-                          style={{ ...S.input(), flex: 1 }}
-                          placeholder='Ilce adi'
+                        <IlceGirisi
+                          il={duzVal.normalized}
                           value={duzVal.district}
-                          onChange={e => setDuzVal(p => ({ ...p, district: e.target.value }))}
+                          onChange={v => setDuzVal(p => ({ ...p, district: v }))}
+                          placeholder='Ilce secin veya yazin'
+                          style={{ ...S.input(), flex: 1 }}
                         />
                       )}
                     </div>
@@ -868,8 +891,11 @@ function OnaySekme() {
                     <span style={{ color: '#484f58', alignSelf: 'center', paddingBottom: 2 }}>&rarr;</span>
                     <div>
                       <div style={{ color: '#8b949e', fontSize: '0.7rem', marginBottom: 3 }}>Normalized (Il)</div>
-                      <input style={{ ...S.input(), width: 140 }} value={duzVal.normalized}
-                        onChange={e => setDuzVal(v => ({ ...v, normalized: e.target.value }))} />
+                      <select style={{ ...S.input(), width: 140 }} value={duzVal.normalized}
+                        onChange={e => setDuzVal(v => ({ ...v, normalized: e.target.value }))}>
+                        <option value=''>Il secin</option>
+                        {IL_ADLARI_ALFABETIK.map(il => <option key={il}>{il}</option>)}
+                      </select>
                     </div>
                     <div>
                       <div style={{ color: '#8b949e', fontSize: '0.7rem', marginBottom: 3 }}>Tur</div>
@@ -881,8 +907,13 @@ function OnaySekme() {
                     {duzVal.altTip === 'ilce' && (
                       <div>
                         <div style={{ color: '#8b949e', fontSize: '0.7rem', marginBottom: 3 }}>Ilce (district)</div>
-                        <input style={{ ...S.input(), width: 130 }} placeholder='Ilce adi' value={duzVal.district}
-                          onChange={e => setDuzVal(v => ({ ...v, district: e.target.value }))} />
+                        <IlceGirisi
+                          il={duzVal.normalized}
+                          value={duzVal.district}
+                          onChange={v => setDuzVal(p => ({ ...p, district: v }))}
+                          placeholder='Ilce secin veya yazin'
+                          style={{ ...S.input(), width: 130 }}
+                        />
                       </div>
                     )}
                   </div>

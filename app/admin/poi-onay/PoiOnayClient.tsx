@@ -11,7 +11,8 @@ import {
 } from '../../../lib/poi-constants';
 // ⚠️ 81 il listesi burada ELLE yazılıydı ve hiçbir test onu `locations.json`
 //    ile karşılaştırmıyordu. Tek kaynağa indirildi (Görev #36).
-import { IL_ADLARI as ILLER } from '../../../lib/lokasyon';
+// 8 Ağu 2026 — plaka sırası yerine Türkçe alfabetik dropdown; değer yine il ADI.
+import { IL_ADLARI_ALFABETIK as ILLER } from '../../../lib/lokasyon';
 
 const PinHarita = dynamic(() => import('./PinHarita'), {
   ssr: false,

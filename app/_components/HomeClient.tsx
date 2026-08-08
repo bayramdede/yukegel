@@ -8,11 +8,12 @@ import { ILAN_LIMITI, ILAN_SELECT, ilanNormalize, uyeYeniMi, durakToplami } from
 // korumuyordu: biri güncellenip diğeri unutulsa ana sayfa filtresi sessizce
 // eksik il gösterecekti. Artık tek kaynak, `npm run test:lokasyon` kapsamında.
 //
-// ⚠️ `index + 1 = plaka kodu = province_id` SÖZLEŞMESİ. `ILLER` dizisinin sırası
-//    `lib/constants/locations.json` ile birebir aynı olmak ZORUNDA; bunu
-//    `npm run test:lokasyon` doğruluyor. Dropdown değeri bu id — filtreye il ADI
-//    değil id gidiyor, sunucu da `ilId()` beyaz listesinden bir kez daha geçiriyor.
-import { ILLER } from '../../lib/ilan-sabitler';
+// 8 Ağu 2026 — dropdown DEĞERİ hâlâ `province_id` ama artık `index+1`'den DEĞİL,
+// `il.id`'den DOĞRUDAN okunuyor. Eskiden "index+1 = plaka kodu" sözleşmesi
+// listenin PLAKA SIRASINDA kalmasını zorunlu kılıyordu — Türkçe alfabetik göstermek
+// isteseydik `i+1` yanlış id üretirdi (alfabetik sırada index+1 ≠ plaka kodu).
+// `ILLER_TAM_ALFABETIK` id'yi kaydın içinde taşıdığı için bu bağımlılık artık yok.
+import { ILLER_TAM_ALFABETIK as ILLER } from '../../lib/lokasyon';
 import GirisLink from './GirisLink';
 import type { AuthChangeEvent, Session } from '@supabase/supabase-js';
 
@@ -867,13 +868,13 @@ export default function HomeClient({ initialIlanlar = [], totalCount = 0 }: { in
           <select value={kalkis} onChange={e => setKalkis(e.target.value)}
             style={{ background: '#0d1117', color: '#e2e8f0', border: '1px solid #30363d', borderRadius: 6, padding: '5px 10px', fontSize: '0.82rem', cursor: 'pointer' }}>
             <option value=''>📍 Kalkış İli</option>
-            {/* value = plaka kodu (index+1). Filtreye il adı GİTMİYOR. */}
-            {ILLER.map((il, i) => <option key={il} value={String(i + 1)}>{il}</option>)}
+            {/* value = plaka kodu (il.id). Filtreye il adı GİTMİYOR. */}
+            {ILLER.map(il => <option key={il.id} value={String(il.id)}>{il.name}</option>)}
           </select>
           <select value={varis} onChange={e => setVaris(e.target.value)}
             style={{ background: '#0d1117', color: '#e2e8f0', border: '1px solid #30363d', borderRadius: 6, padding: '5px 10px', fontSize: '0.82rem', cursor: 'pointer' }}>
             <option value=''>🏁 Varış İli</option>
-            {ILLER.map((il, i) => <option key={il} value={String(i + 1)}>{il}</option>)}
+            {ILLER.map(il => <option key={il.id} value={String(il.id)}>{il.name}</option>)}
           </select>
           <select value={aracTipi} onChange={e => setAracTipi(e.target.value)}
             style={{ background: '#0d1117', color: '#e2e8f0', border: '1px solid #30363d', borderRadius: 6, padding: '5px 10px', fontSize: '0.82rem', cursor: 'pointer' }}>
