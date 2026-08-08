@@ -59,8 +59,13 @@ aynı; `id = index + 1` sözleşmesi buna dayanıyor.
 
 ### Neden il için tablo var, ilçe için yok
 
-İlçe DB tablosu **açılmadı** (spec md.2). Bir ilçe tablosu her okumaya JOIN ekler ve karşılığında
-yalnızca "yazım doğru mu" garantisi verir — onu zaten formdaki Searchable Select veriyor.
+> 🔴 **8 Ağu 2026 — BU BAŞLIK BAYAT.** `public.districts` tablosu **açıldı**
+> (973 satır, 81 il) — Dalga 5 ile birlikte; bu belgenin 244. satırı bunu zaten
+> söylüyor ama buradaki paragraf 30 Tem'den beri güncellenmemişti. `ilce_resmi()`
+> ve `poi_ilce_coz()` o tablodan okuyor. Aşağıdaki gerekçe TARİHSEL.
+
+~~İlçe DB tablosu **açılmadı** (spec md.2). Bir ilçe tablosu her okumaya JOIN ekler ve karşılığında
+yalnızca "yazım doğru mu" garantisi verir — onu zaten formdaki Searchable Select veriyor.~~
 
 `public.provinces` ise açıldı, çünkü verdiği şey farklı: `province_id` FK'sız bir integer olsaydı
 istemciden gelen `999` ya da `-1` sessizce DB'ye girer ve **hiçbir yerde patlamazdı** — ilan
@@ -86,6 +91,30 @@ filtre tarafı "resmî ilçe" ile "serbest etiket"i karıştırmaz.
 > `app/_components/IlceGirisi.tsx` (`<input list>`+`<datalist>`, `ilceler()`'den
 > besleniyor, serbest yazıma hâlâ açık) + tüm il dropdown'ları
 > `IL_ADLARI_ALFABETIK`/`ILLER_TAM_ALFABETIK`'e çevrildi.
+
+## POI tarafı (8 Ağu 2026 — geçişin son parçası)
+
+`pois` tablosu bu belgenin Dalga 1-5'inin HİÇBİRİNE dahil edilmemişti; 7 Ağu'da
+"farklı sistem" gerekçesiyle bilinçli olarak kapsam dışı bırakılmıştı. Bayram'ın
+*"Poi tarafına da coğrafi standardı uygula"* talimatıyla aynı sözleşme buraya da
+uygulandı: `province_id` smallint FK + `district` metin + `district_official`.
+
+| | önce | sonra |
+|---|---|---|
+| `province_id` kapsama | — | **%99,96** (9.174/9.178) |
+| resmî ilçe | 4.951 | **8.765** |
+| serbest ilçe | 4.209 | 402 |
+| farklı `city` değeri | 88 | 82 (81 il + Kıbrıs) |
+
+Ayrıntı ve doğrulama: `docs/20260808_poi_cografi_standart.sql`.
+Yeni tek kapı: `lib/poi-lokasyon.ts::poiKonumCoz()` (SQL ikizi
+`public.poi_ilce_coz()`, senkronu `npm run test:poi-senkron` koruyor).
+
+> ⚠️ **`il_key()`e DOKUNULMADI.** Üç fonksiyonel indeks ona bağlı
+> (`provinces_il_key_uniq`, `districts_il_key_uniq`, `districts_ad_key_idx`);
+> IMMUTABLE gövdesini değiştirmek onları REINDEX'e kadar sessizce yanlış
+> yapardı. Hoşgörü (U+0307 temizliği, şapkalı ünlü katlama) ÜSTE, ayrı bir
+> `ilce_key()` fonksiyonunda.
 
 ## Dalgalar
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSupabase, getServiceSupabase } from '../../../../lib/auth';
 import { POI_GECERLI_KATEGORILER } from '../../../../lib/poi-constants';
+import { poiKonumCoz } from '../../../../lib/poi-lokasyon';
 
 export const runtime = 'nodejs';
 
@@ -136,8 +137,29 @@ export async function PATCH(
       updates.categories = [category];
     }
 
-    if (city !== undefined)         updates.city         = city?.trim() || null;
-    if (district !== undefined)     updates.district     = district?.trim() || null;
+    // 🗺️ Coğrafi standart (8 Ağu 2026) — il/ilçe TEK KAPIDAN (`poiKonumCoz`).
+    // ⚠️ PATCH KISMİ: yalnız `district` gelirse ili MEVCUT SATIRDAN okumak
+    //    ZORUNLU. Yoksa il null sanılır, ilçe "resmî değil" diye işaretlenir ve
+    //    backfill'in doğru kurduğu bayrak sessizce bozulur — bu rotanın en
+    //    kolay gözden kaçan kırılma noktası.
+    if (city !== undefined || district !== undefined) {
+      let ilKaynak = city;
+      let ilceKaynak = district;
+      if (city === undefined || district === undefined) {
+        const { data: mevcut } = await supabase
+          .from('pois')
+          .select('city, district')
+          .eq('id', id)
+          .maybeSingle();
+        if (city === undefined)     ilKaynak   = mevcut?.city ?? null;
+        if (district === undefined) ilceKaynak = mevcut?.district ?? null;
+      }
+      const konum = poiKonumCoz(ilKaynak, ilceKaynak);
+      updates.province_id       = konum.provinceId;
+      updates.city              = konum.city;
+      updates.district          = konum.district;
+      updates.district_official = konum.districtOfficial;
+    }
     if (address !== undefined)      updates.address      = address?.trim() || null;
     if (address_note !== undefined) updates.address_note = address_note?.trim() || null;
     if (description !== undefined)  updates.description  = description?.trim() || null;

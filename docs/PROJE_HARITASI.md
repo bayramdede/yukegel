@@ -1,6 +1,17 @@
 # Yükegel — Proje Haritası
 > **Kullanım:** Her sohbet başında sadece bu dosyayı oku. Kaynak dosyaları sadece o dosyada değişiklik yapacaksan oku.  
 >
+> ✅ **8 AĞU 2026 — Coğrafi standart POI tarafına da uygulandı.** `pois` hiçbir
+> dalgaya dahil değildi; artık `province_id` (smallint FK) + `district_official`
+> var. Kapsama **%99,96**, resmî ilçe **4.951 → 8.765**. İlçelerin %46'sı
+> "serbest" görünüyordu ama %89'u Google Places kaynaklı üç mekanik kalıptı
+> (`"<İl> Merkez"`, U+0307 bulaşması, ilçe=il adı). Kalan 402 bilinçli: büyükşehir
+> `"<İl> Merkez"`leri — `Merkez` orada resmî ilçe değil, çözücü TAHMİN ETMİYOR.
+> Yeni tek kapı `lib/poi-lokasyon.ts::poiKonumCoz()` (5 yazma yolu + 2 form).
+> 🚨 `il_key()`e dokunulmadı (3 fonksiyonel indeks ona bağlı) — hoşgörü ayrı
+> `ilce_key()`de. Senkron kopya riski `npm run test:poi-senkron` ile teste
+> bağlandı. Ayrıntı: `docs/20260808_poi_cografi_standart.sql`.
+>
 > ✅ **8 AĞU 2026 — İl comboboxları alfabetik + ilçe artık gerçekten seçenekli.**
 > Bayram'ın şikâyeti haklıydı: `COGRAFI_GECIS.md`'nin "Searchable Select"
 > sözü (spec md.7) hiç uygulanmamıştı, ilçe alanları sıfır önerili düz metindi;

@@ -13,6 +13,7 @@ import {
 //    ile karşılaştırmıyordu. Tek kaynağa indirildi (Görev #36).
 // 8 Ağu 2026 — plaka sırası yerine Türkçe alfabetik dropdown; değer yine il ADI.
 import { IL_ADLARI_ALFABETIK as ILLER } from '../../../lib/lokasyon';
+import IlceGirisi from '../../_components/IlceGirisi';
 
 const PinHarita = dynamic(() => import('./PinHarita'), {
   ssr: false,
@@ -327,13 +328,24 @@ function FormGrid({ form, set, showButtons, onKaydet, onIptal, kayitYukleniyor, 
         <div><label style={lbl}>Konum Adı *</label>
           <input style={inp} value={String(form.name)} onChange={e => set('name', e.target.value)} placeholder="Güven Tır Parkı" />
         </div>
+        {/* 8 Ağu 2026 — coğrafi standart: il 81 sabit değerden (Türkçe alfabetik),
+            ilçe seçilen ile göre önerili ama serbest yazıma açık (spec md.7). */}
         <div>
           <label style={lbl}>Şehir</label>
-          <input style={inp} value={String(form.city)} onChange={e => set('city', e.target.value)} placeholder="İstanbul" />
+          <select style={inp} value={String(form.city)} onChange={e => { set('city', e.target.value); set('district', ''); }}>
+            <option value=''>İl seçin</option>
+            {ILLER.map(il => <option key={il}>{il}</option>)}
+          </select>
         </div>
         <div>
           <label style={lbl}>İlçe</label>
-          <input style={inp} value={String(form.district)} onChange={e => set('district', e.target.value)} placeholder="Kadıköy" />
+          <IlceGirisi
+            il={String(form.city)}
+            value={String(form.district)}
+            onChange={v => set('district', v)}
+            placeholder="Kadıköy"
+            style={inp}
+          />
         </div>
         <div>
           <label style={lbl}>Telefon</label>

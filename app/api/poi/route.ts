@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSupabase, getServiceSupabase } from '../../../lib/auth';
 import { POI_GECERLI_KATEGORILER } from '../../../lib/poi-constants';
+import { poiKonumCoz } from '../../../lib/poi-lokasyon';
 
 export const runtime = 'nodejs';
 
@@ -185,6 +186,11 @@ export async function POST(request: NextRequest) {
     // PostGIS geography point formatı
     const locationWkt = `SRID=4326;POINT(${longitude} ${latitude})`;
 
+    // 🗺️ Coğrafi standart (8 Ağu 2026) — il/ilçe İSTEMCİDEN GELDİĞİ GİBİ yazılmaz.
+    // `province_id` FK'lı; `poiKonumCoz()` çözemezse null kalır ve DB uydurma
+    // değeri zaten reddederdi. `city` artık id'den TÜRETİLİYOR.
+    const konum = poiKonumCoz(city, district);
+
     const { data, error } = await supabase
       .from('pois')
       .insert({
@@ -196,8 +202,10 @@ export async function POST(request: NextRequest) {
         latitude,
         longitude,
         address,
-        city,
-        district,
+        province_id:       konum.provinceId,
+        city:              konum.city,
+        district:          konum.district,
+        district_official: konum.districtOfficial,
         address_note,
         phone,
         website,

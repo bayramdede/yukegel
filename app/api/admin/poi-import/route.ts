@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSupabase, getServiceSupabase } from '../../../../lib/auth';
+import { poiKonumCoz } from '../../../../lib/poi-lokasyon';
 
 export const runtime = 'nodejs';
 
@@ -614,6 +615,10 @@ export async function POST(request: NextRequest) {
           }
 
           const { il: adresIl, ilce } = parseAdresComponents(detay.address_components || []);
+          // 🗺️ Coğrafi standart (8 Ağu 2026). "<İl> Merkez" / "Denizli Merkezefendi"
+          // kalıbı TAM OLARAK burada doğuyordu (Google adres bileşenleri);
+          // `poiKonumCoz()` bunu resmî ilçeye çözüp `district_official`ı işaretliyor.
+          const konum = poiKonumCoz(adresIl || il, ilce);
 
           const { error } = await supabase
             .from('pois')
@@ -625,8 +630,10 @@ export async function POST(request: NextRequest) {
               longitude:           detay.geometry.location.lng,
               location:            `SRID=4326;POINT(${detay.geometry.location.lng} ${detay.geometry.location.lat})`,
               address:             detay.formatted_address || null,
-              city:                adresIl || il,
-              district:            ilce || null,
+              province_id:         konum.provinceId,
+              city:                konum.city,
+              district:            konum.district,
+              district_official:   konum.districtOfficial,
               phone:               detay.formatted_phone_number || null,
               google_maps_url:     detay.url || null,
               google_rating:       detay.rating || null,
@@ -691,6 +698,8 @@ export async function PUT(request: NextRequest) {
     if (!detay) return NextResponse.json({ success: false, error: 'Google Places detay alınamadı.' }, { status: 502 });
 
     const { il: adresIl, ilce } = parseAdresComponents(detay.address_components || []);
+    // 🗺️ Coğrafi standart (8 Ağu 2026) — yukarıdaki toplu yolla aynı kapı.
+    const konum = poiKonumCoz(adresIl || il, ilce);
 
     const { error } = await supabase
       .from('pois')
@@ -702,8 +711,10 @@ export async function PUT(request: NextRequest) {
         longitude:           detay.geometry.location.lng,
         location:            `SRID=4326;POINT(${detay.geometry.location.lng} ${detay.geometry.location.lat})`,
         address:             detay.formatted_address || null,
-        city:                adresIl || il || null,
-        district:            ilce || null,
+        province_id:         konum.provinceId,
+        city:                konum.city,
+        district:            konum.district,
+        district_official:   konum.districtOfficial,
         phone:               detay.formatted_phone_number || null,
         google_maps_url:     detay.url || null,
         google_rating:       detay.rating || null,

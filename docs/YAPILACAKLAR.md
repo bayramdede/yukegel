@@ -1,5 +1,36 @@
 # Yükegel — Yapılacaklar Listesi
 
+> ## ✅ 8 AĞU 2026 — COĞRAFİ STANDART POI TARAFINA DA UYGULANDI
+>
+> `pois` tablosu `COGRAFI_GECIS.md`'nin hiçbir dalgasına dahil edilmemişti (bir
+> gün önce "farklı sistem" diye kapsam dışı bırakmıştım). Bayram'ın talimatıyla
+> aynı sözleşme uygulandı: `province_id` smallint FK + `district` metin +
+> `district_official`.
+>
+> **Sonuç:** il kapsaması **%99,96** (9.174/9.178) · resmî ilçe **4.951 → 8.765**
+> · serbest ilçe 4.209 → 402 · farklı `city` değeri 88 → 82.
+>
+> **İlçelerin %46'sı "serbest" görünüyordu ama %89'u gerçek serbest metin
+> değildi** — Google Places kaynaklı üç mekanik kalıptı: `"<İl> Merkez"` (3.740),
+> U+0307 bulaşması (`"Osmangazi̇"`, 129 — alias tablosunda 4 Ağu'da düzeltilen
+> hatanın aynısı), ilçe=il adı (113). Kademeli bir çözücü bunları açtı.
+>
+> **Kalan 402 BİLİNÇLİ:** çoğu büyükşehirlerin `"<İl> Merkez"`i. Balıkesir/Ordu/
+> Van/Denizli'de `Merkez` resmî ilçe DEĞİL — "Balıkesir Merkez" Karesi mi
+> Altıeylül mü bilinmez. Çözücü tahmin etmiyor; serbest bırakmak spec md.7'nin
+> öngördüğü davranış.
+>
+> 🚨 **`il_key()`e DOKUNULMADI** — üç fonksiyonel indeks ona bağlı, IMMUTABLE
+> gövdesini değiştirmek onları REINDEX'e kadar sessizce yanlış yapardı. Hoşgörü
+> üste, ayrı `ilce_key()`de.
+>
+> Yeni tek kapı `lib/poi-lokasyon.ts::poiKonumCoz()` 5 yazma yoluna bağlandı;
+> POI formlarına da dünkü `IlceGirisi` + alfabetik il select'i geldi.
+> **Senkron kopya riski teste bağlandı:** `npm run test:poi-senkron` TS ile SQL
+> ikizini canlı veride karşılaştırıyor (654 tekil çift, ayrışan 0) — biri
+> değişirse kırılır. Ayrıca `test:poi-lokasyon` 23/23.
+> Ayrıntı: `docs/20260808_poi_cografi_standart.sql`.
+>
 > ## ✅ 8 AĞU 2026 — İL COMBOBOXLARI ALFABETİK + İLÇE ARTIK SEÇENEKLİ (Bayram'ın
 > ## şikâyeti üzerine)
 >

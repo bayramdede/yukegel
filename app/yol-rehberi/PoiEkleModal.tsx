@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 import { POI_HIYERARSI, POI_ALT_ETIKETLER, POI_GENEL_ETIKETLER } from '../../lib/poi-constants';
+import { IL_ADLARI_ALFABETIK } from '../../lib/lokasyon';
+import IlceGirisi from '../_components/IlceGirisi';
 
 interface Props {
   userLat: number | null;
@@ -283,22 +285,27 @@ export default function PoiEkleModal({ onKapat, onBasarili }: Props) {
             <div style={{ fontSize: 12, color: '#f87171', marginBottom: 14 }}>{konumHata}</div>
           )}
 
-          {/* Şehir + İlçe */}
+          {/* Şehir + İlçe — 8 Ağu 2026: coğrafi standart. İl serbest metin DEĞİL
+              (81 sabit değer, Türkçe alfabetik); ilçe seçilen ile göre önerili
+              ama serbest yazıma AÇIK (spec md.7). */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             <div>
               <label style={labelStyle}>Şehir</label>
-              <input
+              <select
                 value={form.city}
-                onChange={e => setForm({ ...form, city: e.target.value })}
-                placeholder="İzmir"
+                onChange={e => setForm({ ...form, city: e.target.value, district: '' })}
                 style={inputStyle}
-              />
+              >
+                <option value=''>İl seçin</option>
+                {IL_ADLARI_ALFABETIK.map(il => <option key={il}>{il}</option>)}
+              </select>
             </div>
             <div>
               <label style={labelStyle}>İlçe</label>
-              <input
+              <IlceGirisi
+                il={form.city}
                 value={form.district}
-                onChange={e => setForm({ ...form, district: e.target.value })}
+                onChange={v => setForm({ ...form, district: v })}
                 placeholder="Bornova"
                 style={inputStyle}
               />

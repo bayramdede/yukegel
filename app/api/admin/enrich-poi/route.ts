@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSupabase, getServiceSupabase } from '../../../../lib/auth';
+import { poiKonumCoz } from '../../../../lib/poi-lokasyon';
 
 export const runtime = 'nodejs';
 
@@ -371,12 +372,18 @@ name için slug'ı düzelt/normalize et (varsa), Nominatim bağlamına göre ger
       ? await googlePlacesEnrich(latN, lngN, slug, googleKey)
       : { phone: null, website: null, google_place_id: null, google_rating: null, google_review_count: null, name: null, address: null };
 
+    // 🗺️ Coğrafi standart (8 Ağu 2026) — bu rota YAZMIYOR, forma ÖNERİ dönüyor.
+    // Yine de kanonikleştiriyoruz: admin formda "Istanbul"/"Edirne Merkez" görüp
+    // onaylarsa, kaydeden rota nasılsa düzeltecek ama ekranda gördüğü ile DB'ye
+    // gireni ayrıştırmanın bir faydası yok. LLM'in yazım tercihi burada bitiyor.
+    const enrichKonum = poiKonumCoz(claudeResult.city, claudeResult.district);
+
     const result: EnrichResult = {
       // Google Places daha güvenilir — varsa üstün tut, yoksa Claude/Nominatim'e düş
       name:                googleResult.name    || claudeResult.name,
       address:             googleResult.address || claudeResult.address,
-      city:                claudeResult.city,
-      district:            claudeResult.district,
+      city:                enrichKonum.city,
+      district:            enrichKonum.district,
       address_note:        claudeResult.address_note,
       category:            claudeResult.category,
       description:         claudeResult.description,

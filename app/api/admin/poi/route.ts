@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSupabase, getServiceSupabase } from '../../../../lib/auth';
 import { POI_GECERLI_KATEGORILER } from '../../../../lib/poi-constants';
 import { scorePoi } from '../../../../lib/poi-score';
+import { poiKonumCoz } from '../../../../lib/poi-lokasyon';
 
 export const runtime = 'nodejs';
 
@@ -179,13 +180,18 @@ export async function POST(request: NextRequest) {
         continue;
       }
 
+      // 🗺️ Coğrafi standart (8 Ağu 2026) — toplu içe aktarımda da tek kapı.
+      const konum = poiKonumCoz(r.city, r.district);
+
       insertable.push({
         name:         String(r.name).trim(),
         description:  r.description?.trim()  || null,
         category:     rowCategory,
         categories:   rowCats,
-        city:         r.city?.trim()         || null,
-        district:     r.district?.trim()     || null,
+        province_id:       konum.provinceId,
+        city:              konum.city,
+        district:          konum.district,
+        district_official: konum.districtOfficial,
         address:      r.address?.trim()      || null,
         address_note: r.address_note?.trim() || null,
         phone:        r.phone?.trim()        || null,

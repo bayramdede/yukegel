@@ -19,6 +19,8 @@
     "test:ad-type": "npx tsx scripts/test-ad-type.mts",
     "test:ilan-limit": "npx tsx scripts/test-ilan-limit.mts",
     "test:seo": "npx tsx scripts/test-seo-canonical.mts",
+    "test:poi-lokasyon": "npx tsx scripts/test-poi-lokasyon.mts",
+    "test:poi-senkron": "npx tsx scripts/test-poi-senkron.mts",
     "olc:86": "npx tsx scripts/olc-86.mts",
     "olc:88": "npx tsx scripts/olc-88.mts",
     "olc:87": "npx tsx scripts/olc-87.mts",
