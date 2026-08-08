@@ -1,6 +1,17 @@
 # Yükegel — Proje Haritası
 > **Kullanım:** Her sohbet başında sadece bu dosyayı oku. Kaynak dosyaları sadece o dosyada değişiklik yapacaksan oku.  
 >
+> ⚡ **8 AĞU 2026 — "İlanlarım geç yükleniyor" → eksik indeks (~49×).**
+> `listings.user_id` İNDEKSLİ DEĞİLDİ (`vehicles.user_id` indeksliydi — aynı
+> desende biri atlanmış). Panel sorgusu 256.175 satırı Parallel Seq Scan'liyordu:
+> **3.684 ms → 74,6 ms**. `user_id` dolu olan yalnız 139 satır (%0,054), o yüzden
+> PARTIAL indeks → 16 kB. Aynı taramada `raw_posts (contact_phone, created_at)`
+> eksikliği de bulundu (WhatsApp içe aktarım spam kontrolü, 5.102 ms × 78 çağrı):
+> **3.784 ms → 0,144 ms** (Index Only Scan). İkisi de CONCURRENTLY oluşturuldu
+> (tablolar canlı). `/panel` uçtan uca dev sunucusunda medyan 427 ms.
+> 📌 Ders: `.eq('user_id', …)` ile sorgulanan her tabloda o kolon indeksli olmalı.
+> Ayrıntı: `docs/20260808_panel_yavasligi.sql`.
+>
 > ✅ **8 AĞU 2026 — Toplu yükleme (Excel) önizleme kartları düzenlenebilir.**
 > Eskiden yalnız 2 alan (kalkış/varış ili) ve yalnız il ÇÖZÜLEMEDİĞİNDE
 > düzenlenebiliyordu; yanlış tonaj/fiyat için tek çare dosyayı yeniden

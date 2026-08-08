@@ -1,5 +1,46 @@
 # Yükegel — Yapılacaklar Listesi
 
+> ## ✅ 8 AĞU 2026 — "İLANLARIM GEÇ YÜKLENİYOR": EKSİK İNDEKS (~49×)
+>
+> **Bildirim:** "İlanlarım vb sayfalar biraz geç yükleniyor."
+>
+> İlk varsayım yanlıştı: `app/panel/page.tsx` üç sorgusunu ZATEN `Promise.all`
+> ile paralel atıyor. Sebep tek bir **eksik indeks**ti: `listings.user_id`
+> indeksli DEĞİLDİ (`vehicles.user_id` indeksliydi — aynı desende biri atlanmış).
+> Panel'in ilan sorgusu tam o kolonu filtreliyor → **Parallel Seq Scan, 256.175
+> satır, 3.684 ms**. Tabloda `user_id` dolu olan yalnız **139** satır var
+> (%0,054; geri kalanı WhatsApp/kazıma kaynaklı sahipsiz ilanlar), yani her
+> panel açılışında 256 bin satır taranıp 139'u eleniyordu.
+>
+> **Aynı taramada ikinci bulgu** (`pg_stat_statements`): `raw_posts`'ta
+> `contact_phone = ANY(...) AND created_at >= ...` → 5.102 ms × 78 çağrı =
+> **398 sn toplam**. Bu WhatsApp ZIP içe aktarımının spam kontrolü ve parça parça
+> atılıyor (bir aktarımda onlarca kez). `raw_posts_dedup_idx`'te `contact_phone`
+> var ama İKİNCİ kolon olarak — baştan filtrelemede işe yaramıyor.
+>
+> **Çözüm — iki PARTIAL indeks, ikisi de CONCURRENTLY** (tablolar canlı ve yazma
+> alıyor; düz `CREATE INDEX` tarama boyunca yazanları kilitlerdi):
+> - `listings (user_id, created_at desc) where user_id is not null` → **16 kB**
+>   (tam indeks ~8 MB olurdu). `created_at desc` indekste olduğu için panelin
+>   `order by`'ı da ayrı Sort adımı gerektirmiyor.
+> - `raw_posts (contact_phone, created_at desc) where contact_phone is not null`
+>   — kolon sırası önemli: eşitlik kolonu (`contact_phone`) ÖNCE, aralık kolonu
+>   (`created_at`) sonra.
+>
+> **Ölçüm (öncesi → sonrası):**
+> - Panel ilan sorgusu: 3.684 ms → **74,6 ms** (137 ilanlı kullanıcı, ~49×);
+>   az ilanlı kullanıcıda ~3 ms
+> - raw_posts telefon sorgusu: 3.784 ms → **0,144 ms** (Index Only Scan,
+>   Heap Fetches 0)
+> - Uçtan uca sayfa (dev sunucusu, 40 ilanlı geçici kullanıcı, 5 istek medyanı):
+>   `/panel` **427 ms**, `/` 345 ms. Üretimde daha hızlı olması beklenir.
+>
+> 📌 **Ders:** `.eq('user_id', …)` ile sorgulanan HER tabloda o kolon indeksli
+> olmalı. `vehicles`'ta vardı, `listings`'te yoktu ve fark edilmedi çünkü tablo
+> küçükken seq scan da hızlıdır — 256 bin satırda ortaya çıktı. Ayrıca kolonun
+> NULL oranı yüksekse indeks PARTIAL olsun.
+> Ayrıntı: `docs/20260808_panel_yavasligi.sql`.
+>
 > ## ✅ 8 AĞU 2026 — TOPLU YÜKLEMEDE (EXCEL) ÖNİZLEME KARTLARI DÜZENLENEBİLİR
 >
 > **İstek:** "Toplu yüklemede (excel) gelen kartları düzenleme şansımız olsun."
