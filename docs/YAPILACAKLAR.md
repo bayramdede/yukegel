@@ -33,10 +33,23 @@
 > - "Kullanıcının tüm ilanları" için sayfa **zaten var**: `/u/<userId>`
 >   (klasör adı `[username]` ama route **id** kullanıyor — bkz. `sitemap.ts`
 >   notu). Yani bu madde büyük ölçüde **bir link eklemek**.
-> - ⚠️ Ama önce şu düzeltilmeli: `/u/[username]` bugün **son 24 saatin**
->   ilanlarını gösteriyor (`gte('created_at', yirmidortSaatOnce)`), yani
->   "TÜM ilanları" demek yanıltıcı olur. Ya filtre gevşetilmeli ya buton
->   "Son ilanları" demeli — ikisinden biri seçilmeli.
+> - ✅ **ÇÖZÜLDÜ (9 Ağu 2026, Bayram: "Aktif ilanları göstersin").**
+>   `/u/[userId]` artık **aktif** ilanların tamamını gösteriyor; 24 saat
+>   penceresi (`gte('created_at', …)`) kaldırıldı. O pencerenin gerekçesi hiçbir
+>   yerde yazılı değildi ve **ana sayfa feed'inde yoktu** — `HomeClient`, SSR
+>   ve `api/listings/ara` üçü de yalnız `status='active'` bakıyor. Yani aynı ilan
+>   ana sayfada dururken sahibinin profilinde 24 saat sonra kayboluyordu (sessiz
+>   eksik liste). Tazeliği zaten `status`/`completed_at`/`expires_at` yönetiyor.
+>   Pencere kalkınca sorgu sınırsız kaldığı için ana sayfayla aynı tavan
+>   (`ILAN_LIMITI`) eklendi.
+>   Doğrulama: geçici kullanıcıya 4 ilan kurulup profil sayfası tarayıcıda
+>   açıldı → 3 ve 10 gün önceki AKTİF ilanlar **görünüyor**, PASİF ve
+>   TAMAMLANMIŞ olanlar **görünmüyor** (4/4).
+>   ⚠️ Bu arada kendi ilk testim GEÇERSİZDİ: sayfada 81 ilin tamamını içeren il
+>   dropdown'ları olduğu için `body.innerText.includes('Ankara')` her zaman
+>   doğruydu — üç kontrolün üçü de yanlış geçiyordu. Ölçüm ilanın benzersiz
+>   `notes` metnine çevrildi. (Ders: sayfa metninde arama yapan bir kontrol,
+>   aradığı kelime sayfada BAŞKA sebeplerle bulunabiliyorsa hiçbir şey kanıtlamaz.)
 > - "Şirketin tüm ilanları" **1. madde olmadan yapılamaz** (şirket kimliği yok).
 >   Yapıldığında muhtemelen yeni bir rota gerekir: `/sirket/<companyId>`.
 > - Buton yalnız `user_id` DOLU ilanlarda gösterilmeli: ilanların **%99,95'i

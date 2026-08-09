@@ -8,6 +8,9 @@ import { girisAdresi } from '../../../lib/redirect';
 //    ikisinin sessizce ayrışmasına açık kapı bırakıyordu.
 // 8 Ağu 2026 — plaka sırası yerine Türkçe alfabetik dropdown; değer yine il ADI.
 import { ilAdi, IL_ADLARI_ALFABETIK as ILLER } from '../../../lib/lokasyon';
+// Profil listesi ana sayfayla AYNI tavanı kullanıyor (24 saat penceresi kalkınca
+// sorgu sınırsız kalmasın diye) — sabit tek yerden.
+import { ILAN_LIMITI } from '../../../lib/ilan-liste';
 
 const supabase = createClient();
 
@@ -77,8 +80,6 @@ export default function PublicIlanListesi() {
       if (!kullanici) { setBulunamadi(true); setYukleniyor(false); return; }
       setSahip(kullanici);
 
-      const yirmidortSaatOnce = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-
       const { data } = await supabase
         .from('listings')
         // ⚠️ SPRINT_01 L1f — `contact_phone` BURADA ÇEKİLMEZ (anon key + herkese açık sayfa).
@@ -97,8 +98,23 @@ export default function PublicIlanListesi() {
         .eq('status', 'active')
         .eq('is_shadow_banned', false)   // ← Sprint 1: shadow ban filtresi
         .is('completed_at', null)
-        .gte('created_at', yirmidortSaatOnce)
-        .order('created_at', { ascending: false });
+        // 🚨 9 Ağu 2026 — `.gte('created_at', 24 saat önce)` KALDIRILDI (Bayram:
+        // "Aktif ilanları göstersin").
+        //
+        // NEDEN KALDIRILDI: bu pencerenin gerekçesi hiçbir yerde yazılı değildi
+        // ve ANA SAYFA FEED'İNDE YOK — `HomeClient`, SSR (`page.tsx`) ve
+        // `api/listings/ara` üçü de yalnız `status='active'` bakıyor, tarih
+        // penceresi koymuyor. Yani aynı ilan ana sayfada görünüyorken sahibinin
+        // profilinde 24 saat sonra KAYBOLUYORDU. Profil sayfasının başlığı
+        // "<Ad> ilanları" olduğu için bu sessiz bir eksik listeydi.
+        // Tazeliği zaten `status`/`completed_at`/`expires_at` yönetiyor; ikinci
+        // ve belgelenmemiş bir kural gereksizdi.
+        //
+        // ⚠️ Pencere kalkınca sorgu SINIRSIZ hale geldi; ana sayfayla aynı
+        //    tavan (`ILAN_LIMITI`) konuldu — çok ilanlı bir hesap profil
+        //    sayfasını (ve PostgREST yanıtını) şişirmesin.
+        .order('created_at', { ascending: false })
+        .limit(ILAN_LIMITI);
 
       const donusturulmus = (data || []).map((ilan: any) => ({
         id: ilan.id,
