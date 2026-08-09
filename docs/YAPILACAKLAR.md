@@ -1,5 +1,49 @@
 # Yükegel — Yapılacaklar Listesi
 
+> ## ⏳ AÇIK — ŞİRKET İLİŞKİSİ VE İLAN DETAYINDA "DİĞER İLANLAR" (9 Ağu 2026'da eklendi)
+>
+> Bayram'ın isteği. İkisi bağlantılı: **2. madde 1. maddeye bağımlı.**
+>
+> ### 1. Kullanıcılar bir şirkete bağlı olabilsin
+> **Bugünkü durum:** `users.company_name` **serbest metin** — ilişki yok.
+> Doldurma oranı ölçüldü: **108 kullanıcının yalnız 1'inde dolu.**
+> 📌 Bu iyi haber: taşınacak veri neredeyse yok, ilişki **temiz kurulabilir**
+> (aynı fırsat `poi_stay_events`te de vardı — boş tablo, risksiz değişiklik).
+> Yarın 500 kullanıcı serbest metin şirket adı girdikten sonra aynı iş
+> "Istanbul/İstanbul" tipi bir tekilleştirme kâbusuna döner; **şimdi yapmak
+> ucuz.**
+>
+> Yapılacaklar:
+> - `companies` tablosu (`id`, `name`, `tax_no/vkn`, `created_at`, …) +
+>   `users.company_id` FK. `company_name` bir süre türetilmiş kopya olarak
+>   kalabilir (coğrafi geçişteki "çift yazım" dönemiyle aynı desen), sonra düşer.
+> - ⚠️ **Rol/yetki sorusu kritik ve şimdiden karara bağlanmalı:** şirkete bağlı
+>   bir kullanıcı diğerinin ilanını **görebilir/düzenleyebilir mi?** Bu bir RLS
+>   ve `api/ilan/duzelt` sahiplik kontrolü değişikliği demek (bugün kontrol
+>   `ilan.user_id !== user.id` → 403). Cevap "evet"se ilan sahipliği artık
+>   kullanıcı değil **şirket** düzeyinde tanımlanır; bu, düşünülmeden yapılırsa
+>   yetki açığı üretir.
+> - VKN zaten `users.vkn`'de ve **hassas kolon** (7 Ağu güvenlik turunda
+>   `anon`/`authenticated`'dan revoke edildi). Şirket tablosuna taşınırken aynı
+>   kolon-düzeyi GRANT disiplini uygulanmalı — yoksa açık geri gelir.
+>
+> ### 2. İlan detayında "kullanıcının tüm ilanları" + "şirketin tüm ilanları"
+> **Bugünkü durum:** `app/ilan/[id]/page.tsx`'te yalnız `/`'a giden
+> "← Tüm İlanlar" var; ilan sahibinin ilanlarına **link yok.**
+> - "Kullanıcının tüm ilanları" için sayfa **zaten var**: `/u/<userId>`
+>   (klasör adı `[username]` ama route **id** kullanıyor — bkz. `sitemap.ts`
+>   notu). Yani bu madde büyük ölçüde **bir link eklemek**.
+> - ⚠️ Ama önce şu düzeltilmeli: `/u/[username]` bugün **son 24 saatin**
+>   ilanlarını gösteriyor (`gte('created_at', yirmidortSaatOnce)`), yani
+>   "TÜM ilanları" demek yanıltıcı olur. Ya filtre gevşetilmeli ya buton
+>   "Son ilanları" demeli — ikisinden biri seçilmeli.
+> - "Şirketin tüm ilanları" **1. madde olmadan yapılamaz** (şirket kimliği yok).
+>   Yapıldığında muhtemelen yeni bir rota gerekir: `/sirket/<companyId>`.
+> - Buton yalnız `user_id` DOLU ilanlarda gösterilmeli: ilanların **%99,95'i
+>   sahipsiz** (WhatsApp/kazıma kaynaklı — 256.175 satırın yalnız 139'unda
+>   `user_id` var). Koşulsuz buton neredeyse her ilanda boş sayfaya götürürdü.
+
+
 > ## 🔴 9 AĞU 2026 — "ZENGİN SONUÇ: ÖĞE ALGILANMADI" · JobPosting UYGULANMADI
 >
 > Bayram Rich Results Test'te "hiçbir öğe algılanmadı" alıp şemayı
