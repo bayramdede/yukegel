@@ -61,7 +61,12 @@ export const ILAN_SELECT = `
   listing_stops ( listing_id, stop_order, province_id, district, vehicle_count, cargo_type, weight_ton, pallet_count )
 `;
 
-export type RozetBilgi = { phone_verified: boolean; created_at: string };
+/**
+ * 🚨 10 Ağu 2026 — `phone_verified` BU TİPTEN ÇIKARILDI. "Telefon Doğrulandı"
+ * rozeti kaldırıldı çünkü kolon istemciden yazılabiliyordu; rozeti kullanıcı
+ * kendine verebiliyordu. Geriye yalnız üyelik tarihi ("Yeni Üye") kaldı.
+ */
+export type RozetBilgi = { created_at: string };
 
 /** Üyelik 30 günden yeni mi — "🆕 Yeni Üye" rozeti. */
 export function uyeYeniMi(createdAt: string | null): boolean {
@@ -110,7 +115,6 @@ export function ilanNormalize(ilan: any, rozet?: RozetBilgi | null) {
     aracTipleri: aracTipiList,
     ustyapilari: (ilan.body_type || []) as string[],
     dogrulanmamis: !ilan.user_id || ilan.trust_level === 'social',
-    telefonDogrulandi: rozet?.phone_verified === true,
     yeniUye: rozet ? uyeYeniMi(rozet.created_at) : false,
     user_id: ilan.user_id,
   };

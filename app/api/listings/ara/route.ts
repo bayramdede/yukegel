@@ -143,7 +143,7 @@ export async function GET(req: NextRequest) {
   if (userIds.length > 0) {
     const { data: ks } = await svc
       .from('users')
-      .select('id, phone_verified, created_at')
+      .select('id, created_at')
       .in('id', userIds);
     for (const k of (ks || []) as any[]) rozetMap[k.id] = k;
   }

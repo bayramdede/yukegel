@@ -355,7 +355,10 @@ function IlanKart({ ilan, kullanici }: { ilan: any; kullanici: any }) {
             </span>
             <span style={{ background: kaynak.bg, color: kaynak.color, fontSize: '0.7rem', fontWeight: 600, padding: '2px 8px', borderRadius: 4 }}>{kaynak.label}</span>
             {ilan.dogrulanmamis && <span style={{ background: '#1a1f2e', color: '#94a3b8', fontSize: '0.7rem', fontWeight: 600, padding: '2px 8px', borderRadius: 4 }}>🔗 Dış Kaynak İlanı</span>}
-            {ilan.telefonDogrulandi && <span style={{ background: '#0d2b1a', color: '#22c55e', fontSize: '0.7rem', fontWeight: 700, padding: '2px 8px', borderRadius: 4 }}>✅ Tel Doğrulandı</span>}
+            {/* 🚨 10 Ağu 2026 — "✅ Tel Doğrulandı" ROZETİ KALDIRILDI. SAKIN GERİ EKLEME.
+                `users.phone_verified` İSTEMCİDEN yazılabiliyor (PanelClient OTP akışı
+                PostgREST'e doğrudan yazıyor), yani kullanıcı rozeti kendine verebiliyordu.
+                Ayrıntı: `app/ilan/[id]/page.tsx` içindeki uzun not. */}
             {ilan.yeniUye && !ilan.dogrulanmamis && <span style={{ background: '#1e1b4b', color: '#a5b4fc', fontSize: '0.7rem', fontWeight: 700, padding: '2px 8px', borderRadius: 4 }}>🆕 Yeni Üye</span>}
             {ilan.fiyat && <span style={{ background: '#0d2b1a', color: '#22c55e', fontSize: '0.7rem', fontWeight: 700, padding: '2px 8px', borderRadius: 4 }}>✓ Fiyat Belli</span>}
           </div>
@@ -723,13 +726,13 @@ export default function HomeClient({ initialIlanlar = [], totalCount = 0 }: { in
         // Rozet zenginleştirme
         const userIds = [...new Set(baseList.map(i => i.user_id).filter(Boolean))];
         if (userIds.length > 0) {
-          const { data: ks } = await supabase.from('users').select('id, phone_verified, created_at').in('id', userIds);
+          const { data: ks } = await supabase.from('users').select('id, created_at').in('id', userIds);
           if (cancelled) return;
-          const kullaniciMap: Record<string, { phone_verified: boolean; created_at: string }> = {};
+          const kullaniciMap: Record<string, { created_at: string }> = {};
           for (const k of (ks || []) as any[]) kullaniciMap[k.id] = k;
           setIlanlar(prev => prev.map(ilan => {
             const kb = ilan.user_id ? kullaniciMap[ilan.user_id] : null;
-            return { ...ilan, telefonDogrulandi: kb?.phone_verified === true, yeniUye: kb ? uyeYeniMi(kb.created_at) : false };
+            return { ...ilan, yeniUye: kb ? uyeYeniMi(kb.created_at) : false };
           }));
         }
       } catch (err) {

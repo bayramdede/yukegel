@@ -21,6 +21,70 @@
 ---
 ---
 
+> ## ✅ 10 AĞU 2026 — "TELEFON DOĞRULANDI" ROZETİ KALDIRILDI
+>
+> **Karar (Bayram): "doğrulanmış telefon rozetini kaldıralım."** Benim önerim
+> yazmayı sunucuya taşımaktı; Bayram daha kısa yolu seçti ve bu yol geçerli —
+> rozet, açığın TEK değer üreten çıktısıydı.
+>
+> **AÇIK NEYDİ:** rozet `users.phone_verified`e bakıyordu ve o kolon İSTEMCİDEN
+> yazılabiliyor. `app/panel/PanelClient.tsx:961` PostgREST'e doğrudan
+> `update({ phone: yeniTel, phone_verified: true })` atıyor. Dürüst akışta satır
+> `supabase.auth.verifyOtp(...)` BAŞARILI olduktan sonra çalışıyor — ama
+> saldırganın o akışı kullanma zorunluluğu yok: kendi oturumuyla aynı yazmayı
+> OTP'siz yapabiliyor. Yani rozet "telefonu doğrulanmış" değil **"kendini
+> doğrulanmış ilan etmiş"** demekti ve nakliyeciye yanlış güven sinyali veriyordu.
+>
+> **ÖNCE KAPSAM ÖLÇÜLDÜ — kolon bir yeteneği kapılıyor mu?** Hayır: `phone_verified`
+> hiçbir yetkiyi/akışı geçirmiyordu, yalnız GÖSTERİM içindi. Sunucu tarafındaki iki
+> yazma yolu (`profil-tamamla/actions.ts`, `api/ilan/[id]/sahiplen`) zaten istemciye
+> güvenmiyor — özellikle `actions.ts:169` bayrağı istemcinin iddiasına değil
+> **gerçek kanıta** bakarak yeniden türetiyor. Bu yüzden rozeti kaldırmak açığın
+> değerini gerçekten sıfırlıyor; kapsamı genişletmeye gerek kalmadı.
+>
+> **KALDIRILAN YÜZEYLER (herkese açık):**
+> - `app/ilan/[id]/page.tsx` → `✅ Telefon Doğrulandı` rozeti + `telefonDogrulandi`
+>   türetimi + `users` SELECT'inden `phone_verified` (yalnız `created_at` kaldı)
+> - `app/_components/HomeClient.tsx` → kart rozeti `✅ Tel Doğrulandı` + sorgu + map
+> - `lib/ilan-liste.ts` → `RozetBilgi.phone_verified` ve `telefonDogrulandi` alanı
+>   (paylaşılan eşleyici; tüm kartlar buradan besleniyor)
+> - `app/api/listings/ara/route.ts` ve `app/page.tsx` → SELECT'lerden çıkarıldı
+>
+> **KORUNANLAR — bilinçli:**
+> - `app/panel` ve `app/profil-tamamla`'daki `✓ Doğrulandı`: kullanıcının KENDİ
+>   telefonunun yanında kendi durumunu görmesi. Başkasına verilen bir güven
+>   iddiası değil, kimse aldatılmıyor. **Ayrım: dışa dönük iddia mı, kendi okuması mı.**
+> - `⚠️ Doğrulanmamış İlan` rozeti: `phone_verified`e DEĞİL
+>   `!user_id || trust_level==='social'`e bakıyor → sahipsiz/dış kaynak ilanı
+>   işaretliyor. Farklı ve güvenilir bir sinyal, duruyor.
+>
+> 🚨 **VAAT EDİLEN FAYDA DA AYNI COMMIT'TE DEĞİŞTİ.**
+> `app/ilan/[id]/sahiplen/page.tsx` faydalar listesinde
+> `'"Telefon Doğrulandı" rozeti eklenir, nakliyeciler güvenle arar'` yazıyordu.
+> Rozet kalkarken bu satır kalsaydı **karşılığı olmayan bir söz** olurdu:
+> kullanıcı sahiplenir, rozeti bekler, hiç gelmez. Yerine olgusal bir fayda
+> yazıldı ("Telefonunuz size ait olarak görünür"). Bekçi bunu da kilitliyor.
+>
+> **BEKÇİ:** `npm run test:seo` → **131 kontrol.** Herkese açık 5 yüzeyin
+> `phone_verified` okumadığını, rozet metninin geçmediğini, paylaşılan eşleyicinin
+> temiz olduğunu ve sahiplenme sayfasının rozeti vaat etmediğini doğruluyor.
+> ⚠️ Kapsam bilinçli olarak "herkese açık yüzeyler" — panel/profil-tamamla hariç.
+> **Mutasyon:** rozet HomeClient'a ve sahiplen vaadine geri eklendi → **ikisi de
+> yakalandı.**
+> 📌 Bekçiyi yazarken kendi yorumuma takıldım: ibare açıklama metninde de geçtiği
+> için ham dosyada arayınca kontrol kendi kendini düşürdü → `yorumsuz()` şart.
+>
+> **Doğrulama:** `tsc` temiz · `test:seo` 131/131 · `test:jsonld` 30/30 ·
+> yerel render (36 KB, ROTA basılmış): rozet **0 kez**, "Doğrulanmamış İlan" **1 kez**.
+>
+> ⚠️ **KALAN MAYIN — kolon hâlâ istemciden yazılabilir.** Bugün zararsız çünkü
+> okuyan public yüzey yok. İki şart altında patlar: (1) **Faz 3 güven puanı bu
+> kolonu okursa**, (2) yeni bir yüzey onu okumaya başlarsa. Kalıcı çözüm kolonu
+> `authenticated`dan `revoke` edip yazmayı server action'a taşımak.
+> `docs/YAPILACAKLAR.md` madde 3'te açık madde olarak duruyor.
+
+---
+
 > ## ✅ 10 AĞU 2026 — ASIL KÖK SEBEP: `Disallow` İLE `noindex` BİRBİRİNİ YOK EDİYORDU
 >
 > Bayram `https://www.yukegel.com/giris?redirect=/ilan/f7318ecd…` adresini verip

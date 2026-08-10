@@ -242,12 +242,16 @@ export default async function IlanDetay({ params }: { params: Promise<{ id: stri
     user
       ? supabase.from('users').select('user_type').eq('id', user.id).maybeSingle()
       : Promise.resolve({ data: null as { user_type: string | null } | null }),
+    // 🚨 10 Ağu 2026 — `phone_verified` bu SELECT'ten ÇIKARILDI. "✅ Telefon
+    //    Doğrulandı" rozeti kaldırıldı çünkü kolon İSTEMCİDEN yazılabiliyordu
+    //    (`PanelClient.tsx` OTP akışı PostgREST'e doğrudan yazıyor), yani rozeti
+    //    kullanıcı kendine verebiliyordu. Sadece `created_at` kaldı ("Yeni Üye").
     ilan.user_id
-      ? supabase.from('users').select('phone_verified, created_at').eq('id', ilan.user_id).single()
-      : Promise.resolve({ data: null as { phone_verified: boolean; created_at: string } | null }),
+      ? supabase.from('users').select('created_at').eq('id', ilan.user_id).single()
+      : Promise.resolve({ data: null as { created_at: string } | null }),
   ]);
   const profilTamamlandi = !!profilSonuc.data?.user_type;
-  const kullaniciBilgi = kullaniciBilgiSonuc.data as { phone_verified: boolean; created_at: string } | null;
+  const kullaniciBilgi = kullaniciBilgiSonuc.data as { created_at: string } | null;
 
   // ── Sprint 1: Shadow ban kontrolü
   // Shadow banned ilan sadece ilan sahibi, moderatör ve admin tarafından görülebilir.
@@ -278,7 +282,6 @@ export default async function IlanDetay({ params }: { params: Promise<{ id: stri
   const ustyapilari = dedupNormalize(ilan.body_type || []);
 
   const dogrulanmamis = !ilan.user_id || ilan.trust_level === 'social';
-  const telefonDogrulandi = kullaniciBilgi?.phone_verified === true;
   const isYeniUye = kullaniciBilgi ? yeniUye(kullaniciBilgi.created_at) : false;
 
   const KAYNAK_ETIKET: Record<string, { label: string; bg: string; color: string }> = {
@@ -454,12 +457,21 @@ export default async function IlanDetay({ params }: { params: Promise<{ id: stri
             );
           })()}
 
-          {telefonDogrulandi && (
-            <span title="Bu kullanıcının telefon numarası doğrulanmıştır."
-              style={{ background: '#0d2b1a', color: '#22c55e', fontSize: '0.78rem', fontWeight: 700, padding: '4px 12px', borderRadius: 6, cursor: 'help' }}>
-              ✅ Telefon Doğrulandı
-            </span>
-          )}
+          {/* 🚨 10 Ağu 2026 — "✅ Telefon Doğrulandı" ROZETİ KALDIRILDI. SAKIN GERİ EKLEME.
+              Rozet `users.phone_verified`e bakıyordu ve o kolon İSTEMCİDEN
+              YAZILABİLİR: `app/panel/PanelClient.tsx`'in OTP akışı PostgREST'e
+              doğrudan `update({ phone_verified: true })` atıyor. Dürüst akışta OTP
+              gerçekten doğrulanıyor, ama saldırganın o akışı kullanma zorunluluğu
+              yok — kendi oturumuyla aynı yazmayı OTP'siz yapabiliyordu. Yani rozet
+              "doğrulanmış" değil "kendini doğrulanmış ilan etmiş" demekti ve
+              nakliyeciye YANLIŞ bir güven sinyali veriyordu.
+              Karar (Bayram, 10 Ağu): rozet kalksın.
+              ⚠️ Yerine bir şey KONMADI. Gerçek güven sinyali Faz 3'te gelecek ve
+              kaynağı sunucuda doğrulanmış bir olgu olacak — bkz.
+              `docs/YAPILACAKLAR.md`. Bekçi: `npm run test:seo`.
+              📌 "⚠️ Doğrulanmamış İlan" rozeti DURUYOR: o `phone_verified`e değil
+              `!user_id || trust_level==='social'`e bakıyor, yani sahipsiz/dış
+              kaynak ilanları işaretliyor. Farklı bir sinyal, güvenilir. */}
           {isYeniUye && !dogrulanmamis && (
             <span title="Bu kullanıcı son 30 gün içinde üye olmuştur."
               style={{ background: '#1e1b4b', color: '#a5b4fc', fontSize: '0.78rem', fontWeight: 700, padding: '4px 12px', borderRadius: 6, cursor: 'help' }}>

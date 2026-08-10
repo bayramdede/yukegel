@@ -20,9 +20,14 @@ interface IlanBilgi {
   listing_stops: Array<{ province_id: number | null; district: string | null; stop_order: number }>;
 }
 
+// 🚨 10 Ağu 2026 — '"Telefon Doğrulandı" rozeti eklenir' MADDESİ ÇIKARILDI.
+//    O rozet kaldırıldı (`users.phone_verified` istemciden yazılabiliyordu), yani
+//    burada vaat etmeye devam etmek KARŞILIĞI OLMAYAN bir söz olurdu — kullanıcı
+//    sahiplenir, rozeti bekler, hiç gelmez. Vaat edilen fayda ile teslim edilen
+//    davranış aynı commit'te değişmek zorunda.
 const FAYDALAR = [
   { ikon: '⚠️', metin: '"Doğrulanmamış İlan" etiketi kalkar, ilanınız daha fazla görünür' },
-  { ikon: '✅', metin: '"Telefon Doğrulandı" rozeti eklenir, nakliyeciler güvenle arar' },
+  { ikon: '📞', metin: 'Telefonunuz size ait olarak görünür, alıcı doğrudan size ulaşır' },
   { ikon: '🔗', metin: 'İlanlarınızı tek linkten kolayca yönetirsiniz' },
   { ikon: '📋', metin: 'Panelden ilanı pasife alabilir, düzenleyebilirsiniz' },
   { ikon: '🚀', metin: 'Yeni ilanlarınızı saniyeler içinde yayınlarsınız' },

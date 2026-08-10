@@ -67,7 +67,7 @@ async function fetchInitialIlanlar() {
     if (userIds.length > 0) {
       const { data: ks } = await publicSupabase
         .from('users')
-        .select('id, phone_verified, created_at')
+        .select('id, created_at')
         .in('id', userIds as string[]);
       for (const k of (ks || []) as any[]) kullaniciMap[k.id] = k;
     }

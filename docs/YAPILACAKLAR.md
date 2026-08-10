@@ -85,10 +85,22 @@ detayında kullanıcının tüm ilanları ve şirketin tüm ilanları butonları
 
 ## ⏳ 3 — Güvenlik takibi (7 Ağu'da açıldı, 10 Ağu'da hâlâ açık)
 
-- 🔴 **`phone_verified` istemciden yazılabiliyor** — `app/panel/PanelClient.tsx:961`
-  doğrudan `supabase.from('users').update({ phone: yeniTel, phone_verified: true })`
-  çağırıyor. Kullanıcı "doğrulanmış telefon" rozetini **kendine verebilir**.
-  Doğrulama sunucu tarafına taşınacak (OTP'yi kim doğruladıysa o yazsın).
+- 🟡 **`phone_verified` hâlâ istemciden yazılabiliyor — ama artık SÖMÜRÜLECEK BİR
+  DEĞERİ YOK.** `app/panel/PanelClient.tsx:961` doğrudan
+  `update({ phone: yeniTel, phone_verified: true })` çağırıyor; dürüst akışta
+  `verifyOtp` başarılı olduktan sonra çalışıyor ama saldırgan o akışı kullanmak
+  zorunda değil, kendi oturumuyla aynı yazmayı OTP'siz yapabiliyor.
+  ✅ **10 Ağu'da rozet kaldırıldı** (Bayram'ın kararı) → kolonu herkese açık
+  hiçbir yüzey okumuyor artık, yani kendine verilen bayrak kimseye gösterilmiyor.
+  🚨 **AMA MAYIN OLARAK DURUYOR ve iki şart altında patlar:**
+  1. **Faz 3 güven puanı bu kolonu OKURSA** açık aynen geri gelir. Güven puanı
+     ancak sunucuda doğrulanmış olgulara dayanabilir — bu kolon o değil.
+  2. Yeni bir yüzey (profil kartı, rozet, filtre) onu okumaya başlarsa.
+  **Kalıcı çözüm:** `phone_verified` kolonunu `authenticated` rolünden `revoke`
+  et ve yazmayı bir server action'a taşı (OTP'yi kim doğruladıysa o yazsın).
+  ⚠️ Kolon bazlı `REVOKE` yaparken tablo geneli `GRANT`ın onu ezdiğini hatırla
+  (`contact_phone` migration'ındaki desen).
+  Bekçi: `npm run test:seo` — herkese açık yüzeylerin kolonu okumadığını doğruluyor.
 - 🔴 **OTP doğrulama denemesinde kaba kuvvet koruması yok.** `kotaDene`
   (`app/api/auth/otp/route.ts:70/78/90`) SMS **gönderimini** sınırlıyor;
   6 haneli kodu **deneme** sayısını sınırlayan bir şey yok.
@@ -149,11 +161,12 @@ beslemesi son günlerde ilan üretmemiş görünüyor — ana sayfa akışı ona
   `<meta name="robots" content="noindex, follow">` taşıyor — yani zincir çalışıyor,
   Google artık etiketi okuyabilir. İlan sayfasındaki bağlantıda `rel="nofollow"` var.
 
-  **Kalan tek adım — SENDE:**
-  Search Console → *Sayfalar → "Robots.txt tarafından engellendi"* →
-  **"Düzeltmeyi doğrula"**.
-  ⚠️ Doğrulama **günler sürer**, bu normaldir; Google URL'leri yeniden taramak
-  zorunda. Bu kez geçecek çünkü artık taranabilirler.
+  ✅ **"Düzeltmeyi doğrula"ya basıldı — 10 Ağu 2026, "Doğrulama Başladı."**
+  ⏳ **Şimdi beklemede ve yapılacak bir şey yok.** Google URL'leri yeniden
+  taramak zorunda; doğrulama **günler sürer** ve bu normaldir.
+  ⚠️ Bu kez geçmesi gerekiyor çünkü URL artık taranabilir (canlıdan doğrulandı:
+  HTTP 200 + `noindex, follow`). **Eğer "Başarısız" derse** bu YENİ bir bulgudur —
+  o zaman rapordaki örnek URL'leri getir, birlikte bakarız.
   📌 Sonra o URL'ler **"noindex ile hariç tutuldu"** durumuna geçecek — bu
   **doğru** son durum, yeni bir hata değil. "Engellendi"den "hariç tutuldu"ya
   geçiş düzeltmenin ta kendisi.

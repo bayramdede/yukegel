@@ -200,6 +200,45 @@ kontrol('o bağlantı rel="nofollow" taşıyor',
   Boolean(girisBaglantisi) && /rel="nofollow"/.test(girisBaglantisi![1]),
   girisBaglantisi ? `nitelikler: ${girisBaglantisi[1].trim().slice(0, 80)}` : 'bağlantı yok');
 
+// ── 7. "Telefon Doğrulandı" rozeti GERİ GELMESİN (10 Ağu 2026) ────────────
+// 🚨 NEDEN: rozet `users.phone_verified`e bakıyordu ve o kolon İSTEMCİDEN
+// yazılabilir (`PanelClient.tsx` OTP akışı PostgREST'e doğrudan
+// `update({ phone_verified: true })` atıyor). Dürüst akışta OTP doğrulanıyor ama
+// saldırganın o akışı kullanma zorunluluğu yok: kendi oturumuyla aynı yazmayı
+// OTP'siz yapabiliyordu. Yani rozet "doğrulanmış" değil "kendini doğrulanmış
+// ilan etmiş" demekti ve nakliyeciye YANLIŞ güven sinyali veriyordu.
+// Karar (Bayram, 10 Ağu): kalksın. Bu blok geri eklenmesini engelliyor.
+//
+// ⚠️ KAPSAM — yalnız HERKESE AÇIK yüzeyler taranır. `app/panel` ve
+//    `app/profil-tamamla` kullanıcının KENDİ durumunu gösteriyor ("✓ Doğrulandı"
+//    kendi telefonunun yanında); orada kimse aldatılmıyor, o yüzden hariç.
+//    Ayrım şu: başkasına gösterilen bir güven iddiası mı, yoksa kendi okuması mı.
+const HERKESE_ACIK = [
+  'ilan/[id]/page.tsx', 'ilan/[id]/Aksiyonlar.tsx', '_components/HomeClient.tsx',
+  'page.tsx', 'u/[username]/page.tsx',
+];
+for (const yol of HERKESE_ACIK) {
+  const tam = join(APP, yol);
+  if (!existsSync(tam)) continue;
+  const kod = yorumsuz(readFileSync(tam, 'utf8'));
+  kontrol(`${yol} → phone_verified OKUMUYOR`, !kod.includes('phone_verified'));
+  kontrol(`${yol} → "Telefon Doğrulandı" rozeti YOK`,
+    !/Tel(efon)?\s+Doğrulandı/.test(kod));
+}
+// Paylaşılan liste eşleyicisi de temiz olmalı — kartların hepsi buradan besleniyor.
+const ilanListe = yorumsuz(readFileSync(join(KOK, 'lib/ilan-liste.ts'), 'utf8'));
+kontrol('lib/ilan-liste.ts → phone_verified OKUMUYOR', !ilanListe.includes('phone_verified'));
+kontrol('lib/ilan-liste.ts → telefonDogrulandi alanı YOK', !ilanListe.includes('telefonDogrulandi'));
+
+// 🚨 Sahiplenme sayfası rozeti VAAT ETMEMELİ. Vaat edilen fayda ile teslim edilen
+//    davranış aynı commit'te değişmek zorunda; yoksa kullanıcı sahiplenir,
+//    rozeti bekler ve hiç gelmez.
+// ⚠️ `yorumsuz()` ŞART: bu dosyadaki açıklama yorumu ibarenin kendisini içeriyor
+//    ve ham metinde arayınca kontrol kendi yorumuna takılıyor (ilk yazımda oldu).
+const sahiplen = yorumsuz(readFileSync(join(APP, 'ilan/[id]/sahiplen/page.tsx'), 'utf8'));
+kontrol('sahiplen sayfası "Telefon Doğrulandı" rozeti VAAT ETMİYOR',
+  !/Telefon Doğrulandı/.test(sahiplen));
+
 console.log(`\n${hatalar.length === 0 ? '✅' : '❌'} SEO metadata: ${gecti} geçti, ${hatalar.length} kaldı`);
 for (const h of hatalar) console.log(`   ✗ ${h}`);
 process.exit(hatalar.length === 0 ? 0 : 1);

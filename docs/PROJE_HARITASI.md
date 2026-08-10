@@ -2250,6 +2250,22 @@ Açık rotalar: /giris, /auth/, /profil-tamamla, /nasil-calisir, /hakkimizda,
   `Allow: /api/ilanlar/` + `Disallow: /api/` birlikte doğru çalışır — geniş
   yasağı kaldırmadan tek bir yol açmanın doğru yolu bu.
 
+- 🚨 **BİR GÜVEN ROZETİ, DAYANDIĞI ALAN KADAR GÜVENİLİRDİR** (10 Ağu 2026,
+  "✅ Telefon Doğrulandı" kaldırıldı). Rozet `users.phone_verified`e bakıyordu ve
+  o kolon **istemciden yazılabiliyordu** (`PanelClient.tsx` OTP akışı PostgREST'e
+  doğrudan `update`). Dürüst akışta OTP doğrulanıyor — ama saldırganın o akışı
+  kullanma zorunluluğu yok. Yani rozet "doğrulanmış" değil **"kendini doğrulanmış
+  ilan etmiş"** demekti. **Kural: bir rozet göstermeden önce onu besleyen alanın
+  KİM tarafından yazılabildiğini sor.** İstemci yazabiliyorsa o bir iddiadır,
+  doğrulama değildir; başkasına güven sinyali olarak sunulamaz.
+  ⚙️ Kaldırma kararı verildiğinde önce **kapsam ölçüldü**: alan bir yeteneği
+  kapılıyor mu, yoksa yalnız gösterim mi? Yalnız gösterimdi → rozeti kaldırmak
+  açığın değerini sıfırladı ve refactor gerekmedi. Kapı olsaydı yetmezdi.
+  ⚠️ Ve **vaat edilen fayda aynı commit'te değişmek zorunda**: `sahiplen` sayfası
+  bu rozeti vaat ediyordu; kalsaydı karşılığı olmayan bir söz olurdu.
+  📌 Kalan mayın: kolon hâlâ istemciden yazılabilir. Bugün okuyan public yüzey
+  olmadığı için zararsız, ama **Faz 3 güven puanı onu okursa açık geri gelir.**
+
 - 🚨🚨 **`Disallow` + `noindex` BİRLİKTE = İKİSİ DE ÇALIŞMAZ** (10 Ağu 2026).
   `/giris` hem `robots.txt`te yasaklıydı hem `noindex` taşıyordu. **`noindex`in
   çalışması sayfanın TARANABİLİR olmasına bağlıdır** — Google sayfayı çekemezse
