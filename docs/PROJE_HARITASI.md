@@ -18,8 +18,28 @@
 > `audit_score` bu kodda RİSK skoru, +50 ilanı yayından düşürürdü; (2) "2 gecikme
 > → otomatik shadow ban" — silahlandırılabilir, moderatör kuyruğuna alındı.
 > ⚠️ Bu inceleme canlı bir hata da ortaya çıkardı: `audit_score` ekranda/JSON-LD'de
-> **"Kalite Skoru" olarak TERS** yayınlanıyor (rozet `>=70`, yani en riskliler).
-> Ayrıntı: `docs/20260810_guven_etkilesim_plan.sql` + `docs/YAPILACAKLAR.md` madde 1.
+> **"Kalite Skoru" olarak TERS** yayınlanıyordu (rozet `>=70`, yani en riskliler).
+> ✅ **10 AĞU 2026'DA KAPANDI** — bkz. aşağıdaki "TERS SKOR" kaydı.
+> Ayrıntı: `docs/20260810_guven_etkilesim_plan.sql` + `docs/ARSIV_YAPILACAKLAR.md`.
+
+> ## ✅ 10 AĞU 2026 — TERS SKOR YAYINI KAPANDI (4 nokta) + `olc:87` TABANI ONARILDI
+>
+> **`audit_score` artık HİÇBİR yerde yayınlanmıyor.** Karar (Bayram): "ibareyi
+> tamamen kaldır" — alternatifler (`100 - audit_score`, ya da rozeti somut
+> doğrulamalara bağlamak) sunuldu, sayının yayınlanmaması seçildi.
+> Kaldırılan dört nokta: yeşil rozet (`>=70` koşulu) · meta `description` ·
+> JSON-LD `quality_score` · `data-quality-score` niteliği; ayrıca
+> `api/ilanlar/[id]` → `meta.kalite_skoru`. Kolon her iki SELECT'ten de çıkarıldı
+> (anon'dan `revoke` edilmiş durumda; bırakmak yeniden yayına davetiye olurdu).
+> ⚠️ **Yerine bir şey konmadı** — sahte güven sinyali üretmemek için. Gerçek
+> sinyal Faz 3'te, bu skordan bağımsız.
+> Bekçi: `npm run test:jsonld` (30 kontrol, 5'i yeni).
+>
+> **`olc:87` tabanı v89'dan v91'e taşındı** ve `BEYAN_EDILEN` bekçisiyle korundu.
+> Ölçüm (10.955 satır / 30 gün): canlı **0 kendine-şerit** ✅; #92 geri alınsa
+> **198 tanesi (189 satır)** geri gelir. `yeni` satırı sıfır — dağıtılmamış
+> düzeltme yok. Aylardır bekleyen ölçüm böylece kapandı.
+> 🚨 İkisi de §9'a ders yazdı: bayat ölçüm tabanı, ve boşa geçen assert.
 >
 > 🔴 **9 AĞU 2026 — `JobPosting` UYGULANMADI (bilinçli ret).** Rich Results Test
 > "öğe algılanmadı" dedi; öneri `Service`→`JobPosting` idi. Google dokümanı:
@@ -2206,6 +2226,21 @@ Açık rotalar: /giris, /auth/, /profil-tamamla, /nasil-calisir, /hakkimizda,
   imzasını aramaktı (`!kendineSerit(to)` → 2 yerde, v89 hâli → 0 yerde). İki dakika
   sürdü ve raporumu tersine çevirdi. Türetilen taban, sürüm damgası taşımalı ve
   eşleşmiyorsa **hata atmalı** — `#87-A düzeltmesi kaynakta YOK` kontrolü gibi.
+
+- 🚨 **"YOK MU?" KONTROLÜ BOŞ VERİDE HER ZAMAN GEÇER — ÜÇÜNCÜ KEZ ISIRDI**
+  (10 Ağu 2026, `test-jsonld.mts`). `audit_score` sızıntısına karşı 5 assert
+  yazıldı, hepsi yeşil geçti. **Mutasyon testi 5'ten yalnız 4'ünü düşürdü:** API
+  assert'i, `kalite_skoru: 99` geri eklenmiş olmasına rağmen "geçti" dedi. Sebep:
+  test JSON-LD'nin kullandığı ilanı sorguluyordu, o ilan `passive`, API bilerek
+  404 dönüyor → `apiYanit.meta` `undefined` → `'kalite_skoru' in {}` = **false**
+  → kontrol boşa geçiyor. Aynı sınıfın önceki iki örneği: `test-safety-rules.mts`
+  boş dizide `every()` (her zaman true), ve `/u/` testinde `body.innerText`
+  içinde "Ankara" aramak (sayfa 81 il adını dropdown'da basıyor).
+  **Kural: bir "X yok" kontrolünden önce "veri VAR" kontrolünü yaz.** Burada
+  `Boolean(apiYanit?.id)` şartı eklendi, ve uygun ilan bulunamazsa kontrol
+  sessizce atlanmıyor — **açıkça düşüyor** (`ok(..., false, 'DOĞRULANAMADI')`).
+  **Ve bunu bulan şey mutasyon testiydi, testin yeşil olması değil.** Yeni bir
+  koruma yazınca korumayı BOZ ve testin gerçekten düştüğünü gör.
 
 - 🚨 **KAPANMIŞ BİR KARARI "YENİ BULGU" SANMAK — liste ile harita ayrışınca olur**
   (10 Ağu 2026). #92'nin `KAYIP=3` bulgusunu yeni keşif gibi sundum; oysa kararı

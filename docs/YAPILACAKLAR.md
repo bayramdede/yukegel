@@ -18,69 +18,7 @@
 
 ---
 
-## 🔴 1 — `audit_score` "Kalite Skoru" olarak TERS yayınlanıyor
-
-**`audit_score` bir RİSK skorudur: YÜKSEK = KÖTÜ.** (`< 31` → temiz/otomatik
-yayın, `>= 71` → shadow ban + arşiv.) Ama dört yerde "kalite" gibi sunuluyor:
-
-| yer | bugünkü hâli |
-|---|---|
-| `app/ilan/[id]/page.tsx` yeşil rozet | koşul **`audit_score >= 70`** → **en riskli** ilana "✓ Doğrulanmış Veri / Kalite Skoru: 70/100" |
-| aynı dosya, meta `description` | "Kalite Skoru: X/100" — **Google indeksliyor** |
-| aynı dosya, JSON-LD | `PropertyValue name="quality_score"` — **AI botlarına gidiyor** |
-| `app/api/ilanlar/[id]` | `kalite_skoru` |
-
-**Kanıt:** `audit_score >= 70` olan **166.657** ilanın **tamamında** `fired_rules`
-dolu — sayı gerçekten ihlal sayıyor, kalite değil.
-
-**Bugünkü canlı etki ~sıfır ama bu şans:** yayında tek ilan var ve skoru 0. Rozet
-eşiği (`>=70`) ile ban eşiği (`>=71`) arasında **1 puanlık pencere** duruyor.
-
-**Yapılacak:** ya yayınlanan değer `100 - audit_score` olur ve rozet koşulu
-`audit_score <= 30`'a döner, ya da "Kalite Skoru" ibaresi tamamen kalkar.
-⚠️ **Dördü BİRLİKTE değişmeli** — yoksa aynı sayı iki ayrı anlamla yayınlanır.
-`scripts/test-jsonld.mts`'e assert eklenecek.
-
-📌 Bu karışıklık `lib/metin-denetim.ts` başında da uyarı olarak duruyor; Faz 3'ün
-"kullanıcı güven puanı" da bu skordan **bağımsız** tanımlanmak zorunda (madde 3).
-
----
-
-## 🔴 2 — #92: düzeltme sahada ÇALIŞIYOR, ama iki iş kaldı
-
-**10 Ağu 2026'da aylardır bekleyen `npm run olc:87` ölçümü çalıştırıldı** ve
-canlı Edge Function kaynağı okundu. Durum tespiti:
-
-**Canlı sürüm `parse-listing` v91, ACTIVE.** #92-A (kaldırılmış `if (!from)`
-kapısı) ve #92-B (`!kendineSerit(to)`, iki push noktasında da) **sahada.**
-Doğrulama: canlı kaynakta `!kendineSerit(to)` **2 yerde**, v89 hâli (`if (!from &&
-rel.rel === 'arrow'`) **0 yerde**.
-
-Ölçüm (7.299 satır, son 30 gün) v89 → v91 geçişini şöyle veriyor:
-
-```
-varyant     satır DEĞİŞTİ   şerit EKLENDİ   şerit SİLİNDİ   0→≥1   ≥1→0   KENDİNE ŞERİT
-canli (v89)          —               —               —      —      —        198 (189 satır)
-yeni  (v91)        196             447             275      0      3 🚨        0 ✅
-```
-
-→ **198 bozuk kendine-şerit sıfırlandı.** #92 amacına ulaştı.
-
-### 2a — `olc-87.mts`'in `canli` varyant tanımı BAYAT (öncelik: bu)
-
-Script'in kendi notu bunu emrediyor: *"Taban sabit değil, HAREKETLİ: her deploydan
-sonra `canli` varyantının tanımı güncellenir."* Güncellenmemiş — tanım hâlâ
-`geri92B(geri92A(yeniKod))`, yani **canlıda olan düzeltmeyi geri alıyor.**
-
-🚨 **Bu bana yanlış alarm verdirdi:** tabloyu okuyup "canlıda 198 bozuk şerit var"
-dedim; gerçekte 0. Script'in çıktısı da bunu iddia ediyor (satır 251: *"`canli`
-satırındaki sayı ŞU AN CANLIDA ÜRETİLEN bozuk şerit adedi"*) — **artık yalan.**
-Düzeltilmezse bir sonraki okuyan aynı tuzağa düşer.
-
-**Yapılacak:** `canli` = v91 (düzeltmeler dahil) olacak; yeni taban `#87-A/B/D +
-#92-A/B` içerecek. `KAYIP` sütunu o zaman v91'e göre ölçülür.
-
-### 2b — "Ş.İçi" istisnası (düşük öncelik — KARAR VERİLMİŞ, yeniden tartışılmayacak)
+## 🟢 1 — #92 `Ş.İçi` istisnası (düşük öncelik — KARAR VERİLMİŞ, yeniden tartışılmayacak)
 
 > ✅ **Bayram'ın kararı (bkz. `docs/PROJE_HARITASI.md`:386): "v90 kalıyor."**
 > 163 yanlış kendine-şeride karşı 1 gerçek + 2 kabul edilebilir kayıp; net kazanç
@@ -103,9 +41,13 @@ bir taşıma sınıfı ve onunla birlikte düşüyor.
 (%0,01) şehir içi kalıbı taşıyor. Yazılacak istisna: `kendineSerit` kontrolüne
 "satırda şehir içi ibaresi varsa aynı il şeridine izin ver".
 
+📌 **Ölçüm altyapısı hazır ve artık güvenilir:** `npm run olc:87` tabanı v91'e
+taşındı ve `BEYAN_EDILEN` bekçisiyle korunuyor. İstisnayı yazınca `geri92*`
+teşhis satırları kazancı, `KAYIP` sütunu da bedeli doğrudan gösterecek.
+
 ---
 
-## 🟡 3 — Güvenli Etkileşim modülü: Faz 1-2 bitti, Faz 3-4 bekliyor
+## 🟡 2 — Güvenli Etkileşim modülü: Faz 1-2 bitti, Faz 3-4 bekliyor
 
 Kaynak PRD: `doc/GuvenEtkilesim.docx` · plan `docs/20260810_guven_etkilesim_plan.sql`
 Bugünkü veri: `deals` 0 satır, `reviews` 0 satır (modül henüz kullanılmadı).
@@ -121,7 +63,9 @@ Bugünkü veri: `deals` 0 satır, `reviews` 0 satır (modül henüz kullanılmad
   görünürlüğünü düşürür, o yüzden tek başıma yapmadım.
 
 ### Faz 3 — profil / rozet / güven puanı
-- Kullanıcı düzeyi güven puanı. 🚨 **`audit_score`'dan BAĞIMSIZ olacak** (madde 1).
+- Kullanıcı düzeyi güven puanı. 🚨 **`audit_score`'dan BAĞIMSIZ olacak.** O skorun "Kalite Skoru" olarak
+  yayınlanması 10 Ağu'da kaldırıldı (kayıt: `docs/ARSIV_YAPILACAKLAR.md`); aynı
+  hatayı güven puanında tekrarlamamak için sinyal SIFIRDAN tanımlanacak.
 - Profil OG kartı — ilan kartı deseni hazır (`app/ilan/[id]/opengraph-image.tsx`).
   ⚠️ Satori `₺` (U+20BA) glifini basmıyor, tofu çıkıyor; orada `TL` yazıldı.
 
@@ -139,13 +83,14 @@ Bugünkü veri: `deals` 0 satır, `reviews` 0 satır (modül henüz kullanılmad
 
 ### PRD'nin bilinçli UYGULANMAYAN iki maddesi (yeniden açılmasın diye kayıtta)
 - `quality_score += 50` — `audit_score` risk skoru olduğu için +50 ilanı
-  **yayından düşürürdü.** Madde 1 çözülmeden anlamsız.
+  **yayından düşürürdü.** Skor artık hiçbir yerde yayınlanmıyor; bu madde
+  yeniden ele alınacaksa `quality_score` diye AYRI bir alan tanımlanmalı.
 - 2 "ödeme gecikti" bildiriminde **otomatik shadow ban** — anlaşmalı iki hesap
   bunu silah olarak kullanır. Yerine moderatör kuyruğuna düşürülüyor.
 
 ---
 
-## ⏳ 4 — Şirket ilişkisi + ilan detayında "diğer ilanlar"
+## ⏳ 3 — Şirket ilişkisi + ilan detayında "diğer ilanlar"
 
 Bayram'ın 9 Ağu talebi: *(1) kullanıcılar şirkete bağlı olabilsin, (2) ilan
 detayında kullanıcının tüm ilanları ve şirketin tüm ilanları butonları olsun.*
@@ -167,7 +112,7 @@ detayında kullanıcının tüm ilanları ve şirketin tüm ilanları butonları
 
 ---
 
-## ⏳ 5 — Güvenlik takibi (7 Ağu'da açıldı, 10 Ağu'da hâlâ açık)
+## ⏳ 4 — Güvenlik takibi (7 Ağu'da açıldı, 10 Ağu'da hâlâ açık)
 
 - 🔴 **`phone_verified` istemciden yazılabiliyor** — `app/panel/PanelClient.tsx:961`
   doğrudan `supabase.from('users').update({ phone: yeniTel, phone_verified: true })`
@@ -177,13 +122,13 @@ detayında kullanıcının tüm ilanları ve şirketin tüm ilanları butonları
   (`app/api/auth/otp/route.ts:70/78/90`) SMS **gönderimini** sınırlıyor;
   6 haneli kodu **deneme** sayısını sınırlayan bir şey yok.
 - 🟡 **`auth_leaked_password_protection` kapalı** — yalnız Supabase Dashboard'dan
-  açılabiliyor, kod/SQL ile yapılamaz → **Bayram'da** (madde 8).
+  açılabiliyor, kod/SQL ile yapılamaz → **Bayram'da** (madde 7).
 - ⏳ **`app/api/auth/switch-account/route.ts` tutarlılık kontrolü hiç yapılmadı.**
   Implicit-flow izi arayan grep boş döndü, ama dosya elle okunmadı.
 
 ---
 
-## ⏳ 6 — Küçük ama gerçek açıklar
+## ⏳ 5 — Küçük ama gerçek açıklar
 
 - **Kaba dil kuralı yanlış pozitif üretebilir.** `safety_rules`'taki kaba dil
   kuralı (40 puan) `mal` kelimesini yakalıyor; nakliyede "mal" = **yük**, tamamen
@@ -202,7 +147,7 @@ detayında kullanıcının tüm ilanları ve şirketin tüm ilanları butonları
 
 ---
 
-## ⏳ 7 — Trafik bekleyen ölçümler (kod tarafı bitti, örneklem yok)
+## ⏳ 6 — Trafik bekleyen ölçümler (kod tarafı bitti, örneklem yok)
 
 Bunlar "yapılacak iş" değil, **doğrulanacak iddia**. Üçü de canlı trafik gerektiriyor.
 
@@ -224,7 +169,7 @@ beslemesi son günlerde ilan üretmemiş görünüyor — ana sayfa akışı ona
 
 ---
 
-## 👤 8 — Bayram'da (kod/SQL ile yapılamaz)
+## 👤 7 — Bayram'da (kod/SQL ile yapılamaz)
 
 - ⏳ **`auth_leaked_password_protection`** — Supabase Dashboard → Authentication →
   Password. Sızmış parola kontrolü kapalı.

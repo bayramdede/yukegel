@@ -5,6 +5,18 @@
 // varyantının tanımı güncellenir (aşağıdaki `varyantlar` bloğu).
 //   6 Ağu 2026 · taban = #87 öncesi  → ölçüldü, #87-A/B/D deploy edildi (v89)
 //   7 Ağu 2026 · taban = v89         → #92-A/#92-B ölçülüyor
+//   10 Ağu 2026 · taban = v91        → #92 SAHADA; ölçülecek yeni düzeltme yok
+//
+// 🚨🚨 EN PAHALI DERS — BU DOSYA BİR KEZ YALAN SÖYLEDİ (10 Ağu 2026).
+//   Yukarıdaki "her deploydan sonra güncellenir" satırı 7 Ağu'da yazıldı ve
+//   UNUTULDU. #92 v90/v91 ile sahaya çıktı, ama `canli` tanımı hâlâ onu geri
+//   alıyordu. Script "canlıda 198 kendine-şerit var" gösterdi; gerçek 0'dı ve
+//   bu sayı rapor edildi. Yani ölçüm aracı, ölçtüğü hatanın kendisini uydurdu.
+//   Sebep: taban bir YORUMLA korunuyordu, KONTROLLE değil.
+//   → Artık `BEYAN_EDILEN` bekçisi var: çekirdeğe beyan edilmemiş bir `#NN`
+//     düzeltme imzası girerse script PATLAR. Yorum güvenilmez, kontrol güvenilir.
+//   → Ve "canlı" iddiası artık DOĞRULANARAK yazılıyor: dağıtılmış kaynak okunup
+//     düzeltme imzası aranıyor (`get_edge_function`). Bkz. `CANLI_SURUM`.
 //
 // 🚨 KAPILAR (ikisi de `yeni` satırında SIFIR olmalı):
 //      ≥1→0 (KAYIP)      — düzeltme çalışan bir satırı öldürdü mü
@@ -99,19 +111,68 @@ for (const [ad, parca] of [['#87-A', A_YENI], ['#87-B', B_YENI], ['#87-D', D_YEN
 const b92Sayisi = yeniKod.split(B92_YENI).length - 1;
 if (b92Sayisi !== 2) throw new Error(`#92-B koruması ${b92Sayisi} yerde — 2 bekleniyordu`);
 
-// TABAN = canlı v89: #92-A ve #92-B geri alınmış hâl. (#87-A/B/D canlıda, dokunulmaz.)
 const geri92A = (k: string) => k.replace(A92_YENI, A92_ESKI);
 const geri92B = (k: string) => k.split(B92_YENI).join(B92_ESKI);
 
+// ── 🚨 TABAN = v91 (10 Ağu 2026). BAYAT TABAN BİR KEZ YALAN SÖYLEDİ ───────────
+//
+// 10 Ağu'da bu blok hâlâ `canli: geri92B(geri92A(yeniKod))` diyordu — yani #92
+// düzeltmesini geri alıp ona "canlı" adını veriyordu. Ama #92 v90/v91 ile SAHAYA
+// ÇIKMIŞTI. Sonuç: tablo "canlıda 198 kendine-şerit var" gösterdi, rapor edildi,
+// ve YANLIŞTI — gerçek sayı 0'dı. Dosyanın başındaki "her deploydan sonra
+// güncellenir" notu bir YORUMDU, kontrol değildi; kimse okumadı.
+//
+// Doğrulama yöntemi (tekrar gerekirse): dağıtılmış kaynağı oku ve düzeltme
+// imzasını ara — Supabase MCP `get_edge_function` ya da
+// `supabase functions download parse-listing`. 10 Ağu ölçümü:
+//   `!kendineSerit(to)`                    → canlıda 2 yerde  (#92-B ✅)
+//   `if (!from && rel.rel === 'arrow'`     → canlıda 0 yerde  (#92-A ✅)
+//   `aracKelimeler` dizisinde 'yuklenecek' → yok              (#93  ✅)
+// Yani yerel ağaç = dağıtılmış v91. TABAN ARTIK `yeniKod`.
+const CANLI_SURUM = 'v91';
+const CANLI_DOGRULAMA = '2026-08-10';
+
+// 🔒 BEKÇİ — tabanın sessizce bayatlamasını ENGELLER.
+// Çekirdekteki her `#NN` düzeltme imzası burada BEYAN EDİLMİŞ olmak zorunda.
+// Yeni bir düzeltme (#94…) eklenince script PATLAR ve seni tabanı gözden
+// geçirmeye zorlar: o düzeltme canlıda mı, yoksa `canli` onu geri mi almalı?
+// Yorum yerine kontrol — 10 Ağu hatasının tekrarını bu satır engelliyor.
+const BEYAN_EDILEN = new Set([
+  '#41', '#42', '#50', '#63', '#64', '#65', '#71', '#73',
+  '#86', '#87', '#88', '#89', '#92', '#93',
+]);
+const bulunanImzalar = new Set(yeniKod.match(/#\d{2,3}/g) ?? []);
+const beyansiz = [...bulunanImzalar].filter(i => !BEYAN_EDILEN.has(i));
+if (beyansiz.length) {
+  throw new Error(
+    `Çekirdekte BEYAN EDİLMEMİŞ düzeltme imzası var: ${beyansiz.join(', ')}\n` +
+    `  → Bu düzeltme(ler) CANLIDA mı? Dağıtılmış kaynağı oku (get_edge_function).\n` +
+    `  → Canlıdaysa: imzayı BEYAN_EDILEN'e ekle, CANLI_SURUM'u güncelle.\n` +
+    `  → Canlıda DEĞİLSE: geri alma fonksiyonu yaz ve 'canli' varyantına ekle,\n` +
+    `     yoksa taban yalan söyler (10 Ağu 2026'da tam bunu yaşadık).`,
+  );
+}
+
+// İskelet KORUNUYOR: `canli` = taban (ilk sıra), `yeni` = elimdeki ağaç (son sıra).
+// Bugün İKİSİ AYNI — çünkü yerel ağaçta dağıtılmamış düzeltme yok. Yani `yeni`
+// satırının TAMAMEN SIFIR olması BEKLENEN sonuçtur, arıza değil: ölçülecek yeni
+// bir düzeltme yok demektir. Bir sonraki düzeltme yazıldığında `yeni` canlanır.
+//
+// Aradaki iki satır TEŞHİS: #92'yi geri alsak ne olurdu — yani düzeltmenin
+// sahadaki değerini gösteriyor. Bunlar silinmedi çünkü #92'nin kazancının
+// kanıtı bu satırlardır (`geri92AB` = eski v89 davranışı, 198 kendine şerit).
 const varyantlar = {
-  canli:     geri92B(geri92A(yeniKod)),
-  yalniz92A: geri92B(yeniKod),
-  yalniz92B: geri92A(yeniKod),
-  yeni:      yeniKod,
+  canli:    yeniKod,
+  geri92A:  geri92A(yeniKod),
+  geri92AB: geri92B(geri92A(yeniKod)),
+  yeni:     yeniKod,
 };
 const M: Record<string, any> = {};
 for (const [ad, kod] of Object.entries(varyantlar)) {
-  if (ad !== 'yeni' && kod === yeniKod) throw new Error(`${ad} mutantı üretilemedi — string değişimi tutmadı`);
+  // ⚠️ 'canli' ve 'yeni' BİLEREK yeniKod'a eşit (taban = dağıtılmış sürüm = yerel ağaç).
+  //    Yalnız TEŞHİS mutantlarının gerçekten farklı olması gerekir.
+  if (ad !== 'yeni' && ad !== 'canli' && kod === yeniKod)
+    throw new Error(`${ad} mutantı üretilemedi — string değişimi tutmadı`);
   const yol = join(dizin, `${ad}.mts`);
   writeFileSync(yol, kod, 'utf8');
   M[ad] = await import(yol);
@@ -183,7 +244,7 @@ console.log(`alias: ${aliases.length}/${aliasSayisi} · satır: ${satirlar.lengt
 console.log(`  durum dağılımı: ${Object.entries(durumSayisi).map(([k, v]) => `${k}=${v}`).join(' · ')}\n`);
 
 // ── Karşılaştır ───────────────────────────────────────────────────────────────
-const ADLAR = ['canli', 'yalniz92A', 'yalniz92B', 'yeni'] as const;
+const ADLAR = ['canli', 'geri92A', 'geri92AB', 'yeni'] as const;
 type Ad = typeof ADLAR[number];
 
 // Şerit anahtarı: parser çıktısı zaten normalize (aynı alias tablosu her varyantta),
@@ -287,8 +348,13 @@ for (const r of satirlar as any[]) {
 // ── Rapor ─────────────────────────────────────────────────────────────────────
 const C = 96;
 console.log('─'.repeat(C));
-console.log('📌 TABAN = "canli" (parse-listing v89, canlıda çalışan sürüm). Diğer satırlar');
-console.log('   ONA GÖRE farkı gösterir. `canli` satırında yalnız KENDİNE ŞERİT anlamlıdır.');
+console.log(`📌 TABAN = "canli" = parse-listing ${CANLI_SURUM} (${CANLI_DOGRULAMA} tarihinde`);
+console.log('   DAĞITILMIŞ KAYNAK OKUNARAK doğrulandı, varsayılmadı). Diğer satırlar ONA GÖRE');
+console.log('   farkı gösterir. `canli` satırında yalnız KENDİNE ŞERİT anlamlıdır.');
+console.log('   `geri92*` satırları TEŞHİS: #92 geri alınsa ne olurdu (sahadaki değeri).');
+if (sonuc.yeni.degisen === 0) {
+  console.log('   ✅ `yeni` satırı sıfır: yerel ağaçta DAĞITILMAMIŞ düzeltme yok. Beklenen.');
+}
 console.log('─'.repeat(C));
 console.log('varyant     satır DEĞİŞTİ   şerit EKLENDİ   şerit SİLİNDİ   0→≥1   ≥1→0   KENDİNE ŞERİT');
 for (const ad of ADLAR) {
@@ -311,7 +377,8 @@ console.log('🚨 "KENDİNE ŞERİT" `yeni` satırında 0 OLMALI — ZORUNLU KAP
 console.log('    Köken = varış (il VE ilçe aynı) olan şerit anlamsızdır. Bu sütun VAR OLDUĞU İÇİN');
 console.log('    var: KAYIP=0 üç kez (#87-E · #87-F · #92) "temiz" dedi, üçünde de canlıda bozuk');
 console.log('    şerit üretiliyordu. Sebep basit — YANLIŞ ŞERİT, ŞERİT SAYISINI DÜŞÜRMEZ.');
-console.log('    `canli` satırındaki sayı düşmüyorsa düzeltme işe yaramamış demektir.');
+console.log('    `canli` satırı 0 DEĞİLSE canlıda o kadar bozuk şerit üretiliyor demektir —');
+console.log(`    ve bu iddia ancak taban gerçekten canlıysa doğrudur (${CANLI_SURUM}, doğrulandı).`);
 console.log('⚠️  "≥1→0" (KAYIP) sütunu 0 OLMALI. Değilse düzeltme çalışan bir satırı öldürüyor.');
 console.log('⚠️  "şerit SİLİNDİ" ALARM DEĞİL — #87-D\'nin temizlediği uydurma şeritler burada');
 console.log('    görünür. Ama her biri gerçekten uydurma mıydı, ÖRNEKLERDEN elle doğrula.');

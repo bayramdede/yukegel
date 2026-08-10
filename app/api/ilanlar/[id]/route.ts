@@ -28,7 +28,7 @@ export async function GET(
       vehicle_type, body_type,
       price_offer, price_negotiable,
       available_date, date_flexible,
-      notes, audit_score,
+      notes,
       moderation_status, status,
       is_shadow_banned, trust_level,
       created_at,
@@ -100,7 +100,12 @@ export async function GET(
     },
     notlar: ilan.notes ?? null,
     meta: {
-      kalite_skoru: ilan.audit_score ?? null,
+      // 🚨 10 Ağu 2026 — `kalite_skoru: ilan.audit_score` KALDIRILDI. `audit_score`
+      //    bir RİSK skorudur (yüksek = kötü, `>= 71` → shadow ban); "kalite" adıyla
+      //    yayınlamak değeri TERS okutuyordu. Bu uç makine-okunur olduğu için
+      //    yanlış anlamın en pahalı olduğu yerdi: tüketen taraf yüksek sayıyı
+      //    "iyi ilan" diye sıralar. Yerine bir şey konmadı — gerçek kalite
+      //    sinyali Faz 3'te gelecek. Ayrıntı: `docs/YAPILACAKLAR.md` madde 1/3.
       moderasyon: ilan.moderation_status,
       guven_seviyesi: ilan.trust_level ?? null,
       olusturulma: ilan.created_at,

@@ -27,6 +27,10 @@ import { SITE_URL } from '../../../lib/site';
 // önerdiği "generateMetadata + page dedup" deseni. Alan kümesi ikisinin
 // İHTİYACININ BİRLEŞİMİ: `status` yalnız `generateMetadata`nın robots kuralında,
 // `contact_phone`/`price_negotiable`/vb. yalnız sayfa gövdesinde kullanılıyor.
+// 🚨 10 Ağu 2026 — `audit_score` bu SELECT'ten ÇIKARILDI. Sayfadaki dört yayın
+//    noktası da kaldırıldığı için tüketicisi kalmadı; ayrıca kolon anon rolünden
+//    `revoke` edilmiş durumda. İstemeye devam etmek, ileride birinin "hazır
+//    geliyor" diye yeniden yayınlamasına davetiye olurdu. Bekçi: `npm run test:jsonld`.
 const getIlan = cache(async (id: string) => {
   const { data } = await supabase
     .from('listings')
@@ -35,7 +39,7 @@ const getIlan = cache(async (id: string) => {
       contact_phone, price_offer, price_negotiable,
       available_date, date_flexible, notes, source,
       created_at, moderation_status, is_shadow_banned, status,
-      trust_level, user_id, audit_score,
+      trust_level, user_id,
       vehicle_type, body_type,
       listing_stops (
         stop_order, province_id, district,
@@ -98,7 +102,12 @@ export async function generateMetadata(
       ? `${rota} rotasında ${yuk ? `${yuk} yükü` : 'yük'} için ${aracTip || 'araç'} aranıyor.`
       : `${rota} rotasında ${aracTip || 'araç'} müsait.`,
     stops.length > 1 ? `${stops.length} duraklı rota.` : null,
-    ilan.audit_score ? `Kalite Skoru: ${ilan.audit_score}/100.` : null,
+    // 🚨 10 Ağu 2026 — BURADA "Kalite Skoru: X/100" VARDI VE TERSİYDİ.
+    //    `audit_score` bir RİSK skorudur (yüksek = kötü); Google bu metni
+    //    indeksliyordu, yani en riskli ilanlar "Kalite Skoru: 100" diye
+    //    aranabilir hâle geliyordu. Karar (Bayram, 10 Ağu): ibare tamamen kalksın.
+    //    Denetim skoru İÇ VERİDİR — zaten öyle tasarlanmış (`audit_score` anon'dan
+    //    `revoke` edilmiş durumda). Ayrıntı: `lib/metin-denetim.ts` başı.
     'Yükegel\'de nakliye ilanları.',
   ].filter(Boolean).join(' ');
 
@@ -336,7 +345,12 @@ export default async function IlanDetay({ params }: { params: Promise<{ id: stri
       { '@type': 'PropertyValue', name: 'vehicle_type', value: (ilan.vehicle_type as string[] | null)?.join(', ') ?? '' },
       { '@type': 'PropertyValue', name: 'body_type', value: (ilan.body_type as string[] | null)?.join(', ') ?? '' },
       { '@type': 'PropertyValue', name: 'stops_count', value: stops.length },
-      { '@type': 'PropertyValue', name: 'quality_score', value: ilan.audit_score ?? null },
+      // 🚨 10 Ağu 2026 — BURADA `quality_score: ilan.audit_score` VARDI VE TERSİYDİ.
+      //    Yayınlanan her şey olgusal olmalı; `audit_score` bir RİSK ölçüsü ve
+      //    "quality" adıyla AI botlarına gidiyordu. Kaldırıldı, yerine bir şey
+      //    KONMADI: gerçek bir kalite sinyali üretmeden uydurmuş oluruz.
+      //    Kalite/güven sinyali Faz 3'te (kullanıcı güven puanı) gelecek ve
+      //    bu skordan BAĞIMSIZ olacak. Bekçi: `npm run test:jsonld`.
       { '@type': 'PropertyValue', name: 'source', value: ilan.source },
     ].filter(p => p.value !== '' && p.value !== null && p.value !== 0),
   };
@@ -469,14 +483,18 @@ export default async function IlanDetay({ params }: { params: Promise<{ id: stri
           </span>
         </div>
 
-        {/* Adım 3: Semantik article + Rota */}
+        {/* Adım 3: Semantik article + Rota
+
+            🚨 10 Ağu 2026 — buradaki `data-quality-score={ilan.audit_score}`
+            KALDIRILDI. Aynı ters skorun dördüncü yayın noktasıydı; `data-*`
+            nitelikleri AI-readiness için makine-okunur olsun diye eklenmişti,
+            yani bu da dışarıya açılan bir kanaldı. */}
         <article
           itemScope
           itemType="https://schema.org/Service"
           data-ai-label="listing"
           data-listing-id={ilan.id}
           data-listing-type={ilan.listing_type}
-          data-quality-score={ilan.audit_score ?? undefined}
           data-verified={!dogrulanmamis ? 'true' : 'false'}
         >
         <div style={{ background: '#161b22', border: '1px solid #30363d', borderRadius: 12, padding: 24, marginBottom: 16 }}>
@@ -614,17 +632,18 @@ export default async function IlanDetay({ params }: { params: Promise<{ id: stri
           </div>
         </div>
 
-        {/* Adım 6: Kalite skoru — görsel (insanlar için) */}
-        {(ilan.audit_score ?? 0) >= 70 && (
-          <div
-            style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', background: '#0d2b1a', border: '1px solid #166534', borderRadius: 8, marginTop: 12 }}
-            data-ai-label="quality_badge"
-            title={`Bu ilan ${ilan.audit_score}/100 kalite skoru ile moderasyondan geçmiştir.`}
-          >
-            <span style={{ color: '#22c55e', fontSize: '0.78rem', fontWeight: 700 }}>✓ Doğrulanmış Veri</span>
-            <span style={{ color: '#4b5563', fontSize: '0.72rem' }}>Kalite Skoru: {ilan.audit_score}/100</span>
-          </div>
-        )}
+        {/* 🚨 10 Ağu 2026 — "✓ Doğrulanmış Veri / Kalite Skoru: X/100" ROZETİ KALDIRILDI.
+            SAKIN GERİ EKLEME. Koşulu `audit_score >= 70` idi ve `audit_score` bir
+            RİSK skorudur (`>= 71` → shadow ban): rozet tam olarak **en riskli**
+            ilanlara "doğrulanmış" diyordu. Kanıt: skoru >= 70 olan 166.657 ilanın
+            TAMAMINDA `fired_rules` dolu. Üstelik ban eşiği 71 olduğu için rozet
+            yalnız 70 puanlık — yani "bir kural ihlalinden shadow ban'a bir puan
+            kalmış" — ilanlarda görünebiliyordu.
+
+            Karar (Bayram, 10 Ağu): sayı ve ibare tamamen kalksın. Yerine bir şey
+            KONMADI; sahte bir güven sinyali üretmemek için. Gerçek güven sinyali
+            Faz 3'te gelecek (kullanıcı düzeyi güven puanı) ve bu skordan
+            BAĞIMSIZ olacak — bkz. `docs/YAPILACAKLAR.md` madde 3. */}
 
         <Aksiyonlar
           ilanId={ilan.id}

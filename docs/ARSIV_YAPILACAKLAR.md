@@ -1,6 +1,7 @@
-# ARŞİV — Yükegel geçmiş kayıtları (28 Tem 2026 → 10 Ağu 2026)
-
-> 🗄️ **BU DOSYA BİR ARŞİVDİR. YENİ MADDE EKLENMEZ.**
+# ARŞİV — Yükegel geçmiş kayıtları (28 Tem 2026 → )
+> 🗄️ **BU DOSYA BİR ARŞİVDİR — BEKLEYEN İŞ ARANACAK YER DEĞİL.**
+> Kapanan maddelerin kaydı buraya **başa eklenir** (en yeni üstte). Buraya bir şey
+> yazılması, o işin **bittiği** anlamına gelir.
 > 10 Ağu 2026'da `docs/YAPILACAKLAR.md` 4.962 satıra çıkmış ve içindeki `⏳`
 > işaretlerinin çoğu bayatlamıştı: kapanan işler kapandı diye işaretlenmiş ama
 > satır listede kalmıştı. Sonuç, listeye bakan birinin **yapılmış işi yapılacak
@@ -19,7 +20,101 @@
 
 ---
 
-# Yükegel — Yapılacaklar Listesi
+> ## ✅ 10 AĞU 2026 — `audit_score` TERS YAYINI KAPANDI: DÖRT NOKTA + BEKÇİ
+>
+> **Karar (Bayram): "İbareyi tamamen kaldır."** İki alternatif (`100 - audit_score`
+> ile tersine çevirmek, ya da rozeti somut doğrulama sinyallerine bağlamak)
+> sunuldu; sayının kendisinin yayınlanmaması seçildi.
+>
+> `audit_score` bir **RİSK** skorudur (`< 31` temiz, `>= 71` shadow ban) ama dört
+> yerde "Kalite Skoru" olarak yayınlanıyordu. Rozet koşulu `>= 70` olduğu için
+> tam olarak **en riskli** ilanlara "✓ Doğrulanmış Veri" diyordu — ve ban eşiği 71
+> olduğundan rozet yalnız "shadow ban'a bir puan kalmış" ilanlarda görünebiliyordu.
+> Kanıt: skoru `>= 70` olan **166.657** ilanın tamamında `fired_rules` dolu.
+>
+> **Kaldırılan dört yayın noktası:**
+> - `app/ilan/[id]/page.tsx` — yeşil rozet (`>= 70` koşulu + "Kalite Skoru: X/100")
+> - aynı dosya — meta `description` içindeki "Kalite Skoru: X/100" (Google indeksliyordu)
+> - aynı dosya — JSON-LD `PropertyValue name="quality_score"` (AI botlarına gidiyordu)
+> - aynı dosya — `data-quality-score` niteliği (AI-readiness için makine-okunur)
+> - `app/api/ilanlar/[id]/route.ts` — `meta.kalite_skoru`
+>
+> `audit_score` her iki dosyanın **SELECT'inden de çıkarıldı**: tüketicisi kalmadı
+> ve kolon anon rolünden `revoke` edilmiş durumda. Bırakmak, ileride birinin
+> "hazır geliyor" diye yeniden yayınlamasına davetiye olurdu.
+>
+> ⚠️ **Yerine bir şey KONMADI.** Sahte güven sinyali üretmemek için; gerçek sinyal
+> Faz 3'te (kullanıcı güven puanı) gelecek ve bu skordan bağımsız olacak.
+>
+> **Bekçi:** `npm run test:jsonld` → 30 kontrol. Beş yeni assert: JSON-LD'de
+> `quality_score` yok · HTML'de `data-quality-score` yok · "Kalite Skoru" ibaresi
+> yok · "Doğrulanmış Veri" yok · API'de `kalite_skoru`/`audit_score` yok.
+>
+> 🚨 **MUTASYON TESTİ BİR BOŞA-GEÇEN ASSERT YAKALADI (kayda değer).** Beş assert'i
+> geri ekleyip test koşturunca yalnız **4'ü** düştü; API assert'i mutasyona rağmen
+> "geçti" dedi. Sebep: test JSON-LD ilanını (`passive`) kullanıyordu, API bilerek
+> 404 dönüyor, `apiYanit.meta` `undefined` oluyor ve `'kalite_skoru' in {}` → false.
+> **Boş nesne/dizi üzerinde "yok mu?" kontrolü HER ZAMAN geçer.** Düzeltme: API'nin
+> gerçekten servis ettiği bir ilan ayrıca sorgulanıyor, yanıtın `id` taşıdığı ÖNCE
+> kanıtlanıyor, ve böyle bir ilan yoksa kontrol sessizce atlanmıyor — **açıkça
+> düşüyor.** Mutasyon tekrarlandı → API assert'i de düştü.
+> (Aynı hata sınıfının üçüncü örneği: `test-safety-rules.mts`'te boş dizide
+>  `every()`, `/u/` testinde 81 il adının sayfada olması.)
+>
+> Doğrulama: `tsc` temiz · `test:jsonld` 30/30 · regresyon `test:87` `test:parser`
+> `test:clean` `test:pass2` `test:ad-type` `test:lokasyon` `test:seo` (74)
+> `test:safety-rules` (32) — hepsi yeşil.
+
+---
+
+> ## ✅ 10 AĞU 2026 — `olc:87` TABANI v91'E TAŞINDI + BAYATLAMAYA KARŞI BEKÇİ
+>
+> 🚨 **ÖLÇÜM ARACI, ÖLÇTÜĞÜ HATAYI UYDURDU.** `scripts/olc-87.mts` tabanını
+> koddan türetiyor: `canli = geri92B(geri92A(yeniKod))` — yani güncel kaynaktan
+> #92'yi **geri alıp** ona "canlı" diyor. #92 v90/v91 ile sahaya çıktı ama bu
+> tanım güncellenmedi. Sonuç: tablo *"canlıda 198 kendine-şerit (189 satır)"*
+> gösterdi ve **rapor edildi**; gerçek sayı **0**'dı.
+>
+> Dosyanın başında *"Taban sabit değil, HAREKETLİ: her deploydan sonra `canli`
+> varyantının tanımı güncellenir"* yazıyordu. **Bir yorumdu, kontrol değildi.**
+>
+> **Nasıl anlaşıldı:** dağıtılmış kaynak okundu (`get_edge_function`) ve düzeltme
+> imzası arandı — iki dakika sürdü, raporu tersine çevirdi:
+> ```
+> !kendineSerit(to)                     → canlıda 2 yerde  (#92-B ✅)
+> if (!from && rel.rel === 'arrow'      → canlıda 0 yerde  (#92-A ✅)
+> aracKelimeler'de 'yuklenecek'         → yok              (#93  ✅)
+> parse-listing sürüm                   → v91, ACTIVE
+> ```
+>
+> **Düzeltme:** taban `yeniKod` oldu (`CANLI_SURUM = 'v91'`,
+> `CANLI_DOGRULAMA = '2026-08-10'` — çıktıda basılıyor, "varsayılmadı" diye).
+> `yalniz92A/B` varyantları `geri92A`/`geri92AB` oldu ve anlamı tersine döndü:
+> artık "#92'yi geri alsak ne kaybederiz" ölçüyorlar, yani düzeltmenin sahadaki
+> değerinin kanıtı onlar.
+>
+> **🔒 BEKÇİ — asıl kalıcı düzeltme bu.** Çekirdekteki her `#NN` düzeltme imzası
+> `BEYAN_EDILEN` kümesinde olmak zorunda; olmayan bir imza girerse script PATLAR
+> ve tabanı gözden geçirmeye zorlar ("bu düzeltme canlıda mı, yoksa `canli` onu
+> geri mi almalı?"). Mutasyonla sınandı: sahte `#94` imzası eklendi → script
+> beklenen hatayı verdi, imza geri alındı.
+>
+> **10 Ağu ölçümü (doğru tabanla, 10.955 satır / son 30 gün):**
+> ```
+> varyant     satır DEĞİŞTİ   şerit EKLENDİ   şerit SİLİNDİ   0→≥1   ≥1→0   KENDİNE ŞERİT
+> canli (v91)          —               —               —      —      —          0 ✅
+> geri92A             35              87             332      0      0          0
+> geri92AB           196             275             447      3      0        198 (189 satır)
+> yeni                 0               0               0      0      0          0
+> ```
+> → Canlı **temiz**. #92 geri alınsa **198 bozuk şerit** geri gelir. `yeni` satırının
+> tamamen sıfır olması **beklenen** sonuç: yerel ağaçta dağıtılmamış düzeltme yok.
+>
+> 📌 Aylardır "Bayram'ın makinesinde koşacak" diye bekleyen ölçüm böylece kapandı.
+> Kalan tek #92 işi: `Ş.İçi` istisnası (düşük öncelik, karar verilmiş).
+
+
+## ══ 28 Tem – 10 Ağu 2026 kayıtları (eski liste, olduğu gibi) ══
 
 > ## ✅ 10 AĞU 2026 — BAYRAM'IN 3 KARARI UYGULANDI (telefon normalizasyonu, WhatsApp, Sarı Bayrak)
 >

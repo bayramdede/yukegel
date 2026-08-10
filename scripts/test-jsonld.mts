@@ -143,6 +143,66 @@ ok('JobPosting şeması KULLANILMIYOR (Google politikası)',
    !bl.some(b => b['@type'] === 'JobPosting'),
    'Yük ilanı bir iş ilanı değildir; yanlış kullanım manuel işlem riski taşır.');
 
+// ── 6. 🚨 `audit_score` HİÇBİR YOLLA DIŞARI SIZMAMALI (10 Ağu 2026) ───
+// `audit_score` bir RİSK skorudur (yüksek = kötü, >= 71 → shadow ban). Dört ayrı
+// yerde "Kalite Skoru" olarak yayınlanıyordu ve değer TERS okunuyordu: rozet
+// koşulu `>= 70` olduğu için tam olarak EN RİSKLİ ilanlara "✓ Doğrulanmış Veri"
+// diyordu. Dördü birlikte kaldırıldı; bu blok geri gelmesini engelliyor.
+//
+// ⚠️ Neden metin araması: sızıntı dört FARKLI biçimde olabiliyordu (JSON-LD
+//    PropertyValue, meta description, `data-quality-score` niteliği, görünür
+//    rozet). Tek tek tip kontrolü yapmak birini kaçırırdı — tuzağın kendisi
+//    "aynı sayı dört yerde" olmasıydı.
+const props: any[] = (service?.additionalProperty ?? []) as any[];
+ok('JSON-LD içinde `quality_score` YOK',
+   !props.some(p => p?.name === 'quality_score'),
+   'audit_score bir RİSK skoru — "quality" adıyla yayınlanamaz.');
+ok('HTML içinde `data-quality-score` niteliği YOK',
+   !html.includes('data-quality-score'));
+ok('sayfada "Kalite Skoru" ibaresi YOK (rozet + meta description)',
+   !html.includes('Kalite Skoru'),
+   'Rozet koşulu `audit_score >= 70` idi; ban eşiği 71 — en riskliye "doğrulanmış" diyordu.');
+ok('sayfada "Doğrulanmış Veri" rozeti YOK',
+   !html.includes('Doğrulanmış Veri'));
+
+// Makine-okunur uç da aynı sözleşmeye tabi.
+//
+// 🚨 BU BLOK BİR KEZ BOŞA GEÇTİ — mutasyon testi yakaladı, kaydı onun için duruyor.
+// İlk hâli JSON-LD testinin kullandığı `cokDurakli` ilanını sorguluyordu. Ama o
+// ilan `passive` (platformda çoğu ilan öyle) ve API bilerek 404 döndürüyor →
+// `apiYanit.meta` `undefined` → `'kalite_skoru' in {}` = **false** → kontrol
+// "geçti" diyordu. `kalite_skoru: 99` mutasyonu uygulandığında test bunu
+// GÖRMEDİ. Boş nesne/dizi üzerinde yapılan "yok mu?" kontrolü her zaman geçer.
+//
+// Düzeltme iki parçalı: (1) API'nin GERÇEKTEN servis ettiği bir ilan seçilir,
+// (2) böyle bir ilan yoksa kontrol SESSİZCE ATLANMAZ, açıkça düşer.
+const { data: apiGorunur } = await svc
+  .from('listings')
+  .select('id')
+  .neq('moderation_status', 'rejected')
+  .eq('is_shadow_banned', false)
+  .neq('status', 'passive')
+  .limit(1)
+  .maybeSingle();
+
+if (!apiGorunur) {
+  ok('API görünür bir ilan bulundu (kalite_skoru kontrolü için)', false,
+     'Hiç aktif ilan yok → API sözleşmesi DOĞRULANAMADI. Bu kontrol boşa geçmesin ' +
+     'diye bilerek düşürülüyor: WhatsApp beslemesi durmuşsa önce onu çalıştır.');
+} else {
+  const apiYanit = await fetch(`${TABAN}/api/ilanlar/${apiGorunur.id}`)
+    .then(r => r.json()).catch(() => null);
+  // ⚠️ ÖNCE yanıtın gerçekten bir ilan olduğunu kanıtla — aşağıdaki iki kontrol
+  //    ancak o zaman anlamlı. `id` yoksa hata gövdesi geldi demektir.
+  ok('API yanıtı gerçek bir ilan döndürdü (kontroller boşa geçmiyor)',
+     Boolean(apiYanit?.id), `yanıt: ${JSON.stringify(apiYanit)?.slice(0, 200)}`);
+  ok('/api/ilanlar/[id] yanıtında `kalite_skoru` YOK',
+     Boolean(apiYanit?.id) && !('kalite_skoru' in (apiYanit.meta ?? {})),
+     `meta: ${JSON.stringify(apiYanit?.meta)}`);
+  ok('/api/ilanlar/[id] yanıtının hiçbir yerinde `audit_score` YOK',
+     Boolean(apiYanit?.id) && !JSON.stringify(apiYanit).includes('audit_score'));
+}
+
 console.log('');
 if (hatalar.length) {
   for (const h of hatalar) console.error(h);
