@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSupabase, getServiceSupabase } from '../../../../lib/auth';
 import { getAuditThresholds } from '../../../../lib/auditLimits';
+import { metniDenetle } from '../../../../lib/metin-denetim';
 import { MAX_NOT, MAX_FIYAT, sayiAralik, bugunISO } from '../../../../lib/ilan-yaz';
 import { ARAC_TIPI_SETI, UTSYAPI_SETI } from '../../../../lib/ilan-sabitler';
 
@@ -96,30 +97,18 @@ export async function POST(req: NextRequest) {
       yeniTarih = available_date;
     }
 
-    // ── Aktif güvenlik kurallarını çek
-    const { data: kurallar } = await svc
-      .from('safety_rules')
-      .select('id, rule_type, pattern, risk_weight, description')
-      .eq('is_active', true)
-      .eq('rule_type', 'REGEX');
-
-    // ── Yeni metni tara
+    // ── Metni tara — 🚨 10 Ağu 2026: BU BLOK `lib/metin-denetim.ts`E TAŞINDI.
+    // Buradaki gömülü kopya `safety_rules` desenlerini `new RegExp(pattern)` ile
+    // derliyordu; desenler POSTGRES sözdizimiyle `(?i)` satır içi bayrak taşıdığı
+    // için JavaScript'te "Invalid group" atıyor ve `catch {}` SESSİZCE atlıyordu.
+    // Sonuç: 10 kuralın 8'i (silah/uyuşturucu, göçmen, ağır küfür, 5607
+    // kaçakçılık, kapora/IBAN, belgesiz nakliye, kaba dil, sosyal medya) bu
+    // yolda HİÇ ÇALIŞMIYORDU — yani kullanıcı ilanını DÜZENLEYEREK denetimi
+    // atlatabiliyordu. Ayrıntı ve kapsam: `lib/metin-denetim.ts` başı.
     const yeniNotes = (notes ?? ilan.notes ?? '').trim();
-    const haystack = (yeniNotes + ' ' + (ilan.raw_text || '')).toLowerCase();
-
-    let score = 0;
-    const firedRules: any[] = [];
-
-    for (const kural of (kurallar || [])) {
-      try {
-        const re = new RegExp(kural.pattern, 'i');
-        if (re.test(haystack)) {
-          score += kural.risk_weight;
-          firedRules.push({ rule_id: kural.id, description: kural.description, weight: kural.risk_weight });
-        }
-      } catch { /* bozuk regex, atla */ }
-    }
-    score = Math.min(score, 100);
+    const denetim = await metniDenetle([yeniNotes, ilan.raw_text], 'user_correction');
+    const score = denetim.skor;
+    const firedRules = denetim.atesLenen;
 
     // ── Eşikleri DB'den oku (admin'in /admin/sistem-ayarlari'ndan değiştirebildiği değerler)
     const { autoPublishScoreMax, rejectScoreMin } = await getAuditThresholds();

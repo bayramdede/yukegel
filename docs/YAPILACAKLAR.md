@@ -1,5 +1,57 @@
 # Yükegel — Yapılacaklar Listesi
 
+> ## 🔴 DÜZELTİLDİ (10 Ağu 2026) — GÜVENLİK KURALLARININ %89'U JAVASCRIPT'TE HİÇ ÇALIŞMIYORDU
+>
+> Güvenli Etkileşim Faz 2'de yorum metinlerini `safety_rules`tan geçirirken
+> testim beklenmedik biçimde `audit_score = 0` verdi. Sebep koddaki bir varsayım
+> değil, **veri ile çalışma zamanı arasındaki sözdizimi uyuşmazlığıydı:**
+>
+> `safety_rules.pattern` değerleri **PostgreSQL** sözdizimiyle yazılmış ve satır
+> içi bayrak taşıyor: `(?i)(silah|uyuşturucu|…)`. JavaScript'in `RegExp`i satır
+> içi bayrağı **desteklemez** → `SyntaxError: Invalid group`. Denetim kodu bunu
+> `catch {}` ile **sessizce atlıyordu.**
+>
+> **Ölçüm: 9 aktif REGEX kuralının 8'i JavaScript'te derlenemiyordu.** Atlananlar
+> en ağırlarıydı: silah/uyuşturucu (100), göçmen taşıma (100), ağır küfür (100),
+> 5607 kaçakçılık (100), kapora/IBAN dolandırıcılığı (90), belgesiz nakliye (80),
+> kaba dil (40), sosyal medya (30). Yalnız `(?i)` içermeyen telefon/e-posta
+> kuralı (70) çalışıyordu.
+>
+> **Kapsam:** asıl tarama Postgres'teki `audit_listing_fn`de ve orada 10 kural da
+> çalışıyor (`~*` operatörü `(?i)`yi kabul eder). Boşluk **yalnız JavaScript
+> yolundaydı: `api/ilan/duzelt`** — yani kullanıcının ilanını **düzenleme** yolu.
+> 🚨 **Pratik sonucu: DÜZENLEYEREK DENETİM ATLATILABİLİYORDU.** Girişte doğru
+> işaretlenmiş bir ilan, notuna "silah"/"kapora" eklenip yeniden puanlandığında
+> ~0 alıp `approved` + `active` olabiliyordu. Ve 9 Ağu'da düzenlemeyi yayındaki
+> ilanlara da açtığım için bu yol daha erişilebilir hale gelmişti.
+>
+> **Düzeltme:** desen derlenmeden önce satır içi bayraklar ayıklanıyor
+> (`i` bayrağı zaten ayrıca veriliyor, anlam değişmiyor); veriye dokunulmadı,
+> kurallar Postgres sözdizimiyle yazılmaya devam edebilir. `api/ilan/duzelt`'teki
+> gömülü kopya kaldırılıp tek kaynağa (`lib/metin-denetim.ts`) bağlandı.
+> ⚠️ `catch` artık **sessiz değil** — derlenemeyen kural `ERROR` seviyesinde
+> loglanıyor; bu boşluğu aylarca gizleyen şey o sessizlikti.
+>
+> **Etki ölçüldü, sarsıntı yok:** 39.671 onaylı ilandan kapora/IBAN'a 0,
+> silah/uyuşturucuya 0, belgesize 0, sosyal medyaya 5 (30 puan = eşik altı).
+> Yani boşluk kapanıyor, mevcut içerik etkilenmiyor.
+>
+> **Nöbetçi test: `npm run test:safety-rules` (12 kontrol, dev sunucusu gerekmez).**
+> Aktif kuralların tamamının derlendiğini + çapa metinlerin (silah, uyuşturucu,
+> kapora/IBAN, kaçak, belgesiz) gerçekten eşleştiğini + normal ilan metninin
+> hiçbirine takılmadığını doğruluyor. Kurallar admin panelinden düzenlenebildiği
+> için **her deploy'da çalıştırılmalı** — hiçbir tsc/lint/build bunu yakalayamaz,
+> çünkü desenler koddu değil VERİ.
+>
+> ⏳ **AYRI MADDE — kural kapsamı (karar Bayram'da, ölçüm hazır):**
+> Telefon kuralı `(0[0-9]{9,10})` yalnız BİTİŞİK numarayı yakalıyor.
+> `0532 111 22 33` / `0532.111.22.33` / `0532-111-22-33` — insanların en doğal
+> yazımı — **tamamen kaçıyor.** Ölçüm: **57.363 ilanda** mevcut kuralın
+> kaçırdığı ayraçlı telefon var. Ayrıca "whatsapp" hiçbir kuralda yok
+> (51.430 ilanda geçiyor). Kural eklemek moderasyon hacmini artırır, o yüzden
+> tek başıma uygulamadım.
+
+
 > ## 🔴 ACİL — `audit_score` "Kalite Skoru" olarak TERS yayınlanıyor (10 Ağu 2026)
 >
 > GuvenEtkilesim PRD'sinin `quality_score` maddesini incelerken ortaya çıktı.
