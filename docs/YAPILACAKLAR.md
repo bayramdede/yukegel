@@ -1,5 +1,65 @@
 # Yükegel — Yapılacaklar Listesi
 
+> ## 🔴 ACİL — `audit_score` "Kalite Skoru" olarak TERS yayınlanıyor (10 Ağu 2026)
+>
+> GuvenEtkilesim PRD'sinin `quality_score` maddesini incelerken ortaya çıktı.
+> **`audit_score` bir RİSK skoru** (`< 31` → otomatik yayın/temiz, `>= 71` →
+> shadow ban + arşiv). Ama `app/ilan/[id]/page.tsx` onu şöyle sunuyor:
+> - yeşil rozet koşulu **`audit_score >= 70`** → yani **en riskli** ilanlara
+>   "✓ Doğrulanmış Veri / Kalite Skoru: 70/100"
+> - meta `description` → "Kalite Skoru: X/100" (Google indeksliyor)
+> - JSON-LD → `PropertyValue name="quality_score"` (AI botlarına gidiyor)
+> - `api/ilanlar/[id]` → `kalite_skoru`
+>
+> **Kanıt:** `audit_score >= 70` olan **166.657** ilanın **tamamında**
+> `fired_rules` dolu (gerçekten ihlalli) — sayı "kalite" değil.
+> **Bugünkü canlı etki ~sıfır** ama bu şans: yayında yalnız 1 ilan var ve skoru 0;
+> rozet eşiği (`>=70`) ile ban eşiği (`>=71`) arasında 1 puanlık pencere var.
+>
+> Yapılacak: ya yayınlanan değer `100 - audit_score` olacak ve rozet koşulu
+> `audit_score <= 30`'a dönecek, ya da "Kalite Skoru" ibaresi tamamen kalkacak.
+> ⚠️ Dördü birlikte değişmeli (rozet + description + JSON-LD + API), yoksa aynı
+> sayı iki ayrı anlamla yayınlanır. `scripts/test-jsonld.mts`'e assert eklenmeli.
+
+> ## 🟡 AÇIK — GÜVENLİ ETKİLEŞİM MODÜLÜ: FAZ 1 BİTTİ, FAZ 2-4 BEKLİYOR
+>
+> Kaynak: `docs/GuvenEtkilesim.docx`. Plan + çatışma analizi + Faz 1:
+> **`docs/20260810_guven_etkilesim_plan.sql`**.
+>
+> ✅ **FAZ 1 (uygulandı ve test edildi):** `deals` (Taşıma Kaydı) + `reviews`
+> tabloları, çift kör yayınlama (`reviews_ciftli_yayinla` + trigger), 14 günlük
+> zaman aşımı (`reviews_zaman_asimi_yayinla` + cron `reviews-timeout-publish`),
+> RLS. Doğrulanan 7 senaryo arasında en kritik olan: değerlendirilen kişi
+> kendisi hakkındaki **yayınlanmamış** yorumu sorguladığında **0 satır** alıyor.
+>
+> ⏳ **FAZ 2** — API + akış: `POST /api/deals` (anlaş, ilan sahibi onayıyla),
+> `PATCH /api/deals/[id]` (in_transit/completed+karşı onay/cancelled),
+> `POST /api/reviews` (metin `safety_rules`tan geçer; ihlalde `is_hidden` +
+> moderatör kuyruğu), panel düğmeleri + değerlendirme formu.
+> ⚠️ Netleşmesi gereken: `listings.completed_at` bugün TEK TARAFLI;
+> `deals.completed_at` ile ilişkisi ne olacak (ikisi ayrışırsa hangisi doğru)?
+> ⚠️ İletişim bilgisi bugün `/api/ilan/[id]/telefon` ile veriliyor; PRD "ancak
+> eşleşmede açılır" diyor → o kapı `deals`e bağlanmalı.
+>
+> ⏳ **FAZ 3** — profil/rozet/güven puanı. Kullanıcı düzeyi güven puanı
+> `audit_score`tan BAĞIMSIZ tanımlanacak (yukarıdaki ters-skor maddesiyle
+> aynı kök). Profil OG kartı için ilan OG kartının deseni hazır.
+>
+> ⏳ **FAZ 4** — ödeme vadesi cron'u + escrow-light teyidi + tesis karnesi
+> (mevcut BOŞ `poi_reviews` tablosu birebir uygun; yeni tablo gerekmiyor).
+>
+> 🔴 **PRD'nin İKİ maddesi bilinçli olarak UYGULANMADI:**
+> 1. *"quality_score'a +50"* — bu kod tabanında `audit_score` risk skorudur,
+>    +50 ilanı yayından düşürürdü; ayrıca puan İLANA değil KULLANICIYA ait olmalı.
+> 2. *"2'den fazla vadesi geçmiş ödeme → otomatik Shadow Ban + ilan girişi
+>    engelle"* — **silahlandırılabilir**: iki hesap anlaşıp rakibi platformdan
+>    atabilir. "Ödeme yapılmadı" tek taraflı ve doğrulanamaz bir iddia.
+>    PRD'nin kendi "Gecikme Alarmı → moderatör paneli" maddesiyle çelişiyordu;
+>    insan denetimi olan seçildi. Otomatik yaptırım istenirse en az şu koşullar
+>    aranmalı: farklı deal'ler, farklı karşı taraflar, vade gerçekten geçmiş,
+>    itiraz penceresi kapanmış.
+
+
 > ## ⏳ AÇIK — ŞİRKET İLİŞKİSİ VE İLAN DETAYINDA "DİĞER İLANLAR" (9 Ağu 2026'da eklendi)
 >
 > Bayram'ın isteği. İkisi bağlantılı: **2. madde 1. maddeye bağımlı.**

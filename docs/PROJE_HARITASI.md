@@ -1,6 +1,26 @@
 # Yükegel — Proje Haritası
 > **Kullanım:** Her sohbet başında sadece bu dosyayı oku. Kaynak dosyaları sadece o dosyada değişiklik yapacaksan oku.  
 >
+> 🤝 **10 AĞU 2026 — GÜVENLİ ETKİLEŞİM MODÜLÜ, FAZ 1 CANLIDA.**
+> `docs/GuvenEtkilesim.docx` PRD'si kod gerçeğine oturtuldu. Yeni tablolar:
+> **`deals`** (Taşıma Kaydı: matched→in_transit→completed, ödeme vadesi alanları,
+> `review_deadline`) + **`reviews`** (rating + `sub_ratings jsonb` +
+> nullable/updatable `payment_rating` + `is_hidden`/`audit_score` +
+> **`published_at` = çift körlemenin tek anahtarı**).
+> Çift kör yayınlama tek yerde (`reviews_ciftli_yayinla` + trigger); 14 günlük
+> zaman aşımı cron'u `reviews-timeout-publish`. Şemada kötüye kullanım kapatıldı:
+> `shipper_id <> carrier_id` (kendine 5 yıldız yok), `unique(deal_id, reviewer_id)`,
+> yorumlar kullanıcı çiftine değil **deal'e** bağlı (sahte itibar üretimi yok).
+> RLS: yazma istemciden YOK (service role); `reviewee_id` için okuma politikası
+> **bilerek yok** — değerlendirilen kişi yayınlanmamış yorumu görmemeli
+> (`SET LOCAL ROLE` ile doğrulandı: 0 satır).
+> 🔴 **PRD'nin 2 maddesi bilinçli uygulanmadı:** (1) "quality_score +50" —
+> `audit_score` bu kodda RİSK skoru, +50 ilanı yayından düşürürdü; (2) "2 gecikme
+> → otomatik shadow ban" — silahlandırılabilir, moderatör kuyruğuna alındı.
+> ⚠️ Bu inceleme canlı bir hata da ortaya çıkardı: `audit_score` ekranda/JSON-LD'de
+> **"Kalite Skoru" olarak TERS** yayınlanıyor (rozet `>=70`, yani en riskliler).
+> Ayrıntı: `docs/20260810_guven_etkilesim_plan.sql` + YAPILACAKLAR başı.
+>
 > 🔴 **9 AĞU 2026 — `JobPosting` UYGULANMADI (bilinçli ret).** Rich Results Test
 > "öğe algılanmadı" dedi; öneri `Service`→`JobPosting` idi. Google dokümanı:
 > JobPosting *yalnız gerçek iş ilanları* içindir, zorunlu alanları

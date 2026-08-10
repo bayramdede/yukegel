@@ -1,0 +1,177 @@
+-- =============================================================================
+-- GÜVENLİ ETKİLEŞİM / ÇİFT KÖR YORUM / TESİS KARNESİ
+-- PRD: docs/GuvenEtkilesim.docx · Plan + Faz 1 uygulaması · 10 Ağustos 2026
+-- =============================================================================
+--
+-- Bu modül tek turda bitmez (7 alt sistem: state machine, çift kör yorum, rol
+-- bazlı kriterler, tesis karnesi, denetim, rozet/profil, ödeme vadesi).
+-- Yapılan: PRD kod gerçeğine oturtuldu + FAZ 1 (temel) uygulandı ve test edildi.
+--
+-- =============================================================================
+-- BÖLÜM 0 — DENETİM: NELER ZATEN VAR
+-- =============================================================================
+-- PRD'nin bazı parçalarının altyapısı hazır; sıfırdan yazmak gereksiz olurdu:
+--   ✅ `safety_rules` (REGEX + risk_weight + is_active) — PRD md.5'in denetim
+--      motoru. `api/ilan/duzelt` bunu zaten kullanıyor; yorum metni de aynı
+--      motordan geçirilecek (yeni kural yazmaya gerek yok).
+--   ✅ `system_config` + `lib/auditLimits.ts` — eşikler admin panelinden
+--      ayarlanabiliyor (auto_publish_score_max / reject_score_min).
+--   ✅ `poi_reviews` (BOŞ, 0 satır) — kolonları PRD md.4 için birebir uygun:
+--      `rating`, `category_ratings jsonb`, `quick_tags[]`, `is_verified_visit`,
+--      `review_type`. Tesis karnesi için YENİ TABLO GEREKMİYOR.
+--   ✅ `poi_visit_logs` + `poi_stay_events` + `check_poi_visit()` — "doğrulanmış
+--      ziyaret" (is_verified_visit) için konum altyapısı hazır (ikisi de boş).
+--   ✅ `pois.avg_rating` / `review_count` + `update_poi_rating()` trigger'ı.
+--   ✅ `listings.completed_at` + panelde "Tamamla" düğmesi — PRD'nin `completed`
+--      durumunun TEK TARAFLI hâli zaten var.
+--   ✅ pg_cron kurulu (4 iş çalışıyor) — zamanlayıcı için altyapı hazır.
+--   ✅ `lib/logger.ts` `structuredLog` — PRD'nin istediği loglama standardı.
+--
+-- YENİ OLAN: eşleşme (matched) kaydı, kullanıcı↔kullanıcı yorumu, çift körleme,
+-- ödeme vadesi takibi. `sahiplen` akışı BUNUNLA KARIŞTIRILMAMALI — o, kazınmış
+-- bir ilanı OTP ile sahiplenmek; anlaşma değil.
+--
+-- =============================================================================
+-- 🚨 BÖLÜM 1 — PRD İLE KOD ARASINDA ÜÇ ÇATIŞMA (uygulanmadan önce karar gerekti)
+-- =============================================================================
+--
+-- ÇATIŞMA 1: "quality_score değerine devasa bir artı (+50)"
+--   PRD, quality_score'u "yüksek = iyi" varsayıyor. Bu kod tabanında ise
+--   `listings.audit_score` bir RİSK skoru: `< 31` → otomatik yayın (temiz),
+--   `>= 71` → shadow ban + arşiv. Yani +50 eklemek ilanı YAYINDAN DÜŞÜRÜRDÜ.
+--   Ayrıca audit_score İLANA ait; güven puanı KULLANICIYA ait olmalı.
+--   KARAR: `audit_score`a DOKUNULMUYOR. Güven puanı ayrı, kullanıcı düzeyinde
+--   bir metrik olacak (Faz 3). PRD'nin bu maddesi olduğu gibi uygulanamaz.
+--
+--   ⚠️ AYRICA BU ÇATIŞMA CANLIDA BİR HATA ORTAYA ÇIKARDI (ayrı ele alınacak):
+--   `app/ilan/[id]/page.tsx` `audit_score`u "Kalite Skoru: X/100" diye
+--   yayınlıyor ve yeşil "✓ Doğrulanmış Veri" rozetini `audit_score >= 70`
+--   koşuluyla gösteriyor — yani EN RİSKLİ ilanlara "kalite" etiketi. Aynı ters
+--   sayı meta description, JSON-LD (`quality_score`) ve `api/ilanlar/[id]`
+--   (`kalite_skoru`) üzerinden Google'a ve AI botlarına da gidiyor.
+--   Ölçüm: `audit_score >= 70` olan 166.657 ilanın TAMAMINDA `fired_rules` dolu
+--   (yani gerçekten ihlalli) — sayının "kalite" olmadığının kanıtı.
+--   Bugünkü canlı etki ~sıfır (yayında yalnız 1 ilan var, skoru 0) ama bu
+--   şans; eşik `>=70` ile ban eşiği `>=71` arasındaki 1 puanlık pencere.
+--   → `docs/YAPILACAKLAR.md`'ye ayrı ve öncelikli madde olarak yazıldı.
+--
+-- ÇATIŞMA 2: "2'den fazla vadesi geçmiş ödeme geri bildirimi → otomatik Shadow Ban"
+--   🔴 BU HÂLİYLE UYGULANMADI. Silahlandırılabilir: iki hesap (ya da bir kişinin
+--   iki hesabı) anlaşıp bir rakibi platformdan atabilir. "Ödeme yapılmadı"
+--   iddiası tek taraflı ve DOĞRULANAMAZ bir veridir; buna dayanarak otomatik
+--   ilan girişi engellemek, dolandırıcıyı değil hedef alınan dürüst kullanıcıyı
+--   cezalandırır.
+--   KARAR: eşik aşılınca kullanıcı otomatik banlanmıyor; moderatör paneline
+--   "Potansiyel Mağduriyet" olarak düşüyor (PRD'nin kendi Gecikme Alarmı maddesi
+--   bunu zaten istiyor — iki madde birbiriyle çelişiyordu, insan denetimi
+--   olanı seçildi). Otomatik yaptırım isteniyorsa en azından: farklı
+--   `deal`lerden, farklı karşı taraflardan, ödeme vadesi gerçekten geçmiş ve
+--   itiraz penceresi kapanmış olma koşulları aranmalı.
+--
+-- ÇATIŞMA 3: "yorumu sessizce pasife alır (is_shadow_banned = true)"
+--   `is_shadow_banned` kolonu `listings` tablosunda; yorumun kendi bayrağı
+--   olmalı. Aynı alanı paylaşmak "ilan mı gizli, yorum mu gizli" ayrımını
+--   kaybettirir. KARAR: `reviews.is_hidden` + `audit_score` + `audit_logs`.
+--
+-- =============================================================================
+-- BÖLÜM 2 — FAZ 1 (UYGULANDI): Taşıma Kaydı + Çift Kör Yorum temeli
+-- =============================================================================
+-- migration: `guven_etkilesim_faz1_deals_reviews`
+--
+-- `public.deals` — PRD md.2'nin state machine'i
+--   status: matched → in_transit → completed (→ cancelled)
+--   matched_at / transit_at / completed_declared_by+at / completed_at / cancelled_at
+--   ⚠️ `completed_declared_by` + `completed_at` AYRI: PRD "biri der, DİĞERİ
+--      ONAYLAR" diyor. Tek alanla tek taraflı tamamlama olurdu.
+--   payment_terms_days / payment_maturity_date / payment_declared_at /
+--   payment_confirmed_at / payment_disputed_at  (ödeme vadesi bölümü)
+--   review_deadline  (completed_at + 14 gün)
+--   🚨 `check (shipper_id <> carrier_id)` — kendi kendine anlaşıp kendine
+--      5 yıldız verme yolunu ŞEMADA kapatır.
+--   🚨 `unique (listing_id, carrier_id)` — aynı ilan+nakliyeci için tek kayıt.
+--
+-- `public.reviews`
+--   rating 1-5 + `sub_ratings jsonb` (rol bazlı kriterler — PRD md.3)
+--   payment_rating / payment_comment / payment_rated_at → NULLABLE ve sonradan
+--     güncellenebilir (PRD'nin teknik notu birebir)
+--   is_hidden / audit_score / audit_logs → denetim motoru (md.5)
+--   published_at → ÇİFT KÖRLEMENİN TEK ANAHTARI (NULL = gizli)
+--   🚨 `unique (deal_id, reviewer_id)` — bir taraf bir kayıtta BİR yorum.
+--   🚨 Yorumlar KULLANICI ÇİFTİNE DEĞİL `deal_id`'ye bağlı: aksi hâlde iki hesap
+--      hiç iş yapmadan birbirine sınırsız yorum yazıp itibar üretebilirdi.
+--
+-- YAYINLAMA MANTIĞI TEK YERDE: `reviews_ciftli_yayinla(deal_id)`
+--   · iki taraf da yazdıysa İKİSİNİ AYNI `now()` ile yayınlar (PRD: "eş zamanlı")
+--   · `is_hidden = true` olan yorum SAYILMAZ → denetimden geçemeyen bir yorum
+--     karşı tarafın yorumunu yayına çıkarmaz
+--   trigger `reviews_yayin_trg` (after insert or update of is_hidden)
+--
+-- ZAMAN AŞIMI: `reviews_zaman_asimi_yayinla()` + cron `reviews-timeout-publish`
+--   ('7 * * * *' — saat başı; pencere 14 gün olduğu için sıklık yeterli)
+--
+-- RLS DURUŞU — ⚠️ YAZMA İSTEMCİDEN YOK:
+--   Tüm mutasyonlar sunucu route'larından `getServiceSupabase()` ile geçecek
+--   (rol/sahiplik orada doğrulanır). Böylece 7 Ağu'da `users` tablosunda
+--   yaşanan kolon-GRANT mayın tarlasına hiç girilmiyor. RLS yalnız OKUMAYI
+--   sınırlıyor:
+--     deals   : yalnız tarafları okur
+--     reviews : yayınlanmış + gizlenmemiş → HERKESE (profil sayfaları)
+--               kendi yazdığı → yazana (yayınlanmasa da)
+--   🚨 `reviewee_id` için politika YOK ve BİLİNÇLİ: değerlendirilen kişi
+--      kendisi hakkındaki YAYINLANMAMIŞ yorumu görmemeli — modülün tüm amacı bu.
+--
+-- =============================================================================
+-- BÖLÜM 3 — FAZ 1 DOĞRULAMASI (hepsi gerçekten çalıştırıldı, ROLLBACK'li)
+-- =============================================================================
+-- ✅ Tek taraf yazdı            → 1 yorum, 0 yayınlanan (kör kaldı)
+-- ✅ İki taraf yazdı            → 2 yorum, 2 yayınlanan,
+--                                 `count(distinct published_at) = 1` (EŞ ZAMANLI)
+-- ✅ 14 gün doldu (tek taraflı) → cron fonksiyonu 1 yorumu yayınladı
+-- ✅ İhlalli yorum (is_hidden)  → karşı tarafın yorumunu YAYINLAMADI (0/2)
+-- ✅ Kendi kendine anlaşma      → 23514 check violation (deals_taraflar_farkli)
+-- ✅ Mükerrer yorum             → 23505 unique violation (reviews_tekil)
+-- ✅ ÇİFT KÖRLEME (asıl test)   → `SET LOCAL ROLE authenticated` +
+--    değerlendirilen kişinin jwt'siyle: kendisi hakkındaki gizli yorumu
+--    sorguladı → **0 satır** döndü.
+-- Kalıntı yok: deals 0, reviews 0, test kullanıcısı 0.
+--
+-- =============================================================================
+-- BÖLÜM 4 — KALAN FAZLAR (sırayla; her biri ayrı tur)
+-- =============================================================================
+-- FAZ 2 — Akış + API + arayüz
+--   · `POST /api/deals` (anlaş)   — ilan sahibi onayıyla mühürlenir; iletişim
+--     bilgileri ancak BU AN açılır (bugün telefon `ilanTelefonlariGetir`/
+--     `/api/ilan/[id]/telefon` üzerinden veriliyor; o kapı deal'e bağlanacak)
+--   · `PATCH /api/deals/[id]` — in_transit / completed(+onay) / cancelled
+--   · `POST /api/reviews` — metin `safety_rules`tan geçer; ihlalde `is_hidden`
+--     + moderatör kuyruğu (kullanıcıya hata gösterme — PRD md.5)
+--   · Panel: "Anlaş", "Yola Çıktı", "İş Tamamlandı"(+karşı onay), değerlendirme
+--     formu (rol bazlı alt kriterler)
+--   ⚠️ `completed_at` bugün `listings`te tek taraflı; `deals.completed_at` ile
+--      ilişkisi netleşmeli (ikisi ayrışırsa hangisi doğru?).
+--
+-- FAZ 3 — Profil, rozet, güven puanı
+--   · `/u/[id]` ve panelde yayınlanmış yorumlar + ortalamalar
+--   · Rozetler (Hızlı Ödemeci / Süper Nakliyeci / Tesis Dostu) — türetilmiş
+--     görünüm olarak; kullanıcı düzeyi güven puanı burada tanımlanır
+--     (ÇATIŞMA 1: `audit_score`tan BAĞIMSIZ)
+--   · Profil OG kartı (`app/u/[id]/opengraph-image.tsx`) — ilan OG kartının
+--     deseni hazır, tekrar kullanılabilir
+--
+-- FAZ 4 — Ödeme vadesi + tesis karnesi
+--   · Vade cron'u: maturity gelince nakliyeciye bildirim; +7 gün itiraz penceresi
+--   · "Ödemeyi Yaptım" / "Aldım" teyidi (escrow-light)
+--   · Gecikme alarmı → moderatör paneli (ÇATIŞMA 2: otomatik ban YOK)
+--   · Tesis karnesi: `poi_reviews` (mevcut tablo) + `deals` üzerinden
+--     "doğrulanmış ziyaret"; POI'de "Şoför Dostu" rozeti
+--
+-- =============================================================================
+-- BÖLÜM 5 — GERİ ALMA (Faz 1)
+-- =============================================================================
+-- select cron.unschedule('reviews-timeout-publish');
+-- drop trigger if exists reviews_yayin_trg on public.reviews;
+-- drop function if exists public.reviews_yayin_tetik();
+-- drop function if exists public.reviews_zaman_asimi_yayinla();
+-- drop function if exists public.reviews_ciftli_yayinla(uuid);
+-- drop table if exists public.reviews;
+-- drop table if exists public.deals;
