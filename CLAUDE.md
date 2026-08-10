@@ -16,6 +16,15 @@ Haritadan anlayabiliyorsan kaynak dosyayı okuma. Değişiklik yapacaksan o dosy
 - Yeni pattern veya tuzak keşfedildi
 - Auth akışı veya middleware değişti
 
+### Üç dosyanın işi AYRI — karıştırma (10 Ağu 2026)
+- `docs/YAPILACAKLAR.md` → **yalnız BEKLEYEN iş.** Bir madde kapandığında oradan
+  **SİLİNİR**, "✅" diye bırakılmaz. Bu dosya 4.962 satıra çıkmış ve `⏳`
+  işaretlerinin çoğu bayatlamıştı; liste ancak kısa kaldığı sürece doğru kalır.
+- `docs/ARSIV_YAPILACAKLAR.md` → olay kaydı, ölçümler, gerekçeler. **Yeni madde eklenmez.**
+- `docs/PROJE_HARITASI.md` §9 → kalıcı dersler. Bir ders gelecekte iş görecekse yeri burasıdır.
+
+⚠️ Bir maddeyi kapatmadan önce **VERİYE bak, listeye değil.**
+
 ## Kod yazarken
 - Dosya değişikliği → önce `read_text_file` ile mevcut hali oku
 - Uzun dosyalarda `write_file` tercih et, `edit_file` ile partial match riski var

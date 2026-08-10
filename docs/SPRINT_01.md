@@ -406,7 +406,7 @@ where table_name='users' and grantee in ('authenticated','anon') order by grante
   metadata'sı `structuredClone` ile klonlanıp yalnızca çocuğun kendi anahtarları eziliyor.
   Bu yanlış inanç yüzünden kök layout'un `canonical: '/'` değeri, canonical yazmayan TÜM
   sayfalara miras kalıyor ve onları "ana sayfanın kopyası" ilan ediyordu.
-  Ayrıntı: `docs/YAPILACAKLAR.md` → #33. Bekçi: `npm run test:seo`.
+  Ayrıntı: `docs/ARSIV_YAPILACAKLAR.md` → #33. Bekçi: `npm run test:seo`.
   ⏭️ Gerçekten açık kalan tek şey: `/ilan/[id]` için **dinamik OG görseli** (kök karta düşüyor).
 
 ### S2 · Auth sayfaları indekslenebilir — `noindex` yok 🟡 ✅

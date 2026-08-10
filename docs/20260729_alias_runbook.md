@@ -159,7 +159,7 @@ ORDER BY 3 DESC, 2;
 **0.1 = 0 → geçmişte sahte güzergâh HASARI YOK.** Yazım farkından doğmuş tek bir
 bozuk güzergâh bile bulunamadı. D4'ün değeri geriye dönük onarım değil,
 **bundan sonrasını önlemek**; ölçülebilir "önce/sonra" farkı olmayacak.
-`YAPILACAKLAR.md`'deki "sahte güzergâhlı satırların kaderi" bileti bu ölçümle
+`docs/ARSIV_YAPILACAKLAR.md`'deki "sahte güzergâhlı satırların kaderi" bileti bu ölçümle
 kapandı.
 
 **0.2 → 6.122 ilan şehir içi ve bunlar meşru.** 244.379 durak satırının %2,5'i.

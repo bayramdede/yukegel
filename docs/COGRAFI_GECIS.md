@@ -377,7 +377,7 @@ yazım döneminde metin kolonu **birinci sınıf veri olarak kalır** — Dalga 
   92'si dolu ve **sıfır id kayması**, Adım 6'nın beş kararı uygulanmış), Adım 7 doğrulaması
   boş dönüyor. Kanıt: `docs/20260804_adim3_4_6_on_kontrol.sql`.
   ✅ **Adım 8.2 / #44 KAPANDI — bu satır BAYATMIŞ.** #44 aslında **4 Ağu'da zaten
-  kapanmıştı** (`docs/YAPILACAKLAR.md`: "Kemalpaşa UPDATE'i zaten çalıştırılmıştı,
+  kapanmıştı** (`docs/ARSIV_YAPILACAKLAR.md`: "Kemalpaşa UPDATE'i zaten çalıştırılmıştı,
   53/53 kanonik + `district_official=true`") ama bu dosyaya hiç yansıtılmamıştı —
   iki dosyada aynı durum, biri güncel biri bayat kaldı (#41 dersi, tekrar). 7 Ağu'da
   yeniden ölçtüm, teyit: `KEMALPAŞA` (büyük harf) **0** satır, aynı normalize

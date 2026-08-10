@@ -19,7 +19,7 @@
 > → otomatik shadow ban" — silahlandırılabilir, moderatör kuyruğuna alındı.
 > ⚠️ Bu inceleme canlı bir hata da ortaya çıkardı: `audit_score` ekranda/JSON-LD'de
 > **"Kalite Skoru" olarak TERS** yayınlanıyor (rozet `>=70`, yani en riskliler).
-> Ayrıntı: `docs/20260810_guven_etkilesim_plan.sql` + YAPILACAKLAR başı.
+> Ayrıntı: `docs/20260810_guven_etkilesim_plan.sql` + `docs/YAPILACAKLAR.md` madde 1.
 >
 > 🔴 **9 AĞU 2026 — `JobPosting` UYGULANMADI (bilinçli ret).** Rich Results Test
 > "öğe algılanmadı" dedi; öneri `Service`→`JobPosting` idi. Google dokümanı:
@@ -96,7 +96,7 @@
 > güncellenmese ekranda düzeltilen değer sessizce kaydedilmezdi. Yan kazanç:
 > düzenleme alanlarına `aria-label` eklendi (etiketleri `<div>`, erişilebilir adı
 > yoktu). Doğrulama: `npm run test:toplu-duzenle` — 15/15, gerçek tarayıcı +
-> gerçek .xlsx + DB'den okuma. Ayrıntı: `docs/YAPILACAKLAR.md` başı.
+> gerçek .xlsx + DB'den okuma. Ayrıntı: `docs/ARSIV_YAPILACAKLAR.md`.
 >
 > ✅ **8 AĞU 2026 — İlanlarım'da ilan düzenleme açıldı.** `POST /api/ilan/duzelt`
 > eskiden yalnız `correction_needed` kabul ediyordu; artık `pending`/`approved`/
@@ -108,7 +108,7 @@
 > değeri eziyordu), `vehicle_type`/`body_type` beyaz listesiz yazılıyordu, ve
 > temiz düzenleme kullanıcının "Pasif Yap" kararını `active` yazarak eziyordu.
 > Doğrulama: `npm run test:ilan-duzelt` — 22/22, gerçek HTTP + gerçek oturum
-> çerezi, geçici kullanıcı sonunda siliniyor. Ayrıntı: `docs/YAPILACAKLAR.md` başı.
+> çerezi, geçici kullanıcı sonunda siliniyor. Ayrıntı: `docs/ARSIV_YAPILACAKLAR.md`.
 >
 > ✅ **8 AĞU 2026 — Mobil header taşması düzeltildi (yatay kaydırma).** Navbar
 > tek satır `height:56` + wrap/ellipsis kuralı yoktu; 375px'te `scrollWidth=668`
@@ -120,7 +120,7 @@
 > **ResizeObserver `--yk-nav-h`'yi ölçüyor**, CSS sabitleri yalnız fallback.
 > Aynı sınıf `u/[username]` navbar'ında da kapatıldı. `overflow-x:hidden`
 > bilerek kullanılmadı (sticky'yi bozar, sebebi gizler).
-> Playwright ile 8 genişlikte doğrulandı. Ayrıntı: `docs/YAPILACAKLAR.md` başı.
+> Playwright ile 8 genişlikte doğrulandı. Ayrıntı: `docs/ARSIV_YAPILACAKLAR.md`.
 >
 > ✅ **8 AĞU 2026 — Coğrafi standart POI tarafına da uygulandı.** `pois` hiçbir
 > dalgaya dahil değildi; artık `province_id` (smallint FK) + `district_official`
@@ -155,7 +155,7 @@
 > geniş `anon`/`authenticated` GRANT'ı kontrol edildi — RLS enabled+sıfır
 > policy olduğu için (Postgres'te "kimseye hiçbir satır" demek) canlıda
 > doğrulanarak SORUN OLMADIĞI kanıtlandı, ek işlem gerekmedi. Ayrıntı:
-> `docs/YAPILACAKLAR.md` başı.
+> `docs/ARSIV_YAPILACAKLAR.md`.
 >
 > 🔴 **8 AĞU 2026 — İkinci PII/iç-veri sızıntısı: `listings.internal_audit_logs`.**
 > `public.users` olayıyla AYNI hata sınıfı (satır RLS `using(true)` + dar
@@ -181,7 +181,7 @@
 > silmiyordu (yalnız update/insert biliyordu, delete yoktu). Doğrulandı
 > (`ROLLBACK`lı gerçek çağrı: moderator başarılı, `user` rolü `42501` ile
 > reddedildi). Bonus: klavye kısayolları (A/R/S/E, kuyruğun başındaki karta).
-> `tsc`/`next build` temiz. Ayrıntı: `docs/YAPILACAKLAR.md` başı.
+> `tsc`/`next build` temiz. Ayrıntı: `docs/ARSIV_YAPILACAKLAR.md`.
 >
 > 🔴 **8 AĞU 2026 — OLAY (kendi hatam, aynı gün düzeltildi): 7 Ağu güvenlik
 > düzeltmesi login'i kırdı.** `public.users`teki `REVOKE ALL`+dar `GRANT`
@@ -196,7 +196,7 @@
 > `/api/auth/hesap-eslesme`, `profilOnDoldur()`, `/api/moderator/kullanici-
 > ara`). Doğrulama: `authenticated` kendi-profil sorgusu artık çalışıyor,
 > `anon` hâlâ PII okuyamıyor (asıl açık bozulmadı). `tsc`/`next build` temiz.
-> Kayıt: `docs/20260808_giris_regresyonu.sql`. Ayrıntı: `docs/YAPILACAKLAR.md` başı.
+> Kayıt: `docs/20260808_giris_regresyonu.sql`. Ayrıntı: `docs/ARSIV_YAPILACAKLAR.md`.
 >
 > ✅ **8 AĞU 2026 — Moderatör paneli: 13 aksiyon iyimser yerel güncellemeye geçti.**
 > Onayla/reddet/arşivle/shadow-ban/düzeltme-iste — hepsi her tıktan sonra TAM
@@ -206,7 +206,7 @@
 > (`toplu-islem/route.ts`ten birebir) bilip `ilanlar` state'ini ağa gitmeden
 > günceller — sekme değişmişse satır kalkar, değişmemişse rozeti güncellenir.
 > "Sonraya Bırak" listesi de `localStorage`'a taşındı (sayfa yenilenince
-> sıfırlanmıyor artık). `tsc`/`next build` temiz. Ayrıntı: `docs/YAPILACAKLAR.md` başı.
+> sıfırlanmıyor artık). `tsc`/`next build` temiz. Ayrıntı: `docs/ARSIV_YAPILACAKLAR.md`.
 >
 > ✅ **7 AĞU 2026 — WhatsApp yükleme artık AYRI SAYFA: `/moderator/whatsapp-yukle`.**
 > `WhatsappYukle.tsx` (parametresiz, moderasyon kuyruğuyla state paylaşmıyor)
@@ -217,7 +217,7 @@
 > önekiyle otomatik, sayfanın kendi client kontrolü, `requireStaff()` sunucuda)
 > — hiçbiri değişmedi. `tsc`/`next build` temiz. `app/moderator/page.tsx`'in
 > geri kalan karmaşıklığına (N+1 update, no_lane state paylaşımı, useMemo'suz
-> filtre) dokunulmadı — ayrıntı `docs/YAPILACAKLAR.md` başı.
+> filtre) dokunulmadı — ayrıntı `docs/ARSIV_YAPILACAKLAR.md`.
 >
 > 🔴 **7 AĞU 2026 — GÜVENLİK: İKİ KRİTİK AÇIK KAPANDI (kayıt/giriş denetimi).**
 > **(1) `public.users`** tablo düzeyinde `anon`/`authenticated`'e GENİŞ GRANT
@@ -234,7 +234,7 @@
 > doğruluyor. Ayrıca `tekil-kontrol` route'una kota eklendi (kotasız TCKN/VKN
 > sorgusu). Kayıt: `docs/20260807_guvenlik_kayit_giris.sql`. **Manuel aksiyon
 > bekliyor (Bayram):** Supabase Dashboard'dan "leaked password protection"
-> açılmalı — kod/SQL ile yapılamaz. Ayrıntı: `docs/YAPILACAKLAR.md` başı.
+> açılmalı — kod/SQL ile yapılamaz. Ayrıntı: `docs/ARSIV_YAPILACAKLAR.md`.
 >
 > ✅ **7 AĞU 2026 — PERFORMANS: ANA SAYFA 400 KAT, SAYAÇ 158 KAT HIZLANDI.**
 > Ölçüldü (`pg_stat_statements`, tahmin değil): ana sayfa sorgusu ort. 1026ms/
@@ -248,7 +248,7 @@
 > auth kontrolü ilan sorgusuyla paralel atılmaya başlandı. `/api/listings/ara`
 > ve `HomeClient.tsx` kod değişikliği gerektirmedi (aynı tabloyu aynı filtreyle
 > sorguluyorlar, DB düzeltmesi otomatik yansıdı). Kayıt: `docs/20260807_
-> performans_listings.sql`. Ayrıntı: `docs/YAPILACAKLAR.md` başı.
+> performans_listings.sql`. Ayrıntı: `docs/ARSIV_YAPILACAKLAR.md`.
 >
 > ✅ **7 AĞU 2026 — #93 KAPANDI: `detectAdType` "yuklenecek" DÜZELTMESİ, CANLI v91.**
 > Ölçüm: `raw_text`'te tam "yuklenecek" geçen 1350 `arac`-etiketli ilandan 25'i
@@ -259,7 +259,7 @@
 > anında sökülür, mutasyonla doğrulandı) + 6 mevcut regresyon paketi yeşil.
 > **Deploy edildi — v91 ACTIVE.** Geçmiş ~1350 yanlış etiketli ilan: yalnız 1'i
 > hâlâ aktif+onaylı görünüyordu, **Bayram kararı: DEĞME** (#90 kalıbı — küçük
-> kazanç, geçmiş veri olduğu gibi bırakıldı). Ayrıntı: `docs/YAPILACAKLAR.md` başı.
+> kazanç, geçmiş veri olduğu gibi bırakıldı). Ayrıntı: `docs/ARSIV_YAPILACAKLAR.md`.
 >
 > ✅ **7 AĞU 2026 — "YAZARAK İLAN EKLE" ÖNCE REGEX DENİYOR, ÇÖZEMEZSE CLAUDE'A DÜŞÜYOR.**
 > Yeni: `lib/lane-parser.ts` (Deno `parse-listing`in deterministik primitiflerinin
@@ -268,7 +268,7 @@
 > 1269 alias'lık gerçek veriyle 6 örnek elle doğrulandı. ✅ İki bilinen kusur da
 > KAPANDI: frigo/frigorifik veri kalitesi taşındı (dosya haritasında `lib/lane-
 > parser.ts` girdisine bak), "yuklenecek" #93 ile düzeltildi (bir üstteki madde).
-> Ayrıntı: `docs/YAPILACAKLAR.md` başı, dosya haritasında `lib/lane-parser.ts`.
+> Ayrıntı: `docs/ARSIV_YAPILACAKLAR.md`, dosya haritasında `lib/lane-parser.ts`.
 >
 > ✅ **6 AĞU 2026 — DALGA 5 BİTTİ. METİN KOLONLARI DÜŞTÜ, CANLI DOĞRULANDI.**
 > `listings.origin_city` ve `listing_stops.city` **artık yok**. Coğrafi standardizasyon
@@ -383,7 +383,7 @@
 > Esenyurt → **Rusya**, sistem zaten yalnız 81 ili temsil edebiliyor).
 > **✅ KARAR (Bayram): v90 kalıyor** — 163 yanlış kendine-şeride karşı 1 gerçek +
 > 2 kabul edilebilir kayıp, net kazanç pozitif. "Ş.İçi" istisnası düşük öncelikli
-> backlog maddesi oldu. Ayrıntı: `docs/YAPILACAKLAR.md` #92 bloğunun sonu.
+> backlog maddesi oldu. Ayrıntı: `docs/YAPILACAKLAR.md` madde 2b.
 > ⏳ **Kalan gerçek iş:** #86/#88 canlı ölçümü hâlâ yeni trafik bekliyor; deploy'dan
 > sonraki 413 satırlık "changed" kümesinin geri kalanı hâlâ tam denetlenmedi.
 > ✅ **#89 CANLI DOĞRULAMASI KAPANDI (7 Ağu 13:10 UTC).** v89'un işlediği gerçek
@@ -393,7 +393,7 @@
 > beklentisi de tuttu, tahmin değil ölçüm.
 > ✅ **Dalga 5 gerçek trafikle doğrulandı:** deploy sonrası WhatsApp dosyası işlendi →
 > **303 ilan · 424 durak · il id boş 0 · duraksız ilan 0.**
-> Ayrıntı: `docs/YAPILACAKLAR.md` başı.
+> Ayrıntı: `docs/ARSIV_YAPILACAKLAR.md`.
 
 > Son güncelleme: 30 Temmuz 2026 — **COĞRAFİ STANDARDİZASYON Dalga 1 CANLIDA, Dalga 2 KODU HAZIR.**
 > İl artık **metin değil `province_id` (plaka kodu, 1-81)**. Üç yeni dosya: `lib/constants/locations.json`
@@ -1316,7 +1316,7 @@ yukegel/
 │                                         #    :164 =   → " -> " aynı şart ("Tlf=0544…" elensin)
 │                                         #    🚨 "/" AYRAÇ DEĞİL, BİLİNÇLİ: veride baskın kullanımı
 │                                         #      ilçe/il ("Kartal / İstanbul"). Ayraç yapmak gerçek
-│                                         #      olmayan hat üretir. Ölçüm: YAPILACAKLAR.md #63.
+│                                         #      olmayan hat üretir. Ölçüm: ARSIV_YAPILACAKLAR.md #63.
 │                                         #    ⚠️ EŞİ: app/api/whatsapp-parse/route.ts normalizeArrows()
 │                                         # 🚨 parseMessage PASS 2 ("YÜKLEMELİ blok") — #88, 6 Ağu 2026.
 │                                         #    Kural: `yükle*` satırı blok KÖKENİNİ kurar, altındaki satırlar
@@ -1604,7 +1604,7 @@ cargo_type, weight_ton, pallet_count, vehicle_count, notes
 > `COGRAFI_GECIS.md`:222 (Dalga 5 drop maddesi üstü çizildi), `20260729_alias_runbook.md`
 > (Adım 0.4 sorgusu yoruma alındı · sonuç tablosu · "sırada" satırı · Adım 8 gerekçesi ·
 > Adım 8.3 tamamen düştü · Dalga 5 drop listesi ve etkileşim tablosu),
-> `W5_DEVIR.md`, `SPRINT_01.md`, `YAPILACAKLAR.md` (3 yer), `PROJE_HARITASI.md`:1130-1131.
+> `W5_DEVIR.md`, `SPRINT_01.md`, `ARSIV_YAPILACAKLAR.md` (3 yer), `PROJE_HARITASI.md`:1130-1131.
 > `20260731_index_temizligi.sql`'deki `destination_city` desenleri **bilerek bırakıldı** —
 > arama deseni olarak zararsız (var olmayan kolon hiçbir tanımda eşleşmez); başına
 > "bu desen kolonun var olduğu anlamına gelmez" notu düşüldü.
@@ -2191,6 +2191,29 @@ Açık rotalar: /giris, /auth/, /profil-tamamla, /nasil-calisir, /hakkimizda,
 ---
 
 ## 9. KURALLAR & TUZAKLAR
+
+- 🚨 **BİR ÖLÇÜM SCRIPT'İNİN "CANLI" TABANI DEPLOY SONRASI BAYATLAR VE YALAN SÖYLER**
+  (10 Ağu 2026, `scripts/olc-87.mts`). Script tabanını koddan **türetiyor**:
+  `canli = geri92B(geri92A(yeniKod))` — yani "canlı" dediği şey, güncel kaynaktan
+  #92 düzeltmesini **geri alarak** üretilmiş varsayımsal bir sürüm. #92 deploy
+  edildikten sonra bu tanım güncellenmedi. Sonuç: tablo *"canlıda 198 bozuk şerit
+  var"* dedi, ben de öyle rapor ettim; **gerçekte 0'dı** — canlı v91 düzeltmeyi
+  içeriyordu. Script kendi başında bunu uyarıyordu bile (satır 4-5: *"Taban sabit
+  değil, HAREKETLİ: her deploydan sonra `canli` varyantının tanımı güncellenir"*),
+  ama uyarı bir **yorum**du, kontrol değil.
+  **Kural:** bir taban "canlı" iddiasında bulunuyorsa, canlıyı **ölçerek** doğrula.
+  Burada doğru hamle `get_edge_function` ile dağıtılmış kaynağı okuyup düzeltme
+  imzasını aramaktı (`!kendineSerit(to)` → 2 yerde, v89 hâli → 0 yerde). İki dakika
+  sürdü ve raporumu tersine çevirdi. Türetilen taban, sürüm damgası taşımalı ve
+  eşleşmiyorsa **hata atmalı** — `#87-A düzeltmesi kaynakta YOK` kontrolü gibi.
+
+- 🚨 **KAPANMIŞ BİR KARARI "YENİ BULGU" SANMAK — liste ile harita ayrışınca olur**
+  (10 Ağu 2026). #92'nin `KAYIP=3` bulgusunu yeni keşif gibi sundum; oysa kararı
+  Bayram vermişti ve **bu dosyanın 386. satırında** yazılıydı: *"v90 kalıyor …
+  'Ş.İçi' istisnası düşük öncelikli backlog maddesi oldu."* `YAPILACAKLAR.md`'deki
+  #92 bloğu o kararı yansıtmıyordu, harita yansıtıyordu. **Kural:** bir bulguyu
+  rapor etmeden önce `PROJE_HARITASI.md`'de ara — kararlar orada, ham not listede.
+  Bu, listeyi kısa tutmanın (bkz. `YAPILACAKLAR.md` başlığı) asıl gerekçesi.
 
 - 🚨 **VIEW, ALTINDAKİ RLS'İ DELİP GEÇER** (29 Tem 2026, Supabase linter "Security Definer View").
   PostgreSQL'de view **varsayılan olarak SAHİBİNİN** yetkileriyle çalışır. `shadow_profiles`
