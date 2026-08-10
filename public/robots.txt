@@ -31,6 +31,34 @@
 #    ⚠️ Yalnız `/api/ilanlar/` açıldı. Başka bir `/api/` yolunu açmadan önce o
 #       ucun yanıtında hassas alan olmadığını DOĞRULA (`contact_phone`, `user_id`,
 #       TCKN/VKN). `/api/ilanlar/[id]` bunları bilinçli olarak döndürmüyor.
+#
+# 🚨🚨 10 AĞU 2026 — `Disallow: /giris` KALDIRILDI. SAKIN GERİ EKLEME.
+#
+#    `noindex` ÇALIŞMASI İÇİN SAYFANIN TARANABİLİR OLMASI ŞARTTIR. Buradaki
+#    yasak, `app/giris/layout.tsx`teki `robots: { index: false }` etiketini
+#    OKUNAMAZ hâle getiriyordu: Google sayfayı çekemediği için "indeksleme"
+#    talimatını hiç görmüyor, URL'i yalnız "engellendi" diye kaydediyordu.
+#    İki talimat birbirini yok ediyordu ve NET ETKİ, hiçbirinin çalışmaması.
+#
+#    SAHADA GÖRÜLEN SONUÇ: Search Console 8 Ağu'da "Robots.txt tarafından
+#    engellendi" bildirimi gönderdi; `/giris?redirect=/ilan/<id>` her ilan
+#    sayfasında bağlantılı olduğu için on binlerce URL bu duruma düştü ve
+#    "Düzeltmeyi doğrula" SONSUZA KADAR "beklemede" kalıyordu — kalmak zorundaydı,
+#    çünkü doğrulamanın beklediği şey URL'in taranabilir olmasıydı.
+#
+#    DOĞRU KURULUM (şu an yürürlükte, üç katman ve her biri farklı iş yapıyor):
+#      1. `rel="nofollow"`  → keşfi baştan engeller  (ilan sayfasındaki bağlantı)
+#      2. taranabilir olmak → `noindex` etiketinin OKUNMASINI sağlar  (bu dosya)
+#      3. `noindex`         → indeksten gerçekten düşürür  (giris/layout.tsx)
+#    Yasak bunların yerine geçmez; 2. adımı bozarak 3.'yü de öldürüyordu.
+#
+#    ⚠️ AYNI ÇAKIŞMA `/admin/`, `/panel/`, `/moderator/`, `/araclarim/`,
+#       `/profil-tamamla/`, `/auth/` yollarında da var (hepsi noindex + Disallow).
+#       ORADA BİLİNÇLİ BIRAKILDI: bu yüzeyler auth arkasında ve herkese açık
+#       hiçbir sayfadan bağlantılı değil, yani Google onları keşfetmiyor → rapor
+#       gürültüsü üretmiyorlar. Yasak orada "taranmasın bile" demek; savunma
+#       katmanı olarak kalıyor. Fark eden şey PUBLIC BAĞLANTI varlığı.
+#       Bekçi: `npm run test:seo`.
 
 # --- Genel crawler'lar (isimli blokla eşleşmeyen HERKES buraya düşer) ---
 User-agent: *
@@ -45,7 +73,6 @@ Disallow: /api/
 Disallow: /araclarim/
 Disallow: /profil-tamamla/
 Disallow: /auth/
-Disallow: /giris
 Disallow: /cikis
 # Telefon açılış akışı: her ilan için ayrı URL üretir, indekslenmesinin değeri yok.
 Disallow: /ilan/*/sahiplen
@@ -65,7 +92,6 @@ Disallow: /api/
 Disallow: /araclarim/
 Disallow: /profil-tamamla/
 Disallow: /auth/
-Disallow: /giris
 Disallow: /cikis
 Disallow: /ilan/*/sahiplen
 
@@ -86,7 +112,6 @@ Disallow: /api/
 Disallow: /araclarim/
 Disallow: /profil-tamamla/
 Disallow: /auth/
-Disallow: /giris
 Disallow: /cikis
 Disallow: /ilan/*/sahiplen
 
@@ -104,7 +129,6 @@ Disallow: /api/
 Disallow: /araclarim/
 Disallow: /profil-tamamla/
 Disallow: /auth/
-Disallow: /giris
 Disallow: /cikis
 Disallow: /ilan/*/sahiplen
 

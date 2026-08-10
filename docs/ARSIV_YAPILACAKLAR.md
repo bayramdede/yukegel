@@ -21,6 +21,60 @@
 ---
 ---
 
+> ## ✅ 10 AĞU 2026 — ASIL KÖK SEBEP: `Disallow` İLE `noindex` BİRBİRİNİ YOK EDİYORDU
+>
+> Bayram `https://www.yukegel.com/giris?redirect=/ilan/f7318ecd…` adresini verip
+> **"hâlâ beklemede diyor"** dedi. İki ayrı sebep vardı ve ilki utanç verici
+> biçimde basitti.
+>
+> ### SEBEP 1 — düzeltme CANLIDA DEĞİLDİ
+> 5 commit push edilmemişti. `rel="nofollow"` ve yeni `robots.txt` yalnız yerel
+> daldaydı. Edge Function'ı (v92) deploy etmiştim, **Next.js uygulamasını
+> etmemiştim** — ve bunu kontrol etmeden "deploy sonrası doğrula" talimatı
+> yazmıştım. 📌 Ders: "düzeltildi" demek "sahada" demek değil; iddiadan önce
+> `git log origin/main..HEAD` bak.
+>
+> ### SEBEP 2 — ASIL HATA. `noindex` ÇALIŞMASI İÇİN SAYFA TARANABİLİR OLMALI.
+> `/giris` **hem** `robots.txt`te `Disallow` **hem** `app/giris/layout.tsx`te
+> `robots: { index: false, follow: true }` taşıyordu. Bu ikisi birbirini yok eder:
+> Google sayfayı ÇEKEMEDİĞİ için `noindex` talimatını **hiç görmez**, URL'i
+> yalnız "engellendi" diye kaydeder. Net etki: **ikisi de çalışmıyor.**
+>
+> Ve doğrulamanın sonsuza kadar "beklemede" kalması bir arıza değil, **mantıksal
+> zorunluluktu**: "Düzeltmeyi doğrula" URL'in taranabilir olmasını bekliyor, ama
+> `robots.txt` tam olarak onu engelliyordu. Kaç kez basılsa geçmezdi.
+>
+> **Ölçek:** `/giris?redirect=/ilan/<id>` her ilan sayfasında bağlantılı ve
+> `redirect` parametresi her ilan için ayrı URL üretiyor → on binlerce URL.
+>
+> **DÜZELTME — `Disallow: /giris` dört bloktan da KALDIRILDI.** Artık üç katman
+> var ve her biri FARKLI iş yapıyor (biri diğerinin yerine geçmez):
+> ```
+> 1. rel="nofollow"   → keşfi baştan engeller        (ilan sayfasındaki bağlantı)
+> 2. taranabilir olma → noindex etiketinin OKUNMASINI sağlar   (robots.txt)
+> 3. noindex          → indeksten gerçekten düşürür  (giris/layout.tsx)
+> ```
+> Eski kurulum 2. adımı bozarak 3.'yü de öldürüyordu.
+>
+> ⚠️ **AYNI ÇAKIŞMA 6 YERDE DAHA VAR VE BİLİNÇLİ BIRAKILDI:** `/admin/`,
+> `/panel/`, `/moderator/`, `/araclarim/`, `/profil-tamamla/`, `/auth/` — hepsi
+> `noindex` + `Disallow`. Fark eden şey **herkese açık bağlantı varlığı**: bu
+> yüzeyler auth arkasında ve hiçbir public sayfadan bağlantılı değil, yani Google
+> onları keşfetmiyor → rapor gürültüsü üretmiyorlar ve yasak orada "taranmasın
+> bile" anlamına geliyor (savunma katmanı). Bekçi bu sayıyı 6'da sabitledi:
+> daralması bir KARAR olmalı, kaza değil.
+>
+> **BEKÇİ:** `npm run test:seo` → **118 kontrol.** `/giris` yasaklanmadığını ve
+> `noindex` taşıdığını doğruluyor. Mutasyon: `Disallow: /giris` geri eklendi →
+> kontrol düştü.
+>
+> 📌 **BEKLENEN SON DURUM (Bayram bilsin):** deploy + "Düzeltmeyi doğrula"dan
+> sonra bu URL'ler **"noindex ile hariç tutuldu"** durumuna geçecek. Bu DOĞRU
+> sonuçtur, yeni bir hata değil — "engellendi"den "hariç tutuldu"ya geçiş
+> düzeltmenin ta kendisi. Doğrulama günler sürer, bu da normal.
+
+---
+
 > ## ✅ 10 AĞU 2026 — RICH RESULTS SONUCU OKUNDU: ŞEMA TEMİZ, AMA İKİ GERÇEK BULGU
 >
 > `RichTestResult` (Search Console çıktısı, 10 Ağu 16:33) incelendi.

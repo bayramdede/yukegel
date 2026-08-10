@@ -140,13 +140,22 @@ beslemesi son günlerde ilan üretmemiş görünüyor — ana sayfa akışı ona
 
 ## 👤 6 — Bayram'da (kod/SQL ile yapılamaz)
 
-- ⏳ **Search Console'da "Robots.txt ile engellendi" bildirimini kapat.**
-  Kök sebep 10 Ağu'da giderildi (ilan sayfasındaki giriş bağlantısına
-  `rel="nofollow"`), ama **deploy sonrası** Search Console'da
-  *Sayfalar → "Robots.txt tarafından engellendi"* raporunun **"Düzeltmeyi
-  doğrula"** düğmesine basılması gerekiyor; yoksa bildirim kendi kendine
-  kapanmaz. ⚠️ Rapordaki URL'lerin `/giris?redirect=…` olduğunu teyit et —
-  başka bir yol çıkarsa o ayrı bir bulgudur, haber ver.
+- ⏳ **Search Console "Robots.txt ile engellendi" — SIRA ÖNEMLİ.**
+  Asıl kök sebep 10 Ağu'da bulundu: `Disallow: /giris` ile `noindex` birbirini
+  yok ediyordu (ayrıntı: `docs/ARSIV_YAPILACAKLAR.md`). Düzeltme kodda hazır.
+  **Yapılacak sıra:**
+  1. **Uygulama deploy edilmeli** (bekleyen commit'ler canlıda değil). Bu
+     olmadan Search Console'da hiçbir şey değişmez — 10 Ağu'da "hâlâ beklemede"
+     görülmesinin sebebi buydu.
+  2. Deploy sonrası `https://www.yukegel.com/robots.txt` açılıp
+     `Disallow: /giris` satırının **gitmiş** olduğu göz ile teyit edilmeli.
+  3. Sonra *Sayfalar → "Robots.txt tarafından engellendi"* → **"Düzeltmeyi
+     doğrula"**. ⚠️ Doğrulama **günler sürer** ve bu normaldir; Google URL'leri
+     yeniden taramak zorunda. Bu kez geçecek, çünkü artık taranabilirler.
+  4. Ardından o URL'ler **"Alternatif sayfa"/"noindex ile hariç tutuldu"**
+     durumuna geçecek — bu **doğru** son durum, hata değil.
+  ⚠️ Rapordaki URL'lerin `/giris?redirect=…` olduğunu teyit et; başka bir yol
+  çıkarsa ayrı bir bulgudur, haber ver.
 - 🔒 **6 EYLÜL 2026'DAN ÖNCE SİLİNMEYECEK — Dalga 5 yedek tabloları.**
   `public.dalga5_yedek_20260806` (14 MB, 234.840 satır) ve
   `public.dalga5_yedek_stops_20260806` (18 MB, 245.086 satır) — coğrafi geçişin

@@ -2250,6 +2250,29 @@ Açık rotalar: /giris, /auth/, /profil-tamamla, /nasil-calisir, /hakkimizda,
   `Allow: /api/ilanlar/` + `Disallow: /api/` birlikte doğru çalışır — geniş
   yasağı kaldırmadan tek bir yol açmanın doğru yolu bu.
 
+- 🚨🚨 **`Disallow` + `noindex` BİRLİKTE = İKİSİ DE ÇALIŞMAZ** (10 Ağu 2026).
+  `/giris` hem `robots.txt`te yasaklıydı hem `noindex` taşıyordu. **`noindex`in
+  çalışması sayfanın TARANABİLİR olmasına bağlıdır** — Google sayfayı çekemezse
+  etiketi hiç görmez. Net etki: URL "engellendi" durumunda çakılı kalır ve
+  Search Console'da "Düzeltmeyi doğrula" **sonsuza kadar "beklemede"** der.
+  Bu bir arıza değil, mantıksal zorunluluk: doğrulamanın beklediği şey URL'in
+  taranabilir olması, ama yasak tam onu engelliyor. Kaç kez basılsa geçmez.
+  **Doğru kurulum üç KATMAN ve hiçbiri diğerinin yerine geçmez:**
+  `rel="nofollow"` keşfi engeller · taranabilirlik `noindex`in OKUNMASINI sağlar ·
+  `noindex` indeksten düşürür. Eski hâl 2. adımı bozarak 3.'yü de öldürüyordu.
+  ⚠️ Aynı çakışma 6 auth-arkası yüzeyde bilinçli duruyor (`/admin/`, `/panel/`,
+  `/moderator/`, `/araclarim/`, `/profil-tamamla/`, `/auth/`): orada public
+  bağlantı YOK, Google keşfetmiyor, yasak "taranmasın bile" demek. **Ayrımı
+  yapan şey herkese açık bağlantının varlığı.** Bekçi: `npm run test:seo`.
+
+- 🚨 **"DÜZELTİLDİ" ≠ "SAHADA" — İDDİADAN ÖNCE `git log origin/main..HEAD`**
+  (10 Ağu 2026). Aynı gün Edge Function'ı deploy ettim (v92) ama Next.js
+  uygulamasını etmedim; 5 commit push edilmemiş duruyordu. Buna rağmen
+  "deploy sonrası Search Console'da doğrula" talimatı yazdım — Bayram bakınca
+  doğal olarak hiçbir şey değişmemişti. Bir düzeltmenin sahada olduğunu
+  söylemeden önce **iki farklı deploy hedefi** olduğunu hatırla (Vercel app +
+  Supabase Edge Functions) ve ikisini ayrı ayrı doğrula.
+
 - 🚨 **`robots.txt` KEŞFİ ENGELLEMEZ, SADECE REDDEDER** (10 Ağu 2026, Search
   Console "Robots.txt tarafından engellendi"). `/giris?redirect=/ilan/<id>`
   bağlantısı her ilan sayfasındaydı ve `redirect` parametresi her ilan için ayrı

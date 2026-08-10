@@ -163,6 +163,31 @@ kontrol('robots.txt: /api/ altında yalnız /api/ilanlar/ açık',
 kontrol('robots.txt Sitemap satırı www host kullanıyor',
   robots.includes('Sitemap: https://www.yukegel.com/sitemap.xml'));
 
+// 🚨🚨 EN ÖNEMLİ KONTROL (10 Ağu 2026) — `noindex` + `Disallow` ÇAKIŞMASI.
+// `noindex` etiketinin çalışması için sayfanın TARANABİLİR olması şarttır: Google
+// sayfayı çekemezse etiketi hiç görmez. İkisini birlikte kullanmak net etki olarak
+// İKİSİNİ DE öldürür ve URL "engellendi" durumunda çakılı kalır — Search Console'da
+// "Düzeltmeyi doğrula" sonsuza kadar "beklemede" der (8-10 Ağu'da tam bu yaşandı).
+//
+// `/giris` HERKESE AÇIK SAYFALARDAN BAĞLANTILI (her ilan sayfası + footer), yani
+// Google onu mutlaka keşfediyor → taranabilir OLMAK ZORUNDA ki noindex okunsun.
+kontrol('robots.txt `/giris`i YASAKLAMIYOR (noindex okunabilsin)',
+  !/^Disallow: \/giris$/m.test(robots),
+  'Disallow + noindex birlikte ikisini de öldürür; /giris public bağlantılı.');
+const girisLayout = readFileSync(join(APP, 'giris/layout.tsx'), 'utf8');
+kontrol('/giris noindex taşıyor (yasak yerine bu çalışıyor)',
+  /index:\s*false/.test(yorumsuz(girisLayout)));
+
+// ⚠️ Auth arkasındaki yüzeylerde aynı çakışma BİLİNÇLİ duruyor: public bağlantı
+//    olmadığı için Google keşfetmiyor, rapor gürültüsü üretmiyorlar ve yasak
+//    "taranmasın bile" demek. Bu listenin daralması bir KARAR olmalı, kaza değil —
+//    bu yüzden sayı sabitlendi.
+const cakisanlar = ['/admin/', '/panel/', '/moderator/', '/araclarim/',
+                    '/profil-tamamla/', '/auth/']
+  .filter(y => robots.includes(`Disallow: ${y}`));
+kontrol('auth arkası 6 yüzey bilinçli olarak hem Disallow hem noindex',
+  cakisanlar.length === 6, `bulunan: ${cakisanlar.length} → ${cakisanlar.join(', ')}`);
+
 // 🚨 Her ilan sayfasındaki giriş bağlantısı `nofollow` OLMAK ZORUNDA. Olmazsa
 //    `redirect` parametresi yüzünden her ilan için ayrı bir yasaklı URL doğar ve
 //    Search Console "Robots.txt tarafından engellendi" bildirimi gönderir
