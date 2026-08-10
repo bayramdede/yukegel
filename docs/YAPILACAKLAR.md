@@ -18,40 +18,7 @@
 
 ---
 
-## 🚀 1 — #92-C şehir içi istisnası: KOD BİTTİ, DEPLOY BEKLİYOR
-
-Yazıldı, test edildi, canlı veriyle ölçüldü. **Tek kalan: `parse-listing` deploy'u.**
-
-`sehirIciSatiri()` (`supabase/functions/parse-listing/index.ts`) satırda şehir içi
-ibaresi görürse aynı-il şeridine izin veriyor; üç koruma noktasında da kullanılıyor.
-
-**Ölçüm (10.976 satır / son 30 gün, taban = dağıtılmış v91):**
-
-```
-varyant     satır DEĞİŞTİ   şerit EKLENDİ   şerit SİLİNDİ   0→≥1   ≥1→0   KENDİNE ŞERİT   ŞEHİR İÇİ
-canli                  —               —               —      —      —          0                0
-yeni                   1               1               0      1      0          0 ✅             1
-```
-
-→ **1 meşru şerit kurtarıldı, bedel sıfır.** İki kapı da temiz (`KAYIP=0`,
-gerekçesiz kendine-şerit `0`). Kurtarılan satır `4aadf724` = `ANKARA ➡️ ANKARA Ş.İÇİ`.
-
-⚠️ **Deploy edilene kadar `olc:87` tabanı #92-C'yi geri alıyor** (`geri92C`).
-Deploy'dan **sonra** `canli: geri92C(yeniKod)` → `canli: yeniKod` yapılacak ve
-`CANLI_SURUM` güncellenecek. Yapılmazsa script yine yalan söyler — 10 Ağu'da
-tam bu unutulduğu için "canlıda 198 bozuk şerit" diye yanlış rapor üretildi.
-
-📌 **Senkron kopyada değişiklik GEREKMEDİ — ölçülerek doğrulandı.**
-`lib/lane-parser.ts` (web "Yazarak İlan Ekle" yolu) bu şeridi hiç düşürmüyordu:
-birincil varış korumasız ekleniyor (`:442`), `:447`'deki aynı-il kontrolü yalnız
-çoklu varışın ikincil kopyasını eliyor. Dört kalıpla sınandı, dördünde de durak
-korundu. ⚠️ Yan bulgu: web tarafı ibare **olmasa da** `Adana→Adana` şeridini
-tutuyor — yani iki ikiz bu noktada ayrışık. Riski düşük (kullanıcı önizlemesi +
-LLM yedeği var), ama bilinçli kayda geçiyor.
-
----
-
-## 🟡 2 — Güvenli Etkileşim modülü: Faz 1-2 bitti, Faz 3-4 bekliyor
+## 🟡 1 — Güvenli Etkileşim modülü: Faz 1-2 bitti, Faz 3-4 bekliyor
 
 Kaynak PRD: `doc/GuvenEtkilesim.docx` · plan `docs/20260810_guven_etkilesim_plan.sql`
 Bugünkü veri: `deals` 0 satır, `reviews` 0 satır (modül henüz kullanılmadı).
@@ -94,7 +61,7 @@ Bugünkü veri: `deals` 0 satır, `reviews` 0 satır (modül henüz kullanılmad
 
 ---
 
-## ⏳ 3 — Şirket ilişkisi + ilan detayında "diğer ilanlar"
+## ⏳ 2 — Şirket ilişkisi + ilan detayında "diğer ilanlar"
 
 Bayram'ın 9 Ağu talebi: *(1) kullanıcılar şirkete bağlı olabilsin, (2) ilan
 detayında kullanıcının tüm ilanları ve şirketin tüm ilanları butonları olsun.*
@@ -116,7 +83,7 @@ detayında kullanıcının tüm ilanları ve şirketin tüm ilanları butonları
 
 ---
 
-## ⏳ 4 — Güvenlik takibi (7 Ağu'da açıldı, 10 Ağu'da hâlâ açık)
+## ⏳ 3 — Güvenlik takibi (7 Ağu'da açıldı, 10 Ağu'da hâlâ açık)
 
 - 🔴 **`phone_verified` istemciden yazılabiliyor** — `app/panel/PanelClient.tsx:961`
   doğrudan `supabase.from('users').update({ phone: yeniTel, phone_verified: true })`
@@ -126,13 +93,13 @@ detayında kullanıcının tüm ilanları ve şirketin tüm ilanları butonları
   (`app/api/auth/otp/route.ts:70/78/90`) SMS **gönderimini** sınırlıyor;
   6 haneli kodu **deneme** sayısını sınırlayan bir şey yok.
 - 🟡 **`auth_leaked_password_protection` kapalı** — yalnız Supabase Dashboard'dan
-  açılabiliyor, kod/SQL ile yapılamaz → **Bayram'da** (madde 7).
+  açılabiliyor, kod/SQL ile yapılamaz → **Bayram'da** (madde 6).
 - ⏳ **`app/api/auth/switch-account/route.ts` tutarlılık kontrolü hiç yapılmadı.**
   Implicit-flow izi arayan grep boş döndü, ama dosya elle okunmadı.
 
 ---
 
-## ⏳ 5 — Küçük ama gerçek açıklar
+## ⏳ 4 — Küçük ama gerçek açıklar
 
 - **Kaba dil kuralı yanlış pozitif üretebilir.** `safety_rules`'taki kaba dil
   kuralı (40 puan) `mal` kelimesini yakalıyor; nakliyede "mal" = **yük**, tamamen
@@ -151,7 +118,7 @@ detayında kullanıcının tüm ilanları ve şirketin tüm ilanları butonları
 
 ---
 
-## ⏳ 6 — Trafik bekleyen ölçümler (kod tarafı bitti, örneklem yok)
+## ⏳ 5 — Trafik bekleyen ölçümler (kod tarafı bitti, örneklem yok)
 
 Bunlar "yapılacak iş" değil, **doğrulanacak iddia**. Üçü de canlı trafik gerektiriyor.
 
@@ -173,7 +140,7 @@ beslemesi son günlerde ilan üretmemiş görünüyor — ana sayfa akışı ona
 
 ---
 
-## 👤 7 — Bayram'da (kod/SQL ile yapılamaz)
+## 👤 6 — Bayram'da (kod/SQL ile yapılamaz)
 
 - ⏳ **`auth_leaked_password_protection`** — Supabase Dashboard → Authentication →
   Password. Sızmış parola kontrolü kapalı.

@@ -19,6 +19,76 @@
 > için `docs/YAPILACAKLAR.md`'ye bak.
 
 ---
+---
+
+> ## ✅ 10 AĞU 2026 — #92-C ŞEHİR İÇİ İSTİSNASI: YAZILDI, ÖLÇÜLDÜ, **v92 SAHADA**
+>
+> #92-B "köken = varış" şeritlerini toptan reddediyordu ve haklıydı (`Mersin→Mersin`
+> diye taşıma yok; o artık yurt dışı varışın temsil edilemeyişinden doğuyordu).
+> Ama aynı reddetme MEŞRU bir sınıfı da düşürdü: `ANKARA ➡️ ANKARA Ş.İÇİ` gerçek
+> bir şehir içi taşıma işi. Bayram'ın kararı (`PROJE_HARITASI`:386) bunu düşük
+> öncelikli backlog maddesi yapmıştı; bu kayıt onun kapanışı.
+>
+> **`sehirIciSatiri()`** — satırda şehir içi ibaresi varsa aynı-il şeridine izin
+> verir. Üç koruma noktasında da kullanılıyor (Pass 1 ok/tire kolu, sol-boş ok
+> kurtarma kolu, `+` kolu). Tek yerden tanımlı — aynı kuralı üç yere kopyalamak
+> bu projede adı konmuş bir hata sınıfı (bkz. `alias-normalize`).
+>
+> **DESEN TAHMİN EDİLMEDİ, CANLI DERLEMDE ÖLÇÜLDÜ:**
+> - 180 günde **285 satır / 276 ilan** eşleşiyor; okunan örneklerin tamamı gerçek:
+>   `antalya sehir ici` (29) · `izmir sehirici kirkayak` (11) · `corlu sehir ici
+>   1360 tir` · `ankara sehirici damper` → **boşluksuz yazım yaygın**, `sehir ?ici`.
+> - Kısaltılmış biçim (`Ş.İÇİ` → `s ici`) 365 günde **3 kez**, üçü de gerçek;
+>   `sehir` kelimesi olmadan yanlış pozitif ÖLÇÜLDÜ = **0**.
+>
+> 🚨 **"İÇİN" TUZAĞI.** Ham metinde `iş için` / `giriş için` içinde "ş içi" geçiyor
+> ve ilk gevşek desenim tam bunları yakaladı (`iş için`, `adli sicil`, `giriş
+> için`). Desen artık `trNorm`DAN SONRA uygulanıyor: trNorm "için"i `icin` yapıyor,
+> kelime sınırı da ayırıyor. İki test bu tuzağı koruyor.
+> ⚠️ SATIR DÜZEYİNDE çalışır, mesaj düzeyinde değil — 5. satırdaki "şehir içi"
+> notu 2. satırdaki uydurma `Mersin→Mersin`i meşrulaştırmamalı. Ayrı test var.
+>
+> **`olc:87` KAPISI AYRIŞTIRILDI — bu kararın kendisi bir ders.** Meşru şehir içi
+> şeridi tanımı gereği "köken = varış" testine takılıyor. Kapıyı olduğu gibi
+> bırakmak onu KALICI KIRMIZI yapardı; bir süre sonra kimse bakmaz ve kapı ölür.
+> **Kapının ölmesi, #92'nin aylarca saklanmasının sebebiydi** — o hatayı kapıyı
+> körelterek tekrarlamamak için iki ayrı sayı var: gerekçesiz (`KENDİNE ŞERİT`,
+> kapı) ve ibareyle gerekçelendirilmiş (`ŞEHİR İÇİ`, bilgi). İbare tanıma mantığı
+> script'e KOPYALANMADI, parser'dan `export` edilip kullanılıyor.
+>
+> **ÖLÇÜM — deploy SONRASI, taban = dağıtılmış v92 (10.976 satır / 30 gün):**
+> ```
+> varyant     satır DEĞİŞTİ   şerit EKLENDİ   şerit SİLİNDİ   0→≥1   ≥1→0   KENDİNE ŞERİT   ŞEHİR İÇİ
+> canli (v92)          —               —               —      —      —        0 ✅                1
+> geri92C              1               0               1      0      1 🚨      0                  0
+> geri92AB           193             274             457      2      0      196 (187 satır) 🚨    0
+> yeni                 0               0               0      0      0        0 ✅                1
+> ```
+> → `geri92C` satırındaki **KAYIP=1** istisnanın değerinin kanıtı: kaldırılırsa
+> çalışan bir şerit ölüyor. `yeni` sıfır = yerel ağaç canlıyla aynı.
+>
+> **DEPLOY VE DOĞRULAMA (iddia edilmedi, ölçüldü):**
+> `supabase functions deploy parse-listing` → **v92 ACTIVE, 12:48:34 UTC.**
+> Ardından `supabase functions download` ile canlı kaynak İNDİRİLDİ ve yerel
+> ağaçla **birebir aynı** olduğu `diff` ile doğrulandı (`sehirIciSatiri` 6 yerde).
+> `verify_jwt: true` korundu (v91'deki değer okunarak).
+> Taban v92'ye taşındı, `CANLI_SURUM` güncellendi — bu adımın atlanması 10 Ağu'da
+> "canlıda 198 bozuk şerit" yanlış raporunu doğuran şeydi.
+>
+> **MUTASYON:** `sehirIciSatiri` gövdesi `false` yapıldı → **tam olarak 3 pozitif
+> test düştü, 4 koruma testi ayakta kaldı.** Testler düzeltmeyi gerçekten koruyor.
+>
+> 📌 **SENKRON KOPYADA DEĞİŞİKLİK GEREKMEDİ — varsayılmadı, ölçüldü.**
+> `lib/lane-parser.ts` (web "Yazarak İlan Ekle") bu şeridi hiç düşürmüyordu:
+> birincil varış `:442`'de korumasız ekleniyor, `:447`'deki aynı-il kontrolü
+> yalnız çoklu varışın ikincil kopyasını eliyor. Dört kalıpla sınandı, dördünde
+> de durak korundu. ⚠️ Yan bulgu: web tarafı ibare **olmasa da** `Adana→Adana`
+> şeridini tutuyor — iki ikiz burada AYRIŞIK. Riski düşük (kullanıcı önizlemesi +
+> LLM yedeği), bilinçli kayda geçti.
+>
+> Regresyon: `tsc` temiz · `test:87` (7 yeni) · `test:parser` 29/29 · `test:clean`
+> `test:pass2` `test:ad-type` `test:lokasyon` `test:districts` `test:alias` — yeşil.
+
 
 > ## ✅ 10 AĞU 2026 — `audit_score` TERS YAYINI KAPANDI: DÖRT NOKTA + BEKÇİ
 >

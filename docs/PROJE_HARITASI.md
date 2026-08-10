@@ -403,7 +403,14 @@
 > Esenyurt → **Rusya**, sistem zaten yalnız 81 ili temsil edebiliyor).
 > **✅ KARAR (Bayram): v90 kalıyor** — 163 yanlış kendine-şeride karşı 1 gerçek +
 > 2 kabul edilebilir kayıp, net kazanç pozitif. "Ş.İçi" istisnası düşük öncelikli
-> backlog maddesi oldu. Ayrıntı: `docs/YAPILACAKLAR.md` madde 2b.
+> backlog maddesi oldu.
+> ✅ **10 AĞU 2026 — O BACKLOG MADDESİ DE KAPANDI (#92-C, v92 SAHADA).**
+> `sehirIciSatiri()` satırda şehir içi ibaresi görürse aynı-il şeridine izin
+> veriyor; üç koruma noktasında kullanılıyor. Desen canlı derlemde ölçülerek
+> yazıldı (180 günde 285 satır; boşluksuz "şehirici" yazımı yaygın) ve "iş için"
+> tuzağı `trNorm` sonrası uygulamayla çözüldü. `olc:87`in KENDİNE ŞERİT kapısı
+> ayrıştırıldı — meşru şehir içi şeridi ayrı sayılıyor, yoksa kapı kalıcı kırmızı
+> olup körelirdi. Ayrıntı: `docs/ARSIV_YAPILACAKLAR.md`.
 > ⏳ **Kalan gerçek iş:** #86/#88 canlı ölçümü hâlâ yeni trafik bekliyor; deploy'dan
 > sonraki 413 satırlık "changed" kümesinin geri kalanı hâlâ tam denetlenmedi.
 > ✅ **#89 CANLI DOĞRULAMASI KAPANDI (7 Ağu 13:10 UTC).** v89'un işlediği gerçek
@@ -2226,6 +2233,19 @@ Açık rotalar: /giris, /auth/, /profil-tamamla, /nasil-calisir, /hakkimizda,
   imzasını aramaktı (`!kendineSerit(to)` → 2 yerde, v89 hâli → 0 yerde). İki dakika
   sürdü ve raporumu tersine çevirdi. Türetilen taban, sürüm damgası taşımalı ve
   eşleşmiyorsa **hata atmalı** — `#87-A düzeltmesi kaynakta YOK` kontrolü gibi.
+
+- 🚨 **YENİ MEŞRU BİR VAKA EKLERKEN KAPIYI KÖRELTME — AYRIŞTIR** (10 Ağu 2026,
+  #92-C). Şehir içi taşıma (`ANKARA ➡️ ANKARA Ş.İÇİ`) tanımı gereği "köken = varış"
+  şeridi üretir, yani `olc:87`in KENDİNE ŞERİT kapısına takılır. İki kolay yol
+  vardı ve **ikisi de yanlıştı**: (a) kapıyı kaldırmak, (b) kapının her koşuda
+  🚨 göstermesine alışmak. İkisi de aynı yere çıkar — kapı ölür. **Ve o kapının
+  ölmesi, #92'nin aylarca saklanmasının sebebiydi** (`KAYIP=0` üç kez "temiz"
+  dedi, üçünde de canlıda bozuk şerit üretiliyordu). Doğrusu **ayrıştırmak**:
+  gerekçesiz olan sayı kapı olarak kaldı (`KENDİNE ŞERİT`), gerekçelendirilmiş
+  olan ayrı bir bilgi sütunu oldu (`ŞEHİR İÇİ`). Kural: bir kapıyı bir istisna
+  yüzünden gevşetmen gerekiyorsa, istisnayı **ölçülebilir hâle getir** ve kapıyı
+  daralt — sustur ya da kaldır değil. Ek olarak: gerekçe tanıma mantığı ölçüm
+  script'ine KOPYALANMADI, parser'dan `export` edildi (ikiz ayrışma tuzağı).
 
 - 🚨 **"YOK MU?" KONTROLÜ BOŞ VERİDE HER ZAMAN GEÇER — ÜÇÜNCÜ KEZ ISIRDI**
   (10 Ağu 2026, `test-jsonld.mts`). `audit_score` sızıntısına karşı 5 assert

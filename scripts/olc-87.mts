@@ -5,7 +5,9 @@
 // varyantının tanımı güncellenir (aşağıdaki `varyantlar` bloğu).
 //   6 Ağu 2026 · taban = #87 öncesi  → ölçüldü, #87-A/B/D deploy edildi (v89)
 //   7 Ağu 2026 · taban = v89         → #92-A/#92-B ölçülüyor
-//   10 Ağu 2026 · taban = v91        → #92 SAHADA; ölçülecek yeni düzeltme yok
+//   10 Ağu 2026 · taban = v91        → #92 SAHADA; #92-C yazıldı ve ölçüldü
+//   10 Ağu 2026 · taban = v92        → #92-C de SAHADA (canlı kaynak indirilip
+//                                      yerel ağaçla birebir olduğu doğrulandı)
 //
 // 🚨🚨 EN PAHALI DERS — BU DOSYA BİR KEZ YALAN SÖYLEDİ (10 Ağu 2026).
 //   Yukarıdaki "her deploydan sonra güncellenir" satırı 7 Ağu'da yazıldı ve
@@ -126,9 +128,12 @@ if (b92Sayisi !== 2) throw new Error(`#92-B koruması ${b92Sayisi} yerde — 2 b
 const geri92A = (k: string) => k.replace(A92_YENI, A92_ESKI);
 const geri92B = (k: string) => k.split(B92_YENI).join(B92_ESKI);
 
-// #92-C — şehir içi istisnası (10 Ağu 2026). CANLIDA HENÜZ YOK, yani taban onu
-//   geri almak ZORUNDA. Gövdeyi `false` yapmak istisnayı tamamen kapatır ve üç
-//   çağrı noktasının hepsini birden etkisizleştirir (tek yerden mutasyon).
+// #92-C — şehir içi istisnası (10 Ağu 2026). v92 ile SAHADA (aşağıdaki `canli`
+//   tanımına bak). Bu geri-alma fonksiyonu SİLİNMEDİ: `geri92C` teşhis satırı
+//   istisnanın sahadaki değerini ölçmeye devam ediyor, ve bir sonraki düzeltme
+//   yazıldığında taban yine buradan türetilecek.
+//   Gövdeyi `false` yapmak istisnayı tamamen kapatır ve üç çağrı noktasının
+//   hepsini birden etkisizleştirir (tek yerden mutasyon).
 const C92_YENI = `  return / (?:sehir ?ici|s ici) /.test(n)`;
 const C92_ESKI = `  return false`;
 if (!yeniKod.includes(C92_YENI)) {
@@ -151,7 +156,7 @@ const geri92C = (k: string) => k.replace(C92_YENI, C92_ESKI);
 //   `if (!from && rel.rel === 'arrow'`     → canlıda 0 yerde  (#92-A ✅)
 //   `aracKelimeler` dizisinde 'yuklenecek' → yok              (#93  ✅)
 // Yani yerel ağaç = dağıtılmış v91. TABAN ARTIK `yeniKod`.
-const CANLI_SURUM = 'v91';
+const CANLI_SURUM = 'v92';
 const CANLI_DOGRULAMA = '2026-08-10';
 
 // 🔒 BEKÇİ — tabanın sessizce bayatlamasını ENGELLER.
@@ -183,13 +188,15 @@ if (beyansiz.length) {
 // Aradaki iki satır TEŞHİS: #92'yi geri alsak ne olurdu — yani düzeltmenin
 // sahadaki değerini gösteriyor. Bunlar silinmedi çünkü #92'nin kazancının
 // kanıtı bu satırlardır (`geri92AB` = eski v89 davranışı, 198 kendine şerit).
-// 10 Ağu 2026, ikinci güncelleme: #92-C YAZILDI ama HENÜZ DEPLOY EDİLMEDİ.
-// Yani yerel ağaç artık canlıdan FARKLI ve taban onu geri almak zorunda —
-// tabanın var olma sebebi tam olarak bu durum.
+// 10 Ağu 2026, ÜÇÜNCÜ güncelleme: #92-C DEPLOY EDİLDİ (v92, 12:48:34 UTC) ve
+// canlı kaynak indirilip yerel ağaçla BİREBİR olduğu doğrulandı. Taban yine
+// `yeniKod`. `geri92C` SİLİNMEDİ: teşhis satırı istisnanın sahadaki değerini
+// ölçmeye devam ediyor (ve bir sonraki düzeltmede taban yine ondan türetilecek).
 const varyantlar = {
-  canli:    geri92C(yeniKod),              // = dağıtılmış v91 (istisna yok)
+  canli:    yeniKod,                            // = dağıtılmış v92
+  geri92C:  geri92C(yeniKod),                   // teşhis: şehir içi istisnası olmasa
   geri92AB: geri92C(geri92B(geri92A(yeniKod))), // teşhis: #92 hiç olmasaydı
-  yeni:     yeniKod,                       // aday: #92-C dahil
+  yeni:     yeniKod,
 };
 const M: Record<string, any> = {};
 for (const [ad, kod] of Object.entries(varyantlar)) {
@@ -268,7 +275,7 @@ console.log(`alias: ${aliases.length}/${aliasSayisi} · satır: ${satirlar.lengt
 console.log(`  durum dağılımı: ${Object.entries(durumSayisi).map(([k, v]) => `${k}=${v}`).join(' · ')}\n`);
 
 // ── Karşılaştır ───────────────────────────────────────────────────────────────
-const ADLAR = ['canli', 'geri92AB', 'yeni'] as const;
+const ADLAR = ['canli', 'geri92C', 'geri92AB', 'yeni'] as const;
 type Ad = typeof ADLAR[number];
 
 // Şerit anahtarı: parser çıktısı zaten normalize (aynı alias tablosu her varyantta),
