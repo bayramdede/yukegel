@@ -372,6 +372,44 @@ ok('#92-B — çoklu varış kolunda da kendine şerit elenir',
   'BURSA YÜKLEME\n➡️ BURSA + KONYA',
   ['Bursa→Konya']);
 
+console.log('\n── #92-C: ŞEHİR İÇİ İSTİSNASI (10 Ağu 2026) ──');
+
+// 🚨 ASIL VAKA — canlı satır `4aadf724`. #92-B bu MEŞRU şeridi düşürüyordu;
+//    `olc:87` onu KAYIP=3'ün 1'i olarak gösterdi (diğer 2'si doğru temizlikti).
+ok('#92-C — "ANKARA ➡️ ANKARA Ş.İÇİ" şeridi KALIR',
+  '⚠️YARIN YÜKLER\nANKARA ➡️ ANKARA Ş.İÇİ\nFRİGO KAMYONET',
+  ['Ankara→Ankara']);
+
+ok('#92-C — açık yazım "şehir içi" de kabul',
+  'BURSA YÜKLEME\nBURSA ➡️ BURSA ŞEHİR İÇİ TIR',
+  ['Bursa→Bursa']);
+
+// Canlı derlemde en yaygın biçim BOŞLUKSUZ ("izmir sehirici kirkayak", 11 kez).
+ok('#92-C — boşluksuz "şehirici" de kabul',
+  'İZMİR YÜKLEME\nİZMİR ➡️ İZMİR ŞEHİRİÇİ TIR',
+  ['İzmir→İzmir']);
+
+// 🔒 EN ÖNEMLİ KORUMA — istisna #92-B'yi GENEL OLARAK delmemeli.
+ok('#92-C — ibare YOKSA kendine şerit HÂLÂ elenir (#92-B korunuyor)',
+  'ADANA YÜKLEME\n➡️ ADANA TENTELİ TIR',
+  []);
+
+// 🚨 "İÇİN" TUZAĞI — ham metinde "iş için" içinde "ş içi" geçer. Desen trNorm'dan
+//    SONRA uygulandığı için "icin" olur ve eşleşmez. Gevşek desenle bu satır
+//    kendine şerit üretirdi (ilk denememde tam bu oldu).
+ok('#92-C — "iş için" ibaresi istisnayı TETİKLEMEZ',
+  'ADANA YÜKLEME\n➡️ ADANA iş için tenteli tır',
+  []);
+
+ok('#92-C — "giriş için" de tetiklemez',
+  'MERSİN YÜKLEME\n➡️ MERSİN giriş için evrak',
+  []);
+
+// ⚠️ SATIR DÜZEYİ: başka satırdaki ibare bu satırı meşrulaştırmamalı.
+ok('#92-C — ibare BAŞKA satırdaysa kendine şerit meşrulaşmaz',
+  'şehir içi işler de yapılır\nMERSİN YÜKLEME\n➡️ MERSİN TENTELİ',
+  []);
+
 console.log('\n── KORUMA: #88 ve mevcut davranış bozulmadı ──');
 
 ok('temiz kontrol — Çorlu→Hatay',

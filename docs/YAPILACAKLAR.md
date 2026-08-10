@@ -18,32 +18,36 @@
 
 ---
 
-## 🟢 1 — #92 `Ş.İçi` istisnası (düşük öncelik — KARAR VERİLMİŞ, yeniden tartışılmayacak)
+## 🚀 1 — #92-C şehir içi istisnası: KOD BİTTİ, DEPLOY BEKLİYOR
 
-> ✅ **Bayram'ın kararı (bkz. `docs/PROJE_HARITASI.md`:386): "v90 kalıyor."**
-> 163 yanlış kendine-şeride karşı 1 gerçek + 2 kabul edilebilir kayıp; net kazanç
-> pozitif. **"Ş.İçi" istisnası düşük öncelikli backlog maddesi.** Aşağıdaki tablo
-> o kararın dayanağıdır — kararı yeniden açmak için değil, istisnayı yazacak kişi
-> hangi vakayı kurtaracağını bilsin diye duruyor.
+Yazıldı, test edildi, canlı veriyle ölçüldü. **Tek kalan: `parse-listing` deploy'u.**
 
-`KAYIP = 3` satırın üçü elle okundu (dosyanın kendi kuralı: örnekleri elle oku):
+`sehirIciSatiri()` (`supabase/functions/parse-listing/index.ts`) satırda şehir içi
+ibaresi görürse aynı-il şeridine izin veriyor; üç koruma noktasında da kullanılıyor.
 
-| satır | eski şerit | yeni | hüküm |
-|---|---|---|---|
-| `4aadf724` `ANKARA -> ANKARA Ş.İÇİ` | `Ankara/→Ankara/` | (yok) | 🚨 **GERİLEME** — meşru şehir içi iş |
-| `59169e5a` Mersin → Rusya | `Mersin/→Mersin/` | (yok) | ✅ doğru temizlik (yurt dışı varış temsil edilemiyor) |
-| `d7d6edda` Mersin → Rusya | `Mersin/→Mersin/` | (yok) | ✅ doğru temizlik |
+**Ölçüm (10.976 satır / son 30 gün, taban = dağıtılmış v91):**
 
-Düzeltme **aynı il** şeritlerini toptan reddediyor; `Ş.İÇİ` / `ŞEHİR İÇİ` meşru
-bir taşıma sınıfı ve onunla birlikte düşüyor.
+```
+varyant     satır DEĞİŞTİ   şerit EKLENDİ   şerit SİLİNDİ   0→≥1   ≥1→0   KENDİNE ŞERİT   ŞEHİR İÇİ
+canli                  —               —               —      —      —          0                0
+yeni                   1               1               0      1      0          0 ✅             1
+```
 
-**Hacim ölçüldü ve kararı destekliyor:** son 30 günde **34.112 ilanın 3'ü**
-(%0,01) şehir içi kalıbı taşıyor. Yazılacak istisna: `kendineSerit` kontrolüne
-"satırda şehir içi ibaresi varsa aynı il şeridine izin ver".
+→ **1 meşru şerit kurtarıldı, bedel sıfır.** İki kapı da temiz (`KAYIP=0`,
+gerekçesiz kendine-şerit `0`). Kurtarılan satır `4aadf724` = `ANKARA ➡️ ANKARA Ş.İÇİ`.
 
-📌 **Ölçüm altyapısı hazır ve artık güvenilir:** `npm run olc:87` tabanı v91'e
-taşındı ve `BEYAN_EDILEN` bekçisiyle korunuyor. İstisnayı yazınca `geri92*`
-teşhis satırları kazancı, `KAYIP` sütunu da bedeli doğrudan gösterecek.
+⚠️ **Deploy edilene kadar `olc:87` tabanı #92-C'yi geri alıyor** (`geri92C`).
+Deploy'dan **sonra** `canli: geri92C(yeniKod)` → `canli: yeniKod` yapılacak ve
+`CANLI_SURUM` güncellenecek. Yapılmazsa script yine yalan söyler — 10 Ağu'da
+tam bu unutulduğu için "canlıda 198 bozuk şerit" diye yanlış rapor üretildi.
+
+📌 **Senkron kopyada değişiklik GEREKMEDİ — ölçülerek doğrulandı.**
+`lib/lane-parser.ts` (web "Yazarak İlan Ekle" yolu) bu şeridi hiç düşürmüyordu:
+birincil varış korumasız ekleniyor (`:442`), `:447`'deki aynı-il kontrolü yalnız
+çoklu varışın ikincil kopyasını eliyor. Dört kalıpla sınandı, dördünde de durak
+korundu. ⚠️ Yan bulgu: web tarafı ibare **olmasa da** `Adana→Adana` şeridini
+tutuyor — yani iki ikiz bu noktada ayrışık. Riski düşük (kullanıcı önizlemesi +
+LLM yedeği var), ama bilinçli kayda geçiyor.
 
 ---
 

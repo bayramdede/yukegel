@@ -415,6 +415,39 @@ function ayniIlce(a: string | null | undefined, b: string | null | undefined): b
   return yerKey(a) === yerKey(b)
 }
 
+/**
+ * 🚨 #92-C (10 Ağu 2026) — ŞEHİR İÇİ İSTİSNASI. Aynı-il şeridini MEŞRU kılar.
+ *
+ * #92-B "köken = varış" şeritlerini toptan reddetmeye başladı ve haklıydı:
+ * `Mersin→Mersin` diye bir taşıma yok, o şerit yurt dışı varışın (Rusya)
+ * temsil edilemeyişinden doğan bir artıktı. AMA aynı reddetme MEŞRU bir sınıfı
+ * da düşürdü — `ANKARA ➡️ ANKARA Ş.İÇİ` gerçek bir şehir içi taşıma işidir.
+ * `olc:87` bunu `KAYIP=3`'ün 1'i olarak gösterdi (diğer 2'si doğru temizlikti).
+ *
+ * KARAR (Bayram): "v90 kalıyor, Ş.İçi istisnası düşük öncelikli backlog." Bu
+ * fonksiyon o istisna. Şerit SİLMEZ, yalnız reddedilmiş bir şeridi geri verir.
+ *
+ * ⚠️ SATIR DÜZEYİNDE ÇALIŞIR, mesaj düzeyinde DEĞİL. Mesajın 5. satırındaki
+ *    "şehir içi" notu, 2. satırdaki uydurma `Mersin→Mersin`i meşrulaştırmamalı.
+ *
+ * 📌 DESEN CANLI DERLEM ÜZERİNDE ÖLÇÜLEREK YAZILDI (yazım tahmin edilmedi):
+ *    180 günde 285 satır / 276 ilan eşleşiyor ve okunan örneklerin tamamı
+ *    gerçek şehir içi ibaresi — `antalya sehir ici` (29), `izmir sehirici
+ *    kirkayak` (11), `corlu sehir ici 1360 tir`, `ankara sehirici damper`…
+ *    Bu yüzden `sehir ?ici`: boşluksuz "şehirici" yazımı yaygın, kaçırılamaz.
+ *
+ * 🚨 "İÇİN" TUZAĞI — desen `trNorm`DAN SONRA uygulanmak ZORUNDA. Ham metinde
+ *    `iş için` / `giriş için` içinde "ş içi" geçer ve gevşek bir desen bunları
+ *    yakalar (ilk denemede tam bunu yaptım: "iş için", "adli sicil", "giriş
+ *    için" eşleşti). `trNorm` "için"i `icin` yapar, kelime sınırı da ayırır.
+ *    Kısaltılmış biçim (`Ş.İÇİ` → `s ici`) 365 günde 3 kez geçiyor ve ÜÇÜ DE
+ *    gerçek; 'sehir' kelimesi olmadan yanlış pozitif ÖLÇÜLDÜ = 0.
+ */
+function sehirIciSatiri(line: string): boolean {
+  const n = ` ${trNorm(line)} `
+  return / (?:sehir ?ici|s ici) /.test(n)
+}
+
 /** Lane / blok dedup anahtarı — yazım farkı ayrı lane üretmesin. */
 function laneKey(from: string, fromDist: string | null | undefined, to: string, toDist: string | null | undefined): string {
   return `${yerKey(from)}|${yerKey(fromDist)}|${yerKey(to)}|${yerKey(toDist)}`
@@ -676,7 +709,9 @@ function parseMessage(message: string, aliases: Alias[]): {
               const partHits = findPlaces(part, aliases)
               const to = bestPlace(partHits)
               // W5/D4 — yazım farkı yüzünden "Istanbul→İstanbul" lane'i doğmasın.
-              if (to && !ayniSehir(to.normalized, fromCity.normalized)) {
+              // 🚨 #92-C — ama satır "şehir içi" diyorsa o şerit MEŞRUDUR.
+              if (to && (!ayniSehir(to.normalized, fromCity.normalized) ||
+                         sehirIciSatiri(line))) {
                 lanes.push({
                   from: fromCity.normalized,
                   fromDistrict: fromCity.district || null,
@@ -766,9 +801,11 @@ function parseMessage(message: string, aliases: Alias[]): {
         // ⚠️ Burada YALNIZ `ayniSehir` kullanmak KAYBIN AYNISINI TEKRARLARDI:
         //    kurtarmaya çalıştığımız iki vaka da İSTANBUL İÇİ (Avcılar→Tuzla).
         //    Şart aşağıdaki normal yolun kuralıyla aynı olmalı — şehir FARKLI *veya* İLÇE farklı.
+        // 🚨 #92-C — "şehir içi" ibaresi aynı-il şeridini meşru kılar (bkz. sehirIciSatiri).
         if (altFrom && altTo &&
             (!ayniSehir(altTo.normalized, altFrom.normalized) ||
-             !ayniIlce(altTo.district, altFrom.district))) {
+             !ayniIlce(altTo.district, altFrom.district) ||
+             sehirIciSatiri(line))) {
           // ⚠️ #87-F: burada `contextFrom` GÜNCELLENMEZ. Her sol-boş ok satırı
           //    kendi sağını bağımsız çözer; blok başlığı bozulmaz.
           lanes.push({
@@ -801,7 +838,11 @@ function parseMessage(message: string, aliases: Alias[]): {
     //    düşmedi. İki kusur birbirini örtüyordu.
     // 📌 Kural :743 ile AYNI olmalı — şehir FARKLI *veya* İLÇE farklı. Sadece
     //    `ayniSehir` kullanmak `İstanbul→İstanbul/Tuzla` gibi GERÇEK şeritleri öldürür.
+    // 🚨 #92-C (10 Ağu 2026) — satır "şehir içi" diyorsa aynı-il şeridi MEŞRUDUR.
+    //    `ANKARA ➡️ ANKARA Ş.İÇİ` #92-B tarafından düşürülüyordu. Bkz. sehirIciSatiri().
+    const sehirIci = sehirIciSatiri(line)
     const kendineSerit = (to: PlaceHit): boolean =>
+      !sehirIci &&
       ayniSehir(to.normalized, from.normalized) && ayniIlce(to.district, from.district)
 
     if (rightParts.length > 1) {

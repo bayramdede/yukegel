@@ -20,7 +20,13 @@
 //
 // 🚨 KAPILAR (ikisi de `yeni` satırında SIFIR olmalı):
 //      ≥1→0 (KAYIP)      — düzeltme çalışan bir satırı öldürdü mü
-//      KENDİNE ŞERİT     — köken = varış üretiliyor mu  ← #92'de eklendi, aşağıda niye
+//      KENDİNE ŞERİT     — GEREKÇESİZ köken = varış üretiliyor mu ← #92'de eklendi
+//
+// 📌 ŞEHİR İÇİ sütunu (#92-C, 10 Ağu 2026) bir KAPI DEĞİL, bilgi sütunudur.
+//    "Köken = varış" olan ama satırında şehir içi ibaresi bulunan şeritler MEŞRU
+//    (`ANKARA ➡️ ANKARA Ş.İÇİ`) ve KENDİNE ŞERİT sayısından DÜŞÜLÜR. Kapıyı bu
+//    şekilde ayrıştırmak zorunluydu: aksi hâlde her koşu 🚨 gösterir, kapı
+//    körelir ve kimse bakmaz — #92'nin aylarca saklanma sebebi tam buydu.
 //
 // #86/#88'den FARKLI bir soru soruyor ve bu fark scriptin tamamını şekillendiriyor:
 //
@@ -95,7 +101,13 @@ function cekirdek(): string {
   let son = -1;
   for (let i = pm + 1; i < s.length; i++) if (s[i] === '}') { son = i; break; }
   if (son < 0) throw new Error('parseMessage sonu bulunamadı');
-  return s.slice(bas, son + 1).join('\n') + '\nexport { parseMessage, cleanMessage, splitByRelation }\n';
+  // ⚠️ `sehirIciSatiri` de dışa açılıyor (#92-C). Sebebi ÖNEMLİ: KENDİNE ŞERİT
+  //    kapısı artık meşru şehir içi şeridini ayırt etmek zorunda ve bunu yapmak
+  //    için ibare tanıma mantığına ihtiyacı var. Deseni buraya KOPYALAMAK, bu
+  //    projede adı konmuş bir hata sınıfı olurdu (aynı kural iki yerde iki yazım,
+  //    zamanla ayrışır — bkz. alias-normalize). Tek kaynak: parser'ın kendisi.
+  return s.slice(bas, son + 1).join('\n') +
+    '\nexport { parseMessage, cleanMessage, splitByRelation, sehirIciSatiri }\n';
 }
 
 const dizin = mkdtempSync(join(tmpdir(), 'olc87-'));
@@ -113,6 +125,16 @@ if (b92Sayisi !== 2) throw new Error(`#92-B koruması ${b92Sayisi} yerde — 2 b
 
 const geri92A = (k: string) => k.replace(A92_YENI, A92_ESKI);
 const geri92B = (k: string) => k.split(B92_YENI).join(B92_ESKI);
+
+// #92-C — şehir içi istisnası (10 Ağu 2026). CANLIDA HENÜZ YOK, yani taban onu
+//   geri almak ZORUNDA. Gövdeyi `false` yapmak istisnayı tamamen kapatır ve üç
+//   çağrı noktasının hepsini birden etkisizleştirir (tek yerden mutasyon).
+const C92_YENI = `  return / (?:sehir ?ici|s ici) /.test(n)`;
+const C92_ESKI = `  return false`;
+if (!yeniKod.includes(C92_YENI)) {
+  throw new Error('#92-C (sehirIciSatiri gövdesi) kaynakta YOK — geri mi alındı? Ölçüm anlamsız.');
+}
+const geri92C = (k: string) => k.replace(C92_YENI, C92_ESKI);
 
 // ── 🚨 TABAN = v91 (10 Ağu 2026). BAYAT TABAN BİR KEZ YALAN SÖYLEDİ ───────────
 //
@@ -161,11 +183,13 @@ if (beyansiz.length) {
 // Aradaki iki satır TEŞHİS: #92'yi geri alsak ne olurdu — yani düzeltmenin
 // sahadaki değerini gösteriyor. Bunlar silinmedi çünkü #92'nin kazancının
 // kanıtı bu satırlardır (`geri92AB` = eski v89 davranışı, 198 kendine şerit).
+// 10 Ağu 2026, ikinci güncelleme: #92-C YAZILDI ama HENÜZ DEPLOY EDİLMEDİ.
+// Yani yerel ağaç artık canlıdan FARKLI ve taban onu geri almak zorunda —
+// tabanın var olma sebebi tam olarak bu durum.
 const varyantlar = {
-  canli:    yeniKod,
-  geri92A:  geri92A(yeniKod),
-  geri92AB: geri92B(geri92A(yeniKod)),
-  yeni:     yeniKod,
+  canli:    geri92C(yeniKod),              // = dağıtılmış v91 (istisna yok)
+  geri92AB: geri92C(geri92B(geri92A(yeniKod))), // teşhis: #92 hiç olmasaydı
+  yeni:     yeniKod,                       // aday: #92-C dahil
 };
 const M: Record<string, any> = {};
 for (const [ad, kod] of Object.entries(varyantlar)) {
@@ -244,7 +268,7 @@ console.log(`alias: ${aliases.length}/${aliasSayisi} · satır: ${satirlar.lengt
 console.log(`  durum dağılımı: ${Object.entries(durumSayisi).map(([k, v]) => `${k}=${v}`).join(' · ')}\n`);
 
 // ── Karşılaştır ───────────────────────────────────────────────────────────────
-const ADLAR = ['canli', 'geri92A', 'geri92AB', 'yeni'] as const;
+const ADLAR = ['canli', 'geri92AB', 'yeni'] as const;
 type Ad = typeof ADLAR[number];
 
 // Şerit anahtarı: parser çıktısı zaten normalize (aynı alias tablosu her varyantta),
@@ -260,13 +284,28 @@ const sk = (l: any) => `${l.from}/${l.fromDistrict || ''}→${l.to}/${l.toDistri
 //    "Mersin'den Mersin'e yük" diye bir şey yok.
 // 📌 İlçe dahil karşılaştırılır: `İstanbul→İstanbul/Tuzla` GERÇEK bir şerittir,
 //    kendine şerit DEĞİLDİR. Sadece ile bakmak onu yanlışlıkla suçlu gösterirdi.
+// 🚨 #92-C (10 Ağu 2026) — KAPI AYRIŞTIRILDI. Aksi hâlde KALICI KIRMIZI olurdu.
+//    Şehir içi taşıma (`ANKARA ➡️ ANKARA Ş.İÇİ`) MEŞRU bir aynı-il şeridi üretir,
+//    yani "köken = varış" testine takılır. Kapıyı olduğu gibi bırakırsam her koşu
+//    🚨 gösterir; bir süre sonra kimse bakmaz ve kapı ölür. Kapının ölmesi, #92'nin
+//    aylarca saklanmasının sebebiydi — o hatayı kapıyı körelterek tekrarlamayacağım.
+//    Bu yüzden iki AYRI sayı: gerçekten anlamsız olan (`kendine`) ve ibareyle
+//    gerekçelendirilmiş olan (`sehirIci`). Kapı yalnız birincisine bakar.
 const kendineMi = (l: any) =>
   l.from === l.to && (l.fromDistrict || '') === (l.toDistrict || '');
+/** Kendine şerit AMA satırında şehir içi ibaresi var → gerekçeli, kapıya takılmaz. */
+const gerekceliMi = (ad: Ad, l: any) =>
+  kendineMi(l) && Boolean(l.raw_line) && M[ad].sehirIciSatiri(l.raw_line);
 
-function cikti(ad: Ad, t: string): { set: Set<string>; kendine: number } | null {
+function cikti(ad: Ad, t: string): { set: Set<string>; kendine: number; sehirIci: number } | null {
   try {
     const lanes = M[ad].parseMessage(M[ad].cleanMessage(t), aliases).lanes;
-    return { set: new Set(lanes.map(sk)), kendine: lanes.filter(kendineMi).length };
+    return {
+      set: new Set(lanes.map(sk)),
+      // ⚠️ `kendine` artık YALNIZ GEREKÇESİZ olanları sayar — kapının anlamı bu.
+      kendine: lanes.filter((l: any) => kendineMi(l) && !gerekceliMi(ad, l)).length,
+      sehirIci: lanes.filter((l: any) => gerekceliMi(ad, l)).length,
+    };
   } catch { return null; }
 }
 
@@ -281,8 +320,8 @@ function solBosOkVar(ad: Ad, t: string): boolean {
   } catch { return false; }
 }
 
-type Sayac = { kazanc: number; kayip: number; eklenen: number; silinen: number; degisen: number; kendine: number; kendineSatir: number };
-const yeniSayac = (): Sayac => ({ kazanc: 0, kayip: 0, eklenen: 0, silinen: 0, degisen: 0, kendine: 0, kendineSatir: 0 });
+type Sayac = { kazanc: number; kayip: number; eklenen: number; silinen: number; degisen: number; kendine: number; kendineSatir: number; sehirIci: number };
+const yeniSayac = (): Sayac => ({ kazanc: 0, kayip: 0, eklenen: 0, silinen: 0, degisen: 0, kendine: 0, kendineSatir: 0, sehirIci: 0 });
 const sonuc: Record<string, Sayac> = Object.fromEntries(ADLAR.map(a => [a, yeniSayac()]));
 
 const kayipOrnek: any[] = [];
@@ -296,7 +335,7 @@ for (const r of satirlar as any[]) {
   const tab = cikti('canli', t);
   if (tab === null) { patlak++; continue; }
   const e = tab.set;
-  const v: Record<string, { set: Set<string>; kendine: number }> = {};
+  const v: Record<string, { set: Set<string>; kendine: number; sehirIci: number }> = {};
   let atla = false;
   for (const ad of ADLAR.slice(1)) {
     const s = cikti(ad, t);
@@ -311,9 +350,11 @@ for (const r of satirlar as any[]) {
   // Kendine şerit HER varyantta sayılır — taban dahil. Tablonun anlamı:
   // "canli" satırındaki sayı ŞU AN CANLIDA ÜRETİLEN bozuk şerit adedi.
   sonuc.canli.kendine += tab.kendine;
+  sonuc.canli.sehirIci += tab.sehirIci;
   if (tab.kendine) sonuc.canli.kendineSatir++;
   for (const ad of ADLAR.slice(1)) {
     sonuc[ad].kendine += v[ad].kendine;
+    sonuc[ad].sehirIci += v[ad].sehirIci;
     if (v[ad].kendine) sonuc[ad].kendineSatir++;
   }
 
@@ -356,7 +397,7 @@ if (sonuc.yeni.degisen === 0) {
   console.log('   ✅ `yeni` satırı sıfır: yerel ağaçta DAĞITILMAMIŞ düzeltme yok. Beklenen.');
 }
 console.log('─'.repeat(C));
-console.log('varyant     satır DEĞİŞTİ   şerit EKLENDİ   şerit SİLİNDİ   0→≥1   ≥1→0   KENDİNE ŞERİT');
+console.log('varyant     satır DEĞİŞTİ   şerit EKLENDİ   şerit SİLİNDİ   0→≥1   ≥1→0   KENDİNE ŞERİT   ŞEHİR İÇİ');
 for (const ad of ADLAR) {
   const s = sonuc[ad];
   const taban = ad === 'canli';
@@ -364,7 +405,8 @@ for (const ad of ADLAR) {
     `${ad.padEnd(11)} ${(taban ? '—' : String(s.degisen)).padStart(12)}   ${(taban ? '—' : String(s.eklenen)).padStart(13)}` +
     `   ${(taban ? '—' : String(s.silinen)).padStart(13)}   ${(taban ? '—' : String(s.kazanc)).padStart(4)}` +
     `   ${(taban ? '—' : String(s.kayip)).padStart(4)}${!taban && s.kayip ? ' 🚨' : '  '}` +
-    `   ${String(s.kendine).padStart(6)} (${s.kendineSatir} satır)${s.kendine ? ' 🚨' : ''}`
+    `   ${String(s.kendine).padStart(6)} (${s.kendineSatir} satır)${s.kendine ? ' 🚨' : ''}` +
+    `   ${String(s.sehirIci).padStart(9)}`
   );
 }
 console.log(`hata verdi  ${String(patlak).padStart(12)}`);
