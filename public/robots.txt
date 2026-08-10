@@ -18,6 +18,19 @@
 # KURAL: yeni bir özel alan (panel benzeri) eklerken DÖRT bloğu da güncelle
 #        (*, GoogleBot, GPTBot, ClaudeBot).
 #        Listeler bilinçli olarak birebir aynı; farklılaşırlarsa bu bir hatadır.
+#
+# 🚨 10 AĞU 2026 — `Allow: /api/ilanlar/` EKLENDİ. SEBEBİ ÖNEMLİ:
+#    8 Ağu'da AI-readiness için "makine-okunur API" yazıldı (`/api/ilanlar/[id]`,
+#    hassas veri yok, 5 dk CDN cache) — AMA `Disallow: /api/` onu DÖRT BLOKTA DA
+#    kapatıyordu. Yani uç, tam olarak kendisi için yazıldığı GPTBot/ClaudeBot'a
+#    kapalıydı; üstelik siteden ona giden hiçbir bağlantı da yok. Ölü uçtu.
+#    ⚙️ NASIL ÇALIŞIR: Google'da en UZUN (en spesifik) eşleşen kural kazanır.
+#       `/api/ilanlar/` (13 karakter) > `/api/` (5 karakter) → Allow kazanır,
+#       `/api/` altındaki HER ŞEY kapalı kalır. Bu yüzden `Disallow: /api/`
+#       satırları olduğu gibi duruyor — kaldırılmadı, daraltıldı.
+#    ⚠️ Yalnız `/api/ilanlar/` açıldı. Başka bir `/api/` yolunu açmadan önce o
+#       ucun yanıtında hassas alan olmadığını DOĞRULA (`contact_phone`, `user_id`,
+#       TCKN/VKN). `/api/ilanlar/[id]` bunları bilinçli olarak döndürmüyor.
 
 # --- Genel crawler'lar (isimli blokla eşleşmeyen HERKES buraya düşer) ---
 User-agent: *
@@ -26,6 +39,8 @@ Disallow: /admin/
 Disallow: /moderator/
 Disallow: /moderator-giris/
 Disallow: /panel/
+# Makine-okunur ilan ucu — bkz. baştaki 10 Ağu 2026 notu (en uzun kural kazanır).
+Allow: /api/ilanlar/
 Disallow: /api/
 Disallow: /araclarim/
 Disallow: /profil-tamamla/
@@ -44,6 +59,8 @@ Disallow: /admin/
 Disallow: /moderator/
 Disallow: /moderator-giris/
 Disallow: /panel/
+# Makine-okunur ilan ucu — bkz. baştaki 10 Ağu 2026 notu (en uzun kural kazanır).
+Allow: /api/ilanlar/
 Disallow: /api/
 Disallow: /araclarim/
 Disallow: /profil-tamamla/
@@ -63,6 +80,8 @@ Disallow: /admin/
 Disallow: /moderator/
 Disallow: /moderator-giris/
 Disallow: /panel/
+# Makine-okunur ilan ucu — bkz. baştaki 10 Ağu 2026 notu (en uzun kural kazanır).
+Allow: /api/ilanlar/
 Disallow: /api/
 Disallow: /araclarim/
 Disallow: /profil-tamamla/
@@ -79,6 +98,8 @@ Disallow: /admin/
 Disallow: /moderator/
 Disallow: /moderator-giris/
 Disallow: /panel/
+# Makine-okunur ilan ucu — bkz. baştaki 10 Ağu 2026 notu (en uzun kural kazanır).
+Allow: /api/ilanlar/
 Disallow: /api/
 Disallow: /araclarim/
 Disallow: /profil-tamamla/

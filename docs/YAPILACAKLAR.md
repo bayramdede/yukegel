@@ -92,8 +92,6 @@ detayında kullanıcının tüm ilanları ve şirketin tüm ilanları butonları
 - 🔴 **OTP doğrulama denemesinde kaba kuvvet koruması yok.** `kotaDene`
   (`app/api/auth/otp/route.ts:70/78/90`) SMS **gönderimini** sınırlıyor;
   6 haneli kodu **deneme** sayısını sınırlayan bir şey yok.
-- 🟡 **`auth_leaked_password_protection` kapalı** — yalnız Supabase Dashboard'dan
-  açılabiliyor, kod/SQL ile yapılamaz → **Bayram'da** (madde 6).
 - ⏳ **`app/api/auth/switch-account/route.ts` tutarlılık kontrolü hiç yapılmadı.**
   Implicit-flow izi arayan grep boş döndü, ama dosya elle okunmadı.
 
@@ -142,11 +140,13 @@ beslemesi son günlerde ilan üretmemiş görünüyor — ana sayfa akışı ona
 
 ## 👤 6 — Bayram'da (kod/SQL ile yapılamaz)
 
-- ⏳ **`auth_leaked_password_protection`** — Supabase Dashboard → Authentication →
-  Password. Sızmış parola kontrolü kapalı.
-- ⏳ **Google Search Console → Rich Results Test.** Son durumda "1 geçerli öğe
-  algılandı" (BreadcrumbList) alındı. `Service` şeması Google'ın zengin sonuç
-  listesinde **yok** — o yüzden onun görünmemesi normal, arıza değil.
+- ⏳ **Search Console'da "Robots.txt ile engellendi" bildirimini kapat.**
+  Kök sebep 10 Ağu'da giderildi (ilan sayfasındaki giriş bağlantısına
+  `rel="nofollow"`), ama **deploy sonrası** Search Console'da
+  *Sayfalar → "Robots.txt tarafından engellendi"* raporunun **"Düzeltmeyi
+  doğrula"** düğmesine basılması gerekiyor; yoksa bildirim kendi kendine
+  kapanmaz. ⚠️ Rapordaki URL'lerin `/giris?redirect=…` olduğunu teyit et —
+  başka bir yol çıkarsa o ayrı bir bulgudur, haber ver.
 - 🔒 **6 EYLÜL 2026'DAN ÖNCE SİLİNMEYECEK — Dalga 5 yedek tabloları.**
   `public.dalga5_yedek_20260806` (14 MB, 234.840 satır) ve
   `public.dalga5_yedek_stops_20260806` (18 MB, 245.086 satır) — coğrafi geçişin

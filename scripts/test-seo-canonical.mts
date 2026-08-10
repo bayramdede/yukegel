@@ -124,6 +124,57 @@ for (const segment of ['admin', 'moderator', 'panel', 'araclarim']) {
   kontrol(`/${segment} noindex`, noindex);
 }
 
+// ── 6. robots.txt sözleşmesi (10 Ağu 2026) ───────────────────────────────
+// 🚨 NEDEN VAR: 8 Ağu'da AI-readiness için makine-okunur bir uç yazıldı
+// (`/api/ilanlar/[id]`) ama `Disallow: /api/` onu DÖRT BLOKTA DA kapatıyordu —
+// yani uç, kendisi için yazıldığı GPTBot/ClaudeBot'a kapalıydı. Hiçbir tsc/lint
+// bunu göremez: robots.txt bir METİN dosyası, kod değil. Yakalayabilecek tek
+// şey budur. Dosyanın kendi kuralı da "dört blok birebir aynı olacak" diyor;
+// o kural şimdiye kadar YORUMLA korunuyordu, artık kontrolle korunuyor.
+const robots = readFileSync(join(KOK, 'public/robots.txt'), 'utf8');
+const bloklar = robots.split(/^User-agent:/m).slice(1);
+kontrol('robots.txt dört User-agent bloğu taşıyor', bloklar.length === 4,
+  `bulunan: ${bloklar.length}`);
+
+// Her blokta özel alanlar kapalı OLMAK ZORUNDA — biri atlanırsa panel taranır.
+const ZORUNLU_KAPALI = ['/admin/', '/moderator/', '/moderator-giris/', '/panel/',
+                        '/api/', '/araclarim/', '/profil-tamamla/', '/auth/'];
+for (const [i, blok] of bloklar.entries()) {
+  const ad = blok.split('\n')[0].trim();
+  for (const yol of ZORUNLU_KAPALI) {
+    kontrol(`robots blok #${i + 1} (${ad}) → Disallow: ${yol}`,
+      blok.includes(`Disallow: ${yol}`));
+  }
+  // Makine-okunur uç HER blokta açık olmalı; `/api/ilanlar/` daha uzun olduğu
+  // için Google'da `Disallow: /api/`yi yener (en spesifik kural kazanır).
+  kontrol(`robots blok #${i + 1} (${ad}) → Allow: /api/ilanlar/`,
+    blok.includes('Allow: /api/ilanlar/'));
+}
+
+// ⚠️ `/api/` altında AÇILAN tek yol `/api/ilanlar/` olmalı. Yeni bir Allow
+//    eklenirse burası kırmızı yanar ve o ucun yanıtı elden geçirilmeye zorlanır
+//    (hassas alan sızdırıyor mu?).
+const apiAllowlari = [...robots.matchAll(/^Allow: (\/api\/[^\s]*)$/gm)].map(m => m[1]);
+kontrol('robots.txt: /api/ altında yalnız /api/ilanlar/ açık',
+  apiAllowlari.every(y => y === '/api/ilanlar/'),
+  `bulunan: ${[...new Set(apiAllowlari)].join(', ')}`);
+
+// Sitemap yönlenmeyen host ile verilmeli (apex 307 ile www'ye gidiyor).
+kontrol('robots.txt Sitemap satırı www host kullanıyor',
+  robots.includes('Sitemap: https://www.yukegel.com/sitemap.xml'));
+
+// 🚨 Her ilan sayfasındaki giriş bağlantısı `nofollow` OLMAK ZORUNDA. Olmazsa
+//    `redirect` parametresi yüzünden her ilan için ayrı bir yasaklı URL doğar ve
+//    Search Console "Robots.txt tarafından engellendi" bildirimi gönderir
+//    (8 Ağu 2026'da tam bu oldu). robots.txt keşiften SONRA reddeder; asıl
+//    çözüm keşfi engellemek.
+const ilanSayfasi = readFileSync(join(APP, 'ilan/[id]/page.tsx'), 'utf8');
+const girisBaglantisi = /<a\s+href=\{`\/giris\?redirect=[^`]*`\}([^>]*)>/.exec(ilanSayfasi);
+kontrol('ilan sayfasında /giris?redirect= bağlantısı bulundu', Boolean(girisBaglantisi));
+kontrol('o bağlantı rel="nofollow" taşıyor',
+  Boolean(girisBaglantisi) && /rel="nofollow"/.test(girisBaglantisi![1]),
+  girisBaglantisi ? `nitelikler: ${girisBaglantisi[1].trim().slice(0, 80)}` : 'bağlantı yok');
+
 console.log(`\n${hatalar.length === 0 ? '✅' : '❌'} SEO metadata: ${gecti} geçti, ${hatalar.length} kaldı`);
 for (const h of hatalar) console.log(`   ✗ ${h}`);
 process.exit(hatalar.length === 0 ? 0 : 1);

@@ -621,7 +621,17 @@ export default async function IlanDetay({ params }: { params: Promise<{ id: stri
               <div style={{ color: '#8b949e', fontSize: '0.85rem', marginBottom: 12 }}>
                 Telefon numarasını görmek için giriş yapın.
               </div>
-              <a href={`/giris?redirect=/ilan/${ilan.id}`}
+              {/* 🚨 10 Ağu 2026 — `rel="nofollow"` EKLENDİ, SAKIN KALDIRMA.
+                  Search Console 8 Ağu'da "Robots.txt tarafından engellendi"
+                  bildirimi gönderdi. Sebep buydu: bu bağlantı HER ilan sayfasında
+                  var ve `redirect` parametresi yüzünden her ilan için AYRI bir URL
+                  üretiyor. Google ilan sayfasını tarıyor (izinli), bu bağlantıyı
+                  keşfediyor, sonra `Disallow: /giris` onu reddediyor — on binlerce
+                  kez. robots.txt keşiften SONRA reddeder; `nofollow` keşfi
+                  baştan engeller. Doğru katman bu.
+                  ⚠️ Giriş sayfasının indekslenmemesi ZATEN doğru (arama değeri yok);
+                  düzeltilen şey tarama bütçesi israfı ve rapor gürültüsü. */}
+              <a href={`/giris?redirect=/ilan/${ilan.id}`} rel="nofollow"
                 style={{ display: 'inline-block', background: '#22c55e', color: '#000', fontWeight: 800, fontSize: '1rem', padding: '12px 32px', borderRadius: 8, textDecoration: 'none' }}>
                 🔐 Giriş Yap / Kaydol
               </a>

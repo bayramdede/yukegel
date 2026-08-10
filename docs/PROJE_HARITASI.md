@@ -252,9 +252,12 @@
 > geçirilebiliyordu (ilan/araç/TCKN transferi + kurbanın hesabını pasifleştirme).
 > Artık sunucu iki hesabın gerçekten aynı e-postaya ait olduğunu kendisi
 > doğruluyor. Ayrıca `tekil-kontrol` route'una kota eklendi (kotasız TCKN/VKN
-> sorgusu). Kayıt: `docs/20260807_guvenlik_kayit_giris.sql`. **Manuel aksiyon
-> bekliyor (Bayram):** Supabase Dashboard'dan "leaked password protection"
-> açılmalı — kod/SQL ile yapılamaz. Ayrıntı: `docs/ARSIV_YAPILACAKLAR.md`.
+> sorgusu). Kayıt: `docs/20260807_guvenlik_kayit_giris.sql`.
+> ✅ **10 AĞU 2026 — Bayram "leaked password protection"ı AÇTI** (HaveIBeenPwned
+> Pwned Passwords API, Pro plan). Bu maddeden kalan İKİ açık var ve ikisi de kod
+> tarafında: `phone_verified` istemciden yazılabiliyor (`PanelClient.tsx:961`) ve
+> OTP **doğrulama** denemesinde kaba kuvvet koruması yok (yalnız SMS *gönderimi*
+> sınırlı). Ayrıntı: `docs/ARSIV_YAPILACAKLAR.md`.
 >
 > ✅ **7 AĞU 2026 — PERFORMANS: ANA SAYFA 400 KAT, SAYAÇ 158 KAT HIZLANDI.**
 > Ölçüldü (`pg_stat_statements`, tahmin değil): ana sayfa sorgusu ort. 1026ms/
@@ -2233,6 +2236,28 @@ Açık rotalar: /giris, /auth/, /profil-tamamla, /nasil-calisir, /hakkimizda,
   imzasını aramaktı (`!kendineSerit(to)` → 2 yerde, v89 hâli → 0 yerde). İki dakika
   sürdü ve raporumu tersine çevirdi. Türetilen taban, sürüm damgası taşımalı ve
   eşleşmiyorsa **hata atmalı** — `#87-A düzeltmesi kaynakta YOK` kontrolü gibi.
+
+- 🚨 **`robots.txt` KOD DEĞİL VERİDİR — HİÇBİR DERLEYİCİ ONU OKUMAZ** (10 Ağu 2026).
+  8 Ağu'da AI-readiness için `/api/ilanlar/[id]` yazıldı, ama `Disallow: /api/`
+  onu dört bloğun tamamında kapatıyordu: uç, **tam olarak kendisi için yazıldığı
+  GPTBot/ClaudeBot'a kapalıydı** ve siteden ona giden bağlantı da yoktu. İki gün
+  kimse görmedi çünkü `tsc`/`lint`/`build` bir metin dosyasını denetlemez —
+  `safety_rules` desenlerinin JavaScript'te aylarca derlenmemesiyle **aynı hata
+  sınıfı**: davranışı belirleyen şey kod değil VERİ olduğunda, tek bekçi ona
+  bakan bir testtir. Artık `npm run test:seo` robots.txt sözleşmesini kilitliyor
+  (dört blok, 8 zorunlu disallow, `/api/` altında açılan tek yol).
+  ⚙️ Yararlı ayrıntı: Google'da **en uzun eşleşen kural kazanır**, bu yüzden
+  `Allow: /api/ilanlar/` + `Disallow: /api/` birlikte doğru çalışır — geniş
+  yasağı kaldırmadan tek bir yol açmanın doğru yolu bu.
+
+- 🚨 **`robots.txt` KEŞFİ ENGELLEMEZ, SADECE REDDEDER** (10 Ağu 2026, Search
+  Console "Robots.txt tarafından engellendi"). `/giris?redirect=/ilan/<id>`
+  bağlantısı her ilan sayfasındaydı ve `redirect` parametresi her ilan için ayrı
+  bir URL üretiyordu; Google izinli ilan sayfasını tarayıp bu yasaklı URL'leri
+  on binlerce kez keşfediyordu. Yasak doğruydu (giriş sayfası indekslenmemeli),
+  israf yanlıştı. **Kural: bir URL'in hiç KEŞFEDİLMEMESİ gerekiyorsa çözüm
+  `rel="nofollow"`dır; robots.txt keşiften SONRA devreye girer.** İkisi farklı
+  katman ve biri diğerinin yerine geçmez.
 
 - 🚨 **YENİ MEŞRU BİR VAKA EKLERKEN KAPIYI KÖRELTME — AYRIŞTIR** (10 Ağu 2026,
   #92-C). Şehir içi taşıma (`ANKARA ➡️ ANKARA Ş.İÇİ`) tanımı gereği "köken = varış"

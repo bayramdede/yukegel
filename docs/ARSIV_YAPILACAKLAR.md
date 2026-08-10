@@ -21,6 +21,64 @@
 ---
 ---
 
+> ## ✅ 10 AĞU 2026 — RICH RESULTS SONUCU OKUNDU: ŞEMA TEMİZ, AMA İKİ GERÇEK BULGU
+>
+> `RichTestResult` (Search Console çıktısı, 10 Ağu 16:33) incelendi.
+>
+> **ŞEMA TARAFI TEMİZ — kapandı.** `1 geçerli öğe algılandı` · BreadcrumbList
+> (Ana Sayfa → "Tekirdağ → İstanbul") · tarama başarılı · dizine eklemeye izin
+> **Evet** · `200 OK` · 12 duraklı gerçek bir ilan doğru işlenmiş.
+> 📌 `Service` şemasının görünmemesi ARIZA DEĞİL: Google'ın zengin sonuç
+> ürettiği tipler arasında yok (9 Ağu'da `JobPosting`e geçme önerisi bu yüzden
+> reddedilmişti). Beklenen davranış.
+>
+> ### BULGU 1 — "Robots.txt tarafından engellendi" (8 Ağu bildirimi) · kök sebep bulundu
+> Rapor: *"Search Console, sitenizdeki bazı sayfa içeriklerinin Robots.txt
+> tarafından engellendiğini belirledi."*
+> **Sebep:** `/giris?redirect=/ilan/<id>` bağlantısı **HER ilan sayfasında** var
+> (`app/ilan/[id]/page.tsx`) ve `redirect` parametresi yüzünden her ilan için
+> **AYRI bir URL** üretiyor. Google ilan sayfasını tarıyor (izinli), bağlantıyı
+> keşfediyor, sonra `Disallow: /giris` reddediyor — on binlerce kez.
+> ⚠️ Giriş sayfasının indekslenmemesi ZATEN doğru; sorun indeksleme değil,
+> **tarama bütçesi israfı + rapor gürültüsü.**
+> **Düzeltme:** bağlantıya `rel="nofollow"`. Katman farkı önemli — robots.txt
+> keşiften SONRA reddeder, `nofollow` keşfi baştan engeller.
+> ⏳ Deploy sonrası Search Console'da "Düzeltmeyi doğrula"ya basılmalı (Bayram).
+> 📌 Sitemap SUÇSUZ: yalnız `/`, `/ilan/<id>`, `/u/<id>` ve statik sayfalar
+> üretiyor, hiçbiri yasaklı değil — bu kontrol edildi.
+>
+> ### BULGU 2 — makine-okunur API, kendi hedef kitlesine KAPALIYDI
+> 8 Ağu'da AI-readiness için `/api/ilanlar/[id]` yazıldı (hassas veri yok, 5 dk
+> CDN cache). Ama `Disallow: /api/` onu **dört bloğun tamamında** kapatıyordu —
+> yani uç, tam olarak kendisi için yazıldığı **GPTBot ve ClaudeBot'a kapalıydı.**
+> Üstelik siteden ona giden **hiçbir bağlantı da yok**: keşfedilemez + yasaklı,
+> yani ölü uç. İki gün boyunca hiçbir test bunu göremedi çünkü robots.txt bir
+> METİN dosyası — `tsc`/`lint`/`build` onu okumaz.
+> **Düzeltme:** dört bloğa da `Allow: /api/ilanlar/`. `Disallow: /api/` KALDI —
+> Google'da en uzun (en spesifik) kural kazandığı için `/api/ilanlar/` (13 kr) >
+> `/api/` (5 kr) → yalnız bu yol açıldı, `/api/` altındaki her şey kapalı kaldı.
+> ✅ Ucun güvenliği teyit edildi: SELECT'te `contact_phone`/`user_id` YOK,
+> `rejected`/shadow-ban/`passive` ilanlar 404. `notes` serbest metin ama zaten
+> herkese açık ilan sayfasında da basılıyor → yeni maruziyet yok.
+>
+> ### BEKÇİ (`npm run test:seo` → 115 kontrol, 20'si yeni)
+> robots.txt artık **kontrolle** korunuyor, yorumla değil. Dosyanın kendi kuralı
+> ("dört blok birebir aynı olacak") şimdiye kadar sadece bir yorumdu.
+> Yeni kontroller: dört blok var mı · her blokta 8 özel alan kapalı mı · her
+> blokta `Allow: /api/ilanlar/` var mı · `/api/` altında BAŞKA bir Allow açılmış
+> mı (açılırsa kırmızı yanar ve o ucun yanıtı gözden geçirilmeye zorlanır) ·
+> Sitemap www host'u · ilan sayfasındaki giriş bağlantısı `nofollow` taşıyor mu.
+> **Mutasyon:** üç ayrı bozma denendi (GPTBot'tan Allow silindi · `nofollow`
+> kaldırıldı · `/api/admin/` açıldı) → **üçü de yakalandı.**
+>
+> ### AYRICA — sızmış parola koruması AÇILDI (Bayram)
+> `auth_leaked_password_protection` etkinleştirildi (HaveIBeenPwned Pwned
+> Passwords API, Pro plan). 7 Ağu güvenlik denetiminden kalan üç maddeden biri
+> kapandı; kalan ikisi hâlâ açık: `phone_verified` istemciden yazılabiliyor,
+> OTP doğrulama denemesinde kaba kuvvet koruması yok.
+
+---
+
 > ## ✅ 10 AĞU 2026 — #92-C ŞEHİR İÇİ İSTİSNASI: YAZILDI, ÖLÇÜLDÜ, **v92 SAHADA**
 >
 > #92-B "köken = varış" şeritlerini toptan reddediyordu ve haklıydı (`Mersin→Mersin`
