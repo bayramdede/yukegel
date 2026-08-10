@@ -2296,7 +2296,8 @@ Açık rotalar: /giris, /auth/, /profil-tamamla, /nasil-calisir, /hakkimizda,
   script'ine KOPYALANMADI, parser'dan `export` edildi (ikiz ayrışma tuzağı).
 
 - 🚨 **"YOK MU?" KONTROLÜ BOŞ VERİDE HER ZAMAN GEÇER — ÜÇÜNCÜ KEZ ISIRDI**
-  (10 Ağu 2026, `test-jsonld.mts`). `audit_score` sızıntısına karşı 5 assert
+  (10 Ağu 2026, `test-jsonld.mts` — ve aynı gün canlı doğrulamada DÖRDÜNCÜ kez).
+  `audit_score` sızıntısına karşı 5 assert
   yazıldı, hepsi yeşil geçti. **Mutasyon testi 5'ten yalnız 4'ünü düşürdü:** API
   assert'i, `kalite_skoru: 99` geri eklenmiş olmasına rağmen "geçti" dedi. Sebep:
   test JSON-LD'nin kullandığı ilanı sorguluyordu, o ilan `passive`, API bilerek

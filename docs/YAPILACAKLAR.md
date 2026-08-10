@@ -143,17 +143,20 @@ beslemesi son günlerde ilan üretmemiş görünüyor — ana sayfa akışı ona
 - ⏳ **Search Console "Robots.txt ile engellendi" — SIRA ÖNEMLİ.**
   Asıl kök sebep 10 Ağu'da bulundu: `Disallow: /giris` ile `noindex` birbirini
   yok ediyordu (ayrıntı: `docs/ARSIV_YAPILACAKLAR.md`). Düzeltme kodda hazır.
-  **Yapılacak sıra:**
-  1. **Uygulama deploy edilmeli** (bekleyen commit'ler canlıda değil). Bu
-     olmadan Search Console'da hiçbir şey değişmez — 10 Ağu'da "hâlâ beklemede"
-     görülmesinin sebebi buydu.
-  2. Deploy sonrası `https://www.yukegel.com/robots.txt` açılıp
-     `Disallow: /giris` satırının **gitmiş** olduğu göz ile teyit edilmeli.
-  3. Sonra *Sayfalar → "Robots.txt tarafından engellendi"* → **"Düzeltmeyi
-     doğrula"**. ⚠️ Doğrulama **günler sürer** ve bu normaldir; Google URL'leri
-     yeniden taramak zorunda. Bu kez geçecek, çünkü artık taranabilirler.
-  4. Ardından o URL'ler **"Alternatif sayfa"/"noindex ile hariç tutuldu"**
-     durumuna geçecek — bu **doğru** son durum, hata değil.
+  ✅ **Deploy YAPILDI ve canlıdan doğrulandı (10 Ağu 2026, `3d2ceb8`):**
+  canlı `robots.txt`te `Disallow: /giris` **yok**, dört blokta
+  `Allow: /api/ilanlar/` **var**; Bayram'ın verdiği URL **HTTP 200** dönüyor ve
+  `<meta name="robots" content="noindex, follow">` taşıyor — yani zincir çalışıyor,
+  Google artık etiketi okuyabilir. İlan sayfasındaki bağlantıda `rel="nofollow"` var.
+
+  **Kalan tek adım — SENDE:**
+  Search Console → *Sayfalar → "Robots.txt tarafından engellendi"* →
+  **"Düzeltmeyi doğrula"**.
+  ⚠️ Doğrulama **günler sürer**, bu normaldir; Google URL'leri yeniden taramak
+  zorunda. Bu kez geçecek çünkü artık taranabilirler.
+  📌 Sonra o URL'ler **"noindex ile hariç tutuldu"** durumuna geçecek — bu
+  **doğru** son durum, yeni bir hata değil. "Engellendi"den "hariç tutuldu"ya
+  geçiş düzeltmenin ta kendisi.
   ⚠️ Rapordaki URL'lerin `/giris?redirect=…` olduğunu teyit et; başka bir yol
   çıkarsa ayrı bir bulgudur, haber ver.
 - 🔒 **6 EYLÜL 2026'DAN ÖNCE SİLİNMEYECEK — Dalga 5 yedek tabloları.**

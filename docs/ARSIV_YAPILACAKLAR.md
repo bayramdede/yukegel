@@ -72,6 +72,27 @@
 > sonra bu URL'ler **"noindex ile hariç tutuldu"** durumuna geçecek. Bu DOĞRU
 > sonuçtur, yeni bir hata değil — "engellendi"den "hariç tutuldu"ya geçiş
 > düzeltmenin ta kendisi. Doğrulama günler sürer, bu da normal.
+>
+> ### ✅ DEPLOY EDİLDİ VE CANLIDAN DOĞRULANDI (`3d2ceb8`, 6 commit)
+> `main`e push → Vercel. Ardından **iddia edilmedi, canlı sunucudan ölçüldü:**
+> - `robots.txt`: `Disallow: /giris` **yok** · `Allow: /api/ilanlar/` dört blokta **var**
+> - Bayram'ın verdiği URL: **HTTP 200** + `<meta name="robots" content="noindex, follow">`
+>   → zincirin çalıştığının kanıtı: sayfa taranabilir, dolayısıyla etiket okunabilir
+> - ilan sayfasındaki giriş bağlantısı: `rel="nofollow"` **var**
+> - aktif bir ilan sayfası (31 KB, render olmuş): "Kalite Skoru" · "Doğrulanmış
+>   Veri" · `quality_score` · `data-quality-score` → **dördü de YOK**;
+>   `BreadcrumbList` yerinde
+> - `/api/ilanlar/<aktif-id>`: `meta` = `[moderasyon, guven_seviyesi, olusturulma]`,
+>   `kalite_skoru`/`audit_score`/`contact_phone`/`user_id` → **hiçbiri yok**
+>
+> 🚨 **CANLI DOĞRULAMADA "BOŞA GEÇEN KONTROL" TUZAĞINA BİR KEZ DAHA DÜŞTÜM —
+> ama bu kez yakaladım.** API kontrollerini ilk olarak Bayram'ın verdiği ilan
+> id'siyle koşturdum; o ilan `passive` olduğu için uç **404** döndü, `meta` `{}`
+> oldu ve dört kontrol de "geçti" dedi. Yeşil çıktıya güvenmeyip ham yanıta
+> baktığım için görüldü. Düzeltme: ucun GERÇEKTEN servis ettiği bir ilan
+> (`status='active'`) seçildi ve kontrollerden ÖNCE `assert d.get('id')` konuldu.
+> 📌 Aynı hata sınıfının **dördüncü** örneği (bkz. §9). Kalıp her seferinde aynı:
+> "yok mu?" diye sorduğun veri hiç gelmediğinde cevap her zaman "yok".
 
 ---
 
