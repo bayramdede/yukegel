@@ -43,7 +43,7 @@ ok('(?<ad>…) adlı gruba DOKUNMUYOR', desenAyikla('(?<x>a)') === '(?<x>a)');
 // ── 2. CANLI kuralların HEPSİ derleniyor mu? ───────────────────────────
 const { data: kurallar, error } = await svc
   .from('safety_rules')
-  .select('id, description, pattern, risk_weight, is_active, rule_type')
+  .select('id, description, pattern, risk_weight, is_active, rule_type, applies_to, category')
   .eq('is_active', true)
   .eq('rule_type', 'REGEX');
 if (error) { console.error('DB hatası:', error.message); process.exit(1); }
@@ -92,6 +92,53 @@ for (const k of kurallar!) {
 }
 ok('normal ilan metni hiçbir kurala takılmıyor', temizEslesme === 0,
    `${temizEslesme} kural takıldı — yanlış pozitif`);
+
+// ── 4. BAYRAM'IN 10 AĞU KARARLARI ─────────────────────────────────────
+// (a) Telefon: "normalizasyon sonrası mevcut regex ile devam"
+const rakamNormalize = (m: string) => m.replace(/(?<=\d)[ .\-]{1,2}(?=\d)/g, '');
+const telefonKurali = kurallar!.find(k => k.description?.startsWith('Güvenlik: İlan içine telefon'));
+ok('telefon kuralı bulundu', Boolean(telefonKurali));
+if (telefonKurali) {
+  const re = new RegExp(desenAyikla(telefonKurali.pattern), 'i');
+  for (const yazim of ['0532 111 22 33', '0532.111.22.33', '0532-111-22-33', '05321112233']) {
+    ok(`telefon yakalanıyor: "${yazim}"`, re.test(rakamNormalize(yazim.toLowerCase())), 
+       `normalize: ${rakamNormalize(yazim)}`);
+  }
+  // 🚨 YANLIŞ POZİTİF: tarih/fiyat/saat telefon sanılMAMALI
+  for (const temizMetin of ['01.09.2026 tarihinde 20 ton', 'fiyat 5.000 TL 12 palet',
+                            'saat 08.30 da 15 ton', '2026 09 01 tarihli 18 ton']) {
+    ok(`yanlış pozitif YOK: "${temizMetin}"`, !re.test(rakamNormalize(temizMetin.toLowerCase())),
+       `normalize: ${rakamNormalize(temizMetin)}`);
+  }
+}
+
+// (b) WhatsApp kuralı: 70 puan + YALNIZ kullanıcı metni
+const waKurali = kurallar!.find(k => k.description?.startsWith('İletişim Yönlendirme'));
+ok('whatsapp kuralı aktif', Boolean(waKurali));
+if (waKurali) {
+  ok('whatsapp 70 puan (sarı bayrak seviyesi, eşik 71 altında)', waKurali.risk_weight === 70,
+     `bulunan: ${waKurali.risk_weight}`);
+  ok('🚨 whatsapp kuralı YALNIZ kullanıcı metnine uygulanıyor',
+     (waKurali as any).applies_to === 'user_text',
+     `applies_to=${(waKurali as any).applies_to} — 'all' olsaydı gelen WhatsApp içe aktarımlarının %20'si moderatör kuyruğuna düşerdi`);
+  ok('whatsapp kuralı iletisim kategorisinde', (waKurali as any).category === 'iletisim');
+  const re = new RegExp(desenAyikla(waKurali.pattern), 'i');
+  for (const y of ['whatsapp tan yaz', 'whats app', 'watsap', 'whatsap']) {
+    ok(`whatsapp yakalanıyor: "${y}"`, re.test(y));
+  }
+  ok('normal metin whatsapp kuralına takılmıyor', !re.test('istanbul ankara 20 ton tir'));
+}
+
+// (c) Sarı Bayrak: iletişim kuralları TEK BAŞINA ilanı kapatmıyor
+// (70 < reject_score_min=71 → orta bant → moderatör onayı, shadow ban YOK)
+const iletisimKurallari = kurallar!.filter(k => (k as any).category === 'iletisim');
+ok('iletişim kategorisinde 2 kural var (telefon + whatsapp)', iletisimKurallari.length === 2,
+   `bulunan: ${iletisimKurallari.length}`);
+ok('🟡 tek bir iletişim kuralı ilanı KAPATMIYOR (puan < 71)',
+   // ⚠️ `length > 0` ŞART: boş dizide `every()` her zaman true döner ve kontrol
+   //    BOŞA GEÇER (ilk çalıştırmada tam bunu yaşadım — kolonlar select'te yoktu).
+   iletisimKurallari.length > 0 && iletisimKurallari.every(k => k.risk_weight < 71),
+   iletisimKurallari.map(k => `${k.description}=${k.risk_weight}`).join(', '));
 
 console.log('');
 if (hatalar.length) {

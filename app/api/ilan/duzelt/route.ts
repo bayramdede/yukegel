@@ -106,7 +106,10 @@ export async function POST(req: NextRequest) {
     // yolda HİÇ ÇALIŞMIYORDU — yani kullanıcı ilanını DÜZENLEYEREK denetimi
     // atlatabiliyordu. Ayrıntı ve kapsam: `lib/metin-denetim.ts` başı.
     const yeniNotes = (notes ?? ilan.notes ?? '').trim();
-    const denetim = await metniDenetle([yeniNotes, ilan.raw_text], 'user_correction');
+    // ⚠️ Ayrım ŞART: `applies_to='user_text'` kuralları (whatsapp) yalnız
+    //    kullanıcının yazdığı nota uygulanır, ilanın kazındığı ham mesaja DEĞİL.
+    const denetim = await metniDenetle(
+      { kullanici: yeniNotes, kaynakMetin: ilan.raw_text }, 'user_correction');
     const score = denetim.skor;
     const firedRules = denetim.atesLenen;
 
@@ -141,7 +144,13 @@ export async function POST(req: NextRequest) {
       yeniModerasyon = 'pending';
       yeniStatus     = 'passive';
       yeniShadow     = false;
-      mesaj = 'İlanınız güncellendi ve moderatör incelemesine gönderildi.';
+      // 🟡 SARI BAYRAK (Bayram'ın 10 Ağu kararı): ihlal YALNIZ iletişim
+      // kategorisindeyse ilan KAPATILMIYOR ve kullanıcıya ne olduğu AÇIKÇA
+      // söyleniyor. Genel "incelemeye gönderildi" mesajı kullanıcıya neyi
+      // düzeltmesi gerektiğini anlatmıyordu.
+      mesaj = denetim.yalnizIletisim
+        ? 'İlanınızdaki iletişim bilgileri güvenlik nedeniyle moderatör onayına düşmüştür. İlanınız silinmedi; onaylandığında yayına alınacak.'
+        : 'İlanınız güncellendi ve moderatör incelemesine gönderildi.';
     } else {
       // Hâlâ yüksek risk → düzeltme gerekiyor
       yeniModerasyon = 'correction_needed';

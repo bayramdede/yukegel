@@ -53,12 +53,22 @@ export interface AtesLenenKural {
   rule_id: string;
   description: string | null;
   weight: number;
+  /** 'iletisim' → Sarı Bayrak mesajı; null → genel akış. */
+  category?: string | null;
 }
 
 export interface DenetimSonucu {
   /** 0-100 arası RİSK skoru (yüksek = kötü). */
   skor: number;
   atesLenen: AtesLenenKural[];
+  /**
+   * Ateşlenen kuralların TAMAMI iletişim kategorisinde mi?
+   * Bayram'ın 10 Ağu kararı: bu durumda ilan KAPATILMAZ, kullanıcıya
+   * "iletişim bilgileri moderatör onayına düştü" (Sarı Bayrak) mesajı gösterilir.
+   * ⚠️ "TAMAMI" şart: metinde hem telefon hem silah varsa sarı bayrak mesajı
+   *    göstermek asıl ihlali gizlemek olurdu.
+   */
+  yalnizIletisim: boolean;
   /** `skor < autoPublishScoreMax` — hiç müdahale gerekmez. */
   temiz: boolean;
   /** `skor >= rejectScoreMin` — gizlenmeli (shadow) + insan incelemesi. */
@@ -73,39 +83,77 @@ export interface DenetimSonucu {
 }
 
 /**
+ * 🚨 RAKAM NORMALİZASYONU (Bayram'ın 10 Ağu kararı: "normalizasyon sonrası
+ * mevcut regex ile devam"). Telefon kuralı `(0[0-9]{9,10})` yalnız BİTİŞİK
+ * numarayı yakalıyordu; `0532 111 22 33` / `0532.111.22.33` / `0532-111-22-33`
+ * — insanların en doğal yazımı — tamamen kaçıyordu (57.363 ilanda ölçüldü).
+ * Regex'i değiştirmek yerine METNİ normalize ediyoruz: rakamlar arasındaki 1-2
+ * ayraç silinir, mevcut kural olduğu gibi kalır.
+ *
+ * ⚠️ YANLIŞ POZİTİF RİSKİ ÖLÇÜLDÜ: tarih/fiyat/saat birleşip telefona benzer mi?
+ *    Canlı veride yeni yakalanan 94.102 ilanın 94.102'si `05` ile başlıyor
+ *    (yani gerçek cep numarası); şüpheli eşleşme SIFIR. Sentetik testler de
+ *    temiz: "01.09.2026 20 ton" → 8 haneli, kural 10-11 istiyor → tetiklemiyor.
+ */
+function rakamNormalize(metin: string): string {
+  return metin.replace(/(?<=\d)[ .\-]{1,2}(?=\d)/g, '');
+}
+
+export interface DenetlenecekMetin {
+  /** Kullanıcının KENDİ yazdığı alan (not, yorum). Tüm kurallar buna uygulanır. */
+  kullanici?: string | null;
+  /**
+   * Ham kaynak metni (WhatsApp mesajı vb.).
+   * ⚠️ `applies_to='user_text'` olan kurallar BUNA UYGULANMAZ — ilanın kazındığı
+   *    mesajda "whatsapp" geçmesi ihlal değil, kaynağın kendisi.
+   */
+  kaynakMetin?: string | null;
+}
+
+/**
  * Metni aktif `safety_rules` (REGEX) kurallarına karşı tarar.
  *
- * @param metinler Birleştirilip taranacak parçalar (null/undefined atlanır).
- * @param kaynak   Denetim izine yazılacak etiket ('review', 'user_correction'…).
+ * @param metin  Kullanıcı metni ve (varsa) ham kaynak metni.
+ * @param etiket Denetim izine yazılacak etiket ('review', 'user_correction'…).
  */
 export async function metniDenetle(
-  metinler: (string | null | undefined)[],
-  kaynak: string,
+  metin: DenetlenecekMetin,
+  etiket: string,
 ): Promise<DenetimSonucu> {
   const svc = getServiceSupabase();
 
   const { data: kurallar } = await svc
     .from('safety_rules')
-    .select('id, rule_type, pattern, risk_weight, description')
+    .select('id, rule_type, pattern, risk_weight, description, applies_to, category')
     .eq('is_active', true)
     .eq('rule_type', 'REGEX');
 
   // ⚠️ `toLowerCase()` + regex'lerin kendi `i` bayrağı BİRLİKTE: kurallar
   //    tarihsel olarak küçük harf varsayımıyla yazılmış, bayrağı kaldırmak
   //    eski kuralları sessizce kaçırırdı.
-  const samanlik = metinler.filter(Boolean).join(' ').toLowerCase();
+  const kullaniciMetni = (metin.kullanici ?? '').toLowerCase();
+  const tumMetin = [metin.kullanici, metin.kaynakMetin].filter(Boolean).join(' ').toLowerCase();
+
+  // Her kapsam için HAM ve NORMALİZE edilmiş hâli birlikte taranır: normalize
+  // etmek bazı eşleşmeleri kazandırır ama hiçbirini KAYBETTİRMEMELİ.
+  const samanlik = {
+    all:       tumMetin + ' ' + rakamNormalize(tumMetin),
+    user_text: kullaniciMetni + ' ' + rakamNormalize(kullaniciMetni),
+  };
 
   let skor = 0;
   const atesLenen: AtesLenenKural[] = [];
 
   for (const kural of kurallar ?? []) {
     try {
-      if (new RegExp(desenAyikla(kural.pattern), 'i').test(samanlik)) {
+      const hedef = kural.applies_to === 'user_text' ? samanlik.user_text : samanlik.all;
+      if (hedef.trim() && new RegExp(desenAyikla(kural.pattern), 'i').test(hedef)) {
         skor += kural.risk_weight;
         atesLenen.push({
           rule_id: kural.id,
           description: kural.description,
           weight: kural.risk_weight,
+          category: kural.category ?? null,
         });
       }
     } catch (e: any) {
@@ -127,13 +175,14 @@ export async function metniDenetle(
   return {
     skor,
     atesLenen,
+    yalnizIletisim: atesLenen.length > 0 && atesLenen.every(k => k.category === 'iletisim'),
     temiz: skor < autoPublishScoreMax,
     gizlenmeli: skor >= rejectScoreMin,
     iz: {
       score: skor,
       fired_rules: atesLenen,
       scanned_at: new Date().toISOString(),
-      source: kaynak,
+      source: etiket,
     },
   };
 }

@@ -1,5 +1,52 @@
 # Yükegel — Yapılacaklar Listesi
 
+> ## ✅ 10 AĞU 2026 — BAYRAM'IN 3 KARARI UYGULANDI (telefon normalizasyonu, WhatsApp, Sarı Bayrak)
+>
+> ### 1. Telefon: "normalizasyon sonrası mevcut regex ile devam" ✅
+> Regex'e dokunulmadı; **metin** normalize ediliyor — rakamlar arasındaki 1-2
+> ayraç siliniyor, `(0[0-9]{9,10})` olduğu gibi kaldı.
+> `0532 111 22 33` / `0532.111.22.33` / `0532-111-22-33` artık yakalanıyor.
+> ⚠️ **Yanlış pozitif riskini ölçtüm** (tarih/fiyat birleşip telefona benzer mi):
+> canlı veride yeni yakalanan **94.102 ilanın 94.102'si `05` ile başlıyor** —
+> şüpheli eşleşme **sıfır**. Sentetik testler de temiz: `01.09.2026 20 ton` →
+> 8 hane, kural 10-11 istiyor → tetiklemiyor.
+>
+> ### 2. WhatsApp kuralı: 70 puan ✅ — ama **kapsam** eklemek zorunlu oldu
+> 🚨 Kuralı olduğu gibi eklemek gelen içe aktarımların **%20'sini** moderatör
+> kuyruğuna atardı. Ölçüm: son 7 günün 23.221 ilanının **4.635'inde** "whatsapp"
+> geçiyor — ama neredeyse tamamı `raw_text`te, yani **ilanın kazındığı WhatsApp
+> mesajının kendisinde**. Kullanıcının yazdığı `notes` alanında yalnız **5**.
+> Kaynağı anmak ihlal değil.
+> → `safety_rules.applies_to` kolonu eklendi (`all` | `user_text`).
+> WhatsApp kuralı **`user_text`**: yalnız kullanıcının kendi yazdığı metne
+> uygulanıyor. Telefon kuralı `all` kaldı (ham metne gizlenmiş numara tam olarak
+> onun işi — girişte 161 bin ilan böyle işaretlendi).
+>
+> ### 3. Sarı Bayrak / Düzeltme Talebi ✅
+> `safety_rules.category` eklendi; telefon + whatsapp `iletisim` olarak
+> etiketlendi. İhlal **yalnızca** iletişim kategorisindeyse kullanıcıya:
+> *"İlanınızdaki iletişim bilgileri güvenlik nedeniyle moderatör onayına
+> düşmüştür. İlanınız silinmedi; onaylandığında yayına alınacak."*
+> ⚠️ **"Yalnızca" şart:** metinde hem telefon hem silah/kapora varsa bu mesaj
+> **gösterilmiyor** — asıl ihlali gizlemek olurdu. Ağır ihlal eski akışta kalıyor
+> (`correction_needed` + shadow ban).
+> ⚠️ 70 puan seçimi akışla tutarlı: `reject_score_min` = 71, yani iletişim kuralı
+> **tek başına ilanı kapatmıyor**, orta banda düşürüp moderatör onayına gönderiyor.
+>
+> **Doğrulama:** `test:safety-rules` **32/32** (kural derlenmesi + çapa eşleşmeler
+> + yanlış pozitif yokluğu + üç kararın şema düzeyinde doğruluğu),
+> `test:ilan-duzelt` **30/30** (Sarı Bayrak akışı uçtan uca: ayraçlı telefon
+> yakalanıyor · ilan kapatılmıyor · doğru mesaj gösteriliyor · ağır ihlalde o
+> mesaj GÖSTERİLMİYOR), `test:deals` 22/22, `test:jsonld` 23/23.
+>
+> 📌 **İki kez kendi testim beni yanılttı, ikisini de düzelttim:** (a) yeni
+> kolonları `select`e eklemeyi unutunca `applies_to=undefined` geldi ve
+> "iletişim kuralı ilanı kapatmıyor" kontrolü **boş dizide `every()` ile boşa
+> geçti** — `length > 0` şartı eklendi; (b) aynı hata `is_shadow_banned` için
+> tekrarlandı. Ders: bir assert'in geçmesi, gerçekten bir şey ölçtüğü anlamına
+> gelmiyor.
+
+
 > ## 🔴 DÜZELTİLDİ (10 Ağu 2026) — GÜVENLİK KURALLARININ %89'U JAVASCRIPT'TE HİÇ ÇALIŞMIYORDU
 >
 > Güvenli Etkileşim Faz 2'de yorum metinlerini `safety_rules`tan geçirirken

@@ -76,7 +76,7 @@ try {
       body: JSON.stringify(govde),
     }).then(async r => ({ durum: r.status, veri: await r.json().catch(() => ({})) }));
   const oku = () => svc.from('listings')
-    .select('notes, vehicle_type, body_type, price_offer, price_negotiable, available_date, date_flexible, moderation_status, status')
+    .select('notes, vehicle_type, body_type, price_offer, price_negotiable, available_date, date_flexible, moderation_status, status, is_shadow_banned')
     .eq('id', ilanId).single().then(r => r.data as any);
 
   // ── 3. Oturumsuz çağrı reddedilmeli ───────────────────────────────────
@@ -160,6 +160,39 @@ try {
   ok('gönderilmeyen tarih korundu', s.available_date === '2026-12-01', `bulunan: ${s.available_date}`);
   ok('gönderilmeyen araç tipi korundu', JSON.stringify(s.vehicle_type) === JSON.stringify(['TIR']),
      `bulunan: ${JSON.stringify(s.vehicle_type)}`);
+
+  // ── 13. 🟡 SARI BAYRAK (Bayram'ın 10 Ağu kararı) ──────────────────────
+  // İletişim bilgisi tetiklenince ilan KAPATILMAMALI: moderatör onayına
+  // düşmeli, shadow ban YEMEMELİ ve kullanıcı NE OLDUĞUNU anlamalı.
+  await ilanKur('approved', 'active');
+  r = await cagir({ id: ilanId, notes: 'Detay icin 0532 111 22 33 numarasindan ara' });
+  s = await oku();
+  ok('ayraçlı telefon artık yakalanıyor (normalizasyon)', s.moderation_status === 'pending',
+     `moderation=${s.moderation_status} (eskiden ayraçlı numara kaçıyordu → approved kalırdı)`);
+  ok('🟡 ilan KAPATILMADI (shadow ban yok)', s.is_shadow_banned === false,
+     `is_shadow_banned=${s.is_shadow_banned}`);
+  ok('🟡 kullanıcıya iletişim odaklı Sarı Bayrak mesajı gösterildi',
+     String(r.veri?.mesaj || '').includes('iletişim bilgileri'),
+     `mesaj: ${r.veri?.mesaj}`);
+  ok('🟡 mesaj ilanın silinmediğini söylüyor',
+     String(r.veri?.mesaj || '').includes('silinmedi'), `mesaj: ${r.veri?.mesaj}`);
+
+  // WhatsApp daveti de aynı akışı tetiklemeli
+  await ilanKur('approved', 'active');
+  r = await cagir({ id: ilanId, notes: 'whatsapp tan yazin' });
+  s = await oku();
+  ok('whatsapp daveti moderatör onayına düşürüyor', s.moderation_status === 'pending',
+     `moderation=${s.moderation_status}`);
+  ok('whatsapp daveti ilanı KAPATMIYOR', s.is_shadow_banned === false);
+
+  // ⚠️ Ama iletişim DIŞI ağır ihlal varsa Sarı Bayrak mesajı GÖSTERİLMEMELİ
+  await ilanKur('approved', 'active');
+  r = await cagir({ id: ilanId, notes: 'kapora gonder iban vereyim' });
+  s = await oku();
+  ok('ağır ihlal (kapora/IBAN) hâlâ kapatıyor', s.moderation_status === 'correction_needed'
+     && s.is_shadow_banned === true, `moderation=${s.moderation_status} shadow=${s.is_shadow_banned}`);
+  ok('ağır ihlalde Sarı Bayrak mesajı GÖSTERİLMİYOR',
+     !String(r.veri?.mesaj || '').includes('iletişim bilgileri'), `mesaj: ${r.veri?.mesaj}`);
 
 } finally {
   // ── Temizlik ───────────────────────────────────────────────────────────

@@ -77,7 +77,7 @@ export async function POST(req: NextRequest) {
   const metin = typeof comment === 'string' ? comment.trim().slice(0, MAX_YORUM) : null;
 
   // ── Denetim motoru (PRD md.5) ──
-  const denetim = await metniDenetle([metin], 'review');
+  const denetim = await metniDenetle({ kullanici: metin }, 'review');
 
   // PRD: "kullanıcıya hata bildirmek yerine moderatör paneline düşürür"
   // → ihlalde 200 dönüyoruz, yorum kaydediliyor ama `is_hidden=true`.
