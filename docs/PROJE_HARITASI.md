@@ -2250,6 +2250,22 @@ Açık rotalar: /giris, /auth/, /profil-tamamla, /nasil-calisir, /hakkimizda,
   `Allow: /api/ilanlar/` + `Disallow: /api/` birlikte doğru çalışır — geniş
   yasağı kaldırmadan tek bir yol açmanın doğru yolu bu.
 
+- 🚨 **BİR DEĞİŞİKLİĞİ "YOKLUK" İLE DOĞRULAYAMAZSIN — POZİTİF İŞARET ARA**
+  (10 Ağu 2026, rozet kaldırma). Canlıda "rozet yok" gördüm ve "deploy yayıldı"
+  dedim; ikisi de yanlıştı. Rozet **başka bir sebepten** yoktu (ilanın sahibi
+  yok → koşul hiç sağlanmıyor) ve deploy henüz yayılmamıştı. Ölçtüm: sahibi olup
+  `phone_verified = true` olan **görünür ilan sayısı = 0**, yani "canlıda rozet
+  yok" kontrolü **yapısı gereği** boşa geçiyor.
+  Sonra pozitif işaret aradım (`sahiplen` sayfasındaki yeni metin) — o da işe
+  yaramadı: sayfa `'use client'`, metin sunucu HTML'ine hiç girmiyor.
+  **Kural: doğrulama için VARLIK ara, yokluk değil; ve o işaretin sunucuda render
+  edildiğini önce doğrula.** Gözlenebilir canlı fark üretmeyen değişikliklerde
+  (bu gibi) tek gerçek koruma statik bekçi + mutasyon testidir — canlı ölçüm
+  yapılamadığını **söylemek**, yapılmış gibi davranmaktan iyidir.
+  📌 Aynı hata sınıfının bugünkü 5. ve 6. örneği (bkz. aşağıdaki "boş veride
+  kontrol" maddesi). Kalıp değişmiyor: sorduğun koşul hiç oluşmamışsa cevap
+  her zaman "temiz" gelir.
+
 - 🚨 **BİR GÜVEN ROZETİ, DAYANDIĞI ALAN KADAR GÜVENİLİRDİR** (10 Ağu 2026,
   "✅ Telefon Doğrulandı" kaldırıldı). Rozet `users.phone_verified`e bakıyordu ve
   o kolon **istemciden yazılabiliyordu** (`PanelClient.tsx` OTP akışı PostgREST'e

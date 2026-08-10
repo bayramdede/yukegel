@@ -74,8 +74,33 @@
 > 📌 Bekçiyi yazarken kendi yorumuma takıldım: ibare açıklama metninde de geçtiği
 > için ham dosyada arayınca kontrol kendi kendini düşürdü → `yorumsuz()` şart.
 >
-> **Doğrulama:** `tsc` temiz · `test:seo` 131/131 · `test:jsonld` 30/30 ·
-> yerel render (36 KB, ROTA basılmış): rozet **0 kez**, "Doğrulanmamış İlan" **1 kez**.
+> **DOĞRULAMA — ve neyin doğrulanamadığı.**
+> Geçerli kanıtlar: `tsc` temiz (tip artık yok, derleme düzeyinde kanıt) ·
+> `test:seo` **131/131** statik kaynak taraması · **mutasyon** (rozet iki yere geri
+> eklendi → ikisi de yakalandı) · `test:jsonld` 30/30 · `test:87` `test:parser`
+> `test:lokasyon` `test:safety-rules` yeşil.
+>
+> 🚨 **CANLI HTML İLE DOĞRULAMAK İMKÂNSIZ — VE SEBEBİ KENDİ BAŞINA BİR BULGU.**
+> Rozetin görünme koşulu "ilanın sahibi var **ve** o kullanıcının
+> `phone_verified = true`". Canlıda ölçtüm:
+> ```sql
+> select … from listings l join users u on u.id = l.user_id
+> where l.user_id is not null and u.phone_verified = true
+>   and l.moderation_status <> 'rejected' and l.is_shadow_banned = false
+> → 0 satır
+> ```
+> **Hiçbir görünür ilan bu koşulu sağlamıyor.** Yani (a) rozetin canlı etkisi
+> zaten SIFIRDI, (b) "canlıda rozet yok" ölçümü **yapısı gereği boşa geçer** —
+> rozet zaten görünmüyordu, yokluğu hiçbir şey ispatlamaz.
+>
+> 📌 **BU TUZAĞA BUGÜN İKİ KEZ DÜŞTÜM, İKİSİNİ DE YAKALADIM.** İlk koşuda
+> "✅ deploy yayıldı (deneme 1)" yazdım; gerçekte deploy henüz yayılmamıştı ve
+> rozet başka bir sebepten (ilanın sahibi yok) görünmüyordu. Sonra pozitif bir
+> işaret aradım (`sahiplen` sayfasındaki YENİ fayda metni) — o da işe yaramadı,
+> çünkü sayfa `'use client'` ve metin sunucu HTML'inde hiç basılmıyor.
+> **Ders: bir değişikliğin canlıda olduğunu YOKLUKLA kanıtlayamazsın.** Pozitif
+> bir işaret gerekir, ve o işaretin sunucuda render edildiğini önce doğrula.
+> Bu değişiklikte gözlenebilir bir canlı fark YOK; kalıcı koruma statik bekçidir.
 >
 > ⚠️ **KALAN MAYIN — kolon hâlâ istemciden yazılabilir.** Bugün zararsız çünkü
 > okuyan public yüzey yok. İki şart altında patlar: (1) **Faz 3 güven puanı bu
