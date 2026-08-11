@@ -22,6 +22,20 @@
 > ✅ **10 AĞU 2026'DA KAPANDI** — bkz. aşağıdaki "TERS SKOR" kaydı.
 > Ayrıntı: `docs/20260810_guven_etkilesim_plan.sql` + `docs/ARSIV_YAPILACAKLAR.md`.
 
+> 🤝 **10 AĞU 2026 — FAZ 2 EKRANLARI AÇILDI VE UÇTAN UCA CANLI DOĞRULANDI.**
+> Yukarıdaki API'ler artık ekrana bağlı: `/ilan/[id]` sayfasında **"🤝 Bu İşi Al"**
+> (talep oluşturur) ve panelde yeni **"🤝 Anlaşmalarım"** sekmesi (onayla/reddet/
+> yola çıktı/tamamla + rol bazlı değerlendirme formu). Dosyalar:
+> `app/ilan/[id]/Aksiyonlar.tsx`, `app/panel/AnlasmalarSekmesi.tsx` (yeni),
+> `app/panel/panelStil.ts` (yeni), `app/panel/PanelClient.tsx`, `app/panel/page.tsx`.
+> 🚨 İlk sürüm bir DAİRESEL IMPORT çökmesiyle `/panel`'i tamamen düşürüyordu —
+> `tsc`/`build`/`lint` YAKALAMADI, gerçek tarayıcıda bulundu ve düzeltildi
+> (kalıcı ders: §9). Ardından gerçek iki hesapla (talep→onayla→yola çıktı→
+> tamamla→çift kör değerlendirme→yayın + reddet akışı) tarayıcıda uçtan uca
+> koşuldu, hepsi doğru çalıştı. Ayrıntı: `docs/ARSIV_YAPILACAKLAR.md`.
+> ⚠️ `listings.completed_at`↔`deals.completed_at` ilişkisi ve iletişim bilgisini
+> eşleşmeye bağlama (PRD md.4) **hâlâ açık karar** — `docs/YAPILACAKLAR.md` md.1.
+
 > ## ✅ 10 AĞU 2026 — TERS SKOR YAYINI KAPANDI (4 nokta) + `olc:87` TABANI ONARILDI
 >
 > **`audit_score` artık HİÇBİR yerde yayınlanmıyor.** Karar (Bayram): "ibareyi
@@ -2197,6 +2211,9 @@ aynı `normalized`+`district`'e** çözülüyor. Ek olarak 303 mesajda (3 gerçe
 | `/api/admin/poi-import/[id]/summarize` | POI için Claude yorum özeti üret (POST) |
 | `/api/listings/yakin` | Yakınımdaki Yükler: lat/lng → en yakın il (offline haversine) → o ildeki aktif ilanlar (GET) |
 | `/api/listings/ara` | **Ana sayfa il filtresi (GET, Dalga 3).** `?kalkis=<plaka>&varis=<plaka>&tip=yuk\|arac`. Service role; `origin_province_id` / `listing_stops.province_id` tamsayı eşitliği. En az bir il zorunlu (yoksa 400) — filtresiz liste zaten SSR'den geliyor. Tanınmayan il → **400**, sessiz "tüm iller" değil. Yanıt rozetleri de içerir (ikinci istek yok). |
+| `/api/deals` | 🤝 Güvenli Etkileşim (Faz 1-2). `POST` — nakliyeci talep oluşturur (`status='requested'`); `shipper_id` İSTEMCİDEN DEĞİL `listings.user_id`'den. `GET` — oturum sahibinin taraf olduğu kayıtlar (`?rol=shipper\|carrier`). Ekran: `/ilan/[id]` "Bu İşi Al" (POST) + panel "Anlaşmalarım" (GET — SSR'de doğrudan `page.tsx`'ten, bu route'u ÇAĞIRMIYOR, aynı sorgu deseni JOIN'li tekrarlanıyor). |
+| `/api/deals/[id]` | 🤝 `PATCH { action }` — durum geçişleri (`onayla`/`reddet`/`yola_cikti`/`tamamla`/`iptal`). 🚨 Yetki tablosu route içinde: onayla/reddet YALNIZ shipper, yola_cikti YALNIZ carrier, tamamla/iptal İKİ TARAF. `tamamla` iki adımlı (beyan + karşı onay, `completed_declared_by`). `onayla` yan etkisi: `listings.status='passive'` + rakip talepler otomatik `cancelled`. |
+| `/api/reviews` | 🤝 `POST` — çift kör değerlendirme (`deal_id, rating, sub_ratings?, comment?`). `published_at` BİLEREK yazılmıyor — yayınlama DB trigger'ında (`reviews_ciftli_yayinla`). İhlalli yorum kullanıcıya hata GÖSTERMEZ, `is_hidden=true` ile sessizce moderatör kuyruğuna düşer (PRD md.5). Ekran: panel "Anlaşmalarım" → tamamlanmış anlaşmada "⭐ Değerlendirme Yaz". |
 
 ---
 
@@ -2221,6 +2238,27 @@ Açık rotalar: /giris, /auth/, /profil-tamamla, /nasil-calisir, /hakkimizda,
 ---
 
 ## 9. KURALLAR & TUZAKLAR
+
+- 🚨 **`tsc`/`eslint`/`next build` DAİRESEL IMPORT'U YAKALAMAZ — YALNIZ TARAYICIDA PATLAR**
+  (10 Ağu 2026, Güvenli Etkileşim Faz 2 paneli). `PanelClient.tsx` yeni
+  `AnlasmalarSekmesi.tsx`'i içe aktardı; o da paylaşılan stil sabitlerini
+  (`C`/`inp`/`lbl`/`btn`) GERİ `PanelClient.tsx`'ten aldı — iki "kardeş" dosya
+  birbirini içe aktarıyordu. Üç statik kontrol de (`tsc --noEmit`, `eslint`,
+  `next build`) TEMİZ geçti çünkü tip kontrolü ve derleme modül **çalıştırma
+  sırasından** bağımsız; hata yalnız tarayıcıda gerçek modül grafiği kurulurken
+  ortaya çıkıyor: `AnlasmalarSekmesi`nin modül-seviyesi `DURUM_RENK` nesnesi
+  `C.surface`'a eriştiği an `PanelClient` henüz kendi `const C = {...}`
+  satırına ulaşmamıştı → `ReferenceError: Cannot access 'C' before
+  initialization`, `/panel` sayfası **tamamen çöküyordu.** Bunu yalnız gerçek
+  bir tarayıcıda `/panel`'i açıp görmek yakaladı — "derleniyor" ile "çalışıyor"
+  arasındaki fark burada da (bkz. aşağıdaki "ölü dosya" dersi) somuttu.
+  **Düzeltme:** paylaşılan sabitler üçüncü, bağımsız bir dosyaya taşındı
+  (`app/panel/panelStil.ts`); ikisi de ORADAN içe aktarıyor.
+  **Kural: iki "kardeş" bileşen dosyası asla birbirinden paylaşılan sabit/tip
+  içe aktarmamalı.** Paylaşılan bir şey varsa üçüncü, hiçbir tarafı içe
+  aktarmayan bir dosyaya konur — aksi hâlde hangi dosya önce yüklenirse
+  yüklensin (bundler'ın kararı, senin değil) TDZ çökmesi bir gün geri gelir.
+  Statik araçlar bunu göstermez; tek bekçi gerçek bir sayfa yüklemesidir.
 
 - 🚨 **BİR ÖLÇÜM SCRIPT'İNİN "CANLI" TABANI DEPLOY SONRASI BAYATLAR VE YALAN SÖYLER**
   (10 Ağu 2026, `scripts/olc-87.mts`). Script tabanını koddan **türetiyor**:
@@ -2874,86 +2912,64 @@ Bot WhatsApp'tan cevap yazar:
 
 ## 15. GÜVEN VE İTİBAR SİSTEMİ (Airbnb Çift Körleme Modeli)
 
-### Genel Bakış
-Platform güvenilirliğini artırmak için çift kör (double-blind) puanlama sistemi. İki taraf da yorum yazmadan yorumlar yayınlanmaz; sadece biri yazarsa 7 gün sonra otomatik yayınlanır.
+> ⚠️ **Bu bölüm 10 Ağu 2026'da GERÇEK UYGULAMAYLA DEĞİŞTİRİLDİ.** Aşağıdaki eski
+> hâli (`transactions` tablosu, 7 günlük pencere, "İşi Aldım" adı, Edge Function)
+> **hiç kurulmadı** — bir planlama taslağıydı. Gerçek şema ve akış farklı çıktı;
+> güncel gerçek dosya 1'deki değişiklik notu ve `docs/20260810_guven_etkilesim_plan.sql`.
+> Eski hâli birebir metin olarak `docs/ARSIV_YAPILACAKLAR.md`'de değil, git
+> geçmişinde duruyor — burada tekrar edilmiyor ki biri yanlışlıkla ona göre
+> kod yazmasın.
 
-### İş Akışı
-```
-1. Nakliyeci → "İşi Aldım" butonu → Yük sahibi onayı → transaction kaydı oluşur
-2. Taşıma tamamlandıktan 24 saat sonra her iki tarafa değerlendirme bildirimi
-3. Her iki taraf yorum yazarsa → anında is_published = true
-4. Sadece biri yazarsa → 7 günlük cron job otomatik yayınlar
-5. Hiçbiri yazmazsa → yorum kaydı açık kalır, 7 gün sonra kapanır
-```
+### Gerçek şema (Faz 1, CANLIDA)
+- **`deals`** — `matched → in_transit → completed` (+ `cancelled`) durum makinesi.
+  `shipper_id`/`carrier_id` ayrı FK'ler (`users`'a üçü var, `completed_declared_by`
+  dahil — PostgREST embed'inde FK adıyla disambiguate GEREKİR, bkz. §7).
+  `check(shipper_id <> carrier_id)` — kendine 5 yıldız yolu şemada kapalı.
+  `unique(listing_id, carrier_id)`. `payment_terms_days`/`payment_maturity_date`
+  yazılıyor, henüz OKUYAN yok (Faz 4).
+- **`reviews`** — `rating` + rol bazlı `sub_ratings jsonb` (aşağıdaki beyaz liste)
+  + `is_hidden`/`audit_score`/`audit_logs` (denetim motoru) + **`published_at` =
+  çift körlemenin TEK anahtarı** (NULL = gizli). `unique(deal_id, reviewer_id)`,
+  yorumlar **`deal_id`'ye** bağlı (kullanıcı çiftine değil — aksi hâlde iş
+  yapmadan sınırsız yorum üretilebilirdi).
+- Çift kör yayınlama **TEK yerde**: `reviews_ciftli_yayinla(deal_id)` +
+  trigger `reviews_yayin_trg`. Zaman aşımı **14 gün** (PRD'nin "7 gün"ü değil),
+  cron `reviews-timeout-publish` saat başı çalışır.
+- RLS: tüm YAZMA istemciden YOK (service role, route'larda sahiplik/rol
+  doğrulanır). Okuma: `deals` yalnız tarafları görür; `reviews` yayınlanmış +
+  gizlenmemiş → herkese, kendi yazdığı → yazana (yayınlanmasa da).
+  **`reviewee_id` için okuma politikası BİLEREK yok** — değerlendirilen kişi
+  kendisi hakkındaki yayınlanmamış yorumu görmemeli.
 
-### Veritabanı Gereksinimleri
-```sql
--- transactions tablosu ("Bu işi aldım" akışı için)
-CREATE TABLE transactions (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  listing_id uuid REFERENCES listings(id),
-  carrier_id uuid REFERENCES users(id),   -- nakliyeci
-  owner_id uuid REFERENCES users(id),     -- yük sahibi
-  status text DEFAULT 'pending',          -- pending|active|completed|cancelled
-  created_at timestamptz DEFAULT now(),
-  completed_at timestamptz
-);
+### Rol bazlı alt kriterler (`sub_ratings` beyaz listesi — `app/api/reviews/route.ts`)
+| Reviewer rolü | Kriterler (puanladığı şey karşı tarafın) |
+|---|---|
+| `shipper` (ilan sahibi, nakliyeciyi puanlar) | `zamanindalik`, `mal_guvenligi`, `iletisim` |
+| `carrier` (nakliyeci, ilan sahibini puanlar) | `odeme_guvenligi`, `tesis_kalitesi`, `bilgi_dogrulugu` |
 
--- reviews tablosu
-CREATE TABLE reviews (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  transaction_id uuid REFERENCES transactions(id),
-  listing_id uuid REFERENCES listings(id),
-  reviewer_id uuid REFERENCES users(id),
-  target_id uuid REFERENCES users(id),
-  rating smallint CHECK (rating BETWEEN 1 AND 5),
-  comment text,
-  is_published boolean DEFAULT false,
-  created_at timestamptz DEFAULT now(),
-  published_at timestamptz
-);
-```
-RLS: Kullanıcı yalnızca kendi yazdığı yorumları ve `is_published = true` olanları görebilir.
+`app/panel/AnlasmalarSekmesi.tsx`'teki `ALT_KRITERLER` bu tablonun BİREBİR
+aynası — anahtar uyuşmazsa sunucu o kriteri sessizce atar.
 
-### Çift Körleme Mantığı (Edge Function / DB Webhook)
-- Her iki taraf `reviews` tablosuna yazdığında → her iki kaydı da `is_published = true` yap
-- pg_cron (günlük): `created_at < now() - interval '7 days'` olan tek taraflı kayıtları yayınla
+### Ekranlar (Faz 2, 10 Ağu 2026'da açıldı)
+- **Talep oluşturma** — `/ilan/[id]` sayfasında "🤝 Bu İşi Al" (`Aksiyonlar.tsx`).
+- **Durum yönetimi + değerlendirme** — panelde "🤝 Anlaşmalarım" sekmesi
+  (`app/panel/AnlasmalarSekmesi.tsx`): onayla/reddet/yola çıktı/tamamla
+  (beyan + karşı onay) + 5 yıldız + yukarıdaki rol bazlı alt kriterler.
+- Buton görünürlüğü **yetki VERMEZ** — `app/api/deals/[id]/route.ts`'teki
+  yetki tablosu her istekte yeniden doğrulanır; ekran yalnız boşa buton
+  göstermemek için sunucunun aynasıdır (§7'deki desenle aynı).
 
-### Rozet Sistemi
-| Rozet | Kriter | Kime |
-|---|---|---|
-| ⚡ Hızlı Ödemeci | Faz 2 ödeme modülüyle tanımlanacak | Yük sahibi |
-| 🛡️ Güvenilir Nakliyeci | Son 10 işte ortalama puan ≥ 4.5 | Nakliyeci |
-| ⏰ Dakik Şoför | Zamanında teslimat oranı ≥ %90 | Nakliyeci |
+### Henüz YOK (açık kararlar + sıradaki fazlar)
+- 🔓 `listings.completed_at` ↔ `deals.completed_at` ilişkisi netleşmedi.
+- 🔓 İletişim bilgisini eşleşmeye bağlama (PRD md.4) — ürün kararı bekliyor.
+- **Faz 3** — kullanıcı düzeyi güven puanı (`audit_score`'dan BAĞIMSIZ olacak,
+  bkz. bu dosyanın başındaki "TERS SKOR" kaydı), rozetler, profil OG kartı.
+- **Faz 4** — ödeme vadesi cron'u, "ödemeyi yaptım/aldım" çift teyidi, gecikme
+  alarmı, tesis karnesi (`poi_reviews` — bkz. §9'daki uyuyan `update_poi_rating`
+  hatası, Faz 4 onu uyandırır).
 
-Rozetler DB function ile hesaplanır, `users.badges jsonb` kolonunda saklanır.
-
-### UI/UX Gereksinimleri
-- **İlan Kartları:** Yük sahibinin ⭐ puanı + toplam tamamladığı iş sayısı kart üzerinde
-- **Profil Sayfası:** Alınan yorumlar kronolojik liste + kazanılan rozetler bölümü
-- **Değerlendirme Formu:** 5 yıldız + metin alanı (opsiyonel), "Puanla ve Bitir" butonu
-- **Çift körleme durumu:** "Karşı taraf henüz değerlendirme yazmadı, X gün sonra yayınlanacak"
-
-### Görevler
-- [ ] `transactions` tablosu + RLS politikaları
-- [ ] `reviews` tablosu + RLS politikaları
-- [ ] `users.badges jsonb` kolonu
-- [ ] "İşi Aldım" butonu → yük sahibi onay/red akışı (transaction INSERT)
-- [ ] Çift körleme mantığı: DB Webhook veya Edge Function
-- [ ] pg_cron job: 7 günlük tek taraflı yorum otomatik yayınlama
-- [ ] Taşıma bittikten 24s sonra değerlendirme bildirimi tetikleyicisi
-- [ ] Rozet hesaplama DB function
-- [ ] İlan kartına puan + iş sayısı bileşeni
-- [ ] Profil sayfasına Yorumlar + Rozetler bölümü
-- [ ] Değerlendirme formu UI (nakliyeci tarafı + müşteri tarafı)
-
-### Öncelik Sırası
-1. DB şeması (`transactions` + `reviews` + `users.badges`)
-2. "İşi Aldım / Onayla" transaction akışı UI
-3. Değerlendirme formu UI'ları
-4. Çift körleme Edge Function + pg_cron
-5. Bildirim tetikleyicileri (24s sonra)
-6. Profil sayfası güncelleme + rozet sistemi
+Ayrıntı ve doğrulama kayıtları: `docs/20260810_guven_etkilesim_plan.sql`,
+`docs/ARSIV_YAPILACAKLAR.md`, açık maddeler `docs/YAPILACAKLAR.md` madde 1.
 
 ---
 

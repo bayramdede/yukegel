@@ -18,14 +18,14 @@
 
 ---
 
-## 🟡 1 — Güvenli Etkileşim modülü: Faz 1-2 bitti, Faz 3-4 bekliyor
+## 🟡 1 — Güvenli Etkileşim modülü: Faz 1-2 ekranları bitti, iki karar + Faz 3-4 bekliyor
 
 Kaynak PRD: `doc/GuvenEtkilesim.docx` · plan `docs/20260810_guven_etkilesim_plan.sql`
-Bugünkü veri: `deals` 0 satır, `reviews` 0 satır (modül henüz kullanılmadı).
+Bugünkü veri: `deals` 0 satır, `reviews` 0 satır — **ekranlar 10 Ağu'da açıldı ve
+uçtan uca tarayıcıda geçici test hesaplarıyla doğrulandı** (bkz.
+`docs/ARSIV_YAPILACAKLAR.md`), ama henüz GERÇEK kullanıcı kullanımı yok.
 
-### Faz 2'den kalanlar
-- **Panel arayüzü** — `deals` aksiyon butonları (anlaş / onayla / yola çıktı /
-  tamamla) ve değerlendirme formu. API'ler hazır ve 22/22 test geçiyor, **ekran yok.**
+### Faz 2'den kalanlar (ekran YOK'tu, artık VAR — bkz. `docs/ARSIV_YAPILACAKLAR.md`)
 - **`listings.completed_at` ↔ `deals.completed_at` ilişkisi belirsiz.** İlki tek
   taraflı ("işi aldım" işareti), ikincisi çift teyitli. İkisi ayrışırsa hangisi
   doğru sayılacak — karar verilmemiş.
@@ -83,27 +83,47 @@ detayında kullanıcının tüm ilanları ve şirketin tüm ilanları butonları
 
 ---
 
-## ⏳ 3 — Güvenlik takibi (7 Ağu'da açıldı, 10 Ağu'da hâlâ açık)
+## ⏳ 3 — Güvenlik takibi (7 Ağu'da açıldı)
 
-- 🟡 **`phone_verified` hâlâ istemciden yazılabiliyor — ama artık SÖMÜRÜLECEK BİR
-  DEĞERİ YOK.** `app/panel/PanelClient.tsx:961` doğrudan
-  `update({ phone: yeniTel, phone_verified: true })` çağırıyor; dürüst akışta
-  `verifyOtp` başarılı olduktan sonra çalışıyor ama saldırgan o akışı kullanmak
-  zorunda değil, kendi oturumuyla aynı yazmayı OTP'siz yapabiliyor.
-  ✅ **10 Ağu'da rozet kaldırıldı** (Bayram'ın kararı) → kolonu herkese açık
-  hiçbir yüzey okumuyor artık, yani kendine verilen bayrak kimseye gösterilmiyor.
-  🚨 **AMA MAYIN OLARAK DURUYOR ve iki şart altında patlar:**
-  1. **Faz 3 güven puanı bu kolonu OKURSA** açık aynen geri gelir. Güven puanı
-     ancak sunucuda doğrulanmış olgulara dayanabilir — bu kolon o değil.
-  2. Yeni bir yüzey (profil kartı, rozet, filtre) onu okumaya başlarsa.
-  **Kalıcı çözüm:** `phone_verified` kolonunu `authenticated` rolünden `revoke`
-  et ve yazmayı bir server action'a taşı (OTP'yi kim doğruladıysa o yazsın).
-  ⚠️ Kolon bazlı `REVOKE` yaparken tablo geneli `GRANT`ın onu ezdiğini hatırla
-  (`contact_phone` migration'ındaki desen).
+- 🟡 **`phone_verified` mayını — KOD TARAFI KAPANDI, DB TARAFI DEPLOY BEKLİYOR.**
+  (11 Ağu 2026) `app/api/auth/telefon-degistir/route.ts` (yeni) OTP doğrulamayı
+  ve `phone_verified` yazımını sunucuya taşıdı (`verifyOtp` SSR client'la,
+  yazma `getServiceSupabase()` ile — yalnız gerçek doğrulama başarısından
+  sonra). `PanelClient.tsx`'teki `otpGonder`/`otpDogrula` artık bu route'a
+  gidiyor, istemciden doğrudan `supabase.from('users').update(...)` YOK.
+  DB tarafı hazır (`docs/20260811_phone_verified_revoke.sql` — tam tüketici
+  taraması yapıldı, dar kapsamlı: yalnız `phone_verified` UPDATE geri alınıyor,
+  SELECT ve diğer dört kolon dokunulmuyor) ama **BİLEREK ÇALIŞTIRILMADI** —
+  sıra önemli: DB revoke, kod prod'a deploy edilmeden çalıştırılırsa canlıdaki
+  ESKİ (istemci-yazan) kod 42501 ile patlar. **Sıradaki adım: kod deploy edilip
+  doğrulandıktan SONRA o SQL dosyası çalıştırılmalı.**
+  `npx tsc`/`npm run build` temiz; route'un auth-gate/CSRF/format-doğrulama
+  yolları dev sunucusunda gerçek isteklerle test edildi (401/403/400 doğru
+  döndü). `verifyOtp` gerçek SMS akışı test EDİLMEDİ (gerçek telefon gerekir,
+  ayrıca gereksiz Twilio ücreti doğurmamak için tetiklenmedi) — mantığı zaten
+  kanıtlanmış `sahiplen` route'undaki AYNI desenin taşınması.
   Bekçi: `npm run test:seo` — herkese açık yüzeylerin kolonu okumadığını doğruluyor.
-- 🔴 **OTP doğrulama denemesinde kaba kuvvet koruması yok.** `kotaDene`
-  (`app/api/auth/otp/route.ts:70/78/90`) SMS **gönderimini** sınırlıyor;
-  6 haneli kodu **deneme** sayısını sınırlayan bir şey yok.
+- 🔴 **OTP doğrulama denemesinde kaba kuvvet koruması yok — sanılandan BÜYÜK
+  bir açık.** (11 Ağu 2026'da kapsam netleşti.) `kotaDene`
+  (`app/api/auth/otp/route.ts:70/78/90`) SMS **gönderimini** sınırlıyor; 6
+  haneli kodu **deneme** sayısını sınırlayan bir şey yok. Asıl mesele bu
+  maddenin ilk yazıldığından daha büyük: giriş akışının ASIL doğrulama çağrısı
+  `app/giris/page.tsx:381` `supabase.auth.verifyOtp({ phone, token: otp, type:
+  'sms' })`u **doğrudan istemciden**, hiçbir `kotaDene` katmanından geçmeden
+  çağırıyor — `/api/auth/otp/route.ts` yalnız SMS GÖNDERİMİNİ kontrol ediyor,
+  DOĞRULAMAYA hiç karışmıyor. Yani 6 haneli kodu deneme hızını sınırlayan
+  TEK şey Supabase Auth'un kendi (bu kod tabanınca denetlenmemiş/bilinmeyen)
+  iç davranışı. Aynı desen `app/api/ilan/[id]/sahiplen/route.ts` ve YENİ
+  `app/api/auth/telefon-degistir/route.ts`de de var: ikisi de gönderim
+  tarafında kota koyuyor ama `verifyOtp` çağrısının kendisinde deneme sayısı
+  sınırı yok (ikisi en azından SUNUCUDA çalışıyor, `giris/page.tsx` gibi tümüyle
+  istemcide değil — risk farklı katmanda ama var).
+  ⚠️ **Neden bu turda dokunulmadı:** `giris/page.tsx`'teki düzeltme, giriş
+  akışının ANA yolunu (client → server taşıma + oturum sonrası merge/is_active/
+  redirect mantığının yeniden ele alınması) değiştirmeyi gerektiriyor — 8 Ağu'da
+  tam bu tabloda ("`public.users`te 20+ yer atlandı") bir login kırılması
+  yaşanmıştı. Bu ölçekte bir değişiklik ayrı, dikkatli bir tur ister; aceleye
+  getirilmemeli.
 - ⏳ **`app/api/auth/switch-account/route.ts` tutarlılık kontrolü hiç yapılmadı.**
   Implicit-flow izi arayan grep boş döndü, ama dosya elle okunmadı.
 

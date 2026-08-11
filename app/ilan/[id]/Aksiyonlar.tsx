@@ -20,14 +20,52 @@ interface Props {
   dogrulanmamis?: boolean;
   contactPhone?: string | null;
   uyeGiris?: boolean; // Server'dan gelecek
+  // Güvenli Etkileşim Faz 2 — "Bu İşi Al" görünürlüğü.
+  ilanSahipVar?: boolean;
+  isOwner?: boolean;
+  ilanTamamlandi?: boolean;
 }
 
-export default function Aksiyonlar({ ilanId, dogrulanmamis, contactPhone, uyeGiris = false }: Props) {
+export default function Aksiyonlar({
+  ilanId, dogrulanmamis, contactPhone, uyeGiris = false,
+  ilanSahipVar = false, isOwner = false, ilanTamamlandi = false,
+}: Props) {
   const [sikayetAcik, setSikayetAcik] = useState(false);
   const [secim, setSecim] = useState('');
   const [aciklama, setAciklama] = useState('');
   const [gonderildi, setGonderildi] = useState(false);
   const [kopyalandi, setKopyalandi] = useState(false);
+
+  // ── "Bu İşi Al" — GuvenEtkilesim PRD md.2, 1. aşama (POST /api/deals) ──
+  const [anlasFormAcik, setAnlasFormAcik] = useState(false);
+  const [vade, setVade] = useState('');
+  const [anlasYukleniyor, setAnlasYukleniyor] = useState(false);
+  const [anlasSonuc, setAnlasSonuc] = useState<{ ok: boolean; mesaj: string } | null>(null);
+
+  async function talepGonder() {
+    setAnlasYukleniyor(true);
+    setAnlasSonuc(null);
+    try {
+      const vadeSayi = vade.trim() === '' ? undefined : parseInt(vade, 10);
+      const res = await fetch('/api/deals', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          listing_id: ilanId,
+          ...(Number.isInteger(vadeSayi) ? { payment_terms_days: vadeSayi } : {}),
+        }),
+      });
+      const d = await res.json();
+      if (res.ok) {
+        setAnlasSonuc({ ok: true, mesaj: 'Talebiniz gönderildi. İlan sahibi onayladığında anlaşma mühürlenir — sonucu panelinizden takip edebilirsiniz.' });
+      } else {
+        setAnlasSonuc({ ok: false, mesaj: d.error || 'Talep gönderilemedi.' });
+      }
+    } catch (e: any) {
+      setAnlasSonuc({ ok: false, mesaj: e.message || 'Bir hata oluştu.' });
+    }
+    setAnlasYukleniyor(false);
+  }
 
   async function paylas() {
     const url = window.location.href;
@@ -88,6 +126,16 @@ export default function Aksiyonlar({ ilanId, dogrulanmamis, contactPhone, uyeGir
               <span>💬</span> İlan Sahibine Bildir
             </button>
           )}
+
+          {/* Bu İşi Al — Güvenli Etkileşim Faz 2. Yalnız: giriş yapılmış, ilanın
+              sahibi sen değilsin, ilanın gerçek bir sahibi var (sahipsiz ilanda
+              taraf yok) ve ilan tamamlanmamış. Kalan kural sunucuda. */}
+          {uyeGiris && !isOwner && ilanSahipVar && !ilanTamamlandi && !anlasSonuc?.ok && (
+            <button onClick={() => setAnlasFormAcik(a => !a)}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, background: anlasFormAcik ? '#0d2b1a' : '#14532d', border: '1px solid #22c55e', color: '#4ade80', borderRadius: 8, padding: '9px 14px', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}>
+              <span>🤝</span> Bu İşi Al
+            </button>
+          )}
         </div>
 
         {/* Şikayet */}
@@ -100,6 +148,44 @@ export default function Aksiyonlar({ ilanId, dogrulanmamis, contactPhone, uyeGir
           <span style={{ color: '#6b7280', fontSize: '0.78rem' }}>✓ Şikayet alındı</span>
         )}
       </div>
+
+      {/* Bu İşi Al — talep formu */}
+      {anlasFormAcik && !anlasSonuc?.ok && (
+        <div style={{ marginTop: 12, background: '#0d1117', border: '1px solid #166534', borderRadius: 10, padding: 20 }}>
+          <div style={{ color: '#e2e8f0', fontWeight: 600, fontSize: '0.9rem', marginBottom: 6 }}>
+            Bu iş için talep gönder
+          </div>
+          <div style={{ color: '#8b949e', fontSize: '0.8rem', marginBottom: 14 }}>
+            Talebiniz ilan sahibine gider. Onayladığı an anlaşma mühürlenir ve iş süreci başlar.
+          </div>
+          <div style={{ marginBottom: 14 }}>
+            <label style={{ color: '#8b949e', fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase' as const, display: 'block', marginBottom: 6 }}>
+              Ödeme Vadesi (gün, opsiyonel)
+            </label>
+            <input type="number" min={0} max={180} value={vade}
+              onChange={e => setVade(e.target.value)} placeholder="Örn. 30"
+              style={{ width: 160, background: '#161b22', color: '#e2e8f0', border: '1px solid #374151', borderRadius: 6, padding: '8px 12px', fontSize: '0.85rem', outline: 'none', boxSizing: 'border-box' as const }} />
+          </div>
+          {anlasSonuc && !anlasSonuc.ok && (
+            <div style={{ color: '#f87171', fontSize: '0.82rem', marginBottom: 12 }}>⚠️ {anlasSonuc.mesaj}</div>
+          )}
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={talepGonder} disabled={anlasYukleniyor}
+              style={{ background: '#22c55e', color: '#000', border: 'none', borderRadius: 6, padding: '8px 20px', fontSize: '0.85rem', fontWeight: 700, cursor: anlasYukleniyor ? 'default' : 'pointer', opacity: anlasYukleniyor ? 0.6 : 1 }}>
+              {anlasYukleniyor ? 'Gönderiliyor...' : 'Talep Gönder'}
+            </button>
+            <button onClick={() => { setAnlasFormAcik(false); setAnlasSonuc(null); }}
+              style={{ background: 'none', border: '1px solid #374151', color: '#6b7280', borderRadius: 6, padding: '8px 16px', fontSize: '0.85rem', cursor: 'pointer' }}>
+              İptal
+            </button>
+          </div>
+        </div>
+      )}
+      {anlasSonuc?.ok && (
+        <div style={{ marginTop: 12, background: '#0d2b1a', border: '1px solid #166534', borderRadius: 10, padding: '14px 20px', color: '#4ade80', fontSize: '0.85rem', fontWeight: 600 }}>
+          ✅ {anlasSonuc.mesaj}
+        </div>
+      )}
 
       {/* Şikayet formu */}
       {sikayetAcik && !gonderildi && (

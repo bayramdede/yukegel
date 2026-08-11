@@ -21,6 +21,80 @@
 ---
 ---
 
+> ## ✅ 10 AĞU 2026 — GÜVENLİ ETKİLEŞİM FAZ 2 EKRANLARI AÇILDI (deals/reviews'un İLK arayüzü)
+>
+> API'ler (`POST /api/deals`, `PATCH /api/deals/[id]`, `POST /api/reviews`) 22/22
+> test geçerek hazır bekliyordu ama **hiç ekranı yoktu** — `deals`/`reviews` 0
+> satırda kilitli kalıyordu çünkü onları dolduracak bir buton bile yoktu.
+>
+> **Eklenenler:**
+> - `app/ilan/[id]/Aksiyonlar.tsx` — "🤝 Bu İşi Al" (talep OLUŞTURMA girişi).
+>   Giriş yapılmış + ilan sahibi değilsin + ilanın gerçek sahibi var + ilan
+>   tamamlanmamış şartlarında görünür; opsiyonel ödeme vadesi alanıyla
+>   `POST /api/deals`'e gider. Sahiplik/durum kontrolü YİNE sunucuda — burası
+>   yalnız boşa buton göstermemek için (`app/ilan/[id]/page.tsx`'e `isOwner` +
+>   `ilanSahipVar` + `ilanTamamlandi` prop'ları eklendi, `completed_at` SELECT'e
+>   girdi).
+> - `app/panel/AnlasmalarSekmesi.tsx` (yeni dosya) — panelde "🤝 Anlaşmalarım"
+>   sekmesi: durum filtreleri, onayla/reddet/yola çıktı/tamamla (beyan+karşı
+>   onay) butonları ve rol bazlı alt kriterli değerlendirme formu (5 yıldız +
+>   `ALT_KRITERLER` — sunucudaki beyaz listenin BİREBİR aynası, aksi hâlde
+>   `api/reviews` kriteri sessizce atardı). Buton görünürlüğü
+>   `app/api/deals/[id]/route.ts`'teki "🚨 YETKİ TABLOSU"nun aynası; göstermek
+>   yetki VERMEZ, sunucu her istekte yeniden doğruluyor.
+> - `app/panel/page.tsx` — `deals`/`reviews` servis rolüyle, OTURUMDAN filtreli
+>   okunuyor (`GET /api/deals`'teki gibi). Görüntü için `listings`/`users`e JOIN
+>   var; `deals` tablosunda `users`e üç ayrı FK olduğundan (`shipper_id`,
+>   `carrier_id`, `completed_declared_by`) PostgREST embed'i **FK adıyla**
+>   (`!deals_shipper_id_fkey` vb.) disambiguate edildi — adsız embed hangi
+>   kolonu kullanacağını bilemezdi.
+> - `app/panel/PanelClient.tsx` — `C`/`inp`/`lbl`/`btn` paylaşılan stil
+>   yardımcıları `export` edildi (yeni sekme dosyası aynı görsel dili tekrar
+>   tanımlamak yerine oradan alıyor); `?sekme=anlasmalarim` derin bağlantı
+>   beyaz listesine eklendi.
+>
+> **Bilinçli yapılmayan:** `listings.completed_at` ↔ `deals.completed_at`
+> ilişkisi ve "iletişim bilgisini eşleşmeye bağlama" (PRD md.4) — ikisi de
+> `docs/YAPILACAKLAR.md` madde 1'de açık ürün kararı olarak duruyor, bu turda
+> dokunulmadı.
+>
+> **Doğrulama (statik):** `npx tsc --noEmit` temiz, `npm run build` başarılı
+> (56/56 sayfa), yeni dosyanın lint hatası tek kalemde: tırnak escape
+> (düzeltildi) — geri kalan `no-explicit-any` uyarıları kod tabanının zaten
+> var olan deseni, yeni bir sızıntı değil.
+>
+> 🚨 **STATİK DOĞRULAMA YETMEDİ — "Önce doğrula" turu gerçek bir çökmeyi
+> yakaladı.** `tsc`/`eslint`/`next build` HİÇBİRİ göremedi çünkü hata yalnız
+> ÇALIŞMA ZAMANINDA, tarayıcıda modül sırası kurulurken patlıyordu:
+> `PanelClient.tsx` `AnlasmalarSekmesi`'ni içe aktarıyor, `AnlasmalarSekmesi.tsx`
+> da `C`/`inp`/`lbl`/`btn`'i GERİ `PanelClient.tsx`'ten alıyordu — DAİRESEL
+> IMPORT. Turbopack `AnlasmalarSekmesi`nin modül-seviyesi kodunu (`DURUM_RENK`
+> nesnesi `C.surface` kullanıyor) çalıştırdığı an `PanelClient` henüz kendi
+> `const C = {...}` satırına ulaşmamıştı → `ReferenceError: Cannot access 'C'
+> before initialization`, **`/panel` tamamen çöküyordu.** Test kullanıcısıyla
+> `/panel`'e ilk gidişte bu ekranla karşılaşıldı (ekran görüntüsü alındı).
+> **Düzeltme:** paylaşılan stil sabitleri üçüncü bir dosyaya (`app/panel/panelStil.ts`)
+> taşındı; hem `PanelClient.tsx` hem `AnlasmalarSekmesi.tsx` ORADAN içe
+> aktarıyor, döngü tamamen kesildi. Ders: iki "kardeş" bileşen dosyası asla
+> birbirinden paylaşılan sabit içe aktarmamalı — üçüncü bir ortak dosya gerekir.
+>
+> ✅ **CANLI UÇTAN UCA DOĞRULANDI (dev sunucusu + gerçek tarayıcı + iki gerçek
+> hesap, `docs/PROJE_HARITASI.md`'deki gibi geçici kullanıcılarla, sonunda
+> silindi):** Nakliyeci `/ilan/[id]`'de "🤝 Bu İşi Al" ile talep gönderdi →
+> ilan sahibi panelde gördü, "✅ Onayla" ile mühürledi (DB'de `listings.status`
+> gerçekten `passive` oldu) → nakliyeci "🚚 Yola Çıktı" → nakliyeci "✅ İşi
+> Tamamla" (beyan, "karşı tarafın onayı bekleniyor" mesajı doğru) → ilan
+> sahibi "✅ Onayla ve Tamamla" (tamamlandı, `payment_maturity_date` ve
+> `review_deadline` ekranda doğru hesaplarla göründü) → ilan sahibi
+> değerlendirme yazdı (rol bazlı kriterler doğru: zamanindalik/mal_guvenligi/
+> iletişim; "karşı taraf yazınca yayınlanacak" mesajı) → nakliyeci de yazdı
+> (kriterler doğru: ödeme_güvenilirliği/tesis_kalitesi/bilgi_doğruluğu) →
+> **çift kör yayın anında tetiklendi, "yayınlandı" mesajı iki tarafta da
+> göründü.** Ayrıca ikinci bir kayıtla "✖ Reddet" akışı (neden kutusu + iptal
+> rozeti + neden metni gösterimi) ayrı test edildi. Konsolda hata yok.
+> Test verisi (2 kullanıcı + 2 ilan + deal + review) sonunda service role ile
+> silindi — `deals`/`reviews` tekrar 0 satırda, kalıntı yok.
+
 > ## ✅ 10 AĞU 2026 — "TELEFON DOĞRULANDI" ROZETİ KALDIRILDI
 >
 > **Karar (Bayram): "doğrulanmış telefon rozetini kaldıralım."** Benim önerim

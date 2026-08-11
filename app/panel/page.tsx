@@ -41,7 +41,7 @@ export default async function Panel() {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
 
-  const [{ data: profil }, { data: ilanlar }, { data: araclar }] = await Promise.all([
+  const [{ data: profil }, { data: ilanlar }, { data: araclar }, { data: anlasmalar }, { data: yorumlarim }] = await Promise.all([
     svc.from('users')
       .select('display_name, email, phone, phone_verified, user_type, tckn, vkn, company_name, bio, username')
       .eq('id', user.id).single(),
@@ -65,6 +65,30 @@ export default async function Panel() {
     svc.from('vehicles')
       .select('id, plate, vehicle_type, body_types, brand, model, year, capacity_ton, is_active')
       .eq('user_id', user.id).order('created_at', { ascending: false }),
+    // Güvenli Etkileşim Faz 2 (10 Ağu 2026) — `deals` + `reviews` panele ilk kez
+    // geliyor. Servis rolüyle okunuyor ama filtre OTURUMDAN geliyor (aynen
+    // `GET /api/deals`'teki gibi) — istemci başkasının kaydını isteyemez.
+    // Joinler yalnız GÖSTERİM için: rota başlığı (listing) ve karşı taraf adı
+    // (shipper/carrier). Çoklu `users` FK'si yüzünden hint ZORUNLU, aksi hâlde
+    // PostgREST hangi kolon üzerinden join yapacağını bilemez.
+    svc.from('deals')
+      .select(`id, listing_id, shipper_id, carrier_id, status, matched_at, transit_at,
+        completed_declared_by, completed_declared_at, completed_at,
+        payment_terms_days, payment_maturity_date, review_deadline,
+        cancelled_at, cancelled_by, cancel_reason, created_at,
+        listing:listings!deals_listing_id_fkey ( id, listing_type, origin_province_id, price_offer,
+          listing_stops ( province_id, stop_order ) ),
+        shipper:users!deals_shipper_id_fkey ( display_name ),
+        carrier:users!deals_carrier_id_fkey ( display_name )`)
+      .or(`shipper_id.eq.${user.id},carrier_id.eq.${user.id}`)
+      .order('created_at', { ascending: false })
+      .limit(200),
+    // Kendi yazdığım yorumlar — "bu deal'i zaten değerlendirdim mi?" kontrolü.
+    // RLS zaten `reviewer_id = auth.uid()`e izin veriyor; servis rolüyle okuyoruz
+    // çünkü sayfanın geri kalanı da öyle, ama filtre yine oturumdan.
+    svc.from('reviews')
+      .select('id, deal_id, rating, comment, published_at')
+      .eq('reviewer_id', user.id),
   ]);
 
   return (
@@ -74,6 +98,8 @@ export default async function Panel() {
       profil={profil}
       ilanlar={ilanlar || []}
       araclar={araclar || []}
+      anlasmalar={anlasmalar || []}
+      yorumlarim={yorumlarim || []}
     />
   );
 }

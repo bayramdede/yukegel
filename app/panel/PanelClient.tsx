@@ -2,50 +2,20 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { createClient } from '../../lib/supabase';
 import { ilAdi } from '../../lib/lokasyon';
+import AnlasmalarSekmesi from './AnlasmalarSekmesi';
+// 🚨 `C`/`inp`/`lbl`/`btn` BURADA TANIMLANMIYOR — `panelStil.ts`'ten geliyor.
+// SAKIN buraya geri taşıma: `AnlasmalarSekmesi.tsx` da bunları kullanıyor;
+// bu dosyadan tanımlayıp export edersen ve o da bunu import ederse dairesel
+// import + "Cannot access 'C' before initialization" çökmesi GERİ GELİR
+// (bkz. `panelStil.ts` başındaki not — canlıda tarayıcıda doğrulanmış hata).
+import { C, inp, lbl, btn } from './panelStil';
 
 const supabase = createClient();
-
-const C = {
-  bg: '#0d1117', surface: '#161b22', border: '#30363d',
-  text: '#e2e8f0', muted: '#8b949e', dim: '#4b5563',
-  green: '#22c55e', greenBg: '#14532d', greenDark: '#0d2b1a',
-  blue: '#60a5fa', blueBg: '#1e3a5f',
-  red: '#ef4444', redBg: '#7f1d1d',
-  amber: '#f59e0b', amberBg: '#451a03',
-  purple: '#a78bfa', purpleBg: '#2e1065',
-};
-
-const inp: React.CSSProperties = {
-  width: '100%', background: C.bg, color: C.text,
-  border: `1px solid ${C.border}`, borderRadius: 6,
-  padding: '9px 12px', fontSize: '0.9rem', outline: 'none',
-  boxSizing: 'border-box',
-};
-const lbl: React.CSSProperties = {
-  color: C.muted, fontSize: '0.72rem', fontWeight: 700,
-  letterSpacing: '0.05em', textTransform: 'uppercase',
-  display: 'block', marginBottom: 6,
-};
-const btn = (variant: 'primary' | 'secondary' | 'danger' | 'ghost' | 'amber'): React.CSSProperties => ({
-  padding: '8px 16px', borderRadius: 6, cursor: 'pointer',
-  fontWeight: 700, fontSize: '0.85rem', whiteSpace: 'nowrap' as const,
-  border: variant === 'secondary' || variant === 'ghost' ? `1px solid ${C.border}` : 'none',
-  background:
-    variant === 'primary' ? C.green :
-    variant === 'danger' ? '#dc2626' :
-    variant === 'amber' ? C.amber :
-    variant === 'ghost' ? 'none' : C.surface,
-  color:
-    variant === 'primary' ? '#000' :
-    variant === 'danger' ? '#fff' :
-    variant === 'amber' ? '#000' :
-    C.muted,
-});
 
 const ARAC_TIPLERI = ['TIR', 'Kırkayak', 'Kamyon', 'Kamyonet', 'Panelvan'];
 const UTSYAPI = ['Tenteli', 'Açık Kasa', 'Kapalı Kasa', 'Frigorifik', 'Damperli', 'Lowbed', 'Liftli', 'Silo'];
 
-type Tab = 'ilanlarim' | 'araclarim' | 'profilim';
+type Tab = 'ilanlarim' | 'araclarim' | 'anlasmalarim' | 'profilim';
 
 interface Props {
   userId: string;
@@ -53,9 +23,11 @@ interface Props {
   profil: any;
   ilanlar: any[];
   araclar: any[];
+  anlasmalar: any[];
+  yorumlarim: any[];
 }
 
-export default function PanelClient({ userId, userEmail, profil, ilanlar, araclar }: Props) {
+export default function PanelClient({ userId, userEmail, profil, ilanlar, araclar, anlasmalar, yorumlarim }: Props) {
   const [sekme, setSekme] = useState<Tab>('ilanlarim');
   const isNakliyeci = profil?.user_type === 'arac_sahibi';
 
@@ -72,13 +44,15 @@ export default function PanelClient({ userId, userEmail, profil, ilanlar, aracla
   useEffect(() => {
     const gelen = new URLSearchParams(window.location.search).get('sekme');
     // Beyaz liste: URL'den gelen ham değer state'e yazılmaz.
-    if (gelen === 'ilanlarim' || gelen === 'araclarim' || gelen === 'profilim') setSekme(gelen);
+    if (gelen === 'ilanlarim' || gelen === 'araclarim' || gelen === 'anlasmalarim' || gelen === 'profilim') setSekme(gelen);
   }, []);
 
   const aktifIlan = ilanlar.filter(i =>
     !i.completed_at && i.status === 'active' &&
     ['approved', 'auto_published'].includes(i.moderation_status)
   ).length;
+
+  const aktifAnlasma = anlasmalar.filter(d => !['completed', 'cancelled'].includes(d.status)).length;
 
   return (
     <div style={{ minHeight: '100vh', background: C.bg, fontFamily: "'IBM Plex Sans', system-ui, sans-serif" }}>
@@ -128,6 +102,7 @@ export default function PanelClient({ userId, userEmail, profil, ilanlar, aracla
           {([
             { id: 'ilanlarim', label: '📋 İlanlarım', count: ilanlar.length },
             { id: 'araclarim', label: '🚛 Araçlarım', count: araclar.length },
+            { id: 'anlasmalarim', label: '🤝 Anlaşmalarım', count: aktifAnlasma },
             { id: 'profilim', label: '👤 Profilim' },
           ] as { id: Tab; label: string; count?: number }[]).map(t => (
             <button key={t.id} onClick={() => setSekme(t.id)}
@@ -144,6 +119,7 @@ export default function PanelClient({ userId, userEmail, profil, ilanlar, aracla
 
         {sekme === 'ilanlarim' && <IlanlarSekmesi ilanlar={ilanlar} userId={userId} />}
         {sekme === 'araclarim' && <AraclarSekmesi araclar={araclar} userId={userId} />}
+        {sekme === 'anlasmalarim' && <AnlasmalarSekmesi anlasmalar={anlasmalar} yorumlarim={yorumlarim} userId={userId} />}
         {sekme === 'profilim' && <ProfilSekmesi profil={profil} userEmail={userEmail} userId={userId} />}
       </div>
     </div>
@@ -943,12 +919,24 @@ function ProfilSekmesi({ profil, userEmail, userId }: { profil: any; userEmail: 
     setKaydediliyor(false);
   }
 
+  // 🚨 11 Ağu 2026 — bu iki fonksiyon artık `/api/auth/telefon-degistir`e
+  // gidiyor, istemciden DOĞRUDAN `supabase.auth.*` / `supabase.from('users')`
+  // ÇAĞIRMIYOR. `phone_verified` istemciden yazılabildiği için (kendine rozet
+  // sorunu, bkz. `docs/YAPILACAKLAR.md` madde 3) yazma sunucuya taşındı;
+  // `authenticated` rolünün o kolonu UPDATE etme yetkisi de DB'de geri alındı
+  // (`docs/20260811_phone_verified_revoke.sql`) — SAKIN buraya doğrudan
+  // `supabase.from('users').update({ phone_verified: ... })` GERİ EKLEME,
+  // PostgREST 42501 döner ve kullanıcı sessizce takılır kalır.
   async function otpGonder() {
     const temiz = yeniTel.replace(/\D/g, '');
     if (temiz.length !== 11 || !temiz.startsWith('0')) { setTelHata('Geçerli bir telefon numarası girin.'); return; }
     setTelYukleniyor(true); setTelHata('');
-    const { error } = await supabase.auth.updateUser({ phone: '+9' + temiz });
-    if (error) setTelHata('SMS gönderilemedi: ' + error.message);
+    const res = await fetch('/api/auth/telefon-degistir', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ adim: 'gonder', telefon: temiz }),
+    });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok) setTelHata(d.error || 'SMS gönderilemedi.');
     else setTelFaz('otp');
     setTelYukleniyor(false);
   }
@@ -956,9 +944,12 @@ function ProfilSekmesi({ profil, userEmail, userId }: { profil: any; userEmail: 
   async function otpDogrula() {
     setTelYukleniyor(true); setTelHata('');
     const temiz = yeniTel.replace(/\D/g, '');
-    const { error } = await supabase.auth.verifyOtp({ phone: '+9' + temiz, token: otp, type: 'phone_change' });
-    if (error) { setTelHata('Kod hatalı veya süresi dolmuş.'); setTelYukleniyor(false); return; }
-    await supabase.from('users').update({ phone: yeniTel, phone_verified: true }).eq('id', userId);
+    const res = await fetch('/api/auth/telefon-degistir', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ adim: 'dogrula', telefon: temiz, otp }),
+    });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok) { setTelHata(d.error || 'Kod hatalı veya süresi dolmuş.'); setTelYukleniyor(false); return; }
     setTelFaz('idle'); setYeniTel(''); setOtp(''); setBasariMesaji('Telefon numarası güncellendi.');
     setTelYukleniyor(false);
   }

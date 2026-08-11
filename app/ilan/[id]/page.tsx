@@ -39,7 +39,7 @@ const getIlan = cache(async (id: string) => {
       contact_phone, price_offer, price_negotiable,
       available_date, date_flexible, notes, source,
       created_at, moderation_status, is_shadow_banned, status,
-      trust_level, user_id,
+      trust_level, user_id, completed_at,
       vehicle_type, body_type,
       listing_stops (
         stop_order, province_id, district,
@@ -252,6 +252,10 @@ export default async function IlanDetay({ params }: { params: Promise<{ id: stri
   ]);
   const profilTamamlandi = !!profilSonuc.data?.user_type;
   const kullaniciBilgi = kullaniciBilgiSonuc.data as { created_at: string } | null;
+  // Güvenli Etkileşim Faz 2 — "Bu İşi Al" butonunun görünürlüğü. Sahiplik ve
+  // tamamlanmışlık burada yalnız GÖSTERİM içindir; gerçek yetki kontrolü
+  // `POST /api/deals`'te (bkz. o dosyadaki 🚨 not).
+  const isOwner = !!user && ilan.user_id === user.id;
 
   // ── Sprint 1: Shadow ban kontrolü
   // Shadow banned ilan sadece ilan sahibi, moderatör ve admin tarafından görülebilir.
@@ -674,6 +678,12 @@ export default async function IlanDetay({ params }: { params: Promise<{ id: stri
           // Numara yalnızca görme hakkı olana geçer; misafirde null.
           contactPhone={user && profilTamamlandi ? ilan.contact_phone : null}
           uyeGiris={!!user}
+          // Güvenli Etkileşim Faz 2 — "Bu İşi Al" (deals talebi) için görünürlük
+          // bilgisi. `POST /api/deals` sahiplik/durum kontrolünü ZATEN yapıyor;
+          // bunlar yalnız kullanıcıya boşa buton göstermemek için.
+          ilanSahipVar={!!ilan.user_id}
+          isOwner={isOwner}
+          ilanTamamlandi={!!ilan.completed_at}
         />
         </article>
       </main>
