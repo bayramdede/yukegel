@@ -341,10 +341,34 @@ function AnlasmaKarti({
         </div>
       </div>
 
-      {(deal.payment_terms_days !== null && deal.payment_terms_days !== undefined) && (
-        <div style={{ color: C.muted, fontSize: '0.78rem' }}>
-          💳 Ödeme vadesi: {deal.payment_terms_days} gün
-          {deal.payment_maturity_date && <> · Vade tarihi: {tarihFmt(deal.payment_maturity_date)}</>}
+      {/* Anlaşma Şartları — 11 Ağu 2026, talep ekranına eklenen fiyat + not.
+          Taraflar "neye onay verdiğini" görsün diye durumdan BAĞIMSIZ, tek
+          kutuda: rakam, not, vade. Onaylama/reddetme kararı bu kutuya bakarak
+          verilir — sunucu doğrulaması `agreed_price`'ı zaten zorunlu kılıyor,
+          eski kayıtlarda (migration öncesi) yalnız yoksa satır basılmaz. */}
+      {(deal.agreed_price !== null && deal.agreed_price !== undefined
+        || deal.note
+        || (deal.payment_terms_days !== null && deal.payment_terms_days !== undefined)) && (
+        <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <div style={{ color: C.dim, fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase' as const }}>
+            Anlaşma Şartları
+          </div>
+          {(deal.agreed_price !== null && deal.agreed_price !== undefined) && (
+            <div style={{ color: C.green, fontWeight: 700, fontSize: '0.95rem' }}>
+              ₺{Number(deal.agreed_price).toLocaleString('tr-TR')}
+            </div>
+          )}
+          {(deal.payment_terms_days !== null && deal.payment_terms_days !== undefined) && (
+            <div style={{ color: C.muted, fontSize: '0.78rem' }}>
+              💳 Ödeme vadesi: {deal.payment_terms_days} gün
+              {deal.payment_maturity_date && <> · Vade tarihi: {tarihFmt(deal.payment_maturity_date)}</>}
+            </div>
+          )}
+          {deal.note && (
+            <div style={{ color: C.muted, fontSize: '0.78rem', whiteSpace: 'pre-wrap' as const }}>
+              📝 {deal.note}
+            </div>
+          )}
         </div>
       )}
 

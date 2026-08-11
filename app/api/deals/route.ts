@@ -20,8 +20,16 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await ssr.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Giriş gerekli' }, { status: 401 });
 
-  const { listing_id, payment_terms_days } = await req.json().catch(() => ({}));
+  const { listing_id, payment_terms_days, agreed_price, note } = await req.json().catch(() => ({}));
   if (!listing_id) return NextResponse.json({ error: 'listing_id gerekli' }, { status: 400 });
+
+  // Anlaşılan fiyat — 11 Ağu 2026, talep ekranına eklendi. ZORUNLU: taraflar
+  // "neye onay verdiğini" ancak bir rakam varsa görebilir, bkz. PROJE_HARITASI §15.
+  const fiyat = typeof agreed_price === 'number' && Number.isFinite(agreed_price) ? agreed_price : null;
+  if (fiyat === null || fiyat <= 0 || fiyat > 100_000_000) {
+    return NextResponse.json({ error: 'Anlaşılan fiyat gerekli (geçerli bir tutar girin).' }, { status: 400 });
+  }
+  const notMetni = typeof note === 'string' && note.trim() !== '' ? note.trim().slice(0, 1000) : null;
 
   const svc = getServiceSupabase();
 
@@ -76,8 +84,10 @@ export async function POST(req: NextRequest) {
       carrier_id: user.id,
       status: 'requested',
       payment_terms_days: vade,
+      agreed_price: fiyat,
+      note: notMetni,
     })
-    .select('id, status, created_at')
+    .select('id, status, agreed_price, note, created_at')
     .single();
 
   if (error) {
@@ -115,7 +125,8 @@ export async function GET(req: NextRequest) {
     .select(`id, listing_id, shipper_id, carrier_id, status, matched_at, transit_at,
              completed_declared_by, completed_declared_at, completed_at,
              payment_terms_days, payment_maturity_date, payment_declared_at,
-             payment_confirmed_at, payment_disputed_at, review_deadline, created_at`)
+             payment_confirmed_at, payment_disputed_at, review_deadline, created_at,
+             agreed_price, note`)
     .order('created_at', { ascending: false })
     .limit(200);
 

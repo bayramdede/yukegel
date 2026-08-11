@@ -166,8 +166,8 @@ export function ilanTavanIsle(userId: string, ayar: IlanLimitAyar): void {
 /**
  * Son 24 saatte AYNI seferin ilanı var mı?
  *
- * Anahtar: `(user_id, listing_type, origin_province_id, İLK durağın province_id,
- * available_date)`.
+ * Anahtar: `(user_id, listing_type, origin_province_id, origin_district, İLK
+ * durağın province_id + district, available_date)`.
  *
  * ⚠️ `ILAN_VER_ANALIZ` V6'daki tanım "origin_city + ilk durak city" diyordu; o tanım
  * ARTIK UYGULANAMAZ. Dalga 5 (`docs/20260731_dalga5_metin_kolon_drop.sql`)
@@ -175,20 +175,37 @@ export function ilanTavanIsle(userId: string, ayar: IlanLimitAyar): void {
  * yalnız `province_id`. Metin karşılaştırması zaten "İstanbul"/"istanbul"/"İSTANBUL"
  * üçlüsünde yanılırdı; id karşılaştırması hem mümkün olan hem doğru olan.
  *
+ * 🚨 11 Ağu 2026 — BULUNAN BUG: anahtar yalnız İL'e bakıyordu, İLÇE'ye değil.
+ * Bayram Tekirdağ-Çorlu'dan Tekirdağ-Ergene'ye çıkış ilçesini değiştirdi, aynı
+ * ilde kaldığı için "mükerrer" diye engellendi — oysa güzergah gerçekte
+ * farklıydı. Şimdi `origin_district`/ilk durağın `district`'i de anahtarda.
+ * İlçe NULL olabilir (kullanıcı belirtmedi) — `.eq(null)` PostgREST'te hiçbir
+ * satırı eşlemez, o yüzden NULL için `.is()` dalı ayrı.
+ *
  * `stop_order = 1` — `ilan_olustur()` durakları `with ordinality` ile numaralıyor,
  * yani ilk durak 1'dir (0 değil).
  *
  * Yalnız GÖRÜNÜR/KUYRUKTAKİ ilanlar mükerrer sayılır: `expired` olan bir ilanı
  * yenilemek meşru, `rejected`/`archived` olanı düzeltip yeniden vermek de öyle.
+ *
+ * 🚨 11 Ağu 2026 — İKİNCİ BULUNAN BUG: `status IN ('active','passive')` TAMAMLANMIŞ
+ * bir işi de aday sayıyordu — mühürlenmiş/tamamlanmış anlaşmalarda `listings.status`
+ * `passive` oluyor (bkz. `app/api/deals/[id]/route.ts`) ve o `passive`, "iş bitti,
+ * artık geçmiş" ile "hâlâ devam ediyor" ikisini de kapsıyordu. Bayram'ın tamamlanmış
+ * bir ilanı vardı, aktif hiçbiri yoktu, yine de engellendi. Ayrım `completed_at`:
+ * NULL ise iş hâlâ açık/devam ediyor (mükerrer sayılır), doluysa iş bitmiş, yeni
+ * ilan meşru (mükerrer SAYILMAZ).
  */
 export async function mukerrerBul(opts: {
   userId: string;
   tip: string;
   kalkisIlId: number;
+  kalkisIlce: string | null;
   ilkDurakIlId: number;
+  ilkDurakIlce: string | null;
   tarih: string;
 }): Promise<{ id: string; createdAt: string } | null> {
-  const { userId, tip, kalkisIlId, ilkDurakIlId, tarih } = opts;
+  const { userId, tip, kalkisIlId, kalkisIlce, ilkDurakIlId, ilkDurakIlce, tarih } = opts;
   try {
     const svc = getServiceSupabase();
     const gunOnce = new Date(Date.now() - ILAN_GUN_MS).toISOString();
@@ -197,7 +214,7 @@ export async function mukerrerBul(opts: {
     //    İki adımlı, çünkü PostgREST gömülü (`!inner`) filtreleri sessizce
     //    kapsam dışı davranabiliyor; iki düz sorgu okunabilir ve doğrulanabilir.
     //    Maliyet: ikinci sorgu YALNIZCA aday varsa atılıyor — normal akışta 1 sorgu.
-    const { data: adaylar } = await svc
+    let adaySorgu = svc
       .from('listings')
       .select('id, created_at')
       .eq('user_id', userId)
@@ -207,20 +224,25 @@ export async function mukerrerBul(opts: {
       .gte('created_at', gunOnce)
       .in('status', ['active', 'passive'])
       .in('moderation_status', ['pending', 'approved', 'auto_published'])
+      .is('completed_at', null)
       .order('created_at', { ascending: false })
       .limit(20);
+    adaySorgu = kalkisIlce ? adaySorgu.eq('origin_district', kalkisIlce) : adaySorgu.is('origin_district', null);
+    const { data: adaylar } = await adaySorgu;
 
     const liste = (adaylar ?? []) as Array<{ id: string; created_at: string }>;
     if (liste.length === 0) return null;
 
-    // 2) Adaylardan hangisinin İLK durağı aynı ile gidiyor?
-    const { data: duraklar } = await svc
+    // 2) Adaylardan hangisinin İLK durağı aynı il-ilçeye gidiyor?
+    let durakSorgu = svc
       .from('listing_stops')
       .select('listing_id')
       .in('listing_id', liste.map(l => l.id))
       .eq('stop_order', 1)
       .eq('province_id', ilkDurakIlId)
       .limit(1);
+    durakSorgu = ilkDurakIlce ? durakSorgu.eq('district', ilkDurakIlce) : durakSorgu.is('district', null);
+    const { data: duraklar } = await durakSorgu;
 
     const eslesenId = (duraklar ?? [])[0]?.listing_id as string | undefined;
     if (!eslesenId) return null;

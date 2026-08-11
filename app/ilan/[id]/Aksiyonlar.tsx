@@ -43,11 +43,22 @@ export default function Aksiyonlar({
 
   // ── "Bu İşi Al" — GuvenEtkilesim PRD md.2, 1. aşama (POST /api/deals) ──
   const [anlasFormAcik, setAnlasFormAcik] = useState(false);
+  const [fiyat, setFiyat] = useState('');
+  const [not, setNot] = useState('');
   const [vade, setVade] = useState('');
   const [anlasYukleniyor, setAnlasYukleniyor] = useState(false);
   const [anlasSonuc, setAnlasSonuc] = useState<{ ok: boolean; mesaj: string } | null>(null);
 
+  // Fiyat ZORUNLU — bkz. `app/api/deals/route.ts` sunucu tarafı doğrulaması;
+  // burada yalnız butonu erken devre dışı bırakmak için (yetki VERMEZ).
+  const fiyatSayi = fiyat.trim() === '' ? NaN : Number(fiyat.replace(',', '.'));
+  const fiyatGecerli = Number.isFinite(fiyatSayi) && fiyatSayi > 0;
+
   async function talepGonder() {
+    if (!fiyatGecerli) {
+      setAnlasSonuc({ ok: false, mesaj: 'Lütfen anlaştığınız fiyatı girin.' });
+      return;
+    }
     setAnlasYukleniyor(true);
     setAnlasSonuc(null);
     try {
@@ -57,6 +68,8 @@ export default function Aksiyonlar({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           listing_id: ilanId,
+          agreed_price: fiyatSayi,
+          ...(not.trim() ? { note: not.trim() } : {}),
           ...(Number.isInteger(vadeSayi) ? { payment_terms_days: vadeSayi } : {}),
         }),
       });
@@ -163,6 +176,24 @@ export default function Aksiyonlar({
           </div>
           <div style={{ color: '#8b949e', fontSize: '0.8rem', marginBottom: 14 }}>
             Talebiniz ilan sahibine gider. Onayladığı an anlaşma mühürlenir ve iş süreci başlar.
+            Buradaki fiyat, not ve vade her iki tarafın panelinde &ldquo;Anlaşma Şartları&rdquo;
+            olarak görünür.
+          </div>
+          <div style={{ marginBottom: 14 }}>
+            <label style={{ color: '#8b949e', fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase' as const, display: 'block', marginBottom: 6 }}>
+              Anlaştığınız Fiyat (₺) *
+            </label>
+            <input type="number" min={0} step="1" value={fiyat}
+              onChange={e => setFiyat(e.target.value)} placeholder="Örn. 15000"
+              style={{ width: 160, background: '#161b22', color: '#e2e8f0', border: '1px solid #374151', borderRadius: 6, padding: '8px 12px', fontSize: '0.85rem', outline: 'none', boxSizing: 'border-box' as const }} />
+          </div>
+          <div style={{ marginBottom: 14 }}>
+            <label style={{ color: '#8b949e', fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase' as const, display: 'block', marginBottom: 6 }}>
+              Not (opsiyonel)
+            </label>
+            <textarea value={not} onChange={e => setNot(e.target.value)} rows={3} maxLength={1000}
+              placeholder="Yükleme/boşaltma detayı, ödeme şekli vb."
+              style={{ width: '100%', background: '#161b22', color: '#e2e8f0', border: '1px solid #374151', borderRadius: 6, padding: '8px 12px', fontSize: '0.85rem', outline: 'none', resize: 'vertical' as const, boxSizing: 'border-box' as const }} />
           </div>
           <div style={{ marginBottom: 14 }}>
             <label style={{ color: '#8b949e', fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase' as const, display: 'block', marginBottom: 6 }}>
@@ -176,8 +207,8 @@ export default function Aksiyonlar({
             <div style={{ color: '#f87171', fontSize: '0.82rem', marginBottom: 12 }}>⚠️ {anlasSonuc.mesaj}</div>
           )}
           <div style={{ display: 'flex', gap: 8 }}>
-            <button onClick={talepGonder} disabled={anlasYukleniyor}
-              style={{ background: '#22c55e', color: '#000', border: 'none', borderRadius: 6, padding: '8px 20px', fontSize: '0.85rem', fontWeight: 700, cursor: anlasYukleniyor ? 'default' : 'pointer', opacity: anlasYukleniyor ? 0.6 : 1 }}>
+            <button onClick={talepGonder} disabled={anlasYukleniyor || !fiyatGecerli}
+              style={{ background: '#22c55e', color: '#000', border: 'none', borderRadius: 6, padding: '8px 20px', fontSize: '0.85rem', fontWeight: 700, cursor: (anlasYukleniyor || !fiyatGecerli) ? 'default' : 'pointer', opacity: (anlasYukleniyor || !fiyatGecerli) ? 0.6 : 1 }}>
               {anlasYukleniyor ? 'Gönderiliyor...' : 'Talep Gönder'}
             </button>
             <button onClick={() => { setAnlasFormAcik(false); setAnlasSonuc(null); }}

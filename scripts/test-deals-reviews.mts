@@ -71,15 +71,25 @@ try {
   const ck = { s: await oturum(epostaS, sifre), c: await oturum(epostaC, sifre), x: await oturum(epostaX, sifre) };
 
   // ── 1. Talep ────────────────────────────────────────────────────────────
-  let r = await cagir(ck.s, '/api/deals', 'POST', { listing_id: ilanId });
+  let r = await cagir(ck.s, '/api/deals', 'POST', { listing_id: ilanId, agreed_price: 5000 });
   ok('ilan veren KENDİ ilanına talep gönderemez', r.durum === 400, `${r.durum} ${JSON.stringify(r.veri)}`);
 
   r = await cagir(ck.c, '/api/deals', 'POST', { listing_id: ilanId, payment_terms_days: 30 });
+  ok('🚨 fiyatsız talep reddedilir (agreed_price ZORUNLU)', r.durum === 400, `${r.durum} ${JSON.stringify(r.veri)}`);
+
+  r = await cagir(ck.c, '/api/deals', 'POST', { listing_id: ilanId, payment_terms_days: 30, agreed_price: -5 });
+  ok('🚨 negatif fiyat reddedilir', r.durum === 400, `${r.durum}`);
+
+  r = await cagir(ck.c, '/api/deals', 'POST', {
+    listing_id: ilanId, payment_terms_days: 30, agreed_price: 12500, note: 'Yükleme yardımcısı sende olsun.',
+  });
   ok('nakliyeci talep gönderdi', r.durum === 200 && r.veri.deal?.status === 'requested',
      `${r.durum} ${JSON.stringify(r.veri)}`);
+  ok('fiyat ve not kaydedildi', r.veri.deal?.agreed_price === 12500 && r.veri.deal?.note === 'Yükleme yardımcısı sende olsun.',
+     JSON.stringify(r.veri.deal));
   dealId = r.veri.deal?.id;
 
-  r = await cagir(ck.c, '/api/deals', 'POST', { listing_id: ilanId });
+  r = await cagir(ck.c, '/api/deals', 'POST', { listing_id: ilanId, agreed_price: 8000 });
   ok('aynı nakliyeci ikinci talep gönderemez', r.durum === 409, `${r.durum}`);
 
   // ── 2. YETKİ: onaylama yalnız ilan verende ──────────────────────────────

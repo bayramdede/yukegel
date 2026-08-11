@@ -80,6 +80,30 @@
 > (`docs/YAPILACAKLAR.md` madde 4). Kalıcı ders: §9. Ayrıntı:
 > `docs/ARSIV_YAPILACAKLAR.md`.
 
+> 🤝 **11 AĞU 2026 — "BU İŞİ AL" TALEP EKRANINA ANLAŞILAN FİYAT + NOT EKLENDİ.**
+> `deals.agreed_price` (numeric, ZORUNLU) ve `deals.note` (text, opsiyonel,
+> ≤1000 karakter) — migration `deals_agreed_price_and_note`. Nakliyeci
+> `/ilan/[id]`'de talep gönderirken fiyatı girmeden buton aktif olmuyor
+> (istemci) + sunucu da (`app/api/deals/route.ts`) `agreed_price` yoksa/≤0 ise
+> 400 döner. Panelde (`AnlasmalarSekmesi.tsx`) her iki taraf da tek bir
+> "Anlaşma Şartları" kutusunda rakam + not + ödeme vadesini görüyor —
+> durumdan (requested/matched/…) bağımsız, sürekli görünür. `test:deals`
+> 25/25 (3 yeni kontrol: fiyatsız/negatif talep reddi, fiyat+not kaydı).
+> 🔓 **Bilinçli ERTELENDİ (Bayram'ın isteğiyle):** teklif verirken araç seçme
+> — o zaman karşı taraf araç bilgilerini de görecek, ama şu aşamada yönetimi
+> zor; sonraki faz, `docs/YAPILACAKLAR.md` madde 1.
+
+> 🔴 **11 AĞU 2026 — "MÜKERRER İLAN" YANLIŞ POZİTİF VERİYORDU, İKİ AYRI SEBEPTEN
+> (Bayram'ın canlıda yaşadığı bug).** `lib/ilan-limit.ts::mukerrerBul` (1)
+> tamamlanmış (`completed_at` dolu) bir işi hâlâ "devam ediyor" sayıp aktif hiç
+> ilan yokken bile yeni ilanı reddediyordu — `completed_at IS NOT NULL` artık
+> aday dışı; (2) yalnız İL bazlı karşılaştırıyordu, aynı ilde farklı ilçeye
+> (Tekirdağ-Çorlu → Tekirdağ-Ergene) taşınan güzergahı "aynı sefer" sayıyordu —
+> anahtara `origin_district`/ilk durağın `district`'i eklendi (NULL-safe:
+> `.eq(null)` PostgREST'te hiçbir satırı eşlemediği için ilçe yoksa `.is()`
+> dalı). Yeni bekçi: `npm run test:mukerrer` (4/4, DB'ye gerçek yazan/silen
+> HTTP'siz test). Kalıcı ders: §9.
+
 > ## ✅ 10 AĞU 2026 — TERS SKOR YAYINI KAPANDI (4 nokta) + `olc:87` TABANI ONARILDI
 >
 > **`audit_score` artık HİÇBİR yerde yayınlanmıyor.** Karar (Bayram): "ibareyi
@@ -2255,7 +2279,7 @@ aynı `normalized`+`district`'e** çözülüyor. Ek olarak 303 mesajda (3 gerçe
 | `/api/admin/poi-import/[id]/summarize` | POI için Claude yorum özeti üret (POST) |
 | `/api/listings/yakin` | Yakınımdaki Yükler: lat/lng → en yakın il (offline haversine) → o ildeki aktif ilanlar (GET) |
 | `/api/listings/ara` | **Ana sayfa il filtresi (GET, Dalga 3).** `?kalkis=<plaka>&varis=<plaka>&tip=yuk\|arac`. Service role; `origin_province_id` / `listing_stops.province_id` tamsayı eşitliği. En az bir il zorunlu (yoksa 400) — filtresiz liste zaten SSR'den geliyor. Tanınmayan il → **400**, sessiz "tüm iller" değil. Yanıt rozetleri de içerir (ikinci istek yok). |
-| `/api/deals` | 🤝 Güvenli Etkileşim (Faz 1-2). `POST` — nakliyeci talep oluşturur (`status='requested'`); `shipper_id` İSTEMCİDEN DEĞİL `listings.user_id`'den. `GET` — oturum sahibinin taraf olduğu kayıtlar (`?rol=shipper\|carrier`). Ekran: `/ilan/[id]` "Bu İşi Al" (POST) + panel "Anlaşmalarım" (GET — SSR'de doğrudan `page.tsx`'ten, bu route'u ÇAĞIRMIYOR, aynı sorgu deseni JOIN'li tekrarlanıyor). |
+| `/api/deals` | 🤝 Güvenli Etkileşim (Faz 1-2). `POST` — nakliyeci talep oluşturur (`status='requested'`); `shipper_id` İSTEMCİDEN DEĞİL `listings.user_id`'den. **`agreed_price` ZORUNLU** (11 Ağu 2026 eklendi — sayı, >0, ≤100M; yoksa/geçersizse 400), `note` opsiyonel (≤1000 karakter). `GET` — oturum sahibinin taraf olduğu kayıtlar (`?rol=shipper\|carrier`). Ekran: `/ilan/[id]` "Bu İşi Al" (POST) + panel "Anlaşmalarım" (GET — SSR'de doğrudan `page.tsx`'ten, bu route'u ÇAĞIRMIYOR, aynı sorgu deseni JOIN'li tekrarlanıyor). |
 | `/api/deals/[id]` | 🤝 `PATCH { action }` — durum geçişleri (`onayla`/`reddet`/`yola_cikti`/`tamamla`/`iptal`). 🚨 Yetki tablosu route içinde: onayla/reddet YALNIZ shipper, yola_cikti YALNIZ carrier, tamamla/iptal İKİ TARAF. `tamamla` iki adımlı (beyan + karşı onay, `completed_declared_by`). `onayla` yan etkisi: `listings.status='passive'` + rakip talepler otomatik `cancelled`. **11 Ağu 2026** — `iptal`, ZATEN mühürlenmiş (`matched`/`in_transit`) bir kaydı iptal ederken `cancel_type: 'anlasma'\|'is'` İSTER (yoksa 400): `anlasma` → `listings` geri `active`, `is` → `passive` kalır. `'requested'` iptali/reddi bunu istemez (listings hiç dokunulmamıştı). |
 | `/api/reviews` | 🤝 `POST` — çift kör değerlendirme (`deal_id, rating, sub_ratings?, comment?`). `published_at` BİLEREK yazılmıyor — yayınlama DB trigger'ında (`reviews_ciftli_yayinla`). İhlalli yorum kullanıcıya hata GÖSTERMEZ, `is_hidden=true` ile sessizce moderatör kuyruğuna düşer (PRD md.5). Ekran: panel "Anlaşmalarım" → tamamlanmış anlaşmada "⭐ Değerlendirme Yaz". |
 
@@ -2282,6 +2306,30 @@ Açık rotalar: /giris, /auth/, /profil-tamamla, /nasil-calisir, /hakkimizda,
 ---
 
 ## 9. KURALLAR & TUZAKLAR
+
+- 🚨 **"MÜKERRER İLAN" KONTROLÜ İKİ AYRI HATA BİRDEN TAŞIYORDU — İKİSİ DE
+  "durum tek başına yeterli sinyal" varsayımından geldi** (11 Ağu 2026,
+  `lib/ilan-limit.ts::mukerrerBul`, Bayram'ın canlıda yaşadığı bug).
+  (1) `status IN ('active','passive')` aday sayıyordu ama `passive` İKİ FARKLI
+  ŞEYİ kapsıyor: "iş hâlâ açık/eşleşme sürüyor" VE "iş bitti, tamamlandı"
+  (`deals` mühürlenince ikisi de `listings.status='passive'` yapıyor, bkz.
+  `app/api/deals/[id]/route.ts`). Ayrım `status`'ta değil `completed_at`'te —
+  kontrol bunu bilmediği için tamamlanmış (geçmiş) bir işi hâlâ "devam ediyor"
+  sanıp yeni, alakasız bir ilanı reddetti. **Kural: bir `status` değeri birden
+  fazla iş durumunu temsil ediyorsa, o durumu ayıran GERÇEK sinyal (burada
+  `completed_at`) da kontrole dahil edilmeli — `status` tek başına yeterli
+  değilse "yeterliymiş gibi" filtrelemeye devam etmek yanlış sonucu SESSİZCE
+  üretir.**
+  (2) Mükerrer anahtarı yalnız İL id'sine bakıyordu, İLÇE'ye değil — aynı ilde
+  farklı ilçeye taşınan bir güzergah (Tekirdağ-Çorlu → Tekirdağ-Ergene) "aynı
+  sefer" sayıldı. `province_id` DB'de gerçek bir FK/id, ama kullanıcı için
+  "aynı yer" ilçe düzeyinde tanımlı — id'nin var olması id'nin YETERLİ
+  GRANÜLERLİKTE olduğu anlamına gelmiyor. Düzeltme: anahtara
+  `origin_district`/durağın `district`'i eklendi; ilçe NULL olabileceği için
+  (`.eq(null)` PostgREST'te HİÇBİR satırı eşlemez) `kalkisIlce ? .eq(...) :
+  .is(..., null)` dallanması şart oldu. Bekçi: `npm run test:mukerrer` (4/4,
+  yeni dosya — hem iki bugu hem regresyonu (aynı il-ilçe hâlâ yakalanıyor)
+  ayrı ayrı sınıyor).
 
 - 🚨 **POSTGRES REGEX'İ JS'E TAŞIRKEN "DERLENİYOR" YETMEZ — `\b` SESSİZCE
   FARKLI ANLAMA GELİR** (11 Ağu 2026, `lib/metin-denetim.ts`). 10 Ağu'da
@@ -3010,7 +3058,10 @@ Bot WhatsApp'tan cevap yazar:
   dahil — PostgREST embed'inde FK adıyla disambiguate GEREKİR, bkz. §7).
   `check(shipper_id <> carrier_id)` — kendine 5 yıldız yolu şemada kapalı.
   `unique(listing_id, carrier_id)`. `payment_terms_days`/`payment_maturity_date`
-  yazılıyor, henüz OKUYAN yok (Faz 4).
+  yazılıyor, henüz OKUYAN yok (Faz 4). `agreed_price`/`note` (11 Ağu 2026) —
+  talep gönderirken nakliyecinin girdiği fiyat (ZORUNLU, `check(agreed_price
+  is null or agreed_price >= 0)`) ve serbest not; her iki tarafa panelde
+  "Anlaşma Şartları" olarak gösteriliyor.
 - **`reviews`** — `rating` + rol bazlı `sub_ratings jsonb` (aşağıdaki beyaz liste)
   + `is_hidden`/`audit_score`/`audit_logs` (denetim motoru) + **`published_at` =
   çift körlemenin TEK anahtarı** (NULL = gizli). `unique(deal_id, reviewer_id)`,
@@ -3036,9 +3087,13 @@ aynası — anahtar uyuşmazsa sunucu o kriteri sessizce atar.
 
 ### Ekranlar (Faz 2, 10 Ağu 2026'da açıldı)
 - **Talep oluşturma** — `/ilan/[id]` sayfasında "🤝 Bu İşi Al" (`Aksiyonlar.tsx`).
+  **11 Ağu 2026** — form'a anlaşılan fiyat (ZORUNLU) + not (opsiyonel) eklendi;
+  fiyat girilmeden "Talep Gönder" pasif kalır.
 - **Durum yönetimi + değerlendirme** — panelde "🤝 Anlaşmalarım" sekmesi
   (`app/panel/AnlasmalarSekmesi.tsx`): onayla/reddet/yola çıktı/tamamla
   (beyan + karşı onay) + 5 yıldız + yukarıdaki rol bazlı alt kriterler.
+  Her kartta durumdan bağımsız "Anlaşma Şartları" kutusu — fiyat + not +
+  ödeme vadesi, her iki tarafa aynı görünür (11 Ağu 2026).
 - Buton görünürlüğü **yetki VERMEZ** — `app/api/deals/[id]/route.ts`'teki
   yetki tablosu her istekte yeniden doğrulanır; ekran yalnız boşa buton
   göstermemek için sunucunun aynasıdır (§7'deki desenle aynı).

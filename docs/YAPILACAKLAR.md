@@ -32,6 +32,13 @@ uçtan uca tarayıcıda geçici test hesaplarıyla doğrulandı** (bkz.
 - **İletişim bilgisini eşleşmeye bağlama** (PRD md.4): `/api/ilan/[id]/telefon`
   şu an eşleşme aramadan numara veriyor. Ürün kararı — daraltmak ilan
   görünürlüğünü düşürür, o yüzden tek başıma yapmadım.
+- **Teklif verirken araç seçme — Bayram'ın isteğiyle BİLİNÇLİ ERTELENDİ (11 Ağu
+  2026).** `agreed_price`/`note` eklendi (bkz. `docs/PROJE_HARITASI.md` §15) ama
+  araç seçimi henüz yok: nakliyeci "Bu İşi Al" derken hangi aracı kullanacağını
+  seçmiyor, `vehicles` tablosuyla `deals` arasında bağ yok. Gerekçe: "şu aşamada
+  yönetmesi zor". Kurulunca ilan sahibi karşı tarafın araç bilgilerini
+  (plaka/tip/kapasite) de görecek — `Aksiyonlar.tsx`'teki talep formuna
+  `vehicles`'tan seçim + `deals.vehicle_id` (yeni kolon) + panelde gösterim.
 
 ### Faz 3 — profil / rozet / güven puanı
 ✅ **"/u/[id] yayınlanmış yorumlar + ortalamalar" bitti (11 Ağu 2026)** —

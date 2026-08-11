@@ -355,14 +355,20 @@ export async function ilanYaz(
     return { ok: false, hata: tavanSonuc.hata };
   }
 
-  // Mükerrer anahtarı `province_id` üzerinden — metin kolonları Dalga 5'te düştü.
-  // Gerekçe ve kanal politikası `lib/ilan-limit.ts` / `KANAL_POLITIKA` içinde.
+  // Mükerrer anahtarı `province_id` + `district` üzerinden — metin kolonları
+  // (şehir) Dalga 5'te düştü ama ilçe METNİ (`ilceNormalize` çıktısı) hâlâ var
+  // ve anahtara 11 Ağu 2026'da eklendi (bkz. `lib/ilan-limit.ts` başlık notu —
+  // yalnız il bazlı karşılaştırma Çorlu→Ergene gibi İL İÇİ güzergah
+  // değişikliklerini "mükerrer" sayıyordu). Gerekçe ve kanal politikası
+  // `lib/ilan-limit.ts` / `KANAL_POLITIKA` içinde.
   if (KANAL_POLITIKA[kaynak].mukerrerKontrol) {
     const mukerrer = await mukerrerBul({
       userId,
       tip,
       kalkisIlId: kalkisIl.id,
+      kalkisIlce: kalkisIlce?.ad ?? null,
       ilkDurakIlId: duraklar[0].province_id,
+      ilkDurakIlce: duraklar[0].district,
       tarih,
     });
     if (mukerrer) {
