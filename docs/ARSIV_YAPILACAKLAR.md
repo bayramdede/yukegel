@@ -21,6 +21,63 @@
 ---
 ---
 
+> ## ✅ 11 AĞU 2026 — İKİNCİ BİR JS/POSTGRES SAPMASI: `\b` TÜRKÇE HARFLERİ TANIMIYORDU, GERÇEK BİR YORUM SESSİZCE GİZLENDİ
+>
+> Bayram'ın "karşılıklı iş alıp onay verdim, yorum yaptık, kontrol et" isteği
+> üzerine incelerken bulundu: kendi yazdığı **tamamen temiz** bir değerlendirme
+> ("ilgili nakliyeci. hiç sıkıntı yaşamadım") `audit_score=100` alıp
+> `is_hidden=true` ile SESSİZCE gizlenmişti — "Ağır Küfür" kuralı (100 puan)
+> ateşlenmişti.
+>
+> **Kök sebep:** `safety_rules.pattern` Postgres ARE sözdizimiyle yazılıyor ve
+> `\b` orada LOCALE/UTF8-farkında (Türkçe ı/ş/ğ/ü/ö/ç birer kelime karakteri).
+> `lib/metin-denetim.ts`'nin JS `RegExp`i `\b`'yi YALNIZ ASCII bilir
+> (`\w`=`[A-Za-z0-9_]`). "sıkıntı" kelimesinde "k"dan sonraki "ı" JS'e göre
+> kelime SINIRI sayılıyor ve `\b(…sik…)\b` deseni "sık" alt dizisini kelimenin
+> TAM İÇİNDE yakalıyordu. Empirik doğrulama: `'... sıkıntı ...' ~* '\b(sik)\b'`
+> **canlı Postgres'te `false`** (asıl ilan taraması `audit_listing_fn` TEMİZ);
+> aynı desen JS'te derlenip `sıkıntı`, `sıkı`, `sıkışık`, `sıkıcı`,
+> `sıkılmadım` gibi gündelik kelimelerin HEPSİNDE `true` dönüyordu.
+> Etkilenen yol: yalnız JS'in derlediği iki uç — `POST /api/reviews` ve
+> `app/api/ilan/duzelt` (10 Ağu'daki `(?i)` sözdizimi hatasıyla AYNI dosya,
+> AYNI kök neden sınıfı — Postgres/JS sözdizim+semantik sapması — ama bu sefer
+> sessiz bir SyntaxError değil, SESSİZ YANLIŞ SONUÇ).
+>
+> **Kapsam ölçüldü:** aktif 10 REGEX kuralından **5'i** `\b` kullanıyor —
+> Ağır Küfür (100), Dolandırıcılık/kapora (90), Belgesiz nakliye (80), Kaba
+> Dil (40), Sosyal medya/URL (30). `listings.internal_audit_logs` taramasında
+> kapora kuralı 7.403, belgesiz nakliye kuralı 13 ilanda ateşlenmiş görünüyor
+> — ama bunların HANGİSİNİN Postgres (doğru) hangisinin JS-düzenleme (şüpheli)
+> yolundan geldiğini ayırt eden bir kolon YOK, yani bu sayı "muhtemelen çoğu
+> doğru, bir kısmı şüpheli" — **retroaktif tam denetim bu turun kapsamı DIŞINDA
+> bırakıldı** (bkz. `docs/YAPILACAKLAR.md` — küçük, güvenli bir düzeltmeyi
+> büyük, riskli bir kitlesel veri onarımına dönüştürmemek için).
+>
+> **Düzeltme:** `lib/metin-denetim.ts`'e `bSiniriUnicodeYap()` eklendi — `\b`'yi
+> JS'te simetrik bir Unicode sınır ifadesiyle (`\p{L}`/`\p{N}` + `u` bayrağı)
+> değiştiriyor. Derleme artık `new RegExp(bSiniriUnicodeYap(desenAyikla(p)),
+> 'iu')`. `scripts/test-safety-rules.mts` AYNI mantığın ikinci bir kopyasını
+> taşıdığı için (dosyanın kendi notu: "ayrışırsa test yalan söyler") ORADA da
+> güncellendi + "sıkıntı ailesi" için 4 yeni regresyon testi eklendi.
+>
+> **Doğrulama:** aktif 10 kuralın TAMAMI yeni haliyle derleniyor; "sıkıntı/
+> sıkı/sıkışık/sıkıcı/sıkılmadım" artık TEMİZ dönüyor; gerçek ihlal çapaları
+> (silah/uyuşturucu/kapora/kaçak/belgesiz + amına/orospu/yarrak/sik gibi
+> küfür örnekleri) AYNEN yakalanmaya devam ediyor — hiçbiri regresyona
+> uğramadı. `npm run test:safety-rules` 36/36 (32 eski + 4 yeni), `npm run
+> test:deals` 22/22, `npx tsc --noEmit` temiz.
+>
+> **Veri onarımı:** Bayram'ın gizlenmiş gerçek yorumu, düzeltilmiş motorla
+> yeniden taranıp temiz çıktı — `is_hidden=false` + doğru `audit_score`/
+> `audit_logs` ile güncellendi, `reviews_yayin_trg` (UPDATE OF is_hidden'da
+> tetiklenir) karşı tarafın yorumuyla birlikte ikisini de yayınladı.
+>
+> 📌 **Ders (aynı §9 kaydına eklendi):** bir güvenlik kuralının "derlendiğini"
+> doğrulamak yetmez — Postgres'ten JS'e taşınan HER regex ÖZELLİĞİ (satır içi
+> bayrak, kelime sınırı, Unicode karakter sınıfları…) ayrı ayrı sınanmalı.
+> İki motor "aynı deseni" çalıştırıyor görünse de altta YATAN dil farklı
+> anlam üretebilir — bu ikinci kez oldu, aynı dosyada, üç gün arayla.
+
 > ## ✅ 11 AĞU 2026 — BAYRAM'IN BULDUĞU GERÇEK BUG: "ANLAŞMA İPTAL EDİLİNCE İLAN CANLIYA DÖNMEDİ"
 >
 > Bayram'ın canlıda bizzat yaşadığı bug: mühürlenmiş (matched) bir anlaşma

@@ -69,6 +69,17 @@
 > edemiyordu — kısmi indekse çevrildi. Hepsi dev+prod'da gerçek tarayıcıyla
 > doğrulandı, `test:deals` 22/22. Ayrıntı: `docs/ARSIV_YAPILACAKLAR.md`.
 
+> 🔴 **11 AĞU 2026 — İKİNCİ BİR JS/POSTGRES SAPMASI: Bayram'ın GERÇEK, TEMİZ
+> yorumu ("hiç sıkıntı yaşamadım") sessizce gizlendi.** `\b` Postgres'te
+> Türkçe harfleri tanıyor, JS'te tanımıyordu — "sıkıntı" içindeki "sık" bir
+> "ağır küfür" kuralını yanlışlıkla ateşledi. `lib/metin-denetim.ts`'e
+> `bSiniriUnicodeYap()` eklendi, `test:safety-rules` 36/36 (4 yeni regresyon
+> testiyle), Bayram'ın yorumu yeniden tarandı ve doğru şekilde yayınlandı.
+> ⚠️ Aynı `\b` deseni kapora/belgesiz-nakliye kurallarında da var — RETROAKTİF
+> etki (geçmiş ilan düzenlemeleri) ÖLÇÜLMEDİ, bilerek kapsam dışı bırakıldı
+> (`docs/YAPILACAKLAR.md` madde 4). Kalıcı ders: §9. Ayrıntı:
+> `docs/ARSIV_YAPILACAKLAR.md`.
+
 > ## ✅ 10 AĞU 2026 — TERS SKOR YAYINI KAPANDI (4 nokta) + `olc:87` TABANI ONARILDI
 >
 > **`audit_score` artık HİÇBİR yerde yayınlanmıyor.** Karar (Bayram): "ibareyi
@@ -2271,6 +2282,25 @@ Açık rotalar: /giris, /auth/, /profil-tamamla, /nasil-calisir, /hakkimizda,
 ---
 
 ## 9. KURALLAR & TUZAKLAR
+
+- 🚨 **POSTGRES REGEX'İ JS'E TAŞIRKEN "DERLENİYOR" YETMEZ — `\b` SESSİZCE
+  FARKLI ANLAMA GELİR** (11 Ağu 2026, `lib/metin-denetim.ts`). 10 Ağu'da
+  `(?i)` satır içi bayrağı sorunu çözülmüştü (SyntaxError → sessiz atlama);
+  bu kez desen JS'te SORUNSUZ DERLENDİ ama YANLIŞ eşleşti: Postgres'in `\b`'si
+  UTF8/locale-farkında (Türkçe ı/ş/ğ/ü/ö/ç birer kelime karakteri), JS'inki
+  YALNIZ ASCII (`\w`=`[A-Za-z0-9_]`). Sonuç: "sıkıntı" kelimesinde "k"dan
+  sonraki "ı" JS'e göre kelime SINIRI sayıldı, `\b(sik)\b` gibi bir "ağır
+  küfür" deseni gündelik bir kelimenin İÇİNDE ateşledi — gerçek bir kullanıcı
+  yorumu (Bayram'ın kendisi) sessizce gizlendi. Empirik doğrulama farkı ortaya
+  çıkardı: `'... sıkıntı ...' ~* '\b(sik)\b'` Postgres'te `false`, aynı desen
+  JS'te (Unicode düzeltmesinden önce) `true`.
+  **Kural: "Postgres'te çalışıyor" + "JS'te derleniyor" ≠ "JS'te AYNI ŞEYİ
+  yapıyor."** İki motor arasında taşınan HER regex ÖZELLİĞİ (bayraklar, kelime
+  sınırları, karakter sınıfları, Unicode davranışı…) AYRI AYRI, gerçek
+  test verisiyle sınanmalı — "derleniyor" testi yalnız SYNTAX'ı doğrular,
+  SEMANTİĞİ değil. Düzeltme: `bSiniriUnicodeYap()` — `\b`'yi `\p{L}`/`\p{N}`
+  Unicode kaçışlı simetrik bir sınır ifadesiyle değiştirip `u` bayrağıyla
+  derliyor. Ayrıntı: `docs/ARSIV_YAPILACAKLAR.md`.
 
 - 🚨 **YENİ TABLO OLUŞTURURKEN SUPABASE VARSAYILANI `anon`/`authenticated`E
   SELECT DIŞINDA HER ŞEYİ (INSERT/UPDATE/DELETE/TRUNCATE) GRANT EDER —

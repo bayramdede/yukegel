@@ -49,6 +49,36 @@ function desenAyikla(ham: string): string {
   return ham.replace(/\(\?[imsxu]+\)/g, '');
 }
 
+/**
+ * 🚨 11 AĞU 2026 — İKİNCİ BİR JS/POSTGRES SAPMASI (bu, `(?i)` sözdizimi
+ * hatasından FARKLI — bu sefer desen SESSİZCE DERLENİYOR ama YANLIŞ eşleşiyor).
+ *
+ * Postgres'in `\b` (kelime sınırı) anlayışı LOCALE/UTF8-FARKINDA: Türkçe
+ * ı/ş/ğ/ü/ö/ç birer "kelime karakteri" sayılır. JavaScript'in `\b`'si YALNIZ
+ * ASCII bilir (`\w` = `[A-Za-z0-9_]`). Sonuç: "sıkıntı" kelimesinde "k"
+ * harfinden sonra gelen "ı" JS'e göre kelime SINIRI sayılıyor ve
+ * `\b(…sik…)\b` gibi bir "ağır küfür" deseni "sık" alt dizisini kelimenin
+ * TAM İÇİNDE yanlışlıkla yakalıyor.
+ *
+ * BULUNUŞ: Bayram'ın canlıda yazdığı gerçek, temiz bir değerlendirme
+ * ("ilgili nakliyeci. hiç sıkıntı yaşamadım") audit_score=100 alıp SESSİZCE
+ * gizlendi. Postgres tarafı ETKİLENMİYOR (`'... sıkıntı ...' ~* '\b(sik)\b'`
+ * canlı DB'de `false` döndü, ölçüldü) — yani asıl ilan taraması
+ * (`audit_listing_fn`) TEMİZ; yalnız BU dosyanın derlediği JS yolu (yorum +
+ * `api/ilan/duzelt`) etkileniyordu.
+ *
+ * ÇÖZÜM: `\b`'yi JS'te Unicode harf/rakam sınıflarına göre davranan simetrik
+ * bir sınır ifadesiyle değiştir (`u` bayrağı + `\p{L}`/`\p{N}` Unicode özellik
+ * kaçışları). AKTİF 10 kuralın TAMAMI bu değişimle derleniyor, gerçek
+ * ihlaller (silah/kapora/küfür çapaları) AYNEN yakalanmaya devam ediyor,
+ * "sıkıntı" ailesi (sıkıntı/sıkı/sıkışık/sıkıcı/sıkılmadım) artık TEMİZ
+ * dönüyor — hepsi elle ölçüldü (bkz. `docs/ARSIV_YAPILACAKLAR.md`).
+ */
+function bSiniriUnicodeYap(desen: string): string {
+  const SINIR = '(?:(?<=[\\p{L}\\p{N}_])(?![\\p{L}\\p{N}_])|(?<![\\p{L}\\p{N}_])(?=[\\p{L}\\p{N}_]))';
+  return desen.replace(/\\b/g, SINIR);
+}
+
 export interface AtesLenenKural {
   rule_id: string;
   description: string | null;
@@ -147,7 +177,9 @@ export async function metniDenetle(
   for (const kural of kurallar ?? []) {
     try {
       const hedef = kural.applies_to === 'user_text' ? samanlik.user_text : samanlik.all;
-      if (hedef.trim() && new RegExp(desenAyikla(kural.pattern), 'i').test(hedef)) {
+      // `u` bayrağı `\p{L}`/`\p{N}` Unicode kaçışlarını (bSiniriUnicodeYap'ın
+      // ürettiği) geçerli kılmak için ZORUNLU — kaldırılırsa SyntaxError.
+      if (hedef.trim() && new RegExp(bSiniriUnicodeYap(desenAyikla(kural.pattern)), 'iu').test(hedef)) {
         skor += kural.risk_weight;
         atesLenen.push({
           rule_id: kural.id,

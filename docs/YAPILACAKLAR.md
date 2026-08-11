@@ -150,6 +150,21 @@ detayında kullanıcının tüm ilanları ve şirketin tüm ilanları butonları
   kuralı (40 puan) `mal` kelimesini yakalıyor; nakliyede "mal" = **yük**, tamamen
   meşru. Kural 10 Ağu'ya kadar JavaScript'te hiç çalışmıyordu, **artık çalışıyor**
   → gözden geçirilecek. Bekçi: `npm run test:safety-rules`.
+  ⚠️ **BAŞKA bir bulgu ile KARIŞTIRMA:** bu madde kural YAZIMI/kelime seçimi
+  sorunu (kelime kendisi meşru bir bağlamda da geçiyor); 11 Ağu'da bulunan
+  `\b` Unicode sınırı bugu (bkz. `docs/ARSIV_YAPILACAKLAR.md`) FARKLI ve
+  KAPANDI — o, aynı kuralın Türkçe harflerde YANLIŞ ÇALIŞMASIYDI. İkisi aynı
+  kuralın farklı katmanlarında, ikisi de gerçek.
+- 🟡 **`\b` Unicode düzeltmesinin RETROAKTİF etkisi ölçülmedi.** (11 Ağu 2026)
+  `listings.internal_audit_logs`'ta kapora kuralı (`\b` kullanıyor) 7.403,
+  belgesiz nakliye kuralı 13 ilanda ateşlenmiş görünüyor — ama hangisinin
+  Postgres'in DOĞRU taramasından (`audit_listing_fn`, ilan oluşturma), hangisinin
+  JS'in ESKİ HATALI taramasından (`api/ilan/duzelt`, ilan DÜZENLEME) geldiğini
+  ayırt eden bir kolon yok. Bilerek bu turda dokunulmadı — küçük, güvenli bir
+  regex düzeltmesini büyük, riskli bir kitlesel veri onarımına çevirmemek için.
+  **Yapılacak iş (istenirse):** hangi listing'lerin `api/ilan/duzelt`'ten
+  geçtiğini belirleyecek bir iz (yoksa eklenmeli) + o alt kümeyi düzeltilmiş
+  motorla yeniden tarayıp yanlış pozitifleri geri açmak.
 - **E-posta bildirim altyapısı YOK.** `lib/` altında mail/resend/bildirim modülü
   yok. İlan süresi dolunca, iş onaylandığında, durum değişince bildirim
   gönderilemiyor. Faz 4'ün gecikme alarmı da buna dayanacak.

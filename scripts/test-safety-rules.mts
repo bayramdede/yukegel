@@ -25,6 +25,12 @@ const svc = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE
 
 /** `lib/metin-denetim.ts::desenAyikla` ile AYNI mantık — ayrışırsa test yalan söyler. */
 const desenAyikla = (ham: string) => ham.replace(/\(\?[imsxu]+\)/g, '');
+/** `lib/metin-denetim.ts::bSiniriUnicodeYap` ile AYNI mantık — bkz. o dosyadaki
+ * 11 Ağu 2026 notu: Postgres `\b` Unicode-farkında, JS'inki değil. */
+const SINIR = '(?:(?<=[\\p{L}\\p{N}_])(?![\\p{L}\\p{N}_])|(?<![\\p{L}\\p{N}_])(?=[\\p{L}\\p{N}_]))';
+const bSiniriUnicodeYap = (desen: string) => desen.replace(/\\b/g, SINIR);
+/** Kurulum: `desenAyikla` + `bSiniriUnicodeYap` + `iu` bayrağı — `metniDenetle`'nin BİREBİR aynısı. */
+const derle = (pattern: string) => new RegExp(bSiniriUnicodeYap(desenAyikla(pattern)), 'iu');
 
 let gecti = 0; const hatalar: string[] = [];
 const ok = (ad: string, kosul: boolean, ek = '') => {
@@ -55,8 +61,8 @@ const hamDerlenmeyen: string[] = [];
 for (const k of kurallar!) {
   // Ham hâliyle derlenir mi? (bilgi amaçlı — kaçının Postgres sözdizimi olduğunu gösterir)
   try { new RegExp(k.pattern, 'i'); } catch { hamDerlenmeyen.push(k.description ?? k.id); }
-  // Ayıklandıktan sonra DERLENMEK ZORUNDA
-  try { new RegExp(desenAyikla(k.pattern), 'i'); }
+  // Ayıklandıktan + Unicode sınır dönüşümünden sonra DERLENMEK ZORUNDA
+  try { derle(k.pattern); }
   catch (e: any) { derlenmeyen.push(`${k.description ?? k.id} → ${e.message}`); }
 }
 
@@ -79,19 +85,32 @@ const capalar: [string, string][] = [
 for (const [ad, metin] of capalar) {
   let eslesen = 0;
   for (const k of kurallar!) {
-    try { if (new RegExp(desenAyikla(k.pattern), 'i').test(metin.toLowerCase())) eslesen++; } catch {}
+    try { if (derle(k.pattern).test(metin.toLowerCase())) eslesen++; } catch {}
   }
   ok(`çapa "${ad}" en az bir kurala takılıyor`, eslesen > 0, `metin: "${metin}"`);
 }
 
 // Temiz metin HİÇBİR kurala takılmamalı (yanlış pozitif kontrolü)
-const temiz = 'istanbul ankara arasi tekstil yuku 20 ton tir araniyor';
-let temizEslesme = 0;
-for (const k of kurallar!) {
-  try { if (new RegExp(desenAyikla(k.pattern), 'i').test(temiz)) temizEslesme++; } catch {}
+const temizMetinler = [
+  'istanbul ankara arasi tekstil yuku 20 ton tir araniyor',
+  // 🚨 11 Ağu 2026 — bu dört satır ÇAPA: `\b`'nin JS'te ASCII-only olması
+  // yüzünden "sık" alt dizisi "sıkıntı"/"sıkı"/"sıkışık"/"sıkıcı" gibi
+  // TAMAMEN masum kelimelerin İÇİNDE yanlışlıkla eşleşiyordu — canlıda
+  // Bayram'ın gerçek, temiz bir değerlendirmesi bu yüzden sessizce
+  // gizlendi (bkz. docs/ARSIV_YAPILACAKLAR.md). Bir daha geri gelmesin.
+  'ilgili nakliyeci hiç sıkıntı yaşamadım',
+  'sıkıntısız teslimat garantisi',
+  'sıkışık trafik yüzünden geç kaldık ama sorun olmadı',
+  'biraz sıkıcı bir bekleme oldu ama nakliyeci ilgiliydi',
+];
+for (const temiz of temizMetinler) {
+  let temizEslesme: string[] = [];
+  for (const k of kurallar!) {
+    try { if (derle(k.pattern).test(temiz)) temizEslesme.push(k.description ?? k.id); } catch {}
+  }
+  ok(`normal metin hiçbir kurala takılmıyor: "${temiz}"`, temizEslesme.length === 0,
+     `takılan: ${temizEslesme.join(', ')}`);
 }
-ok('normal ilan metni hiçbir kurala takılmıyor', temizEslesme === 0,
-   `${temizEslesme} kural takıldı — yanlış pozitif`);
 
 // ── 4. BAYRAM'IN 10 AĞU KARARLARI ─────────────────────────────────────
 // (a) Telefon: "normalizasyon sonrası mevcut regex ile devam"
@@ -99,7 +118,7 @@ const rakamNormalize = (m: string) => m.replace(/(?<=\d)[ .\-]{1,2}(?=\d)/g, '')
 const telefonKurali = kurallar!.find(k => k.description?.startsWith('Güvenlik: İlan içine telefon'));
 ok('telefon kuralı bulundu', Boolean(telefonKurali));
 if (telefonKurali) {
-  const re = new RegExp(desenAyikla(telefonKurali.pattern), 'i');
+  const re = derle(telefonKurali.pattern);
   for (const yazim of ['0532 111 22 33', '0532.111.22.33', '0532-111-22-33', '05321112233']) {
     ok(`telefon yakalanıyor: "${yazim}"`, re.test(rakamNormalize(yazim.toLowerCase())), 
        `normalize: ${rakamNormalize(yazim)}`);
@@ -122,7 +141,7 @@ if (waKurali) {
      (waKurali as any).applies_to === 'user_text',
      `applies_to=${(waKurali as any).applies_to} — 'all' olsaydı gelen WhatsApp içe aktarımlarının %20'si moderatör kuyruğuna düşerdi`);
   ok('whatsapp kuralı iletisim kategorisinde', (waKurali as any).category === 'iletisim');
-  const re = new RegExp(desenAyikla(waKurali.pattern), 'i');
+  const re = derle(waKurali.pattern);
   for (const y of ['whatsapp tan yaz', 'whats app', 'watsap', 'whatsap']) {
     ok(`whatsapp yakalanıyor: "${y}"`, re.test(y));
   }

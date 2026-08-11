@@ -1,7 +1,10 @@
 'use client';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { createClient } from '../../lib/supabase';
 import { ilAdi } from '../../lib/lokasyon';
 import { C, inp, lbl, btn } from './panelStil';
+
+const supabase = createClient();
 
 /**
  * ANLAŞMALARIM SEKMESİ — Güvenli Etkileşim Faz 2 (10 Ağu 2026)
@@ -93,6 +96,20 @@ function DurumBadge({ durum }: { durum: string }) {
   return <span style={{ background: r.bg, color: r.color, fontSize: '0.72rem', fontWeight: 700, padding: '3px 8px', borderRadius: 4 }}>{DURUM_LABEL[durum] || durum}</span>;
 }
 
+// 11 Ağu 2026 — "işi onaylarken/verirken karşı tarafın profiline bakabilelim"
+// isteği: karşı tarafın adı artık `/u/[id]` profiline linkli, yanında da
+// yayınlanmış yorumlardan türeyen bir rozet var. Rozet İCAT bir skor DEĞİL —
+// `/u/[username]`teki `DegerlendirmelerKarti` ile AYNI ham veriden (ortalama +
+// sayı), yalnız karar anına (bu karta) taşınmış hâli. Veri yoksa rozet hiç
+// basılmıyor — "0 değerlendirme" göstermek yanlış bir sinyal olurdu.
+function ProfilRozeti({ ortalama, sayi }: { ortalama: number; sayi: number }) {
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, background: '#2d1a00', color: '#f59e0b', fontSize: '0.7rem', fontWeight: 700, padding: '2px 7px', borderRadius: 10, whiteSpace: 'nowrap' as const }}>
+      ⭐ {ortalama.toFixed(1)} <span style={{ opacity: 0.7, fontWeight: 500 }}>({sayi})</span>
+    </span>
+  );
+}
+
 function Yildizlar({ value, onChange, size = '1.5rem' }: { value: number; onChange: (n: number) => void; size?: string }) {
   return (
     <div style={{ display: 'flex', gap: 2 }}>
@@ -117,6 +134,32 @@ export default function AnlasmalarSekmesi({ anlasmalar: ilk, yorumlarim: ilkYoru
   const [cancelType, setCancelType] = useState<'anlasma' | 'is' | ''>('');
   const [yorumAcikId, setYorumAcikId] = useState<string | null>(null);
   const [durumFiltre, setDurumFiltre] = useState<DurumFiltre>('hepsi');
+  const [rozetler, setRozetler] = useState<Record<string, { ortalama: number; sayi: number }>>({});
+
+  // Karşı tarafların profil rozetleri — tek toplu sorguda. RLS zaten yalnız
+  // yayınlanmış+gizlenmemiş satırları döndürür (`reviews_yayinlanan_herkese`),
+  // istemci ekstra filtre YAZMIYOR — `/u/[username]`teki desenin aynısı.
+  useEffect(() => {
+    const idler = new Set<string>();
+    anlasmalar.forEach(d => {
+      const karsiId = d.shipper_id === userId ? d.carrier_id : d.shipper_id;
+      if (karsiId) idler.add(karsiId);
+    });
+    // Boşsa (kart yok) hiç sorgu atma — eski `rozetler` zaten hiçbir kartta
+    // GÖRÜNMÜYOR (üstteki liste boşsa kart render edilmiyor), sıfırlamaya
+    // gerek yok; senkron `setState` de effect linter'ını gereksiz tetiklemesin.
+    if (idler.size === 0) return;
+    supabase.from('reviews').select('reviewee_id, rating').in('reviewee_id', Array.from(idler))
+      .then((res: any) => {
+        const gruplar: Record<string, number[]> = {};
+        (res.data || []).forEach((r: any) => { (gruplar[r.reviewee_id] ||= []).push(r.rating); });
+        const sonuc: Record<string, { ortalama: number; sayi: number }> = {};
+        Object.entries(gruplar).forEach(([id, puanlar]) => {
+          sonuc[id] = { ortalama: puanlar.reduce((a, b) => a + b, 0) / puanlar.length, sayi: puanlar.length };
+        });
+        setRozetler(sonuc);
+      });
+  }, [anlasmalar, userId]);
 
   function guncelle(id: string, patch: any) {
     setAnlasmalar(prev => prev.map(d => d.id === id ? { ...d, ...patch } : d));
@@ -215,6 +258,7 @@ export default function AnlasmalarSekmesi({ anlasmalar: ilk, yorumlarim: ilkYoru
               setYorumAcik={(acik: boolean) => setYorumAcikId(acik ? deal.id : null)}
               mevcutYorum={yorumlarim.find(r => r.deal_id === deal.id) || null}
               onYorumGonderildi={yorumEkle}
+              rozetler={rozetler}
             />
           ))}
         </div>
@@ -230,7 +274,7 @@ function AnlasmaKarti({
   deal, userId, yukleniyor, hata, onAksiyon,
   onayBekleyen, setOnayBekleyen, onayTemizle, onayNeden, setOnayNeden,
   digerMetin, setDigerMetin, cancelType, setCancelType,
-  yorumAcik, setYorumAcik, mevcutYorum, onYorumGonderildi,
+  yorumAcik, setYorumAcik, mevcutYorum, onYorumGonderildi, rozetler,
 }: {
   deal: any; userId: string; yukleniyor: string | null; hata?: string;
   onAksiyon: (id: string, action: string, cancel_reason?: string, cancel_type?: 'anlasma' | 'is') => void;
@@ -242,10 +286,13 @@ function AnlasmaKarti({
   cancelType: 'anlasma' | 'is' | ''; setCancelType: (v: 'anlasma' | 'is' | '') => void;
   yorumAcik: boolean; setYorumAcik: (v: boolean) => void;
   mevcutYorum: any; onYorumGonderildi: (r: any) => void;
+  rozetler: Record<string, { ortalama: number; sayi: number }>;
 }) {
   const isShipper = deal.shipper_id === userId;
   const isCarrier = deal.carrier_id === userId;
+  const karsiTarafId: string | null = isShipper ? deal.carrier_id : deal.shipper_id;
   const karsiTaraf = isShipper ? deal.carrier?.display_name : deal.shipper?.display_name;
+  const karsiRozet = karsiTarafId ? rozetler[karsiTarafId] : undefined;
 
   const ilan = deal.listing;
   const kalkis = ilan ? (ilAdi(ilan.origin_province_id) ?? '') : '';
@@ -269,9 +316,23 @@ function AnlasmaKarti({
             <span style={{ color: C.text, fontWeight: 700 }}>{baslik}</span>
             <DurumBadge durum={deal.status} />
           </div>
-          <div style={{ color: C.dim, fontSize: '0.75rem' }}>
-            {isShipper ? '📦 Siz ilan sahibisiniz' : '🚛 Siz nakliyecisiniz'}
-            {karsiTaraf ? ` · Karşı taraf: ${karsiTaraf}` : ''}
+          <div style={{ color: C.dim, fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+            <span>{isShipper ? '📦 Siz ilan sahibisiniz' : '🚛 Siz nakliyecisiniz'}</span>
+            {/* 11 Ağu 2026 — "işi onaylarken/verirken karşı tarafın profiline
+                bakabilelim" isteği: isim artık `/u/[id]` profiline linkli +
+                yanında yayınlanmış yorumlardan türeyen rozet (varsa). Karar
+                anında (onayla/tamamla/iptal butonlarının hemen üstünde)
+                göründüğü için ayrıca aramaya gerek kalmıyor. */}
+            {karsiTaraf && karsiTarafId && (
+              <>
+                <span>· Karşı taraf:</span>
+                <a href={`/u/${karsiTarafId}`} target="_blank" rel="noopener noreferrer"
+                  style={{ color: C.blue, fontWeight: 600, textDecoration: 'none' }}>
+                  {karsiTaraf} ↗
+                </a>
+                {karsiRozet && <ProfilRozeti ortalama={karsiRozet.ortalama} sayi={karsiRozet.sayi} />}
+              </>
+            )}
             {ilan?.id && <> · <a href={`/ilan/${ilan.id}`} style={{ color: C.dim }}>İlanı gör</a></>}
           </div>
         </div>
