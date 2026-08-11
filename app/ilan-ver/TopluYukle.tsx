@@ -76,7 +76,7 @@ export default function TopluYukle({ onGeri }: { onGeri: () => void }) {
   const [duzenleKey, setDuzenleKey] = useState('');
   const [yukleniyor, setYukleniyor] = useState(false);
   const [tarih, setTarih] = useState(bugun());
-  const [sonuc, setSonuc] = useState<{ olusturulan: number; sonuclar: KayitSonucu[] } | null>(null);
+  const [sonuc, setSonuc] = useState<{ olusturulan: number; mukerrer: number; sonuclar: KayitSonucu[] } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   // ── Şablon indir ──
@@ -245,7 +245,7 @@ export default function TopluYukle({ onGeri }: { onGeri: () => void }) {
       if (!data.ok) throw new Error(data.hata);
       if (data.action !== 'commit') throw new Error('Beklenmeyen sunucu yanıtı.');
 
-      setSonuc({ olusturulan: data.olusturulan, sonuclar: data.sonuclar });
+      setSonuc({ olusturulan: data.olusturulan, mukerrer: data.mukerrer, sonuclar: data.sonuclar });
       setAdim('basarili');
     } catch (err: any) {
       alert('❌ ' + (err?.message || 'İlanlar kaydedilemedi.'));
@@ -300,14 +300,17 @@ export default function TopluYukle({ onGeri }: { onGeri: () => void }) {
   // onayına gönderildi" diyordu; oysa ilanların çoğu doğrudan yayına giriyordu.
   if (adim === 'basarili') {
     const basarililar = sonuc?.sonuclar.filter(s => s.ok) ?? [];
-    const hatalilar = sonuc?.sonuclar.filter(s => !s.ok) ?? [];
+    // Mükerrer (staging'e düşen) grupları gerçek hatalardan AYIR — biri
+    // kullanıcının düzeltmesi gereken bir sorun, diğeri normal bir akış.
+    const mukerrerler = sonuc?.sonuclar.filter(s => !s.ok && s.mukerrer) ?? [];
+    const hatalilar = sonuc?.sonuclar.filter(s => !s.ok && !s.mukerrer) ?? [];
     const yayinda = basarililar.filter(s => s.durum === 'yayinda').length;
     const incelemede = basarililar.filter(s => s.durum === 'incelemede').length;
     const reddedilen = basarililar.filter(s => s.durum === 'reddedildi').length;
 
     return (
     <div style={{ maxWidth: 560, margin: '80px auto', padding: '0 16px', textAlign: 'center' }}>
-      <div style={{ fontSize: '3rem', marginBottom: 16 }}>{basarililar.length > 0 ? '✅' : '⚠️'}</div>
+      <div style={{ fontSize: '3rem', marginBottom: 16 }}>{basarililar.length > 0 ? '✅' : (mukerrerler.length > 0 ? 'ℹ️' : '⚠️')}</div>
       <div style={{ color: '#e2e8f0', fontWeight: 800, fontSize: '1.3rem', marginBottom: 8 }}>
         {sonuc?.olusturulan ?? 0} ilan oluşturuldu
       </div>
@@ -316,6 +319,24 @@ export default function TopluYukle({ onGeri }: { onGeri: () => void }) {
         {incelemede > 0 && <div>🕓 {incelemede} ilan moderatör incelemesinde — onaylanınca yayına alınacak.</div>}
         {reddedilen > 0 && <div>⚠️ {reddedilen} ilan otomatik kontrolden geçemedi.</div>}
       </div>
+      {mukerrerler.length > 0 && (
+        <div style={{ background: '#0d1b2a', border: '1px solid #1e3a5f', borderRadius: 8, padding: 16, marginBottom: 24, textAlign: 'left' }}>
+          <div style={{ color: '#60a5fa', fontWeight: 700, fontSize: '0.85rem', marginBottom: 8 }}>
+            ℹ️ {mukerrerler.length} ilan zaten mevcut görünüyor — incelemeye alındı
+          </div>
+          <div style={{ color: '#93c5fd', fontSize: '0.78rem', lineHeight: 1.6 }}>
+            Bu ilanlar sistemde aynı özelliklerde bir ilanla eşleşti. Farklıysa (araç/tonaj vb.)
+            bir moderatör onaylayıp yayına alacak; gerçekten aynıysa mevcut ilanınız geçerli kalır.
+            {mukerrerler.some(m => m.seferNo) && (
+              <div style={{ marginTop: 6 }}>
+                {mukerrerler.filter(m => m.seferNo).map((m, i) => (
+                  <span key={i} style={{ marginRight: 8 }}>Sefer {m.seferNo}</span>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
       {hatalilar.length > 0 && (
         <div style={{ background: '#1a0a0a', border: '1px solid #7f1d1d', borderRadius: 8, padding: 16, marginBottom: 24, textAlign: 'left' }}>
           <div style={{ color: '#f87171', fontWeight: 700, fontSize: '0.85rem', marginBottom: 8 }}>

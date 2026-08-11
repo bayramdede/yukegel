@@ -103,6 +103,24 @@
 > `.eq(null)` PostgREST'te hiçbir satırı eşlemediği için ilçe yoksa `.is()`
 > dalı). Yeni bekçi: `npm run test:mukerrer` (4/4, DB'ye gerçek yazan/silen
 > HTTP'siz test). Kalıcı ders: §9.
+> ⚠️ **BU KONTROL AYNI GÜN TAMAMEN YENİDEN YAZILDI — aşağıdaki "BİRLEŞİK HASH"
+> kaydına bak; `mukerrerBul()` artık YOK.**
+
+> 🔁 **11 AĞU 2026 — MÜKERRER TESPİTİ BİRLEŞİK HASH'E GEÇTİ + EXCEL STAGING
+> (Bayram'ın talebi).** İl/ilçe+tarih beşlisi Bayram'ın "her şeyiyle aynı"
+> tanımına dar geliyordu; `lib/dedup.ts::dedupHashHesapla()` artık **telefon
+> (10 haneye normalize) + tam rota (kalkış+duraklar, il+ilçe sıralı) + araç/kasa
+> (alfabetik) + toplam ton/palet + tarih**'i tek bir SHA-256'da eritiyor.
+> Yeni kolon `listings.dedup_hash` (kısmi indeks), kontrol `ilanYaz()` içinde
+> tek sorgu (`archived` hariç + `completed_at is null` — 11 Ağu'daki iki bug'ın
+> ikisi de korunuyor). Zaman penceresi YOK (tarih hash'in içinde). **Excel'de
+> mükerrer artık REDDEDİLMİYOR**: yeni `excel_dedup_staging` tablosuna düşüyor,
+> moderatör panelinde **"🔁 Mükerrer Excel"** sekmesinde "Mükerrer Değil, Yayınla"
+> (`ilanYaz` `dedupAtla:true`) / "Gerçekten Mükerrer" ile karara bağlanıyor.
+> `excel_dedup_staging` istemciye TAMAMEN kapalı (grant revoke + RLS), liste/
+> onay/ret server action (`app/moderator/actions.ts`). Migration:
+> `docs/20260811_dedup_hash_ve_staging.sql`. Bekçi: `test:mukerrer` (15 kontrol:
+> 9 birim hash + 6 uçtan uca). Kalıcı ders: §9.
 
 > 🤝 **11 AĞU 2026 — "AKTİF DEĞİL" WATERMARK'I ROL-FARKINDA OLDU + NAKLİYECİ
 > ARTIK YÜKÜ İPTAL EDEMİYOR (Bayram'ın iki isteği).**
@@ -1949,7 +1967,15 @@ testi yorumdaki "lower()" yüzünden **yanlış pozitif** verir; davranışı da
 
 ## 4. MODERATÖR PANELİ
 
-Sekmeler: ⏳ Bekleyenler / ✅ Onaylananlar / ❌ Reddedilenler / 💤 Pasifler / 📋 Hepsi / 🔍 Çözümsüz / 🗄️ Arşiv / 🔴 Riskli
+Sekmeler: ⏳ Bekleyenler / ✅ Onaylananlar / ❌ Reddedilenler / 💤 Pasifler / 📋 Hepsi / 🔍 Çözümsüz / 🔁 Mükerrer Excel / 🗄️ Arşiv / 🔴 Riskli
+
+**🔁 Mükerrer Excel** (11 Ağu 2026) — Excel toplu yüklemede `dedup_hash`i var
+olan bir ilana çarpan gruplar (`excel_dedup_staging`). Tablo istemciye TAMAMEN
+kapalı; liste/onay/ret **server action** (`app/moderator/actions.ts`:
+`mukerrerExcelListe/Onayla/Reddet`). "Mükerrer Değil, Yayınla" → `ilanYaz()`
+`dedupAtla:true` ile ilanı orijinal yükleyene yazar; "Gerçekten Mükerrer" →
+kaydı `reddedildi` işaretler. `no_lane` (Çözümsüz) ile aynı desen, ama o tablo
+istemciye açık olduğu için orada action gerekmiyordu.
 
 Toplu işlemler: `approve | reject | passive | archive | unarchive | shadow_ban | shadow_ban_kaldir | correction_needed`
 
@@ -2325,29 +2351,24 @@ Açık rotalar: /giris, /auth/, /profil-tamamla, /nasil-calisir, /hakkimizda,
 
 ## 9. KURALLAR & TUZAKLAR
 
-- 🚨 **"MÜKERRER İLAN" KONTROLÜ İKİ AYRI HATA BİRDEN TAŞIYORDU — İKİSİ DE
-  "durum tek başına yeterli sinyal" varsayımından geldi** (11 Ağu 2026,
-  `lib/ilan-limit.ts::mukerrerBul`, Bayram'ın canlıda yaşadığı bug).
-  (1) `status IN ('active','passive')` aday sayıyordu ama `passive` İKİ FARKLI
-  ŞEYİ kapsıyor: "iş hâlâ açık/eşleşme sürüyor" VE "iş bitti, tamamlandı"
-  (`deals` mühürlenince ikisi de `listings.status='passive'` yapıyor, bkz.
-  `app/api/deals/[id]/route.ts`). Ayrım `status`'ta değil `completed_at`'te —
-  kontrol bunu bilmediği için tamamlanmış (geçmiş) bir işi hâlâ "devam ediyor"
-  sanıp yeni, alakasız bir ilanı reddetti. **Kural: bir `status` değeri birden
-  fazla iş durumunu temsil ediyorsa, o durumu ayıran GERÇEK sinyal (burada
-  `completed_at`) da kontrole dahil edilmeli — `status` tek başına yeterli
-  değilse "yeterliymiş gibi" filtrelemeye devam etmek yanlış sonucu SESSİZCE
-  üretir.**
-  (2) Mükerrer anahtarı yalnız İL id'sine bakıyordu, İLÇE'ye değil — aynı ilde
-  farklı ilçeye taşınan bir güzergah (Tekirdağ-Çorlu → Tekirdağ-Ergene) "aynı
-  sefer" sayıldı. `province_id` DB'de gerçek bir FK/id, ama kullanıcı için
-  "aynı yer" ilçe düzeyinde tanımlı — id'nin var olması id'nin YETERLİ
-  GRANÜLERLİKTE olduğu anlamına gelmiyor. Düzeltme: anahtara
-  `origin_district`/durağın `district`'i eklendi; ilçe NULL olabileceği için
-  (`.eq(null)` PostgREST'te HİÇBİR satırı eşlemez) `kalkisIlce ? .eq(...) :
-  .is(..., null)` dallanması şart oldu. Bekçi: `npm run test:mukerrer` (4/4,
-  yeni dosya — hem iki bugu hem regresyonu (aynı il-ilçe hâlâ yakalanıyor)
-  ayrı ayrı sınıyor).
+- 🚨 **MÜKERRER TESPİTİ: DAR ANAHTAR İKİ BUG DOĞURDU, SONUNDA BİRLEŞİK HASH'E
+  GEÇİLDİ** (11 Ağu 2026, `lib/dedup.ts` + `lib/ilan-yaz.ts`, Bayram).
+  Önce `mukerrerBul()` (artık SİLİNDİ) iki hata taşıyordu, ikisi de "dar bir
+  anahtar yeterli sinyal" varsayımından: (1) `status IN ('active','passive')`
+  tamamlanmış bir işi de aday sayıyordu — `passive` HEM "devam ediyor" HEM "iş
+  bitti"yi kapsıyor (`deals` mühürlenince öyle), ayrım `completed_at`'te; (2)
+  anahtar yalnız İL id'sine bakıyordu, İLÇE'ye değil (Tekirdağ-Çorlu → Ergene
+  "aynı sefer" sayıldı). **İkisinin ortak kökü: bir alt küme sinyalle (durum,
+  il) tam kimliği temsil etmeye çalışmak.** Çözüm noktasal yama değil, kimliği
+  DOĞRU tanımlamaktı: `dedupHashHesapla()` — telefon + tam rota + araç/kasa +
+  toplam ton/palet + tarih tek SHA-256. **Kural: "aynı şey mi?" sorusunu birkaç
+  ayrı kolonu elle karşılaştırarak değil, ilanı tanımlayan TÜM alanları tek bir
+  kanonik parmak izinde eriterek yanıtla — eksik bırakılan her alan sessiz bir
+  yanlış-pozitif ya da yanlış-negatiftir.** İki bilinçli koruma hash'e RAĞMEN
+  DB sorgusunda kaldı: `archived` hariç + `completed_at is null` (tamamlanmış
+  işin aynısı yeniden girilebilmeli — yukarıdaki (1)'in regresyon bekçisi).
+  Bekçi: `npm run test:mukerrer` (15 kontrol: 9 birim hash davranışı +
+  6 uçtan uca `ilanYaz`).
 
 - 🚨 **POSTGRES REGEX'İ JS'E TAŞIRKEN "DERLENİYOR" YETMEZ — `\b` SESSİZCE
   FARKLI ANLAMA GELİR** (11 Ağu 2026, `lib/metin-denetim.ts`). 10 Ağu'da

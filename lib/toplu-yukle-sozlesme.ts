@@ -65,11 +65,18 @@ export interface KayitSonucu {
   id?: string;
   durum?: 'yayinda' | 'incelemede' | 'reddedildi';
   hata?: string;
+  /**
+   * 11 Ağu 2026 — grup mükerrer hash'iyle var olan bir ilana çarptığı için
+   * `listings`e YAZILMADI, `excel_dedup_staging`e düştü (moderatör kararı
+   * bekliyor). `ok:false` DEĞİL — kullanıcı hata görmemeli, "incelemeye alındı"
+   * görmeli. Ayrı bayrak, çünkü `ok:false` "gerçekten oluşturulamadı" demek.
+   */
+  mukerrer?: boolean;
 }
 
 export type TopluYukleYanit =
   | { ok: true; action: 'preview'; preview: OnizlemeSatiri[] }
-  | { ok: true; action: 'commit'; olusturulan: number; sonuclar: KayitSonucu[] }
+  | { ok: true; action: 'commit'; olusturulan: number; mukerrer: number; sonuclar: KayitSonucu[] }
   | { ok: false; hata: string };
 
 /** Tek seferde işlenebilecek en fazla Excel satırı (`ILAN_VER_ANALIZ` B2). */

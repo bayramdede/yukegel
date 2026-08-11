@@ -297,14 +297,21 @@ export default async function IlanDetay({ params }: { params: Promise<{ id: stri
   // devam eder — orada "rol ayrımı yok" kararı (11 Ağu, üstteki eski not)
   // hâlâ geçerli, çünkü onlar gerçekten bir tarafa ait değil.
   const watermark = ilanAktif ? null : (() => {
+    // "Anlaşmalarım" linki — `PanelClient.tsx`'teki `?sekme=` derin bağlantı
+    // deseninin aynısı (bkz. o dosyadaki 31 Tem 2026 notu).
+    const anlasmalarimLink = (
+      <a href="/panel?sekme=anlasmalarim" style={{ color: '#4ade80', fontWeight: 600, textDecoration: 'underline' }}>
+        Anlaşmalarım
+      </a>
+    );
     if (['matched', 'in_transit'].includes(ilgiliDeal?.status ?? '')) {
       if (isOwner) return {
         ton: 'olumlu' as const, ikon: '🤝', baslik: 'Bu iş bir nakliyeciyle anlaşıldı',
-        mesaj: 'Süreci ve karşı tarafın bilgilerini panelinizden ("Anlaşmalarım") takip edebilirsiniz.',
+        mesaj: <>Süreci ve karşı tarafın bilgilerini panelinizden ({anlasmalarimLink}) takip edebilirsiniz.</>,
       };
       if (isCarrierOfDeal) return {
         ton: 'olumlu' as const, ikon: '🤝', baslik: 'Bu işi siz üstlendiniz',
-        mesaj: 'Süreci panelinizden ("Anlaşmalarım") takip edebilirsiniz. Yeni bir talep göndermenize gerek yok.',
+        mesaj: <>Süreci panelinizden ({anlasmalarimLink}) takip edebilirsiniz. Yeni bir talep göndermenize gerek yok.</>,
       };
       return {
         ton: 'uyari' as const, ikon: '⚠️', baslik: 'Bu ilan aktif değil',
@@ -314,7 +321,7 @@ export default async function IlanDetay({ params }: { params: Promise<{ id: stri
     if (ilan.completed_at) {
       if (isOwner || isCarrierOfDeal) return {
         ton: 'olumlu' as const, ikon: '✅', baslik: 'Bu iş tamamlandı',
-        mesaj: 'Henüz yapmadıysanız panelinizden karşı tarafı değerlendirebilirsiniz.',
+        mesaj: <>Henüz yapmadıysanız {anlasmalarimLink}dan karşı tarafı değerlendirebilirsiniz.</>,
       };
       return {
         ton: 'uyari' as const, ikon: '⚠️', baslik: 'Bu ilan aktif değil',

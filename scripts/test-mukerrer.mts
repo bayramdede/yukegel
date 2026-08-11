@@ -1,18 +1,13 @@
 // scripts/test-mukerrer.mts — `npm run test:mukerrer`
 //
-// 11 Ağu 2026 — Bayram'ın canlıda yaşadığı iki bug, `mukerrerBul()`
-// (`lib/ilan-limit.ts`) üzerinde doğrudan (HTTP'siz, dev sunucusu GEREKMEZ):
-//
-//   1) TAMAMLANMIŞ bir iş (deal completed → listings.status='passive',
-//      completed_at DOLU) aktif hiçbir ilan yokken bile "mükerrer" sayılıp
-//      yeni ilanı engelliyordu. Düzeltme: `completed_at IS NOT NULL` artık
-//      aday dışı.
-//   2) Anahtar yalnız İL bazlıydı, İLÇE'ye bakmıyordu. Tekirdağ-Çorlu'dan
-//      Tekirdağ-Ergene'ye çıkış ilçesi değiştirilince (aynı il, FARKLI ilçe)
-//      yine "mükerrer" diye engellendi. Düzeltme: anahtara origin_district /
-//      ilk durağın district'i eklendi.
-//
-// ⚠️ CANLI DB'YE YAZAR: 1 geçici kullanıcı + birkaç ilan; sonunda SİLER.
+// Birleşik mükerrer hash'i (Bayram, 11 Ağu 2026). İki katman:
+//   A) `dedupHashHesapla()` birim davranışı — hangi alan farkı hash'i
+//      değiştirir, hangisi (biçim farkı) DEĞİŞTİRMEZ.
+//   B) `ilanYaz()` uçtan uca — CANLI DB'ye gerçek yazar, sonra siler:
+//      · aynı ilan ikinci kez → mükerrer (engellenir)
+//      · ilçe/araç/tonaj farkı → mükerrer DEĞİL
+//      · tamamlanmış (completed_at) bir işin aynısı → mükerrer DEĞİL
+//        (11 Ağu'da düzeltilen bug'ın regresyon bekçisi)
 
 import { createClient } from '@supabase/supabase-js';
 import { readFileSync } from 'node:fs';
@@ -21,13 +16,11 @@ const env: Record<string, string> = {};
 for (const s of readFileSync(new URL('../.env.local', import.meta.url), 'utf8').split('\n')) {
   const m = s.match(/^([A-Z_]+)=(.*)$/); if (m) env[m[1]] = m[2].trim().replace(/^["']|["']$/g, '');
 }
-// `lib/auth.ts::getServiceSupabase()` bu ikisini process.env'den okuyor —
-// `mukerrerBul` onu ÇAĞIRDIĞI anda (import anında değil) okunduğu için burada
-// atamak yeterli.
 process.env.NEXT_PUBLIC_SUPABASE_URL = env.NEXT_PUBLIC_SUPABASE_URL;
 process.env.SUPABASE_SERVICE_ROLE_KEY = env.SUPABASE_SERVICE_ROLE_KEY;
 
-const { mukerrerBul } = await import('../lib/ilan-limit');
+const { dedupHashHesapla } = await import('../lib/dedup');
+const { ilanYaz } = await import('../lib/ilan-yaz');
 
 const svc = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY);
 
@@ -36,30 +29,39 @@ const ok = (ad: string, kosul: boolean, ek = '') => {
   if (kosul) { gecti++; console.log(`✓ ${ad}`); } else hatalar.push(`✗ ${ad}${ek ? `\n    ${ek}` : ''}`);
 };
 
-const TEKIRDAG = 59; // il id — `docs/COGRAFI_GECIS.md` plaka kodları
-const ISTANBUL = 34;
-const eposta = `mukerrer-${Date.now()}@yukegel-test.local`;
-const tarih = '2026-12-15';
-let userId = '';
-const ilanIdler: string[] = [];
+// ── A) BİRİM: dedupHashHesapla ─────────────────────────────────────────────
+const temel = {
+  tip: 'yuk', telefon: '05001112233',
+  rota: [{ province_id: 59, district: 'Çorlu' }, { province_id: 34, district: 'Merkez' }],
+  vehicleType: ['TIR'], bodyType: ['Tenteli'], toplamTon: 20, toplamPalet: 10, tarih: '2026-12-15',
+};
+const h = (o: Partial<typeof temel>) => dedupHashHesapla({ ...temel, ...o } as any);
 
-async function ilanAc(opts: {
-  status: string; moderation_status: string; completed_at?: string | null;
-  origin_district: string | null; durakIlce: string | null;
-}) {
-  const { data } = await svc.from('listings').insert({
-    user_id: userId, listing_type: 'yuk', origin_province_id: TEKIRDAG,
-    origin_district: opts.origin_district,
-    moderation_status: opts.moderation_status, status: opts.status,
-    is_shadow_banned: false, notes: 'mükerrer testi', source: 'form',
-    available_date: tarih, completed_at: opts.completed_at ?? null,
-  }).select('id').single();
-  const id = data!.id as string;
-  ilanIdler.push(id);
-  await svc.from('listing_stops').insert({
-    listing_id: id, stop_order: 1, province_id: ISTANBUL, district: opts.durakIlce,
-  });
-  return id;
+ok('aynı girdi → aynı hash', h({}) === h({}));
+ok('telefon biçimi (+90 / 0) fark ETMEZ', h({ telefon: '+905001112233' }) === h({ telefon: '05001112233' }),
+   'aynı numara farklı format aynı hash olmalı');
+ok('ilçe büyük/küçük/aksan fark ETMEZ', h({ rota: [{ province_id: 59, district: 'ÇORLU' }, { province_id: 34, district: 'merkez' }] }) === h({}));
+ok('araç/kasa SIRASI fark ETMEZ', dedupHashHesapla({ ...temel, vehicleType: ['Kamyon', 'TIR'] } as any)
+   === dedupHashHesapla({ ...temel, vehicleType: ['TIR', 'Kamyon'] } as any));
+ok('🚨 ilçe FARKI hash degistirir (Corlu->Ergene)',
+   h({ rota: [{ province_id: 59, district: 'Ergene' }, { province_id: 34, district: 'Merkez' }] }) !== h({}));
+ok('🚨 arac tipi farki hash degistirir', h({ vehicleType: ['Kamyon'] }) !== h({}));
+ok('🚨 tonaj farki hash degistirir', h({ toplamTon: 25 }) !== h({}));
+ok('🚨 tarih farki hash degistirir', h({ tarih: '2026-12-16' }) !== h({}));
+ok('🚨 tip farki (yuk/arac) hash degistirir', h({ tip: 'arac' }) !== h({}));
+
+// ── B) UÇTAN UCA: ilanYaz ──────────────────────────────────────────────────
+const eposta = `mukerrer-${Date.now()}@yukegel-test.local`;
+let userId = '';
+const yazilanIdler: string[] = [];
+
+async function yaz(over: Partial<Parameters<typeof ilanYaz>[1]> = {}) {
+  return ilanYaz(userId, {
+    tip: 'yuk', kalkis: 'Tekirdağ', kalkis_ilce: 'Çorlu', tarih: '2026-12-15',
+    arac_tipi: 'TIR',
+    duraklar: [{ sehir: 'İstanbul', ilce: 'Merkez', ton: '20', palet: '10' }],
+    ...over,
+  }, 'form');
 }
 
 try {
@@ -67,55 +69,47 @@ try {
     email: eposta, password: 'Dl!' + Math.random().toString(36).slice(2) + 'Aa1', email_confirm: true,
   });
   userId = data.user!.id;
-  await svc.from('users').update({ user_type: 'yuk_sahibi', display_name: 'MÜKERRER-TEST' }).eq('id', userId);
+  await svc.from('users').update({ user_type: 'yuk_sahibi', display_name: 'MUKERRER', phone: '05001112233' }).eq('id', userId);
 
-  // ── 1. TAMAMLANMIŞ iş mükerrer SAYILMAMALI ──────────────────────────────
-  await ilanAc({
-    status: 'passive', moderation_status: 'approved', completed_at: new Date().toISOString(),
-    origin_district: 'Çorlu', durakIlce: 'Merkez',
-  });
-  let sonuc = await mukerrerBul({
-    userId, tip: 'yuk', kalkisIlId: TEKIRDAG, kalkisIlce: 'Çorlu',
-    ilkDurakIlId: ISTANBUL, ilkDurakIlce: 'Merkez', tarih,
-  });
-  ok('🚨 tamamlanmış iş varken, aktif ilan yokken → mükerrer SAYILMAZ', sonuc === null,
-     JSON.stringify(sonuc));
+  let r = await yaz();
+  ok('ilk ilan yazıldı', r.ok, JSON.stringify(r));
+  if (r.ok) yazilanIdler.push(r.id);
 
-  // ── 2. AKTİF bir ilan aç: Tekirdağ-Çorlu → İstanbul-Merkez ──────────────
-  const aktifId = await ilanAc({
-    status: 'active', moderation_status: 'approved',
-    origin_district: 'Çorlu', durakIlce: 'Merkez',
-  });
+  r = await yaz();
+  ok('🚨 birebir aynı ilan İKİNCİ kez → mükerrer', !r.ok && !!(r as any).mukerrer,
+     JSON.stringify(r));
 
-  // Aynı il-ilçe, aynı tarih → GERÇEK mükerrer, yakalanmalı.
-  sonuc = await mukerrerBul({
-    userId, tip: 'yuk', kalkisIlId: TEKIRDAG, kalkisIlce: 'Çorlu',
-    ilkDurakIlId: ISTANBUL, ilkDurakIlce: 'Merkez', tarih,
-  });
-  ok('aynı il-ilçe → aynı sefer, mükerrer YAKALANIR (regresyon yok)',
-     sonuc?.id === aktifId, JSON.stringify(sonuc));
+  r = await yaz({ kalkis_ilce: 'Ergene' });
+  ok('kalkış ilçesi farklı (Çorlu→Ergene) → mükerrer DEĞİL', r.ok, JSON.stringify(r));
+  if (r.ok) yazilanIdler.push(r.id);
 
-  // ── 3. 🚨 Çıkış ilçesi FARKLI (Tekirdağ-Ergene) — aynı İL, farklı İLÇE ──
-  sonuc = await mukerrerBul({
-    userId, tip: 'yuk', kalkisIlId: TEKIRDAG, kalkisIlce: 'Ergene',
-    ilkDurakIlId: ISTANBUL, ilkDurakIlce: 'Merkez', tarih,
-  });
-  ok('🚨 Çorlu→Ergene (aynı il, FARKLI ilçe) → mükerrer SAYILMAZ', sonuc === null,
-     JSON.stringify(sonuc));
+  r = await yaz({ arac_tipi: 'Kamyon' });
+  ok('araç tipi farklı → mükerrer DEĞİL', r.ok, JSON.stringify(r));
+  if (r.ok) yazilanIdler.push(r.id);
 
-  // ── 4. Varış ilçesi farklıysa da ayrışmalı (simetrik kontrol) ───────────
-  sonuc = await mukerrerBul({
-    userId, tip: 'yuk', kalkisIlId: TEKIRDAG, kalkisIlce: 'Çorlu',
-    ilkDurakIlId: ISTANBUL, ilkDurakIlce: 'Kadıköy', tarih,
-  });
-  ok('varış ilçesi farklı → mükerrer SAYILMAZ', sonuc === null, JSON.stringify(sonuc));
+  r = await yaz({ duraklar: [{ sehir: 'İstanbul', ilce: 'Merkez', ton: '25', palet: '10' }] });
+  ok('tonaj farklı → mükerrer DEĞİL', r.ok, JSON.stringify(r));
+  if (r.ok) yazilanIdler.push(r.id);
+
+  // 🚨 Regresyon: tamamlanmış işin aynısı yeniden girilebilmeli.
+  // İlk ilanı "tamamlanmış" işaretle (completed_at dolu), sonra AYNISINI gir.
+  await svc.from('listings').update({ completed_at: new Date().toISOString(), status: 'passive' }).eq('id', yazilanIdler[0]);
+  r = await yaz();
+  ok('🚨 tamamlanmış (completed_at) işin aynısı → mükerrer DEĞİL (regresyon)', r.ok, JSON.stringify(r));
+  if (r.ok) yazilanIdler.push(r.id);
 
 } finally {
-  if (ilanIdler.length) {
-    await svc.from('listing_stops').delete().in('listing_id', ilanIdler);
-    await svc.from('listings').delete().in('id', ilanIdler);
+  if (yazilanIdler.length) {
+    await svc.from('listing_stops').delete().in('listing_id', yazilanIdler);
+    await svc.from('listings').delete().in('id', yazilanIdler);
   }
+  // Güvenlik: kullanıcının bu testte kalan tüm ilanlarını da temizle.
   if (userId) {
+    const { data: kalan } = await svc.from('listings').select('id').eq('user_id', userId);
+    for (const l of kalan ?? []) {
+      await svc.from('listing_stops').delete().eq('listing_id', l.id);
+      await svc.from('listings').delete().eq('id', l.id);
+    }
     await svc.from('users').delete().eq('id', userId);
     await svc.auth.admin.deleteUser(userId);
   }

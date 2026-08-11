@@ -3,7 +3,8 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { createClient } from '../../lib/supabase';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ilanTelefonlariGetir, ilanTelefonGuncelle, ilanAuditGetir, moderatorIlanOlustur } from './actions';
+import { ilanTelefonlariGetir, ilanTelefonGuncelle, ilanAuditGetir, moderatorIlanOlustur,
+  mukerrerExcelListe, mukerrerExcelOnayla, mukerrerExcelReddet, type MukerrerStagingKaydi } from './actions';
 // ⚠️ `ILLER` = `IL_ADLARI_ALFABETIK`. Buradaki il filtresi Dalga 5'ten sonra
 //    `ilAdi(id) === filtreKalkis` diye TAM EŞİTLİK karşılaştırıyor; `ilAdi()`
 //    `locations.json`'dan okuyor. Dropdown eskiden AYRI bir elle yazılmış
@@ -128,13 +129,17 @@ function KullaniciKart({ kullanici, onAskiya, onFiltrele }: {
 }
 
 // Filtre tipi — 'riskli' Sprint 3 ile eklendi
-type FiltreTip = 'pending' | 'approved' | 'rejected' | 'passive' | 'hepsi' | 'no_lane' | 'arsiv' | 'riskli';
+type FiltreTip = 'pending' | 'approved' | 'rejected' | 'passive' | 'hepsi' | 'no_lane' | 'arsiv' | 'riskli' | 'mukerrer';
 
 export default function Moderator() {
   const [ilanlar, setIlanlar] = useState<any[]>([]);
   const [yukleniyor, setYukleniyor] = useState(true);
   const [filtre, setFiltre] = useState<FiltreTip>('pending');
   const [noLaneListesi, setNoLaneListesi] = useState<any[]>([]);
+  // 11 Ağu 2026 — Excel mükerrer staging. `excel_dedup_staging` istemciye kapalı
+  // (grant revoke + RLS), o yüzden liste/onay/ret server action üzerinden.
+  const [mukerrerListesi, setMukerrerListesi] = useState<MukerrerStagingKaydi[]>([]);
+  const [mukerrerIslem, setMukerrerIslem] = useState<string>('');
   const [islem, setIslem] = useState<string>('');
   const [duzenleId, setDuzenleId] = useState<string>('');
   // 8 Ağu 2026 (pratiklik) — "Çözümsüz" (no_lane) manuel ilan girişi eskiden
@@ -233,15 +238,19 @@ export default function Moderator() {
 
   async function getIstatistik() {
     const bugun = new Date(); bugun.setHours(0, 0, 0, 0);
-    const [{ count: pending }, { count: bugunGelen }, { count: bugunOnaylanan }, { count: cozumsuz }, { count: riskli }] = await Promise.all([
+    const [{ count: pending }, { count: bugunGelen }, { count: bugunOnaylanan }, { count: cozumsuz }, { count: riskli }, mukerrerRes] = await Promise.all([
       supabase.from('listings').select('*', { count: 'exact', head: true }).eq('moderation_status', 'pending'),
       supabase.from('listings').select('*', { count: 'exact', head: true }).gte('created_at', bugun.toISOString()),
       supabase.from('listings').select('*', { count: 'exact', head: true }).eq('moderation_status', 'approved').gte('reviewed_at', bugun.toISOString()),
       supabase.from('raw_posts').select('*', { count: 'exact', head: true }).eq('processing_status', 'no_lane'),
       // Sprint 3: riskli ilan sayısı (audit_score > 30, archived değil)
       supabase.from('listings').select('*', { count: 'exact', head: true }).gt('audit_score', 30).neq('moderation_status', 'archived'),
+      // 11 Ağu 2026 — Excel mükerrer bekleyen sayısı. `excel_dedup_staging`
+      // istemciye kapalı, server action ile (bekleyenleri döner, uzunluğu sayı).
+      mukerrerExcelListe(),
     ]);
-    setIstatistik({ pending, bugunGelen, bugunOnaylanan, cozumsuz, riskli });
+    const mukerrer = mukerrerRes.ok ? mukerrerRes.veri.length : 0;
+    setIstatistik({ pending, bugunGelen, bugunOnaylanan, cozumsuz, riskli, mukerrer });
   }
 
   async function getIlanlar() {
@@ -251,6 +260,12 @@ export default function Moderator() {
         .select('id, raw_text, sender_name, source, source_group, message_timestamp, quality_score')
         .eq('processing_status', 'no_lane').order('created_at', { ascending: false }).limit(100);
       setNoLaneListesi(data || []); setIlanlar([]); setYukleniyor(false); return;
+    }
+
+    if (filtre === 'mukerrer') {
+      const res = await mukerrerExcelListe();
+      setMukerrerListesi(res.ok ? res.veri : []);
+      setIlanlar([]); setYukleniyor(false); return;
     }
 
     // Sprint 3: audit_score ve is_shadow_banned select'e eklendi
@@ -1018,6 +1033,7 @@ export default function Moderator() {
                 { label: 'Bugün Gelen',     val: istatistik.bugunGelen,     color: '#60a5fa' },
                 { label: 'Bugün Onaylanan', val: istatistik.bugunOnaylanan, color: '#22c55e' },
                 { label: 'Çözümsüz',        val: istatistik.cozumsuz,       color: '#f87171' },
+                { label: 'Mükerrer Excel',  val: istatistik.mukerrer,       color: '#60a5fa' },  // 11 Ağu 2026
                 { label: 'Riskli',          val: istatistik.riskli,         color: '#f87171' },  // Sprint 3
               ].map(k => (
                 <div key={k.label} style={{ textAlign: 'center' }}>
@@ -1084,13 +1100,13 @@ export default function Moderator() {
               </div>
             )}
             {/* Tüm tab butonları — Sprint 3: riskli eklendi */}
-            {(['pending', 'approved', 'rejected', 'passive', 'hepsi', 'no_lane', 'arsiv', 'riskli'] as const).map(f => (
+            {(['pending', 'approved', 'rejected', 'passive', 'hepsi', 'no_lane', 'mukerrer', 'arsiv', 'riskli'] as const).map(f => (
               <button key={f} onClick={() => { setFiltre(f); setSonraBak(new Set()); filtreTemizle(); setSelectedIds(new Set()); setLastClickedIdx(null); }}
                 style={{
                   padding: '5px 12px', borderRadius: 6, border: '1px solid',
-                  borderColor: filtre === f ? (f === 'arsiv' ? '#854d0e' : f === 'riskli' ? '#7f1d1d' : '#22c55e') : '#30363d',
-                  background: filtre === f ? (f === 'arsiv' ? '#2a1d00' : f === 'riskli' ? '#2a0d0d' : '#14532d') : '#0d1117',
-                  color: filtre === f ? (f === 'arsiv' ? '#fbbf24' : f === 'riskli' ? '#f87171' : '#22c55e') : '#8b949e',
+                  borderColor: filtre === f ? (f === 'arsiv' ? '#854d0e' : f === 'riskli' ? '#7f1d1d' : f === 'mukerrer' ? '#1e3a5f' : '#22c55e') : '#30363d',
+                  background: filtre === f ? (f === 'arsiv' ? '#2a1d00' : f === 'riskli' ? '#2a0d0d' : f === 'mukerrer' ? '#0d1b2a' : '#14532d') : '#0d1117',
+                  color: filtre === f ? (f === 'arsiv' ? '#fbbf24' : f === 'riskli' ? '#f87171' : f === 'mukerrer' ? '#60a5fa' : '#22c55e') : '#8b949e',
                   fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer',
                 }}>
                 {f === 'pending' ? '⏳ Bekleyenler'
@@ -1098,6 +1114,7 @@ export default function Moderator() {
                   : f === 'rejected' ? '❌ Reddedilenler'
                   : f === 'passive'  ? '💤 Pasifler'
                   : f === 'no_lane'  ? '🔍 Çözümsüz'
+                  : f === 'mukerrer' ? `🔁 Mükerrer Excel${istatistik?.mukerrer ? ` (${istatistik.mukerrer})` : ''}`
                   : f === 'arsiv'    ? '🗄️ Arşiv'
                   : f === 'riskli'   ? `🔴 Riskli${istatistik?.riskli ? ` (${istatistik.riskli})` : ''}`
                   : '📋 Hepsi'}
@@ -1193,7 +1210,64 @@ export default function Moderator() {
           </div>
         )}
 
-        {filtre === 'no_lane' ? (
+        {filtre === 'mukerrer' ? (
+          /* ── Mükerrer Excel tab (11 Ağu 2026) ──
+             Excel toplu yüklemede dedup_hash'i var olan bir ilana çarpan gruplar.
+             Moderatör "araç/tonaj farklı, mükerrer değil" derse onaylar (ilan
+             yazılır), gerçekten aynıysa reddeder. Aksiyonlar server action
+             (`excel_dedup_staging` istemciye kapalı). */
+          <div style={{ display: 'grid', gap: 10 }}>
+            {mukerrerListesi.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '60px 0', color: '#4b5563' }}><div style={{ fontSize: '2rem', marginBottom: 8 }}>✅</div><div>Bekleyen mükerrer Excel ilanı yok</div></div>
+            ) : mukerrerListesi.map(kayit => (
+              <div key={kayit.id} style={{ background: '#161b22', border: '1px solid #30363d', borderRadius: 8, padding: '14px 16px' }}>
+                <div style={{ display: 'flex', gap: 6, marginBottom: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <span style={{ background: '#0d1b2a', color: '#60a5fa', fontSize: '0.68rem', fontWeight: 700, padding: '2px 8px', borderRadius: 4 }}>🔁 Mükerrer Excel</span>
+                  {kayit.seferNo && <span style={{ color: '#9ca3af', fontSize: '0.72rem' }}>Sefer {kayit.seferNo}</span>}
+                  <span style={{ color: '#4b5563', fontSize: '0.72rem' }}>{new Date(kayit.createdAt).toLocaleString('tr-TR')}</span>
+                  {kayit.matchedListingId && (
+                    <a href={`/ilan/${kayit.matchedListingId}`} target="_blank" rel="noopener noreferrer"
+                      style={{ color: '#60a5fa', fontSize: '0.72rem', marginLeft: 'auto', textDecoration: 'underline' }}>
+                      Çakışan ilanı gör ↗
+                    </a>
+                  )}
+                </div>
+                <div style={{ background: '#0d1117', borderRadius: 6, padding: 12, border: '1px solid #1f2937', marginBottom: 10 }}>
+                  <div style={{ color: '#e2e8f0', fontSize: '0.85rem', fontWeight: 700, marginBottom: 4 }}>
+                    {kayit.ozet.kalkis || '—'} → {kayit.ozet.varislar.join(', ') || '—'}
+                  </div>
+                  <div style={{ color: '#8b949e', fontSize: '0.76rem', display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                    {kayit.ozet.tarih && <span>📅 {kayit.ozet.tarih}</span>}
+                    {kayit.ozet.aracTipi && <span>🚛 {kayit.ozet.aracTipi}</span>}
+                    {kayit.ozet.fiyat && <span>💰 {kayit.ozet.fiyat} TL</span>}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button disabled={mukerrerIslem === kayit.id} onClick={async () => {
+                    setMukerrerIslem(kayit.id);
+                    const res = await mukerrerExcelOnayla(kayit.id);
+                    setMukerrerIslem('');
+                    if (!res.ok) { alert('Onaylanamadı: ' + res.hata); return; }
+                    setMukerrerListesi(prev => prev.filter(k => k.id !== kayit.id));
+                    getIstatistik();
+                  }} style={{ padding: '6px 14px', borderRadius: 6, border: 'none', background: '#14532d', color: '#22c55e', fontWeight: 700, fontSize: '0.82rem', cursor: 'pointer', opacity: mukerrerIslem === kayit.id ? 0.5 : 1 }}>
+                    {mukerrerIslem === kayit.id ? '...' : '✅ Mükerrer Değil, Yayınla'}
+                  </button>
+                  <button disabled={mukerrerIslem === kayit.id} onClick={async () => {
+                    setMukerrerIslem(kayit.id);
+                    const res = await mukerrerExcelReddet(kayit.id);
+                    setMukerrerIslem('');
+                    if (!res.ok) { alert('Reddedilemedi: ' + res.hata); return; }
+                    setMukerrerListesi(prev => prev.filter(k => k.id !== kayit.id));
+                    getIstatistik();
+                  }} style={{ padding: '6px 14px', borderRadius: 6, border: 'none', background: '#450a0a', color: '#f87171', fontWeight: 700, fontSize: '0.82rem', cursor: 'pointer', opacity: mukerrerIslem === kayit.id ? 0.5 : 1 }}>
+                    ❌ Gerçekten Mükerrer
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : filtre === 'no_lane' ? (
           /* ── Çözümsüz tab */
           <div style={{ display: 'grid', gap: 10 }}>
             {noLaneListesi.length === 0 ? (

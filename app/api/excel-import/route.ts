@@ -198,40 +198,68 @@ export async function POST(request: NextRequest) {
       yuk_cinsi: String(r?.yukCinsi ?? ''),
     }));
 
-    const sonuc = await ilanYaz(
-      user.id,
-      {
-        tip: 'yuk',
-        kalkis,
-        kalkis_ilce: String(ilk?.kalkisIlce ?? ''),
-        fiyat: String(ilk?.fiyat ?? ''),
-        tarih,
-        genel_not: String(ilk?.not ?? ''),
-        arac_tipi: aracCoz(String(ilk?.aracTipi ?? '')) ?? undefined,
-        utsyapi: [utsCoz(String(ilk?.ustYapi ?? ''))].filter((u): u is string => Boolean(u)),
-        arac_adet: 1,
-        duraklar,
-      },
-      'excel',
-    );
+    // `ilanYaz`e AYNEN geçilecek girdi — mükerrer çıkarsa staging'e de bu
+    // yazılır ki moderatör "onayla" dediğinde satır yeniden ayrıştırılmasın.
+    const ilanGirdi = {
+      tip: 'yuk' as const,
+      kalkis,
+      kalkis_ilce: String(ilk?.kalkisIlce ?? ''),
+      fiyat: String(ilk?.fiyat ?? ''),
+      tarih,
+      genel_not: String(ilk?.not ?? ''),
+      arac_tipi: aracCoz(String(ilk?.aracTipi ?? '')) ?? undefined,
+      utsyapi: [utsCoz(String(ilk?.ustYapi ?? ''))].filter((u): u is string => Boolean(u)),
+      arac_adet: 1,
+      duraklar,
+    };
 
-    sonuclar.push(
-      sonuc.ok
-        ? { seferNo, ok: true, id: sonuc.id, durum: sonuc.durum }
-        : { seferNo, ok: false, hata: sonuc.hata }
-    );
+    const sonuc = await ilanYaz(user.id, ilanGirdi, 'excel');
+
+    if (sonuc.ok) {
+      sonuclar.push({ seferNo, ok: true, id: sonuc.id, durum: sonuc.durum });
+      continue;
+    }
+
+    // Mükerrer değilse gerçek bir hata — kullanıcıya göster.
+    if (!sonuc.mukerrer) {
+      sonuclar.push({ seferNo, ok: false, hata: sonuc.hata });
+      continue;
+    }
+
+    // 🔁 MÜKERRER → STAGING (kullanıcının Batch Pre-check / Staging isteği).
+    // `listings`e YAZILMADI; moderatör "araç/tonaj farklı, mükerrer değil"
+    // diyip onaylayana ya da reddedene kadar `excel_dedup_staging`te bekler.
+    const { error: stagingError } = await svc.from('excel_dedup_staging').insert({
+      user_id: user.id,
+      sefer_no: seferNo || null,
+      girdi: ilanGirdi,
+      dedup_hash: sonuc.mukerrer.hash,
+      matched_listing_id: sonuc.mukerrer.id,
+      status: 'bekliyor',
+    });
+    if (stagingError) {
+      // Staging'e yazamadıysak kullanıcıya dürüst ol — sessizce kaybetme.
+      structuredLog('ERROR', 'excel-import', 'Mükerrer grup staging’e yazılamadı', {
+        user_id: user.id, sefer_no: seferNo, error_message: stagingError.message,
+      });
+      sonuclar.push({ seferNo, ok: false, hata: 'Bu ilan zaten mevcut görünüyor; incelemeye alınamadı, tekrar deneyin.' });
+    } else {
+      sonuclar.push({ seferNo, ok: false, mukerrer: true });
+    }
   }
 
   const olusturulan = sonuclar.filter(s => s.ok).length;
+  const mukerrerSayisi = sonuclar.filter(s => s.mukerrer).length;
 
   structuredLog('INFO', 'excel-import', 'Toplu yükleme tamamlandı', {
     user_id: user.id,
     row_count: rows.length,
     group_count: gruplar.size,
     created: olusturulan,
-    error_count: sonuclar.length - olusturulan,
+    duplicate_staged: mukerrerSayisi,
+    error_count: sonuclar.length - olusturulan - mukerrerSayisi,
     processing_time_ms: Date.now() - baslangic,
   });
 
-  return yanit({ ok: true, action: 'commit', olusturulan, sonuclar });
+  return yanit({ ok: true, action: 'commit', olusturulan, mukerrer: mukerrerSayisi, sonuclar });
 }

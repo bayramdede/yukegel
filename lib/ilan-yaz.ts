@@ -18,7 +18,8 @@ import { getServiceSupabase } from './auth';
 import { getAuditThresholds } from './auditLimits';
 import { structuredLog } from './logger';
 import { ARAC_TIPI_SETI, UTSYAPI_SETI } from './ilan-sabitler';
-import { ilanLimitOku, ilanTavanBak, ilanTavanIsle, mukerrerBul, type IlanLimitAyar } from './ilan-limit';
+import { ilanLimitOku, ilanTavanBak, ilanTavanIsle, type IlanLimitAyar } from './ilan-limit';
+import { dedupHashHesapla } from './dedup';
 // Excel'in tek istekte açabildiği ilan sayısı. V6 tavanının Excel katsayısı buna
 // yaslanıyor: tek meşru dosya asla kendi tavanına takılmamalı.
 import { MAX_ILAN } from './toplu-yukle-sozlesme';
@@ -49,7 +50,17 @@ export type IlanYazSonuc =
    * `app/api/excel-import`, `app/api/whatsapp`) hiç değişmeden çalışmaya devam eder;
    * yeni alan isteyen okur, istemeyen görmez.
    */
-  | { ok: false; hata: string; mukerrer?: { id: string } };
+  | { ok: false; hata: string; mukerrer?: { id: string; hash: string } };
+
+/**
+ * `ilanYaz()` seçenekleri. `dedupAtla` — mükerrer hash kontrolünü ATLAR; yalnız
+ * moderatör `excel_dedup_staging`teki bir grubu "mükerrer değil" diye onayladığında
+ * kullanılır (`app/moderator/actions.ts`). Başka hiçbir yerde açılmamalı: normal
+ * akışta kontrolü atlamak Bayram'ın istediği tekilliği çürütür.
+ */
+export interface IlanYazSecenek {
+  dedupAtla?: boolean;
+}
 
 /** Bir durağın ham hâli. Şehir serbest metin gelebilir; `ilCiftYazim` süzer. */
 export interface DurakGirdi {
@@ -137,13 +148,16 @@ export type IlanKaynak = 'form' | 'excel' | 'whatsapp' | 'facebook';
  * 1 OLAMAZ — toplu yükleme TEK istekte `MAX_ILAN`(=50) ilan yazar, düz 12/saat
  * tavanı meşru bir dosyayı 12. satırda kesip GERİYE YARIM İMPORT bırakırdı.
  *
- * `mukerrerKontrol`: 24 saatlik "aynı sefer zaten var mı" kontrolü.
- * 🚨 Excel'de KAPALI ve bu bir eksiklik değil, zorunluluk: mükerrer anahtarı
- * `(tip, kalkış ili, ilk durak ili, tarih)`. Aynı gün İstanbul→Ankara'ya 10 araç
- * kaldıran bir nakliyecinin dosyasında bu dörtlü 10 kez TEKRARLANIR ve hepsi
- * meşrudur (ilçe/yük/tonaj farklı). Kontrolü açmak o dosyanın ilk satırı dışındaki
- * her şeyi "mükerrer" diye reddederdi. Tekil kanallarda ise kullanıcı ekranda
- * uyarıyı görüp karar verebiliyor.
+ * `mukerrerKontrol`: "bu ilan sistemde zaten var mı" kontrolü.
+ * 🚨 11 Ağu 2026 — Excel'de ARTIK AÇIK (eskiden kapalıydı). Eski gerekçe geçerli
+ * değil: kapalı olma sebebi eski anahtarın `(tip, kalkış ili, ilk durak ili,
+ * tarih)` kadar KABA olmasıydı — aynı gün İstanbul→Ankara'ya 10 araç kaldıran bir
+ * dosyada bu dörtlü 10 kez tekrarlanır ama satırlar meşrudur (ilçe/yük/tonaj
+ * farklı). Yeni birleşik hash (`lib/dedup.ts`) TAM rota + araç/kasa + toplam
+ * ton/palet içerdiği için o 10 satır 10 FARKLI hash üretir — artık yanlış eşleşme
+ * yok, kontrolü açmak güvenli. Excel'de mükerrer çıkan grup REDDEDİLMEZ; route
+ * (`app/api/excel-import`) onu `excel_dedup_staging`e yazıp moderatör kararına
+ * bırakır (kullanıcının Batch Pre-check / Staging isteği).
  *
  * `Record<IlanKaynak, …>` bilerek — birleşime kanal eklenince burası derleme
  * hatası verir ve politikayı yazmayı unutamazsın.
@@ -154,7 +168,7 @@ const KANAL_POLITIKA: Record<IlanKaynak, {
   mukerrerKontrol: boolean;
 }> = {
   form:      { daimaIncele: false, tavanCarpani: 1, mukerrerKontrol: true  },
-  excel:     { daimaIncele: false, tavanCarpani: 5, mukerrerKontrol: false },
+  excel:     { daimaIncele: false, tavanCarpani: 5, mukerrerKontrol: true  },
   whatsapp:  { daimaIncele: true,  tavanCarpani: 1, mukerrerKontrol: true  },
   // WhatsApp ile aynı gerekçe: serbest metinden LLM ile çıkarılıyor, form yok.
   // Bugün çağıranı yok ama DB kısıtı bu değeri kabul ediyor; kanal açılırsa
@@ -277,6 +291,7 @@ export async function ilanYaz(
   userId: string,
   girdi: IlanYazGirdi,
   kaynak: IlanKaynak = 'form',
+  secenek: IlanYazSecenek = {},
 ): Promise<IlanYazSonuc> {
   const svc = getServiceSupabase();
 
@@ -338,9 +353,24 @@ export async function ilanYaz(
   if (!tarih) return { ok: false, hata: 'Geçerli bir tarih seçin.' };
   if (tarih < bugunISO()) return { ok: false, hata: 'Geçmiş bir tarih seçilemez.' };
 
-  // ── V6: TAVAN + MÜKERRER ──────────────────────────────────────────────────
+  // Beyaz liste: listede olmayan değer sessizce DÜŞER. Eskiden V6 mükerrer
+  // bloğundan SONRAYDI; hash'e girdikleri için (11 Ağu 2026) buraya, tavan/
+  // mükerrer kontrolünden ÖNCEYE taşındı.
+  const aracTipi = girdi.arac_tipi && ARAC_TIPI_SETI.has(girdi.arac_tipi)
+    ? [girdi.arac_tipi]
+    : null;
+  const utsyapi = Array.isArray(girdi.utsyapi)
+    ? girdi.utsyapi.filter(u => UTSYAPI_SETI.has(u)).slice(0, UTSYAPI_SETI.size)
+    : [];
+
+  // ── V2: telefon — eskiden RPC'nin hemen öncesindeydi; hash telefonu
+  // İÇERDİĞİ için (11 Ağu 2026) buraya, mükerrer kontrolünden ÖNCEYE taşındı.
+  const telSonuc = await ilanTelefonu(userId, girdi.tel);
+  if (!telSonuc.ok) return { ok: false, hata: telSonuc.hata };
+
+  // ── V6: TAVAN ────────────────────────────────────────────────────────────
   // Konum kasıtlı: BEDAVA (senkron) doğrulamalardan SONRA, DB'ye dokunan
-  // araç/telefon/RPC adımlarından ÖNCE. Çöp girdi tek bir sorguya bile mal olmaz;
+  // araç/RPC adımlarından ÖNCE. Çöp girdi tek bir sorguya bile mal olmaz;
   // geçerli ama fazla ilan da yazma yoluna hiç girmez.
   const tavan = kanalTavani(await ilanLimitOku(), kaynak);
   const tavanSonuc = await ilanTavanBak(userId, tavan);
@@ -355,35 +385,53 @@ export async function ilanYaz(
     return { ok: false, hata: tavanSonuc.hata };
   }
 
-  // Mükerrer anahtarı `province_id` + `district` üzerinden — metin kolonları
-  // (şehir) Dalga 5'te düştü ama ilçe METNİ (`ilceNormalize` çıktısı) hâlâ var
-  // ve anahtara 11 Ağu 2026'da eklendi (bkz. `lib/ilan-limit.ts` başlık notu —
-  // yalnız il bazlı karşılaştırma Çorlu→Ergene gibi İL İÇİ güzergah
-  // değişikliklerini "mükerrer" sayıyordu). Gerekçe ve kanal politikası
-  // `lib/ilan-limit.ts` / `KANAL_POLITIKA` içinde.
-  if (KANAL_POLITIKA[kaynak].mukerrerKontrol) {
-    const mukerrer = await mukerrerBul({
-      userId,
-      tip,
-      kalkisIlId: kalkisIl.id,
-      kalkisIlce: kalkisIlce?.ad ?? null,
-      ilkDurakIlId: duraklar[0].province_id,
-      ilkDurakIlce: duraklar[0].district,
-      tarih,
-    });
-    if (mukerrer) {
-      structuredLog('INFO', 'db-transaction', 'Mükerrer ilan engellendi', {
+  // ── MÜKERRER: BİRLEŞİK HASH (11 Ağu 2026, Bayram) ───────────────────────
+  // Eski `mukerrerBul()` (`lib/ilan-limit.ts`, artık SİLİNDİ) yalnız
+  // (kullanıcı, tip, kalkış/varış il+ilçe, tarih)'e, 24 saatlik bir pencereye
+  // bakıyordu. Yeni hash telefon + TAM rota + araç/kasa tipleri + toplam
+  // ton/palet + tarihi tek bir SHA-256'da eritiyor — "her şeyiyle aynı" kontrolü,
+  // zaman penceresi YOK (tarih hash'in içinde, yarın girmek zaten ayrı hash).
+  // Ayrıntı ve bilinçli sapmalar: `lib/dedup.ts` başlığı.
+  const dedupHash = dedupHashHesapla({
+    tip,
+    telefon: telSonuc.tel,
+    rota: [
+      { province_id: kalkisIl.id, district: kalkisIlce?.ad ?? null },
+      ...duraklar.map(d => ({ province_id: d.province_id, district: d.district })),
+    ],
+    vehicleType: aracTipi,
+    bodyType: utsyapi,
+    toplamTon: duraklar.reduce((t, d) => t + (d.ton ?? 0), 0),
+    toplamPalet: duraklar.reduce((t, d) => t + (d.palet ?? 0), 0),
+    tarih,
+  });
+
+  if (KANAL_POLITIKA[kaynak].mukerrerKontrol && !secenek.dedupAtla) {
+    // 🔓 Bilinçli sapma: kullanıcının "archived olmayan" tanımı TEK BAŞINA
+    // 11 Ağu 2026'da düzeltilen bugu geri getirirdi — tamamlanmış
+    // (`completed_at` dolu) bir iş `archived` OLMUYOR, `passive` kalıyor
+    // (bkz. `app/api/deals/[id]/route.ts`). `completed_at is null` bu yüzden
+    // ayrıca süzülüyor — `docs/PROJE_HARITASI.md` §9'daki dersin tekrarı.
+    const { data: mevcutIlan } = await svc
+      .from('listings')
+      .select('id')
+      .eq('dedup_hash', dedupHash)
+      .neq('moderation_status', 'archived')
+      .is('completed_at', null)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (mevcutIlan) {
+      structuredLog('INFO', 'db-transaction', 'Mükerrer ilan engellendi (hash eşleşti)', {
         user_id: userId,
         source: kaynak,
-        mevcut_listing_id: mukerrer.id,
-        listing_type: tip,
-        origin_province_id: kalkisIl.id,
-        available_date: tarih,
+        mevcut_listing_id: mevcutIlan.id,
+        dedup_hash: dedupHash,
       });
       return {
         ok: false,
-        hata: 'Bu sefer için son 24 saatte zaten bir ilanınız var. Yeni ilan açmak yerine mevcut ilanınızı panelinizden düzenleyip tazeleyebilirsiniz.',
-        mukerrer: { id: mukerrer.id },
+        hata: 'Bu ilan sistemde zaten mevcut. İlanlarım sayfasından güncelleyebilirsiniz.',
+        mukerrer: { id: mevcutIlan.id, hash: dedupHash },
       };
     }
   }
@@ -397,14 +445,6 @@ export async function ilanYaz(
   if (aracAdet === null) {
     return { ok: false, hata: `Araç adedi 1 ile ${MAX_ARAC_ADET} arasında olmalı.` };
   }
-
-  // Beyaz liste: listede olmayan değer sessizce DÜŞER.
-  const aracTipi = girdi.arac_tipi && ARAC_TIPI_SETI.has(girdi.arac_tipi)
-    ? [girdi.arac_tipi]
-    : null;
-  const utsyapi = Array.isArray(girdi.utsyapi)
-    ? girdi.utsyapi.filter(u => UTSYAPI_SETI.has(u)).slice(0, UTSYAPI_SETI.size)
-    : [];
 
   // ── B3: araç bağlantısı ───────────────────────────────────────────────────
   // Kullanıcı `/ilan-ver`'de kendi araçlarından birini seçiyor; o seçim şimdiye
@@ -433,9 +473,8 @@ export async function ilanYaz(
     }
   }
 
-  // ── V2: telefon
-  const telSonuc = await ilanTelefonu(userId, girdi.tel);
-  if (!telSonuc.ok) return { ok: false, hata: telSonuc.hata };
+  // (V2 telefon YUKARIDA çözüldü — hash onu içerdiği için mükerrer
+  // kontrolünden önce gerekiyordu; `telSonuc` orada.)
 
   // ── ATOMİK YAZMA (V5) ─────────────────────────────────────────────────────
   // İlan ve durakları TEK transaction'da yazılır: `public.ilan_olustur()` RPC'si.
@@ -521,6 +560,21 @@ export async function ilanYaz(
   // Aşağıdaki moderasyon adımı ilanı kuyruğa alsa bile ilan YAZILMIŞTIR — kuyruğa
   // alınmak sayacı geri vermez, aksi hâlde tavan "yayına çıkan ilan tavanı" olurdu.
   ilanTavanIsle(userId, tavan);
+
+  // Mükerrer hash'ini yaz — `ilan_olustur()` RPC'si bu kolonu bilmiyor
+  // (parse-listing Edge Function ile paylaşıldığı için genişletilmedi), ayrı
+  // bir UPDATE ile yazılıyor. Bir sonraki ilanın mükerrer kontrolü bunu okur.
+  // ⚠️ Hata olsa bile ilan yazıldı; hash yazılamazsa bir sonraki mükerrer
+  // yakalanmaz ama ilan kaybolmaz — o yüzden hata akışı DURDURMUYOR, yalnız iz.
+  const { error: hashError } = await svc
+    .from('listings')
+    .update({ dedup_hash: dedupHash })
+    .eq('id', listing.id);
+  if (hashError) {
+    structuredLog('WARN', 'db-transaction', 'dedup_hash yazılamadı', {
+      user_id: userId, listing_id: listing.id, error_message: hashError.message,
+    });
+  }
 
   // ── V3: moderasyon kararı ─────────────────────────────────────────────────
   // Eşikler `system_config`'ten; `/api/ilan/duzelt` ile BİREBİR aynı mantık.

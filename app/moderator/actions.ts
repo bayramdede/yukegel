@@ -3,8 +3,9 @@
 import { requireStaff, getServiceSupabase } from '../../lib/auth'
 import { structuredLog } from '../../lib/logger'
 import {
-  kisaMetin, sayiAralik, tamSayiAralik,
+  ilanYaz, kisaMetin, sayiAralik, tamSayiAralik,
   MAX_DURAK, MAX_TON, MAX_PALET, MAX_NOT, MAX_RAW_TEXT, MAX_ARAC_ADET,
+  type IlanYazGirdi,
 } from '../../lib/ilan-yaz'
 import { ARAC_TIPI_SETI, UTSYAPI_SETI } from '../../lib/ilan-sabitler'
 // Çift yazım (`docs/COGRAFI_GECIS.md` Dalga 2). `ilCiftYazim`, `ilNormalize` ile
@@ -355,4 +356,144 @@ export async function moderatorIlanOlustur(
     })
     return { ok: false, hata: 'İlan kaydedilemedi. Teknik bir hata oluştu.' }
   }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// EXCEL MÜKERRER STAGING (Bayram'ın Batch Pre-check / Staging isteği, 11 Ağu 2026)
+// ═══════════════════════════════════════════════════════════════════════════
+// Excel toplu yüklemede `dedup_hash`i var olan bir ilanla çakışan gruplar
+// `listings`e yazılmaz, `excel_dedup_staging`e düşer (`app/api/excel-import`).
+// Tablo istemciye TAMAMEN kapalı (grant revoke + RLS default-deny), o yüzden
+// listeleme/onay/ret YALNIZ burada, rolü `requireStaff()` ile doğrulanmış
+// service-role üzerinden yapılır — `no_lane` (Çözümsüz) sekmesindeki desenle
+// aynı mantık, ama o tablo istemciye açık olduğu için orada action gerekmiyordu.
+
+export interface MukerrerStagingKaydi {
+  id: string
+  seferNo: string | null
+  createdAt: string
+  matchedListingId: string | null
+  /** `girdi` özeti — ekranda "ne yazılacaktı" göstermek için (rota + fiyat vb.). */
+  ozet: {
+    kalkis: string
+    varislar: string[]
+    fiyat: string | null
+    aracTipi: string | null
+    tarih: string | null
+  }
+}
+
+/** Bekleyen mükerrer Excel gruplarını döner (en yeni önce). */
+export async function mukerrerExcelListe(): Promise<ModSonuc<MukerrerStagingKaydi[]>> {
+  const yetki = await requireStaff()
+  if (!yetki.ok) return { ok: false, hata: yetki.error }
+
+  const service = getServiceSupabase()
+  const { data, error } = await service
+    .from('excel_dedup_staging')
+    .select('id, sefer_no, girdi, matched_listing_id, created_at')
+    .eq('status', 'bekliyor')
+    .order('created_at', { ascending: false })
+    .limit(200)
+
+  if (error) {
+    structuredLog('ERROR', 'moderator-actions', 'Mükerrer staging listesi okunamadı', {
+      user_id: yetki.user.id, supabase_error: error.message,
+    })
+    return { ok: false, hata: 'Liste yüklenemedi.' }
+  }
+
+  const kayitlar: MukerrerStagingKaydi[] = (data ?? []).map(r => {
+    const g = (r.girdi ?? {}) as Partial<IlanYazGirdi>
+    const duraklar = Array.isArray(g.duraklar) ? g.duraklar : []
+    return {
+      id: r.id as string,
+      seferNo: (r.sefer_no as string | null) ?? null,
+      createdAt: r.created_at as string,
+      matchedListingId: (r.matched_listing_id as string | null) ?? null,
+      ozet: {
+        kalkis: String(g.kalkis ?? ''),
+        varislar: duraklar.map(d => String(d?.sehir ?? '')).filter(Boolean),
+        fiyat: g.fiyat != null ? String(g.fiyat) : null,
+        aracTipi: g.arac_tipi ?? null,
+        tarih: g.tarih ?? null,
+      },
+    }
+  })
+
+  return { ok: true, veri: kayitlar }
+}
+
+/**
+ * Mükerrer sanılan grubu ONAYLA — "araç/tonaj farklı, mükerrer değil".
+ * Saklanan `girdi` `ilanYaz()`e `dedupAtla:true` ile geçirilir (aksi hâlde AYNI
+ * hash yeniden yakalanır, sonsuz döngü). İlan ORİJİNAL yükleyene ait olur,
+ * moderatöre değil — `user_id` staging satırından okunuyor.
+ */
+export async function mukerrerExcelOnayla(stagingId: string): Promise<ModSonuc<{ id: string }>> {
+  const yetki = await requireStaff()
+  if (!yetki.ok) return { ok: false, hata: yetki.error }
+
+  const service = getServiceSupabase()
+  const { data: kayit } = await service
+    .from('excel_dedup_staging')
+    .select('id, user_id, girdi, status')
+    .eq('id', stagingId)
+    .maybeSingle()
+
+  if (!kayit) return { ok: false, hata: 'Kayıt bulunamadı.' }
+  if (kayit.status !== 'bekliyor') return { ok: false, hata: 'Bu kayıt zaten işlenmiş.' }
+
+  const sonuc = await ilanYaz(
+    kayit.user_id as string,
+    kayit.girdi as IlanYazGirdi,
+    'excel',
+    { dedupAtla: true },
+  )
+
+  if (!sonuc.ok) {
+    structuredLog('WARN', 'moderator-actions', 'Mükerrer staging onayı ilan yazamadı', {
+      user_id: yetki.user.id, staging_id: stagingId, hata: sonuc.hata,
+    })
+    return { ok: false, hata: sonuc.hata }
+  }
+
+  await service.from('excel_dedup_staging')
+    .update({
+      status: 'onaylandi', reviewed_by: yetki.user.id,
+      reviewed_at: new Date().toISOString(), created_listing_id: sonuc.id,
+    })
+    .eq('id', stagingId)
+
+  structuredLog('INFO', 'moderator-actions', 'Mükerrer Excel grubu onaylandı → ilan yazıldı', {
+    user_id: yetki.user.id, staging_id: stagingId, listing_id: sonuc.id,
+  })
+
+  return { ok: true, veri: { id: sonuc.id } }
+}
+
+/** Mükerrer grubu REDDET — gerçekten aynı ilan, yazılmayacak. */
+export async function mukerrerExcelReddet(stagingId: string): Promise<ModSonuc> {
+  const yetki = await requireStaff()
+  if (!yetki.ok) return { ok: false, hata: yetki.error }
+
+  const service = getServiceSupabase()
+  const { data: kayit } = await service
+    .from('excel_dedup_staging')
+    .select('id, status')
+    .eq('id', stagingId)
+    .maybeSingle()
+
+  if (!kayit) return { ok: false, hata: 'Kayıt bulunamadı.' }
+  if (kayit.status !== 'bekliyor') return { ok: false, hata: 'Bu kayıt zaten işlenmiş.' }
+
+  await service.from('excel_dedup_staging')
+    .update({ status: 'reddedildi', reviewed_by: yetki.user.id, reviewed_at: new Date().toISOString() })
+    .eq('id', stagingId)
+
+  structuredLog('INFO', 'moderator-actions', 'Mükerrer Excel grubu reddedildi', {
+    user_id: yetki.user.id, staging_id: stagingId,
+  })
+
+  return { ok: true, veri: undefined }
 }
