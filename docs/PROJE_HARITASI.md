@@ -104,6 +104,24 @@
 > dalı). Yeni bekçi: `npm run test:mukerrer` (4/4, DB'ye gerçek yazan/silen
 > HTTP'siz test). Kalıcı ders: §9.
 
+> 🤝 **11 AĞU 2026 — "AKTİF DEĞİL" WATERMARK'I ROL-FARKINDA OLDU + NAKLİYECİ
+> ARTIK YÜKÜ İPTAL EDEMİYOR (Bayram'ın iki isteği).**
+> (1) `/ilan/[id]` — teklif alan nakliyeci KENDİ aldığı işin sayfasına gidince
+> "Bu ilan aktif değil. Yayından kaldırıldı." görüyordu; yanıltıcıydı, çünkü
+> ilan kaldırılmadı, TAM TERSİNE bu kişiyle mühürlendi. İlan sahibi de aynı
+> genel metni görüyordu. Artık sayfa (`ilgiliDeal` — yalnız ilan pasifken
+> sorgulanır) tarafları tanıyor: sahip "Bu iş bir nakliyeciyle anlaşıldı",
+> işi üstlenen nakliyeci "Bu işi siz üstlendiniz" görüyor; üçüncü kişiler ve
+> tarafsız durumlar (inceleniyor/düzeltme/reddedildi) ESKİ genel metni görmeye
+> devam ediyor.
+> (2) `PATCH /api/deals/[id]` `action:'iptal'` — nakliyeci artık `cancel_type:
+> 'is'` (yükün kendisi iptal, ilan bir daha yayına dönmez) İLE İSTEK ATAMAZ,
+> 403. Yalnız `cancel_type:'anlasma'` (eşleşme bozuldu, ilan tekrar `active`)
+> iki tarafa da açık. Panel (`AnlasmalarSekmesi.tsx`) nakliyeciye "İş İptali"
+> seçeneğini hiç GÖSTERMİYOR — sunucudaki 403'ün ayna deseni.
+> Bekçi: `test:deals` 29/29 (4 yeni kontrol), watermark uçtan uca gerçek
+> tarayıcı isteğiyle (3 rol + anonim) doğrulandı.
+
 > ## ✅ 10 AĞU 2026 — TERS SKOR YAYINI KAPANDI (4 nokta) + `olc:87` TABANI ONARILDI
 >
 > **`audit_score` artık HİÇBİR yerde yayınlanmıyor.** Karar (Bayram): "ibareyi

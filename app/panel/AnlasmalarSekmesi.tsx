@@ -444,6 +444,12 @@ function AnlasmaKarti({
           eski basit serbest-metin akış AYNEN kalıyor. */}
       {confirmAcik && (() => {
         const turSecimiGerekli = onayBekleyen!.action === 'iptal' && ['matched', 'in_transit'].includes(deal.status);
+        // 🚨 11 Ağu 2026 — Bayram: "teklif veren sadece anlaşmayı iptal edebilir,
+        // yükü iptal edemez." Sunucudaki (`app/api/deals/[id]/route.ts`)
+        // `cancel_type==='is' && !isShipper` reddinin BİREBİR aynası — burada
+        // göstermek yetki VERMEZ, yalnız nakliyeciye seçemeyeceği bir seçeneği
+        // hiç göstermemek için.
+        const izinliIptalTurleri = isShipper ? IPTAL_TURLERI : IPTAL_TURLERI.filter(t => t.deger === 'anlasma');
         const nihaiNeden = onayNeden === 'Diğer' ? digerMetin.trim() : onayNeden;
         const gonderilebilir = !turSecimiGerekli || (cancelType && nihaiNeden);
         return (
@@ -456,8 +462,13 @@ function AnlasmaKarti({
 
             {turSecimiGerekli ? (
               <>
+                {!isShipper && (
+                  <div style={{ color: C.dim, fontSize: '0.72rem' }}>
+                    Yükün kendisini yalnız ilan sahibi iptal edebilir — siz yalnız anlaşmayı iptal edebilirsiniz.
+                  </div>
+                )}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {IPTAL_TURLERI.map(t => (
+                  {izinliIptalTurleri.map(t => (
                     <label key={t.deger} onClick={() => { setCancelType(t.deger); setOnayNeden(''); setDigerMetin(''); }}
                       style={{ display: 'flex', gap: 10, alignItems: 'flex-start', cursor: 'pointer', padding: 10, borderRadius: 6, border: `1px solid ${cancelType === t.deger ? C.blue : C.border}`, background: cancelType === t.deger ? C.blueBg : 'transparent' }}>
                       <input type="radio" checked={cancelType === t.deger} onChange={() => { setCancelType(t.deger); setOnayNeden(''); setDigerMetin(''); }} style={{ marginTop: 3 }} />
@@ -471,7 +482,7 @@ function AnlasmaKarti({
                 {cancelType && (
                   <select value={onayNeden} onChange={e => setOnayNeden(e.target.value)} style={{ ...inp, cursor: 'pointer' }}>
                     <option value="">Neden seçin...</option>
-                    {IPTAL_TURLERI.find(t => t.deger === cancelType)!.nedenler.map(n => (
+                    {izinliIptalTurleri.find(t => t.deger === cancelType)!.nedenler.map(n => (
                       <option key={n} value={n}>{n}</option>
                     ))}
                   </select>

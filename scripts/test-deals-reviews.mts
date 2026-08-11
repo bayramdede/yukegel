@@ -109,6 +109,16 @@ try {
   const { data: ilanSonra } = await svc.from('listings').select('status').eq('id', ilanId).single();
   ok('mühürlenince ilan feed’den çıktı (passive)', ilanSonra!.status === 'passive', `bulunan: ${ilanSonra!.status}`);
 
+  // ── 3b. 🚨 Nakliyeci YÜKÜ iptal edemez, yalnız ANLAŞMAYI ────────────────
+  // Reddedilmesi gereken bir istek — durum DEĞİŞMEMELİ, akışın geri kalanı
+  // (yola çıktı → tamamla) hâlâ `matched`e muhtaç, o yüzden burada GERÇEKTEN
+  // iptal ETMİYORUZ, yalnız yetkisiz denemenin 403 döndüğünü doğruluyoruz.
+  r = await cagir(ck.c, `/api/deals/${dealId}`, 'PATCH', { action: 'iptal', cancel_type: 'is', cancel_reason: 'test' });
+  ok('🚨 nakliyeci cancel_type="is" ile YÜKÜ iptal edemez', r.durum === 403, `${r.durum} ${JSON.stringify(r.veri)}`);
+  const { data: dealIptalDenemesiSonrasi } = await svc.from('deals').select('status').eq('id', dealId).single();
+  ok('reddedilen deneme durumu BOZMADI (hâlâ matched)',
+     dealIptalDenemesiSonrasi!.status === 'matched', `bulunan: ${dealIptalDenemesiSonrasi!.status}`);
+
   // ── 4. Değerlendirme, TAMAMLANMADAN yapılamaz ───────────────────────────
   r = await cagir(ck.s, '/api/reviews', 'POST', { deal_id: dealId, rating: 1 });
   ok('🚨 tamamlanmamış işe değerlendirme YAZILAMAZ', r.durum === 409, `${r.durum} ${JSON.stringify(r.veri)}`);
@@ -155,6 +165,29 @@ try {
 
   r = await cagir(ck.s, '/api/reviews', 'POST', { deal_id: dealId, rating: 1 });
   ok('mükerrer değerlendirme engellendi', r.durum === 409, `${r.durum}`);
+
+  // ── 6b. İlan veren (yalnız o) cancel_type="is" ile YÜKÜ GERÇEKTEN iptal
+  // edebilmeli — 3b'de yalnız "nakliyeci edemez" doğrulanmıştı, bunun tersini
+  // (meşru yol bozulmadı mı) atılabilir/tek kullanımlık ayrı bir kayıtla
+  // uçtan uca sınıyoruz.
+  const { data: ilanIs } = await svc.from('listings').insert({
+    user_id: sId, listing_type: 'yuk', origin_province_id: 6,
+    moderation_status: 'approved', status: 'active', is_shadow_banned: false,
+    notes: 'iş iptali testi', source: 'form', available_date: '2026-12-01',
+  }).select('id').single();
+  await svc.from('listing_stops').insert({ listing_id: ilanIs!.id, stop_order: 1, province_id: 34, district: 'Merkez' });
+  const { data: dealIs } = await svc.from('deals').insert({
+    listing_id: ilanIs!.id, shipper_id: sId, carrier_id: cId, status: 'matched',
+    matched_at: new Date().toISOString(), agreed_price: 3000,
+  }).select('id').single();
+  await svc.from('listings').update({ status: 'passive' }).eq('id', ilanIs!.id);
+
+  r = await cagir(ck.s, `/api/deals/${dealIs!.id}`, 'PATCH', { action: 'iptal', cancel_type: 'is', cancel_reason: 'yük artık taşınmayacak' });
+  ok('ilan veren cancel_type="is" ile YÜKÜ iptal EDEBİLİR', r.durum === 200 && r.veri.deal?.cancel_type === 'is',
+     `${r.durum} ${JSON.stringify(r.veri)}`);
+  const { data: ilanIsSonra } = await svc.from('listings').select('status').eq('id', ilanIs!.id).single();
+  ok('"iş" iptalinde ilan PASSIVE KALIR (yayına dönmez)', ilanIsSonra!.status === 'passive',
+     `bulunan: ${ilanIsSonra!.status}`);
 
   // ── 7. Denetim motoru: ihlalli metin sessizce gizlenir ──────────────────
   const { data: ilan2 } = await svc.from('listings').insert({

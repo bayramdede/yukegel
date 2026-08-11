@@ -235,10 +235,21 @@ export default async function IlanDetay({ params }: { params: Promise<{ id: stri
 
   if (!ilan || ilan.moderation_status === 'rejected') return notFound();
 
+  // 11 Ağu 2026 — "ilan canlıda mı?" TEK tanım. `app/panel/PanelClient.tsx`
+  // içindeki `aktifIlan` hesabıyla BİREBİR aynı formül — ikisi ayrışırsa
+  // panel "aktif" derken bu sayfa "pasif" der, kullanıcı hangisine güvenecek?
+  // Bir anlaşma iptal edildiğinde (`cancel_type='anlasma'`) `status` sunucuda
+  // tekrar `active`e döner (bkz. `app/api/deals/[id]/route.ts`) — bu formül
+  // O DEĞİŞİKLİĞİ otomatik yansıtır, ayrı bir bayrak gerekmez.
+  //
+  // Bu, `user`den bağımsız hesaplanabiliyor (yalnız `ilan` alanlarına bakıyor)
+  // — aşağıdaki paralel sorgu grubuna girebilmesi için `user`den ÖNCE taşındı.
+  const ilanAktif = !ilan.completed_at && ilan.status === 'active'
+    && ['approved', 'auto_published'].includes(ilan.moderation_status);
+
   // ── Profil tamamlanmış mı (telefon gösterimi) + ilan sahibinin rozet bilgisi —
-  // ikisi de BAĞIMSIZ satırlar (biri `user.id`, biri `ilan.user_id` sorguluyor),
-  // aynı anda atılır.
-  const [profilSonuc, kullaniciBilgiSonuc] = await Promise.all([
+  // üçü de BAĞIMSIZ satırlar, aynı anda atılır.
+  const [profilSonuc, kullaniciBilgiSonuc, ilgiliDealSonuc] = await Promise.all([
     user
       ? supabase.from('users').select('user_type').eq('id', user.id).maybeSingle()
       : Promise.resolve({ data: null as { user_type: string | null } | null }),
@@ -249,22 +260,74 @@ export default async function IlanDetay({ params }: { params: Promise<{ id: stri
     ilan.user_id
       ? supabase.from('users').select('created_at').eq('id', ilan.user_id).single()
       : Promise.resolve({ data: null as { created_at: string } | null }),
+    // 11 Ağu 2026 — "aktif değil" watermark'ının doğru mesajı için: ilan
+    // pasifse (üstteki `ilanAktif` formülü) bunun nedeni büyük ihtimalle bir
+    // `deals` kaydı (mühürlenmiş/tamamlanmış/iş-iptali). YALNIZ ilan pasifken
+    // sorgulanır — aktif ilanda gereksiz bir sorgu. `.limit(1)` + en yeni önce:
+    // aynı ilanda birden fazla `deals` satırı olabilir (reddedilen talepler,
+    // vs.) ama `listings.status`'u pasif YAPAN her zaman TEK bir kayıttır
+    // (`deals_tekil` kısmi unique — bkz. `docs/PROJE_HARITASI.md` §15).
+    !ilanAktif
+      ? supabase.from('deals').select('carrier_id, shipper_id, status, cancel_type')
+          .eq('listing_id', id).order('created_at', { ascending: false }).limit(1).maybeSingle()
+      : Promise.resolve({ data: null as { carrier_id: string; shipper_id: string; status: string; cancel_type: string | null } | null }),
   ]);
   const profilTamamlandi = !!profilSonuc.data?.user_type;
   const kullaniciBilgi = kullaniciBilgiSonuc.data as { created_at: string } | null;
+  const ilgiliDeal = ilgiliDealSonuc.data;
   // Güvenli Etkileşim Faz 2 — "Bu İşi Al" butonunun görünürlüğü. Sahiplik ve
   // tamamlanmışlık burada yalnız GÖSTERİM içindir; gerçek yetki kontrolü
   // `POST /api/deals`'te (bkz. o dosyadaki 🚨 not).
   const isOwner = !!user && ilan.user_id === user.id;
+  // Bu işi üstlenen nakliyeci ben miyim? — yalnız GERÇEKTEN mühürlenmiş/devam
+  // eden/tamamlanmış bir kayıtta anlamlı; `cancel_type='is'` ile iptal edilmiş
+  // bir kayıtta artık kimsenin "üstlendiği" bir iş yok, geriye sadece geçmiş
+  // kalıyor — o yüzden bilerek `status`u burada da süzüyoruz.
+  const isCarrierOfDeal = !!user && !!ilgiliDeal
+    && ilgiliDeal.carrier_id === user.id
+    && ['matched', 'in_transit', 'completed'].includes(ilgiliDeal.status);
 
-  // 11 Ağu 2026 — "ilan canlıda mı?" TEK tanım. `app/panel/PanelClient.tsx`
-  // içindeki `aktifIlan` hesabıyla BİREBİR aynı formül — ikisi ayrışırsa
-  // panel "aktif" derken bu sayfa "pasif" der, kullanıcı hangisine güvenecek?
-  // Bir anlaşma iptal edildiğinde (`cancel_type='anlasma'`) `status` sunucuda
-  // tekrar `active`e döner (bkz. `app/api/deals/[id]/route.ts`) — bu formül
-  // O DEĞİŞİKLİĞİ otomatik yansıtır, ayrı bir bayrak gerekmez.
-  const ilanAktif = !ilan.completed_at && ilan.status === 'active'
-    && ['approved', 'auto_published'].includes(ilan.moderation_status);
+  // 11 Ağu 2026 — watermark mesajı artık rol-farkında. Bayram'ın bulduğu bug:
+  // teklif veren (nakliyeci) ALDIĞI ilanın detayına gidince "Bu ilan aktif
+  // değil. Yayından kaldırıldı. Yeni bir anlaşma başlatılamaz." görüyordu —
+  // yanıltıcı, çünkü ilan "kaldırılmadı", TAM TERSİNE bu kişiyle mühürlendi.
+  // İlan sahibi de aynı yanıltıcı metni görüyordu. Yalnız TARAFLAR (sahip/bu
+  // işi üstlenen nakliyeci) için mesaj değişir; üçüncü kişiler (ve tarafsız
+  // durumlar: bekliyor/düzeltme/reddedilmiş/arşiv) ESKİ, genel mesajı görmeye
+  // devam eder — orada "rol ayrımı yok" kararı (11 Ağu, üstteki eski not)
+  // hâlâ geçerli, çünkü onlar gerçekten bir tarafa ait değil.
+  const watermark = ilanAktif ? null : (() => {
+    if (['matched', 'in_transit'].includes(ilgiliDeal?.status ?? '')) {
+      if (isOwner) return {
+        ton: 'olumlu' as const, ikon: '🤝', baslik: 'Bu iş bir nakliyeciyle anlaşıldı',
+        mesaj: 'Süreci ve karşı tarafın bilgilerini panelinizden ("Anlaşmalarım") takip edebilirsiniz.',
+      };
+      if (isCarrierOfDeal) return {
+        ton: 'olumlu' as const, ikon: '🤝', baslik: 'Bu işi siz üstlendiniz',
+        mesaj: 'Süreci panelinizden ("Anlaşmalarım") takip edebilirsiniz. Yeni bir talep göndermenize gerek yok.',
+      };
+      return {
+        ton: 'uyari' as const, ikon: '⚠️', baslik: 'Bu ilan aktif değil',
+        mesaj: 'Bu yük başka bir nakliyeciyle anlaşıldı. Yeni bir anlaşma başlatılamaz.',
+      };
+    }
+    if (ilan.completed_at) {
+      if (isOwner || isCarrierOfDeal) return {
+        ton: 'olumlu' as const, ikon: '✅', baslik: 'Bu iş tamamlandı',
+        mesaj: 'Henüz yapmadıysanız panelinizden karşı tarafı değerlendirebilirsiniz.',
+      };
+      return {
+        ton: 'uyari' as const, ikon: '⚠️', baslik: 'Bu ilan aktif değil',
+        mesaj: 'Bu iş tamamlandı. Yeni bir anlaşma başlatılamaz.',
+      };
+    }
+    return {
+      ton: 'uyari' as const, ikon: '⚠️', baslik: 'Bu ilan aktif değil',
+      mesaj: (ilan.moderation_status === 'pending' ? 'İnceleniyor, henüz yayında değil.'
+        : ilan.moderation_status === 'correction_needed' ? 'Düzeltme bekliyor, henüz yayında değil.'
+        : 'Yayından kaldırıldı.') + ' Yeni bir anlaşma başlatılamaz.',
+    };
+  })();
 
   // ── Sprint 1: Shadow ban kontrolü
   // Shadow banned ilan sadece ilan sahibi, moderatör ve admin tarafından görülebilir.
@@ -523,21 +586,24 @@ export default async function IlanDetay({ params }: { params: Promise<{ id: stri
           data-verified={!dogrulanmamis ? 'true' : 'false'}
           data-listing-active={ilanAktif ? 'true' : 'false'}
         >
-        {/* 11 Ağu 2026 — "aktif değil" watermark'ı. Bayram'ın isteği: ilan
-            canlıdan kalktığında (HANGİ SEBEPLE olursa olsun) eski bir linkten
-            gelen ziyaretçi bunu HER ZAMAN görsün. Sahip/rol ayrımı YOK —
-            herkese aynı gösterilir; ilanı düzenleme/yeniden aktive etme
-            paneldeki iş, burada değil. */}
-        {!ilanAktif && (
-          <div style={{ background: '#2d1a00', border: '1px solid #854d0e', borderRadius: 10, padding: '12px 16px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{ fontSize: '1.1rem' }}>⚠️</span>
+        {/* 11 Ağu 2026 — "aktif değil" watermark'ı. Ziyaretçi eski bir linkten
+            gelse bile ilanın canlıda olmadığını HER ZAMAN görür; ama mesaj
+            artık rol-farkında (bkz. yukarıdaki `watermark` hesabı) — sahip ve
+            bu işi üstlenen nakliyeci gerçeği yansıtan bir metin görür, "yayından
+            kaldırıldı" gibi yanıltıcı bir ibareyle karşılaşmaz. */}
+        {watermark && (
+          <div style={{
+            background: watermark.ton === 'olumlu' ? '#0d2b1a' : '#2d1a00',
+            border: `1px solid ${watermark.ton === 'olumlu' ? '#166534' : '#854d0e'}`,
+            borderRadius: 10, padding: '12px 16px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10,
+          }}>
+            <span style={{ fontSize: '1.1rem' }}>{watermark.ikon}</span>
             <div>
-              <div style={{ color: '#fbbf24', fontWeight: 700, fontSize: '0.88rem' }}>Bu ilan aktif değil</div>
+              <div style={{ color: watermark.ton === 'olumlu' ? '#4ade80' : '#fbbf24', fontWeight: 700, fontSize: '0.88rem' }}>
+                {watermark.baslik}
+              </div>
               <div style={{ color: '#94a3b8', fontSize: '0.78rem', marginTop: 2 }}>
-                {ilan.completed_at ? 'Bu iş tamamlandı.'
-                  : ilan.moderation_status === 'pending' ? 'İnceleniyor, henüz yayında değil.'
-                  : ilan.moderation_status === 'correction_needed' ? 'Düzeltme bekliyor, henüz yayında değil.'
-                  : 'Yayından kaldırıldı.'} Yeni bir anlaşma başlatılamaz.
+                {watermark.mesaj}
               </div>
             </div>
           </div>

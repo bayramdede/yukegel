@@ -19,7 +19,9 @@ const KOR_PENCERE_GUN = 14;
  *      onayla / reddet : YALNIZ shipper (ilan veren)
  *      yola_cikti      : YALNIZ carrier (yükü o taşıyor)
  *      tamamla         : İKİ TARAF (biri beyan eder, diğeri onaylar)
- *      iptal           : İKİ TARAF (tamamlanmadan önce)
+ *      iptal           : İKİ TARAF (tamamlanmadan önce) — AMA `cancel_type:'is'`
+ *                        (yükün kendisi iptal) YALNIZ shipper; nakliyeci yalnız
+ *                        `'anlasma'` (eşleşme bozuldu) seçebilir, bkz. 11 Ağu notu.
  *
  * 🚨 11 Ağu 2026 — BULUNAN BUG: `matched`/`in_transit` bir kayıt iptal
  *    edildiğinde `listings.status` HİÇ geri alınmıyordu — "onayla" onu
@@ -142,6 +144,18 @@ export async function PATCH(
         return NextResponse.json({
           error: 'İptal türü belirtilmeli: anlaşma mı, iş mi iptal oldu?',
         }, { status: 400 });
+      }
+      // 🚨 11 Ağu 2026 — Bayram: "teklif veren sadece anlaşmayı iptal edebilir,
+      // yükü iptal edemez; yükü sadece yükün/ilanın sahibi iptal edebilir."
+      // `anlasma` (eşleşme bozuldu, iş hâlâ geçerli) İKİ TARAF için de mantıklı
+      // — nakliyeci de "araç gidemeyecek" diyebilir. `is` (yükün kendisi
+      // ortadan kalktı, ilan bir daha YAYINA DÖNMEZ) yalnız YÜKÜN sahibinin
+      // kararı olmalı; nakliyeci bunu seçebilseydi, ilan sahibinin haberi
+      // olmadan o kişinin ilanını KALICI OLARAK kapatabilirdi.
+      if (muhurlenmisti && cancel_type === 'is' && !isShipper) {
+        return NextResponse.json({
+          error: 'Yükün kendisini yalnız ilan sahibi iptal edebilir. Siz yalnız anlaşmayı iptal edebilirsiniz.',
+        }, { status: 403 });
       }
       yama = { status: 'cancelled', cancelled_at: simdi, cancelled_by: user.id,
                cancel_type: muhurlenmisti ? cancel_type : null,
