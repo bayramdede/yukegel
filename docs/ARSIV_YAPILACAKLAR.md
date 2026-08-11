@@ -21,6 +21,55 @@
 ---
 ---
 
+> ## ✅ 11 AĞU 2026 — `phone_verified` MAYINI TAMAMEN KAPANDI (kod + DB, canlıda doğrulandı)
+>
+> `docs/YAPILACAKLAR.md` madde 3'teki mayın: `PanelClient.tsx` OTP doğrulandıktan
+> sonra istemciden doğrudan `phone_verified: true` yazabiliyordu — saldırganın
+> `verifyOtp` akışını izleme zorunluluğu yoktu, aynı oturumla OTP'siz aynı
+> `update`i atabiliyordu.
+>
+> **Önce TAM tüketici taraması yapıldı** (7 Ağu'daki "`public.users`te 20+ yer
+> atlandı, login kırıldı" olayını tekrarlamamak için — bkz. `docs/PROJE_HARITASI.md`
+> §9). `grep -rn phone_verified app lib` ile bulunan yedi dosyanın hepsi tek tek
+> açılıp hangi Supabase client'ı kullandığı doğrulandı: `PanelClient.tsx:937`
+> DIŞINDA hiçbir yol `authenticated` rolüyle bu kolona yazmıyordu.
+>
+> **Kod:** `app/api/auth/telefon-degistir/route.ts` (yeni) — `verifyOtp` SSR
+> client'la (`getServerSupabase`) sunucuda çalışıyor (aynen `sahiplen`
+> route'undaki desen); `phone_verified` YALNIZ doğrulama başarısından sonra
+> `getServiceSupabase()` ile yazılıyor. `PanelClient.tsx` artık bu route'a
+> `fetch` atıyor. Kullanıcı başına 60 sn kota + CSRF origin kontrolü.
+>
+> **Deploy:** `npm run deploy` ile `main`'e commit+push (`58d8c17`), Vercel
+> build'i `x-matched-path`/`x-vercel-cache: MISS` ile canlıda doğrulandı.
+> Deploy sonrası **canlı bir tarayıcı duman testi** yapıldı (geçici kullanıcı +
+> ilan, sonunda silindi): `/panel?sekme=anlasmalarim` ve `/ilan/[id]` konsol
+> hatasız yüklendi.
+>
+> **DB:** `docs/20260811_phone_verified_revoke.sql` — `apply_migration` ile
+> `revoke update (phone_verified) on public.users from authenticated;`
+> çalıştırıldı (kod deploy'undan SONRA, sıra bilerek korundu). Öncesi/sonrası
+> `information_schema.column_privileges` ile karşılaştırıldı: yalnız
+> `phone_verified` UPDATE'ten düştü, `bio/company_name/display_name/phone`
+> UPDATE'i ve tüm SELECT'ler AYNEN kaldı.
+>
+> **Canlıda saldırı senaryosu bizzat denendi (geçici kullanıcı, sonra silindi):**
+> `authenticated` client'la `update({ phone_verified: true })` → **42501
+> permission denied** (kapandı) — AYNI oturumla `update({ display_name })` →
+> **başarılı** (meşru düzenleme bozulmadı). 📌 **Bir kez kendi test yöntemim
+> beni yanılttı:** ilk denemede `.update().select()` zincirledim, ikisi de
+> 42501 döndü — sebep `SET phone_verified` DEĞİL, `.select()`in tetiklediği
+> `RETURNING *`in `phone`/`bio`/`tckn`/`vkn`/`email` gibi `authenticated`e HİÇ
+> SELECT verilmemiş kolonları da istemesiydi. Gerçek app kodu `.select()`
+> ZİNCİRLEMİYOR (`Prefer: return=minimal`) — testi o desene uyduruncaya kadar
+> yanlış negatif rapor ediyordum. Ders: bir güvenlik testinin kendisi de
+> ölçtüğü koddan SAPARSA yanlış sonuç üretir; test her zaman GERÇEK çağrı
+> desenini birebir taklit etmeli.
+>
+> `verifyOtp`'nin gerçek SMS ile uçtan uca akışı test EDİLMEDİ (gerçek telefon
+> gerekir, gereksiz Twilio ücreti doğurmasın diye tetiklenmedi) — mantığı
+> zaten canlıda kanıtlanmış `sahiplen` route'undaki AYNI çağrının taşınması.
+
 > ## ✅ 10 AĞU 2026 — GÜVENLİ ETKİLEŞİM FAZ 2 EKRANLARI AÇILDI (deals/reviews'un İLK arayüzü)
 >
 > API'ler (`POST /api/deals`, `PATCH /api/deals/[id]`, `POST /api/reviews`) 22/22

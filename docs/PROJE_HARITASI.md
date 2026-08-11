@@ -36,6 +36,14 @@
 > ⚠️ `listings.completed_at`↔`deals.completed_at` ilişkisi ve iletişim bilgisini
 > eşleşmeye bağlama (PRD md.4) **hâlâ açık karar** — `docs/YAPILACAKLAR.md` md.1.
 
+> 🔒 **11 AĞU 2026 — `phone_verified` MAYINI KAPANDI (kod deploy + DB revoke,
+> canlıda saldırı senaryosu bizzat denenerek doğrulandı).** Yeni
+> `app/api/auth/telefon-degistir/route.ts`; `docs/20260811_phone_verified_revoke.sql`
+> uygulandı (`authenticated`in bu kolonu UPDATE yetkisi yok artık). Ayrıntı:
+> `docs/ARSIV_YAPILACAKLAR.md`. Bulunan ama BİLEREK dokunulmayan büyük madde:
+> giriş OTP'sinin (`app/giris/page.tsx:381`) asıl `verifyOtp` çağrısı hâlâ
+> tamamen istemcide ve kaba-kuvvet korumasız — `docs/YAPILACAKLAR.md` md.3.
+
 > ## ✅ 10 AĞU 2026 — TERS SKOR YAYINI KAPANDI (4 nokta) + `olc:87` TABANI ONARILDI
 >
 > **`audit_score` artık HİÇBİR yerde yayınlanmıyor.** Karar (Bayram): "ibareyi

@@ -1,6 +1,11 @@
 -- ============================================================================
 -- Güvenlik takibi madde 3 — public.users.phone_verified UPDATE yetkisini geri al
 --
+-- ✅ UYGULANDI — 11 Ağu 2026, kod deploy'undan (`58d8c17`) SONRA `apply_migration`
+-- ile çalıştırıldı ve canlıda saldırı senaryosu bizzat denenerek doğrulandı
+-- (42501 + meşru alanlar bozulmadı). Ayrıntı: `docs/ARSIV_YAPILACAKLAR.md`.
+-- Bu dosya artık yalnız KAYIT amaçlı — tekrar ÇALIŞTIRMAYA gerek yok.
+--
 -- ÖNCE KODU DEPLOY ET, SONRA BUNU ÇALIŞTIR (sıra tersine olursa panelin
 -- telefon değiştirme akışı istemciden geri düşer ve 42501 ile patlar).
 -- ============================================================================

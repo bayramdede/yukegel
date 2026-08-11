@@ -85,24 +85,6 @@ detayında kullanıcının tüm ilanları ve şirketin tüm ilanları butonları
 
 ## ⏳ 3 — Güvenlik takibi (7 Ağu'da açıldı)
 
-- 🟡 **`phone_verified` mayını — KOD TARAFI KAPANDI, DB TARAFI DEPLOY BEKLİYOR.**
-  (11 Ağu 2026) `app/api/auth/telefon-degistir/route.ts` (yeni) OTP doğrulamayı
-  ve `phone_verified` yazımını sunucuya taşıdı (`verifyOtp` SSR client'la,
-  yazma `getServiceSupabase()` ile — yalnız gerçek doğrulama başarısından
-  sonra). `PanelClient.tsx`'teki `otpGonder`/`otpDogrula` artık bu route'a
-  gidiyor, istemciden doğrudan `supabase.from('users').update(...)` YOK.
-  DB tarafı hazır (`docs/20260811_phone_verified_revoke.sql` — tam tüketici
-  taraması yapıldı, dar kapsamlı: yalnız `phone_verified` UPDATE geri alınıyor,
-  SELECT ve diğer dört kolon dokunulmuyor) ama **BİLEREK ÇALIŞTIRILMADI** —
-  sıra önemli: DB revoke, kod prod'a deploy edilmeden çalıştırılırsa canlıdaki
-  ESKİ (istemci-yazan) kod 42501 ile patlar. **Sıradaki adım: kod deploy edilip
-  doğrulandıktan SONRA o SQL dosyası çalıştırılmalı.**
-  `npx tsc`/`npm run build` temiz; route'un auth-gate/CSRF/format-doğrulama
-  yolları dev sunucusunda gerçek isteklerle test edildi (401/403/400 doğru
-  döndü). `verifyOtp` gerçek SMS akışı test EDİLMEDİ (gerçek telefon gerekir,
-  ayrıca gereksiz Twilio ücreti doğurmamak için tetiklenmedi) — mantığı zaten
-  kanıtlanmış `sahiplen` route'undaki AYNI desenin taşınması.
-  Bekçi: `npm run test:seo` — herkese açık yüzeylerin kolonu okumadığını doğruluyor.
 - 🔴 **OTP doğrulama denemesinde kaba kuvvet koruması yok — sanılandan BÜYÜK
   bir açık.** (11 Ağu 2026'da kapsam netleşti.) `kotaDene`
   (`app/api/auth/otp/route.ts:70/78/90`) SMS **gönderimini** sınırlıyor; 6
