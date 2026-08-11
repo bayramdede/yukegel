@@ -75,7 +75,7 @@ export default async function Panel() {
       .select(`id, listing_id, shipper_id, carrier_id, status, matched_at, transit_at,
         completed_declared_by, completed_declared_at, completed_at,
         payment_terms_days, payment_maturity_date, review_deadline,
-        cancelled_at, cancelled_by, cancel_reason, created_at,
+        cancelled_at, cancelled_by, cancel_type, cancel_reason, created_at,
         listing:listings!deals_listing_id_fkey ( id, listing_type, origin_province_id, price_offer,
           listing_stops ( province_id, stop_order ) ),
         shipper:users!deals_shipper_id_fkey ( display_name ),

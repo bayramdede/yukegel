@@ -257,6 +257,15 @@ export default async function IlanDetay({ params }: { params: Promise<{ id: stri
   // `POST /api/deals`'te (bkz. o dosyadaki 🚨 not).
   const isOwner = !!user && ilan.user_id === user.id;
 
+  // 11 Ağu 2026 — "ilan canlıda mı?" TEK tanım. `app/panel/PanelClient.tsx`
+  // içindeki `aktifIlan` hesabıyla BİREBİR aynı formül — ikisi ayrışırsa
+  // panel "aktif" derken bu sayfa "pasif" der, kullanıcı hangisine güvenecek?
+  // Bir anlaşma iptal edildiğinde (`cancel_type='anlasma'`) `status` sunucuda
+  // tekrar `active`e döner (bkz. `app/api/deals/[id]/route.ts`) — bu formül
+  // O DEĞİŞİKLİĞİ otomatik yansıtır, ayrı bir bayrak gerekmez.
+  const ilanAktif = !ilan.completed_at && ilan.status === 'active'
+    && ['approved', 'auto_published'].includes(ilan.moderation_status);
+
   // ── Sprint 1: Shadow ban kontrolü
   // Shadow banned ilan sadece ilan sahibi, moderatör ve admin tarafından görülebilir.
   // Nadir yol — yukarıdaki iki sorguyla paralelleştirilmedi: `user` yoksa zaten
@@ -512,7 +521,27 @@ export default async function IlanDetay({ params }: { params: Promise<{ id: stri
           data-listing-id={ilan.id}
           data-listing-type={ilan.listing_type}
           data-verified={!dogrulanmamis ? 'true' : 'false'}
+          data-listing-active={ilanAktif ? 'true' : 'false'}
         >
+        {/* 11 Ağu 2026 — "aktif değil" watermark'ı. Bayram'ın isteği: ilan
+            canlıdan kalktığında (HANGİ SEBEPLE olursa olsun) eski bir linkten
+            gelen ziyaretçi bunu HER ZAMAN görsün. Sahip/rol ayrımı YOK —
+            herkese aynı gösterilir; ilanı düzenleme/yeniden aktive etme
+            paneldeki iş, burada değil. */}
+        {!ilanAktif && (
+          <div style={{ background: '#2d1a00', border: '1px solid #854d0e', borderRadius: 10, padding: '12px 16px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ fontSize: '1.1rem' }}>⚠️</span>
+            <div>
+              <div style={{ color: '#fbbf24', fontWeight: 700, fontSize: '0.88rem' }}>Bu ilan aktif değil</div>
+              <div style={{ color: '#94a3b8', fontSize: '0.78rem', marginTop: 2 }}>
+                {ilan.completed_at ? 'Bu iş tamamlandı.'
+                  : ilan.moderation_status === 'pending' ? 'İnceleniyor, henüz yayında değil.'
+                  : ilan.moderation_status === 'correction_needed' ? 'Düzeltme bekliyor, henüz yayında değil.'
+                  : 'Yayından kaldırıldı.'} Yeni bir anlaşma başlatılamaz.
+              </div>
+            </div>
+          </div>
+        )}
         <div style={{ background: '#161b22', border: '1px solid #30363d', borderRadius: 12, padding: 24, marginBottom: 16 }}>
           <div style={{ fontSize: '0.72rem', color: '#8b949e', fontWeight: 700, letterSpacing: '0.08em', marginBottom: 16 }}>ROTA</div>
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 16 }}>
@@ -683,7 +712,7 @@ export default async function IlanDetay({ params }: { params: Promise<{ id: stri
           // bunlar yalnız kullanıcıya boşa buton göstermemek için.
           ilanSahipVar={!!ilan.user_id}
           isOwner={isOwner}
-          ilanTamamlandi={!!ilan.completed_at}
+          ilanAktif={ilanAktif}
         />
         </article>
       </main>

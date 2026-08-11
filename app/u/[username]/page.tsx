@@ -21,6 +21,58 @@ function Chip({ label, bg = '#1f2937', color = '#94a3b8' }: { label: string; bg?
   return <span style={{ background: bg, color, fontSize: '0.72rem', fontWeight: 600, padding: '2px 8px', borderRadius: 4 }}>{label}</span>;
 }
 
+function Yildizlar({ puan, size = '0.85rem' }: { puan: number; size?: string }) {
+  return (
+    <span style={{ fontSize: size, letterSpacing: 1 }}>
+      {[1, 2, 3, 4, 5].map(n => (
+        <span key={n} style={{ color: n <= puan ? '#f59e0b' : '#30363d' }}>★</span>
+      ))}
+    </span>
+  );
+}
+
+// Güvenli Etkileşim Faz 3 (11 Ağu 2026) — yayınlanmış değerlendirmelerin ham
+// gösterimi. `reviewer_role` YAZANIN rolü: 'shipper' ise yazan bir ilan
+// sahibiydi → bu profilin sahibi o işte NAKLİYECİ olarak değerlendirildi
+// (ve tersi). `sub_ratings`/rozet/skor İCAT EDİLMİYOR — yalnız `rating` +
+// `comment`, olduğu gibi.
+function DegerlendirmelerKarti({ yorumlar }: { yorumlar: any[] }) {
+  const [acik, setAcik] = useState(false);
+  const ortalama = yorumlar.reduce((t, y) => t + y.rating, 0) / yorumlar.length;
+  const gosterilecekler = acik ? yorumlar : yorumlar.slice(0, 3);
+
+  return (
+    <div style={{ background: '#161b22', border: '1px solid #30363d', borderRadius: 8, padding: '14px 16px', marginBottom: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <span style={{ color: '#f59e0b', fontWeight: 800, fontSize: '1.05rem' }}>⭐ {ortalama.toFixed(1)}</span>
+        <span style={{ color: '#8b949e', fontSize: '0.82rem' }}>
+          {yorumlar.length} değerlendirme
+        </span>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 12 }}>
+        {gosterilecekler.map(y => (
+          <div key={y.id} style={{ borderTop: '1px solid #21262d', paddingTop: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <Yildizlar puan={y.rating} />
+              <span style={{ color: '#e2e8f0', fontWeight: 600, fontSize: '0.82rem' }}>{y.reviewer?.display_name || 'Bir kullanıcı'}</span>
+              <span style={{ color: '#4b5563', fontSize: '0.72rem' }}>
+                · {y.reviewer_role === 'shipper' ? 'nakliyeci olarak' : 'ilan sahibi olarak'} değerlendirildi
+              </span>
+            </div>
+            {y.comment && <div style={{ color: '#94a3b8', fontSize: '0.82rem', marginTop: 4 }}>{y.comment}</div>}
+          </div>
+        ))}
+      </div>
+      {yorumlar.length > 3 && (
+        <button onClick={() => setAcik(a => !a)}
+          style={{ background: 'none', border: 'none', color: '#22c55e', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer', marginTop: 10, padding: 0 }}>
+          {acik ? '↑ Daha az göster' : `↓ ${yorumlar.length - 3} değerlendirme daha göster`}
+        </button>
+      )}
+    </div>
+  );
+}
+
 export default function PublicIlanListesi() {
   const params = useParams();
   const userId = params.username as string;
@@ -29,6 +81,18 @@ export default function PublicIlanListesi() {
   const [sahip, setSahip] = useState<any>(null);
   const [yukleniyor, setYukleniyor] = useState(true);
   const [bulunamadi, setBulunamadi] = useState(false);
+
+  // Güvenli Etkileşim Faz 3 — yayınlanmış değerlendirmeler (11 Ağu 2026).
+  // 🚨 Bu bir "güven puanı" DEĞİL — türetilmiş/icat edilmiş hiçbir skor yok,
+  // yalnız DB'deki GERÇEK, YAYINLANMIŞ yorumların ham gösterimi. Skor icadı
+  // bilerek YAPILMADI: `audit_score`'un "Kalite Skoru" diye TERS yayınlanması
+  // (10 Ağu'da kaldırıldı, bkz. ARSIV) aynı hatayı tekrarlamamak için — yeni
+  // bir "güven puanı" formülü SIFIRDAN, ayrı bir kararla tanımlanmalı
+  // (`docs/YAPILACAKLAR.md` md.1, Faz 3).
+  // RLS (`reviews_yayinlanan_herkese`) zaten yalnız `published_at IS NOT NULL
+  // AND is_hidden=false` satırlarını anon'a açıyor — istemci ekstra filtre
+  // uygulamasa da çift kör kural burada da geçerli kalıyor.
+  const [degerlendirmeler, setDegerlendirmeler] = useState<any[]>([]);
 
   const [kalkis, setKalkis] = useState('');
   const [varis, setVaris] = useState('');
@@ -79,6 +143,18 @@ export default function PublicIlanListesi() {
 
       if (!kullanici) { setBulunamadi(true); setYukleniyor(false); return; }
       setSahip(kullanici);
+
+      // Yayınlanmış değerlendirmeler — RLS zaten yalnız published+non-hidden
+      // döndürür, ekstra `.eq()` YAZMIYORUZ ki tek doğruluk kaynağı DB'de kalsın
+      // (bkz. `api/reviews`teki "published_at BİLEREK yazılmıyor" ilkesiyle aynı ruh).
+      supabase
+        .from('reviews')
+        .select(`id, rating, comment, reviewer_role, published_at,
+          reviewer:users!reviews_reviewer_id_fkey ( display_name )`)
+        .eq('reviewee_id', userId)
+        .order('published_at', { ascending: false })
+        .limit(50)
+        .then((res: any) => setDegerlendirmeler(res.data || []));
 
       const { data } = await supabase
         .from('listings')
@@ -219,6 +295,7 @@ export default function PublicIlanListesi() {
       </div>
 
       <main style={{ maxWidth: 900, margin: '0 auto', padding: '16px' }}>
+        {degerlendirmeler.length > 0 && <DegerlendirmelerKarti yorumlar={degerlendirmeler} />}
         {yukleniyor ? (
           <div style={{ textAlign: 'center', padding: '80px 0', color: '#4b5563' }}>⏳ Yükleniyor...</div>
         ) : filtered.length === 0 ? (

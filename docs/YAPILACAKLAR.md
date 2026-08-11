@@ -34,9 +34,20 @@ uçtan uca tarayıcıda geçici test hesaplarıyla doğrulandı** (bkz.
   görünürlüğünü düşürür, o yüzden tek başıma yapmadım.
 
 ### Faz 3 — profil / rozet / güven puanı
-- Kullanıcı düzeyi güven puanı. 🚨 **`audit_score`'dan BAĞIMSIZ olacak.** O skorun "Kalite Skoru" olarak
+✅ **"/u/[id] yayınlanmış yorumlar + ortalamalar" bitti (11 Ağu 2026)** —
+`app/u/[username]/page.tsx`'e `DegerlendirmelerKarti` eklendi: RLS'in zaten
+public'e açtığı yayınlanmış+gizlenmemiş yorumları ham gösteriyor (ortalama +
+yıldız + yorumcu adı + rol bağlamı + metin), **hiçbir yeni skor İCAT
+ETMİYOR**. Uçtan uca (tamamlanmış anlaşma → çift kör yayın → profil sayfası)
+gerçek tarayıcıda doğrulandı, hem şirket hem nakliyeci profili doğru rol
+etiketiyle göründü. Ayrıntı: `docs/ARSIV_YAPILACAKLAR.md`.
+- Kullanıcı düzeyi güven puanı — **hâlâ yapılmadı, bilerek.** 🚨
+  **`audit_score`'dan BAĞIMSIZ olacak.** O skorun "Kalite Skoru" olarak
   yayınlanması 10 Ağu'da kaldırıldı (kayıt: `docs/ARSIV_YAPILACAKLAR.md`); aynı
-  hatayı güven puanında tekrarlamamak için sinyal SIFIRDAN tanımlanacak.
+  hatayı güven puanında tekrarlamamak için sinyal SIFIRDAN tanımlanacak. Bu,
+  yukarıdaki "yayınlanmış yorumlar" maddesinden FARKLI: o ham veri gösterimiydi
+  (risk yok), bu bir FORMÜL/SKOR İCADI — hangi sinyallerin ne ağırlıkla
+  sayılacağı ürün kararı, tek başına atılmayacak.
 - Profil OG kartı — ilan kartı deseni hazır (`app/ilan/[id]/opengraph-image.tsx`).
   ⚠️ Satori `₺` (U+20BA) glifini basmıyor, tofu çıkıyor; orada `TL` yazıldı.
 
@@ -108,6 +119,28 @@ detayında kullanıcının tüm ilanları ve şirketin tüm ilanları butonları
   getirilmemeli.
 - ⏳ **`app/api/auth/switch-account/route.ts` tutarlılık kontrolü hiç yapılmadı.**
   Implicit-flow izi arayan grep boş döndü, ama dosya elle okunmadı.
+- 🟡 **`anon`/`authenticated` public şemadaki NEREDEYSE HER tabloda SELECT
+  dışında her şeye (INSERT/UPDATE/DELETE/TRUNCATE) sahip — sistemik, tek
+  tabloya özgü değil.** (11 Ağu 2026, `deals`/`reviews` incelenirken bulundu —
+  ayrıntı `docs/ARSIV_YAPILACAKLAR.md`.) Supabase'in yeni tablo için varsayılan
+  şema-geneli GRANT'ı; migration özel REVOKE yazmadıysa hep böyle gelir.
+  `safety_rules`, `system_config`, `blacklist`, `pois`, `raw_posts`,
+  `shadow_profiles` dahil taranan tabloların BÜYÜK ÇOĞUNLUĞU aynı desende.
+  🚨 **Şu an sömürülebilir DEĞİL** — RLS açık ve INSERT/UPDATE/DELETE için
+  policy yoksa Postgres varsayılanı REDDET; `deals`/`reviews` üzerinde bizzat
+  denendi, hepsi reddedildi. Risk şu: RLS'in TEK savunma katmanı olması —
+  gelecekte biri gevşek bir policy eklerse (`USING (true)` gibi) GRANT açık
+  olduğu için o hata anında sömürülebilir hale gelir, ikinci bir engel yok.
+  **Yapılacak iş:** her tabloyu tek tek gözden geçirip GERÇEKTEN istemciden
+  yazılması gereken (varsa) hariç tümünde INSERT/UPDATE/DELETE/TRUNCATE'i
+  `anon`/`authenticated`dan geri almak — `deals`/`reviews`de yapıldığı gibi
+  (`docs/20260811_deals_reviews_grant_hardening.sql`). ⚠️ Tek bir migration'la
+  YAPILMAMALI: `pois`/`poi_reviews`/`poi_visit_logs`/`archived_links`/`vehicles`
+  gibi bazı tablolarda GERÇEKTEN INSERT/UPDATE policy'si VAR (istemci meşru
+  olarak yazıyor) — o kolonlar/tablolar için REVOKE yanlış olur. Her tablo
+  önce "istemci buraya meşru olarak yazıyor mu?" sorusuyla tek tek
+  sınıflandırılmalı, sonra yalnız "yazmaması gereken" grup için REVOKE
+  yazılmalı. Geniş kapsamlı, dikkatli bir tur ister.
 
 ---
 

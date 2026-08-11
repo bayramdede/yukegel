@@ -21,6 +21,152 @@
 ---
 ---
 
+> ## ✅ 11 AĞU 2026 — BAYRAM'IN BULDUĞU GERÇEK BUG: "ANLAŞMA İPTAL EDİLİNCE İLAN CANLIYA DÖNMEDİ"
+>
+> Bayram'ın canlıda bizzat yaşadığı bug: mühürlenmiş (matched) bir anlaşma
+> iptal edildiğinde `listings.status` HİÇBİR ZAMAN geri `active`e dönmüyordu
+> — "onayla" onu `passive` yapıyor ama `iptal` tarafı bunu geri almıyordu.
+> Kanıt: Bayram kendi iki hesabıyla `/ilan/[id]` → "Bu İşi Al" → onayla →
+> iptal akışını canlıda denedi, sonuç `deals.status='cancelled'` ama
+> `listings.status='passive'` **sonsuza kadar** kaldı (deal id `fa6a7bb9…`,
+> listing id `5afc1821…` — inceleme sırasında bulundu, düzeltmeden sonra
+> elle `active`e çevrildi).
+>
+> **İstenen davranış (Bayram'ın talimatı):**
+> 1. İptal ederken SEBEP sorulsun: **"Anlaşma İptali"** mi, **"İş İptali"** mi?
+>    - Anlaşma iptali (ör. "araç gelmedi") → iş hâlâ geçerli, ilan tekrar
+>      `active`e döner, başka (veya aynı) nakliyeci yeniden talep edebilir.
+>    - İş iptali → yükün kendisi ortadan kalktı, ilan `passive` kalır
+>      (yayından kalkmış sayılır).
+> 2. İlan `active` değilken (HANGİ sebeple olursa olsun) `/ilan/[id]`'ye giden
+>    herkes "bu ilan aktif değil" watermark'ı görsün.
+> 3. Aktif olmayan ilanda yeni anlaşma başlatılamasın.
+>
+> **Yapılanlar:**
+> - `deals.cancel_type text check (anlasma|is)` (yeni kolon, nullable —
+>   yalnız zaten mühürlenmiş bir kayıt iptal edilirken doldurulur).
+> - `app/api/deals/[id]/route.ts` — `iptal` action'ı artık `matched`/
+>   `in_transit` bir kaydı iptal ederken `cancel_type` İSTİYOR (yoksa 400);
+>   `'requested'` durumundaki iptal/reddet (listings hiç dokunulmamıştı) eski
+>   basit akışta kalıyor. Yan etki: `cancel_type==='anlasma'` → `listings`
+>   `active`e döner; `'is'` → zaten `passive`, ek işlem yok.
+> - `app/panel/AnlasmalarSekmesi.tsx` — mühürlenmiş bir kaydı iptal ederken
+>   iki radyo seçenekli tür seçici + türe özel neden dropdown'u (+"Diğer" için
+>   serbest metin). `'requested'` iptali/reddi eski serbest-metin kutusu
+>   AYNEN kaldı.
+> - `app/ilan/[id]/page.tsx` — TEK `ilanAktif` tanımı (`!completed_at &&
+>   status==='active' && moderation approved/auto_published` — panelin
+>   `aktifIlan` hesabıyla BİREBİR aynı formül). `!ilanAktif` iken turuncu
+>   "⚠️ Bu ilan aktif değil" watermark'ı (sebep metniyle: tamamlandı /
+>   inceleniyor / düzeltme bekliyor / yayından kaldırıldı).
+> - `app/ilan/[id]/Aksiyonlar.tsx` — "Bu İşi Al" artık eski dar
+>   `!ilanTamamlandi` yerine geniş `ilanAktif`e bakıyor (`status`u da kapsıyor,
+>   eskiden yalnız `completed_at`e bakıyordu — pasif ama tamamlanmamış bir
+>   ilanda buton YANLIŞLIKLA görünmeye devam ederdi).
+>
+> **Yan bulgu, aynı turda düzeltildi — `deals_tekil` KOŞULSUZ
+> `unique(listing_id, carrier_id)` idi.** Bu, "anlaşma iptali → ilan tekrar
+> canlıya döner → yeniden talep edilebilir" vaadini YARIM karşılıyordu:
+> BAŞKA bir nakliyeci talep edebiliyordu ama AYNI nakliyeci (ör. "araç
+> gelmedi, ikinci araçla tekrar dener") asla tekrar deneyemiyordu — canlı
+> testte bizzat karşılaşıldı (`23505`/"Bu ilana zaten talep gönderdiniz").
+> `deals_tekil` kısmi indekse çevrildi: `unique (listing_id, carrier_id)
+> where status <> 'cancelled'` — yalnız CANLI kayıtlar tekilliği korur,
+> iptal edilmiş bir kayıt artık aynı nakliyecinin yeniden denemesini
+> engellemiyor. Orijinal koruma (aynı LIVE talebi iki kez atamama) ayrıca
+> test edildi, bozulmadı.
+>
+> **Doğrulama (dev + production, gerçek tarayıcı + gerçek API çağrıları):**
+> - `cancel_type` eksikken mühürlenmiş kaydı iptal → 400 ✓
+> - `cancel_type='anlasma'` → `listings.status` `passive`→`active` ✓
+>   (hem API hem panel UI'dan tıklanarak, watermark kayboluyor + "Bu İşi Al"
+>   geri geliyor, hepsi tarayıcıda doğrulandı)
+> - `cancel_type='is'` → `listings.status` `passive` kalıyor ✓ (watermark
+>   duruyor, "Bu İşi Al" gizli)
+> - `'requested'` durumunda reddet — `cancel_type` gerektirmeden çalışıyor,
+>   `listings` hiç dokunulmuyor ✓
+> - Aynı nakliyeci, `anlasma` iptalinden sonra AYNI ilana tekrar talep
+>   gönderebiliyor ✓; bir LIVE talep varken ikinci talep hâlâ engelleniyor ✓
+> - `TEST_TABAN=http://localhost:3199 npm run test:deals` → 22/22 (regresyon yok)
+> - `npx tsc --noEmit` / `npm run build` temiz.
+> Test verisi (geçici kullanıcılar + ilanlar + kayıtlar) sonunda silindi.
+> Bayram'ın kendi test kaydı (gerçek hesabıyla) SİLİNMEDİ — yalnız
+> `listings.status` elle `active`e çevrildi (kodun artık üreteceği doğru
+> sonuçla eşleşsin diye).
+
+> ## ✅ 11 AĞU 2026 — PUBLİK PROFİLDE "YAYINLANMIŞ DEĞERLENDİRMELER" AÇILDI
+>
+> Güvenli Etkileşim Faz 3'ün ilk parçası: `app/u/[username]/page.tsx`e
+> `DegerlendirmelerKarti` eklendi — ortalama + yıldız + yorumcu adı + rol
+> bağlamı ("nakliyeci olarak değerlendirildi" / "ilan sahibi olarak
+> değerlendirildi", `reviewer_role`'den TÜRETİLİYOR) + yorum metni. 3'ten
+> fazla yorumda "daha fazla göster" açılır.
+>
+> 🚨 **BİLEREK bir "güven puanı" DEĞİL.** Hiçbir skor/ağırlık/formül icat
+> edilmedi — DB'deki ham, gerçek, YAYINLANMIŞ (`published_at` dolu,
+> `is_hidden=false`) yorumların gösterimi. `audit_score`'un "Kalite Skoru"
+> diye TERS yayınlanması hatasını (10 Ağu, kaldırıldı) tekrarlamamak için
+> güven puanı formülü ayrı, bilinçli bir karar bekliyor
+> (`docs/YAPILACAKLAR.md` md.1, Faz 3) — bu turda ona DOKUNULMADI.
+>
+> RLS zaten `reviews_yayinlanan_herkese` (`published_at IS NOT NULL AND
+> is_hidden=false`) politikasıyla anon'a doğru satırları açıyordu — istemci
+> ekstra filtre YAZMADI, çift kör kuralın tek doğruluk kaynağı DB'de kaldı
+> (`api/reviews`teki "published_at bilerek yazılmıyor" ilkesiyle aynı ruh).
+>
+> **Doğrulama:** `npx tsc`/`npm run build` temiz. Dev sunucusunda gerçek bir
+> uçtan uca senaryo (2 geçici kullanıcı → talep→onayla→yola çıktı→tamamla→
+> her iki taraf da değerlendirme yazdı→çift kör yayın) kurulup HER İKİ tarafın
+> profil sayfası gerçek tarayıcıda kontrol edildi: nakliyecinin profilinde
+> ilan sahibinin yazdığı 5 yıldız ("nakliyeci olarak değerlendirildi"), ilan
+> sahibinin profilinde nakliyecinin yazdığı 4 yıldız ("ilan sahibi olarak
+> değerlendirildi") — roller doğru yönde, yıldız renkleri doğru, konsol
+> hatasız. Test verisi sonunda silindi.
+>
+> ---
+>
+> **Yan bulgu (aynı incelemenin ürünü) — `deals`/`reviews` GEREKSİZ
+> GRANT'ları da bu turda kapandı**, ayrıntı bir sonraki kayıtta.
+
+> ## ✅ 11 AĞU 2026 — `deals`/`reviews` GEREKSİZ GRANT'LARI KAPANDI (savunma derinliği, SÖMÜRÜ YOKTU)
+>
+> Public profil sayfasına yayınlanmış değerlendirme göstermeden önce `reviews`in
+> RLS/GRANT durumu doğrulanırken bulundu: `anon` VE `authenticated`
+> `public.deals` ve `public.reviews` üzerinde SELECT dışında **HER ŞEYE**
+> (INSERT/UPDATE/DELETE/TRUNCATE/TRIGGER) sahipti — Supabase'in yeni tablolar
+> için varsayılan şema-geneli GRANT'ı, Faz 1 migration'ı özel bir GRANT/REVOKE
+> yazmadığı için hiç ele alınmamıştı. SQL plan dosyası "yazma istemciden YOK"
+> diyordu ama bu GRANT düzeyinde doğru değildi — gerçek koruma RLS'in "policy
+> yoksa reddet" varsayılanıydı.
+>
+> **Sömürülebilir mi diye ÖNCE bizzat denendi (varsayıma güvenilmedi):** iki
+> geçici kullanıcıyla `authenticated` client'tan `deals` INSERT (kendini bir
+> ilana nakliyeci ekleme), `reviews` INSERT (sahte 5 yıldız + anında
+> yayınlanmış yorum), `reviews` DELETE — üçü de reddedildi/etkisizdi (42501 /
+> 0 satır). **Sonuç: sömürü YOK, RLS default-deny gerçekten tutuyordu.**
+> Yine de GRANT'ı daraltmak savunma derinliği: gelecekte biri gevşek bir
+> INSERT/UPDATE policy eklerse (`USING (true)` gibi), GRANT açık olduğu sürece
+> o hata ANINDA canlıya çıkar — GRANT'ı kapatmak o hatanın etkisini sıfırlar.
+>
+> 🚨 **Bu desen SİSTEMİK — tek deals/reviews'a özgü değil.** Tüm public şema
+> taraması `safety_rules`, `system_config`, `blacklist`, `pois`, `raw_posts`,
+> `shadow_profiles` dahil neredeyse HER tabloda aynı deseni gösterdi. Bilerek
+> yalnız Güvenli Etkileşim'in kendi tablolarına sınırlandı — genel tarama tek
+> migration'la kapatılamayacak kadar geniş, ayrı bir maddeye düşüldü
+> (`docs/YAPILACAKLAR.md`).
+>
+> **Uygulandı:** `docs/20260811_deals_reviews_grant_hardening.sql` —
+> `revoke insert, update, delete, truncate, trigger on public.deals/reviews
+> from anon, authenticated`. SELECT'e dokunulmadı (reviews için herkese açık
+> profil sayfası gerekli, deals için RLS zaten doğru daraltıyor).
+>
+> **Doğrulama:** öncesi/sonrası `information_schema.role_table_grants`
+> karşılaştırıldı (yalnız SELECT+REFERENCES kaldı). Sonra CANLI production'a
+> karşı `POST /api/deals` (service role, gerçek geçici kullanıcı) → 200 başarılı.
+> `TEST_TABAN=https://www.yukegel.com npm run test:deals` → **22/22 geçti.**
+> Servis rolü bu REVOKE'tan hiç etkilenmez (RLS+GRANT'ı bypass eder), yani
+> hiçbir uygulama akışı risk altında değildi zaten.
+
 > ## ✅ 11 AĞU 2026 — `phone_verified` MAYINI TAMAMEN KAPANDI (kod + DB, canlıda doğrulandı)
 >
 > `docs/YAPILACAKLAR.md` madde 3'teki mayın: `PanelClient.tsx` OTP doğrulandıktan

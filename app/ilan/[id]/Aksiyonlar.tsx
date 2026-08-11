@@ -23,12 +23,17 @@ interface Props {
   // Güvenli Etkileşim Faz 2 — "Bu İşi Al" görünürlüğü.
   ilanSahipVar?: boolean;
   isOwner?: boolean;
-  ilanTamamlandi?: boolean;
+  // 11 Ağu 2026 — eskiden yalnız `ilanTamamlandi` (completed_at) bakıyordu;
+  // bu, `status !== 'active'` olan (ör. mühürlenmiş/iptal-sonrası pasif kalmış)
+  // bir ilanda "Bu İşi Al"ı YANLIŞLIKLA göstermeye devam ediyordu — sunucu
+  // 409 ile reddederdi ama kullanıcı boşuna tıklardı. Tek, geniş bayrağa
+  // (`app/ilan/[id]/page.tsx`'teki `ilanAktif`) taşındı.
+  ilanAktif?: boolean;
 }
 
 export default function Aksiyonlar({
   ilanId, dogrulanmamis, contactPhone, uyeGiris = false,
-  ilanSahipVar = false, isOwner = false, ilanTamamlandi = false,
+  ilanSahipVar = false, isOwner = false, ilanAktif = false,
 }: Props) {
   const [sikayetAcik, setSikayetAcik] = useState(false);
   const [secim, setSecim] = useState('');
@@ -129,8 +134,9 @@ export default function Aksiyonlar({
 
           {/* Bu İşi Al — Güvenli Etkileşim Faz 2. Yalnız: giriş yapılmış, ilanın
               sahibi sen değilsin, ilanın gerçek bir sahibi var (sahipsiz ilanda
-              taraf yok) ve ilan tamamlanmamış. Kalan kural sunucuda. */}
-          {uyeGiris && !isOwner && ilanSahipVar && !ilanTamamlandi && !anlasSonuc?.ok && (
+              taraf yok) ve ilan AKTİF (bkz. `ilanAktif` tanımı — completed_at,
+              status, moderation_status'un hepsini kapsar). Kalan kural sunucuda. */}
+          {uyeGiris && !isOwner && ilanSahipVar && ilanAktif && !anlasSonuc?.ok && (
             <button onClick={() => setAnlasFormAcik(a => !a)}
               style={{ display: 'flex', alignItems: 'center', gap: 6, background: anlasFormAcik ? '#0d2b1a' : '#14532d', border: '1px solid #22c55e', color: '#4ade80', borderRadius: 8, padding: '9px 14px', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}>
               <span>🤝</span> Bu İşi Al

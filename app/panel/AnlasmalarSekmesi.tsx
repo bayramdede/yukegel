@@ -51,6 +51,23 @@ const DURUM_RENK: Record<string, { bg: string; color: string }> = {
 
 const DURUM_SIRASI: DurumFiltre[] = ['hepsi', 'requested', 'matched', 'in_transit', 'completed', 'cancelled'];
 
+// 11 Ağu 2026 — mühürlenmiş (matched/in_transit) bir kaydı iptal ederken
+// ZORUNLU tür seçimi. Sunucudaki (`app/api/deals/[id]/route.ts`) `cancel_type`
+// dallanmasının BİREBİR aynası: 'anlasma' → ilan tekrar `active`e döner,
+// 'is' → `listings` `passive` kalır (bkz. route'taki uzun açıklama).
+const IPTAL_TURLERI: { deger: 'anlasma' | 'is'; baslik: string; aciklama: string; nedenler: string[] }[] = [
+  {
+    deger: 'anlasma', baslik: '🤝 Anlaşma İptali',
+    aciklama: 'İş hâlâ geçerli — ilan tekrar yayına döner, başka bir nakliyeci talep edebilir.',
+    nedenler: ['Araç gelmedi / zamanında gelmedi', 'Karşı taraf yanıt vermiyor', 'Şartlarda anlaşamadık', 'Diğer'],
+  },
+  {
+    deger: 'is', baslik: '📦 İş İptali',
+    aciklama: 'Yükün/işin kendisi ortadan kalktı — ilan yayından kalkar.',
+    nedenler: ['Yük artık taşınmayacak', 'İş başka şekilde çözüldü', 'Diğer'],
+  },
+];
+
 // Sunucudaki `ALT_KRITERLER` beyaz listesinin BİREBİR aynası — anahtarlar
 // uyuşmazsa `api/reviews` o kriteri sessizce atar (bkz. `altKriterleriAyikla`).
 const ALT_KRITERLER: Record<'shipper' | 'carrier', { key: string; label: string }[]> = {
@@ -96,6 +113,8 @@ export default function AnlasmalarSekmesi({ anlasmalar: ilk, yorumlarim: ilkYoru
   const [hatalar, setHatalar] = useState<Record<string, string>>({});
   const [onayBekleyen, setOnayBekleyen] = useState<{ id: string; action: 'reddet' | 'iptal' } | null>(null);
   const [onayNeden, setOnayNeden] = useState('');
+  const [digerMetin, setDigerMetin] = useState('');
+  const [cancelType, setCancelType] = useState<'anlasma' | 'is' | ''>('');
   const [yorumAcikId, setYorumAcikId] = useState<string | null>(null);
   const [durumFiltre, setDurumFiltre] = useState<DurumFiltre>('hepsi');
 
@@ -108,22 +127,24 @@ export default function AnlasmalarSekmesi({ anlasmalar: ilk, yorumlarim: ilkYoru
     setTimeout(() => setHatalar(prev => { const n = { ...prev }; delete n[id]; return n; }), 6000);
   }
 
-  async function aksiyon(id: string, action: string, cancel_reason?: string) {
+  function onayTemizle() {
+    setOnayBekleyen(null); setOnayNeden(''); setDigerMetin(''); setCancelType('');
+  }
+
+  async function aksiyon(id: string, action: string, cancel_reason?: string, cancel_type?: 'anlasma' | 'is') {
     setYukleniyor(id + '_' + action);
     try {
       const res = await fetch(`/api/deals/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action, ...(cancel_reason ? { cancel_reason } : {}) }),
+        body: JSON.stringify({ action, ...(cancel_reason ? { cancel_reason } : {}), ...(cancel_type ? { cancel_type } : {}) }),
       });
       const d = await res.json();
       if (res.ok) {
-        // Sunucu yanıtı `cancelled_at`/`cancel_reason` DÖNMÜYOR (route'un
-        // seçtiği kolonlarda yok) — gösterim için burada tamamlıyoruz.
-        const ekstra = (action === 'reddet' || action === 'iptal')
-          ? { cancel_reason: cancel_reason || null, cancelled_by: userId, cancelled_at: new Date().toISOString() }
-          : {};
-        guncelle(id, { ...d.deal, ...ekstra });
+        // Sunucu yanıtı artık `cancelled_at`/`cancel_type`/`cancel_reason`'ı
+        // KENDİSİ döndürüyor (route güncellendi) — burada tekrar ETMİYORUZ,
+        // tek doğruluk kaynağı sunucu yanıtı.
+        guncelle(id, d.deal);
       } else {
         hataGoster(id, d.error || 'İşlem yapılamadı.');
       }
@@ -131,8 +152,7 @@ export default function AnlasmalarSekmesi({ anlasmalar: ilk, yorumlarim: ilkYoru
       hataGoster(id, e.message || 'Bir hata oluştu.');
     }
     setYukleniyor(null);
-    setOnayBekleyen(null);
-    setOnayNeden('');
+    onayTemizle();
   }
 
   function yorumEkle(review: any) {
@@ -184,8 +204,13 @@ export default function AnlasmalarSekmesi({ anlasmalar: ilk, yorumlarim: ilkYoru
               onAksiyon={aksiyon}
               onayBekleyen={onayBekleyen}
               setOnayBekleyen={setOnayBekleyen}
+              onayTemizle={onayTemizle}
               onayNeden={onayNeden}
               setOnayNeden={setOnayNeden}
+              digerMetin={digerMetin}
+              setDigerMetin={setDigerMetin}
+              cancelType={cancelType}
+              setCancelType={setCancelType}
               yorumAcik={yorumAcikId === deal.id}
               setYorumAcik={(acik: boolean) => setYorumAcikId(acik ? deal.id : null)}
               mevcutYorum={yorumlarim.find(r => r.deal_id === deal.id) || null}
@@ -203,14 +228,18 @@ export default function AnlasmalarSekmesi({ anlasmalar: ilk, yorumlarim: ilkYoru
 // ═══════════════════════════════════════════════════════════════════
 function AnlasmaKarti({
   deal, userId, yukleniyor, hata, onAksiyon,
-  onayBekleyen, setOnayBekleyen, onayNeden, setOnayNeden,
+  onayBekleyen, setOnayBekleyen, onayTemizle, onayNeden, setOnayNeden,
+  digerMetin, setDigerMetin, cancelType, setCancelType,
   yorumAcik, setYorumAcik, mevcutYorum, onYorumGonderildi,
 }: {
   deal: any; userId: string; yukleniyor: string | null; hata?: string;
-  onAksiyon: (id: string, action: string, cancel_reason?: string) => void;
+  onAksiyon: (id: string, action: string, cancel_reason?: string, cancel_type?: 'anlasma' | 'is') => void;
   onayBekleyen: { id: string; action: 'reddet' | 'iptal' } | null;
   setOnayBekleyen: (v: { id: string; action: 'reddet' | 'iptal' } | null) => void;
+  onayTemizle: () => void;
   onayNeden: string; setOnayNeden: (v: string) => void;
+  digerMetin: string; setDigerMetin: (v: string) => void;
+  cancelType: 'anlasma' | 'is' | ''; setCancelType: (v: 'anlasma' | 'is' | '') => void;
   yorumAcik: boolean; setYorumAcik: (v: boolean) => void;
   mevcutYorum: any; onYorumGonderildi: (r: any) => void;
 }) {
@@ -322,23 +351,68 @@ function AnlasmaKarti({
         </div>
       )}
 
-      {/* ── iptal / reddet onay kutusu ── */}
-      {confirmAcik && (
-        <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <div style={{ color: C.text, fontSize: '0.82rem', fontWeight: 600 }}>
-            {onayBekleyen?.action === 'reddet' ? 'Bu talebi reddetmek istediğinize emin misiniz?' : 'Anlaşmayı iptal etmek istediğinize emin misiniz?'}
+      {/* ── iptal / reddet onay kutusu ──
+          11 Ağu 2026 — ZATEN MÜHÜRLENMİŞ (matched/in_transit) bir kaydı iptal
+          ederken tür seçimi ZORUNLU (bkz. route'taki bug notu: bu seçim
+          olmadan ilan sonsuza kadar yayından düşük kalıyordu). 'reddet' ve
+          'requested' durumunda iptal (henüz listings hiç dokunulmadı) için
+          eski basit serbest-metin akış AYNEN kalıyor. */}
+      {confirmAcik && (() => {
+        const turSecimiGerekli = onayBekleyen!.action === 'iptal' && ['matched', 'in_transit'].includes(deal.status);
+        const nihaiNeden = onayNeden === 'Diğer' ? digerMetin.trim() : onayNeden;
+        const gonderilebilir = !turSecimiGerekli || (cancelType && nihaiNeden);
+        return (
+          <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, padding: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ color: C.text, fontSize: '0.82rem', fontWeight: 600 }}>
+              {onayBekleyen!.action === 'reddet' ? 'Bu talebi reddetmek istediğinize emin misiniz?'
+                : turSecimiGerekli ? 'Bu anlaşmayı neden iptal ediyorsunuz?'
+                : 'Talebi geri çekmek istediğinize emin misiniz?'}
+            </div>
+
+            {turSecimiGerekli ? (
+              <>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {IPTAL_TURLERI.map(t => (
+                    <label key={t.deger} onClick={() => { setCancelType(t.deger); setOnayNeden(''); setDigerMetin(''); }}
+                      style={{ display: 'flex', gap: 10, alignItems: 'flex-start', cursor: 'pointer', padding: 10, borderRadius: 6, border: `1px solid ${cancelType === t.deger ? C.blue : C.border}`, background: cancelType === t.deger ? C.blueBg : 'transparent' }}>
+                      <input type="radio" checked={cancelType === t.deger} onChange={() => { setCancelType(t.deger); setOnayNeden(''); setDigerMetin(''); }} style={{ marginTop: 3 }} />
+                      <div>
+                        <div style={{ color: C.text, fontWeight: 700, fontSize: '0.85rem' }}>{t.baslik}</div>
+                        <div style={{ color: C.dim, fontSize: '0.75rem', marginTop: 2 }}>{t.aciklama}</div>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+                {cancelType && (
+                  <select value={onayNeden} onChange={e => setOnayNeden(e.target.value)} style={{ ...inp, cursor: 'pointer' }}>
+                    <option value="">Neden seçin...</option>
+                    {IPTAL_TURLERI.find(t => t.deger === cancelType)!.nedenler.map(n => (
+                      <option key={n} value={n}>{n}</option>
+                    ))}
+                  </select>
+                )}
+                {onayNeden === 'Diğer' && (
+                  <textarea value={digerMetin} onChange={e => setDigerMetin(e.target.value)} rows={2}
+                    placeholder="Detay yazın..." style={{ ...inp, resize: 'vertical' as const }} />
+                )}
+              </>
+            ) : (
+              <textarea value={onayNeden} onChange={e => setOnayNeden(e.target.value)} rows={2}
+                placeholder="Neden (opsiyonel)" style={{ ...inp, resize: 'vertical' as const }} />
+            )}
+
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                onClick={() => onAksiyon(deal.id, onayBekleyen!.action, nihaiNeden.trim() || undefined, turSecimiGerekli ? (cancelType as 'anlasma' | 'is') : undefined)}
+                disabled={!!yukleniyor || !gonderilebilir}
+                style={{ ...btn('danger'), opacity: gonderilebilir ? 1 : 0.5, cursor: gonderilebilir ? 'pointer' : 'not-allowed' }}>
+                {yukleniyor ? '...' : 'Evet, Onayla'}
+              </button>
+              <button onClick={onayTemizle} style={btn('ghost')}>Vazgeç</button>
+            </div>
           </div>
-          <textarea value={onayNeden} onChange={e => setOnayNeden(e.target.value)} rows={2}
-            placeholder="Neden (opsiyonel)" style={{ ...inp, resize: 'vertical' as const }} />
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button onClick={() => onAksiyon(deal.id, onayBekleyen!.action, onayNeden.trim() || undefined)} disabled={!!yukleniyor}
-              style={btn('danger')}>
-              {yukleniyor ? '...' : 'Evet, Onayla'}
-            </button>
-            <button onClick={() => { setOnayBekleyen(null); setOnayNeden(''); }} style={btn('ghost')}>Vazgeç</button>
-          </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* ── completed: değerlendirme ── */}
       {deal.status === 'completed' && (
@@ -366,6 +440,8 @@ function AnlasmaKarti({
       {deal.status === 'cancelled' && (
         <div style={{ color: C.dim, fontSize: '0.8rem' }}>
           {tarihFmt(deal.cancelled_at)} tarihinde iptal edildi.
+          {deal.cancel_type === 'anlasma' && <div style={{ marginTop: 2, color: C.blue }}>🤝 Anlaşma iptali — ilan tekrar yayına döndü.</div>}
+          {deal.cancel_type === 'is' && <div style={{ marginTop: 2 }}>📦 İş iptali — ilan yayından kalktı.</div>}
           {deal.cancel_reason && <div style={{ marginTop: 2 }}>Neden: {deal.cancel_reason}</div>}
         </div>
       )}

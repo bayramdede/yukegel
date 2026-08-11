@@ -44,6 +44,31 @@
 > giriş OTP'sinin (`app/giris/page.tsx:381`) asıl `verifyOtp` çağrısı hâlâ
 > tamamen istemcide ve kaba-kuvvet korumasız — `docs/YAPILACAKLAR.md` md.3.
 
+> 🔒 **11 AĞU 2026 — `deals`/`reviews` GEREKSİZ GRANT'LARI KAPANDI (savunma
+> derinliği; sömürü YOKTU, bizzat denenip doğrulandı).** `anon`/`authenticated`
+> bu iki tabloda SELECT dışında her şeye sahipti (Supabase'in yeni tablo
+> varsayılanı) — RLS default-deny fiilen koruyordu ama tek katmandı. Şimdi
+> yalnız SELECT+REFERENCES kaldı. **Bu desen SİSTEMİK** (nerdeyse tüm public
+> şema aynı) — genel tarama `docs/YAPILACAKLAR.md` madde 3'e düşüldü, kalıcı
+> ders §9'da. Ayrıntı: `docs/ARSIV_YAPILACAKLAR.md`.
+
+> 🤝 **11 AĞU 2026 — PUBLİK PROFİLDE YAYINLANMIŞ DEĞERLENDİRMELER AÇILDI
+> (Faz 3'ün ilk parçası).** `/u/[username]` artık ortalama + yıldız + rol
+> bağlamı + yorum gösteriyor — **skor İCADI YOK**, DB'deki ham published
+> satırların gösterimi. Güven puanı (formül) hâlâ ayrı, bilinçli bir karar
+> bekliyor. Gerçek uçtan uca (tamamlanmış anlaşma → çift kör yayın → her iki
+> profil sayfası) tarayıcıda doğrulandı. Ayrıntı: `docs/ARSIV_YAPILACAKLAR.md`.
+
+> 🔴 **11 AĞU 2026 — BAYRAM'IN CANLIDA YAŞADIĞI BUG DÜZELTİLDİ: "anlaşma iptal
+> edilince ilan canlıya dönmedi."** `deals.cancel_type` (yeni: `anlasma`/`is`)
+> eklendi — mühürlenmiş bir kaydı iptal ederken artık ZORUNLU. `anlasma` →
+> `listings` tekrar `active`; `is` → `passive` kalır (bilinçli, "iş bitti"
+> demek). `/ilan/[id]`'ye TEK `ilanAktif` tanımı geldi, ilan aktif değilken
+> **watermark** gösterir ve "Bu İşi Al" gizlenir. Yan bulgu: `deals_tekil`
+> koşulsuz unique'ti, iptalden sonra AYNI nakliyeci bir daha asla talep
+> edemiyordu — kısmi indekse çevrildi. Hepsi dev+prod'da gerçek tarayıcıyla
+> doğrulandı, `test:deals` 22/22. Ayrıntı: `docs/ARSIV_YAPILACAKLAR.md`.
+
 > ## ✅ 10 AĞU 2026 — TERS SKOR YAYINI KAPANDI (4 nokta) + `olc:87` TABANI ONARILDI
 >
 > **`audit_score` artık HİÇBİR yerde yayınlanmıyor.** Karar (Bayram): "ibareyi
@@ -2220,7 +2245,7 @@ aynı `normalized`+`district`'e** çözülüyor. Ek olarak 303 mesajda (3 gerçe
 | `/api/listings/yakin` | Yakınımdaki Yükler: lat/lng → en yakın il (offline haversine) → o ildeki aktif ilanlar (GET) |
 | `/api/listings/ara` | **Ana sayfa il filtresi (GET, Dalga 3).** `?kalkis=<plaka>&varis=<plaka>&tip=yuk\|arac`. Service role; `origin_province_id` / `listing_stops.province_id` tamsayı eşitliği. En az bir il zorunlu (yoksa 400) — filtresiz liste zaten SSR'den geliyor. Tanınmayan il → **400**, sessiz "tüm iller" değil. Yanıt rozetleri de içerir (ikinci istek yok). |
 | `/api/deals` | 🤝 Güvenli Etkileşim (Faz 1-2). `POST` — nakliyeci talep oluşturur (`status='requested'`); `shipper_id` İSTEMCİDEN DEĞİL `listings.user_id`'den. `GET` — oturum sahibinin taraf olduğu kayıtlar (`?rol=shipper\|carrier`). Ekran: `/ilan/[id]` "Bu İşi Al" (POST) + panel "Anlaşmalarım" (GET — SSR'de doğrudan `page.tsx`'ten, bu route'u ÇAĞIRMIYOR, aynı sorgu deseni JOIN'li tekrarlanıyor). |
-| `/api/deals/[id]` | 🤝 `PATCH { action }` — durum geçişleri (`onayla`/`reddet`/`yola_cikti`/`tamamla`/`iptal`). 🚨 Yetki tablosu route içinde: onayla/reddet YALNIZ shipper, yola_cikti YALNIZ carrier, tamamla/iptal İKİ TARAF. `tamamla` iki adımlı (beyan + karşı onay, `completed_declared_by`). `onayla` yan etkisi: `listings.status='passive'` + rakip talepler otomatik `cancelled`. |
+| `/api/deals/[id]` | 🤝 `PATCH { action }` — durum geçişleri (`onayla`/`reddet`/`yola_cikti`/`tamamla`/`iptal`). 🚨 Yetki tablosu route içinde: onayla/reddet YALNIZ shipper, yola_cikti YALNIZ carrier, tamamla/iptal İKİ TARAF. `tamamla` iki adımlı (beyan + karşı onay, `completed_declared_by`). `onayla` yan etkisi: `listings.status='passive'` + rakip talepler otomatik `cancelled`. **11 Ağu 2026** — `iptal`, ZATEN mühürlenmiş (`matched`/`in_transit`) bir kaydı iptal ederken `cancel_type: 'anlasma'\|'is'` İSTER (yoksa 400): `anlasma` → `listings` geri `active`, `is` → `passive` kalır. `'requested'` iptali/reddi bunu istemez (listings hiç dokunulmamıştı). |
 | `/api/reviews` | 🤝 `POST` — çift kör değerlendirme (`deal_id, rating, sub_ratings?, comment?`). `published_at` BİLEREK yazılmıyor — yayınlama DB trigger'ında (`reviews_ciftli_yayinla`). İhlalli yorum kullanıcıya hata GÖSTERMEZ, `is_hidden=true` ile sessizce moderatör kuyruğuna düşer (PRD md.5). Ekran: panel "Anlaşmalarım" → tamamlanmış anlaşmada "⭐ Değerlendirme Yaz". |
 
 ---
@@ -2246,6 +2271,27 @@ Açık rotalar: /giris, /auth/, /profil-tamamla, /nasil-calisir, /hakkimizda,
 ---
 
 ## 9. KURALLAR & TUZAKLAR
+
+- 🚨 **YENİ TABLO OLUŞTURURKEN SUPABASE VARSAYILANI `anon`/`authenticated`E
+  SELECT DIŞINDA HER ŞEYİ (INSERT/UPDATE/DELETE/TRUNCATE) GRANT EDER —
+  RLS'İ TEK SAVUNMA KATMANI BIRAKIR** (11 Ağu 2026, `deals`/`reviews`
+  incelenirken bulundu). Migration'da özel bir GRANT/REVOKE yazılmadıysa yeni
+  tablolar bu varsayılanla gelir. Bugüne kadar bu SÖMÜRÜLMEDİ çünkü RLS açıkken
+  bir komut için (INSERT/UPDATE/DELETE) hiçbir policy yoksa Postgres o komutu
+  TÜM satırlarda REDDEDER — GRANT var olsa bile. Ama bu, RLS'i **tek** savunma
+  katmanı yapıyor: biri ileride meşru görünen ama gevşek bir policy eklerse
+  (`USING (true)` gibi), GRANT zaten açık olduğu için açık ANINDA sömürülebilir
+  hale gelir — ikinci bir engel yok. Tarama TÜM public şemada aynı deseni
+  gösterdi (`safety_rules`, `system_config`, `blacklist`, `pois` dahil),
+  yalnız `deals`/`reviews` düzeltildi (dar kapsam, bkz. `docs/YAPILACAKLAR.md`
+  madde 3 — genel tarama ayrı, dikkatli bir tur ister).
+  **Kural: yeni bir tablo oluştururken, istemcinin GERÇEKTEN yazması gereken
+  kolonlar/komutlar dışında `anon`/`authenticated`e INSERT/UPDATE/DELETE
+  GRANT'ı verme (ya da migration sonunda açıkça REVOKE et).** RLS policy'sinin
+  doğruluğuna güvenmek yetmez — GRANT seviyesinde de en az yetki ilkesi
+  uygulanmalı. Doğrulama yöntemi VARSAYIMLA değil: geçici bir kullanıcıyla
+  gerçek bir INSERT/UPDATE/DELETE denemesi yapıp reddedildiğini GÖRMEK gerekir
+  (bu turda tam olarak böyle doğrulandı, bkz. `docs/ARSIV_YAPILACAKLAR.md`).
 
 - 🚨 **`tsc`/`eslint`/`next build` DAİRESEL IMPORT'U YAKALAMAZ — YALNIZ TARAYICIDA PATLAR**
   (10 Ağu 2026, Güvenli Etkileşim Faz 2 paneli). `PanelClient.tsx` yeni
@@ -2966,12 +3012,18 @@ aynası — anahtar uyuşmazsa sunucu o kriteri sessizce atar.
 - Buton görünürlüğü **yetki VERMEZ** — `app/api/deals/[id]/route.ts`'teki
   yetki tablosu her istekte yeniden doğrulanır; ekran yalnız boşa buton
   göstermemek için sunucunun aynasıdır (§7'deki desenle aynı).
+- **Yayınlanmış değerlendirmeler (Faz 3'ün ilk parçası, 11 Ağu 2026)** —
+  `/u/[username]`'de `DegerlendirmelerKarti`: ortalama + yıldız + rol bağlamı
+  + yorum, DB'deki ham published+non-hidden satırların gösterimi. **Skor İCADI
+  YOK** — güven puanından kasıtlı olarak ayrı, bkz. altta.
 
 ### Henüz YOK (açık kararlar + sıradaki fazlar)
 - 🔓 `listings.completed_at` ↔ `deals.completed_at` ilişkisi netleşmedi.
 - 🔓 İletişim bilgisini eşleşmeye bağlama (PRD md.4) — ürün kararı bekliyor.
-- **Faz 3** — kullanıcı düzeyi güven puanı (`audit_score`'dan BAĞIMSIZ olacak,
-  bkz. bu dosyanın başındaki "TERS SKOR" kaydı), rozetler, profil OG kartı.
+- **Faz 3'ün kalanı** — kullanıcı düzeyi güven puanı (`audit_score`'dan
+  BAĞIMSIZ olacak, bkz. bu dosyanın başındaki "TERS SKOR" kaydı — bu bir
+  FORMÜL/İCAT, yukarıdaki ham yorum gösteriminden farklı, tek başına
+  atılmayacak), rozetler, profil OG kartı.
 - **Faz 4** — ödeme vadesi cron'u, "ödemeyi yaptım/aldım" çift teyidi, gecikme
   alarmı, tesis karnesi (`poi_reviews` — bkz. §9'daki uyuyan `update_poi_rating`
   hatası, Faz 4 onu uyandırır).

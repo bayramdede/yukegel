@@ -11,7 +11,7 @@ const KOR_PENCERE_GUN = 14;
  * PATCH /api/deals/[id] — durum geçişleri (GuvenEtkilesim PRD md.2)
  *
  * Body: { action: 'onayla' | 'reddet' | 'yola_cikti' | 'tamamla' | 'iptal',
- *         cancel_reason?: string }
+ *         cancel_reason?: string, cancel_type?: 'anlasma' | 'is' }
  *
  * 🚨 YETKİ TABLOSU — her geçişin KİM tarafından yapılabileceği burada tanımlı.
  *    Bu tablonun gevşek olması modülün tamamını çürütür: örneğin nakliyeci
@@ -20,6 +20,21 @@ const KOR_PENCERE_GUN = 14;
  *      yola_cikti      : YALNIZ carrier (yükü o taşıyor)
  *      tamamla         : İKİ TARAF (biri beyan eder, diğeri onaylar)
  *      iptal           : İKİ TARAF (tamamlanmadan önce)
+ *
+ * 🚨 11 Ağu 2026 — BULUNAN BUG: `matched`/`in_transit` bir kayıt iptal
+ *    edildiğinde `listings.status` HİÇ geri alınmıyordu — "onayla" onu
+ *    `passive` yapıyor ama `iptal` onu geri `active` yapmıyordu. Sonuç: araç
+ *    gelmese/anlaşma bozulsa bile ilan sonsuza kadar yayından düşük kalıyordu.
+ *    Düzeltme `cancel_type` ile geldi:
+ *      'anlasma' — eşleşme bozuldu (ör. araç gelmedi), İŞ HÂLÂ GEÇERLİ →
+ *                  `listings.status` geri `active`e döner, yeni bir nakliyeci
+ *                  talep edebilir.
+ *      'is'      — işin/yükün kendisi iptal oldu → `listings` `passive`
+ *                  KALIR (zaten öyleydi, ekstra işlem gerekmez).
+ *    `cancel_type` yalnız ZATEN mühürlenmiş (`matched`/`in_transit`) bir
+ *    kaydı iptal ederken ZORUNLU — o ana kadar `listings` hiç `passive`
+ *    olmadığı için (`requested` durumunda "reddet"/"iptal" ile geri alınacak
+ *    bir şey yok), eski basit (yalnız serbest metin) akış orada AYNEN kalıyor.
  */
 export async function PATCH(
   req: NextRequest,
@@ -30,7 +45,7 @@ export async function PATCH(
   const { data: { user } } = await ssr.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Giriş gerekli' }, { status: 401 });
 
-  const { action, cancel_reason } = await req.json().catch(() => ({}));
+  const { action, cancel_reason, cancel_type } = await req.json().catch(() => ({}));
   const svc = getServiceSupabase();
 
   const { data: deal } = await svc
@@ -118,7 +133,18 @@ export async function PATCH(
       if (deal.status === 'cancelled') {
         return NextResponse.json({ error: 'Kayıt zaten iptal.' }, { status: 409 });
       }
+      // Yalnız ZATEN mühürlenmiş (listings'i passive yapmış) bir kaydı iptal
+      // ederken cancel_type ZORUNLU — aşağıdaki yan etki bunsuz hangi yöne
+      // gideceğini bilemez. 'requested' durumunda listings hiç dokunulmadığı
+      // için bu ayrım anlamsız, eski basit akış geçerli.
+      const muhurlenmisti = ['matched', 'in_transit'].includes(deal.status);
+      if (muhurlenmisti && cancel_type !== 'anlasma' && cancel_type !== 'is') {
+        return NextResponse.json({
+          error: 'İptal türü belirtilmeli: anlaşma mı, iş mi iptal oldu?',
+        }, { status: 400 });
+      }
       yama = { status: 'cancelled', cancelled_at: simdi, cancelled_by: user.id,
+               cancel_type: muhurlenmisti ? cancel_type : null,
                cancel_reason: typeof cancel_reason === 'string' ? cancel_reason.slice(0, 500) : null };
       break;
     }
@@ -134,7 +160,8 @@ export async function PATCH(
     // ⚠️ Durum yarışına karşı: okuduğumuz durum hâlâ aynıysa yaz. İki taraf aynı
     //    anda "tamamla" derse ikisi de "beyan" yazıp onay adımı atlanabilirdi.
     .eq('status', deal.status)
-    .select('id, status, matched_at, transit_at, completed_declared_by, completed_at, review_deadline, payment_maturity_date')
+    .select(`id, status, matched_at, transit_at, completed_declared_by, completed_at,
+      review_deadline, payment_maturity_date, cancelled_at, cancel_type, cancel_reason`)
     .maybeSingle();
 
   if (error) {
@@ -164,6 +191,19 @@ export async function PATCH(
       .eq('status', 'requested')
       .neq('id', id);
   }
+
+  // ── İptal yan etkisi: mühürlenmiş bir kayıt bozulduğunda ────────────────
+  // 🚨 11 Ağu 2026'da düzeltilen bug — bkz. dosya başındaki not. Yalnız
+  // GERÇEKTEN mühürlenmiş (listings'i passive yapmış) bir kayıt iptal
+  // olduğunda çalışır; 'requested' iptalinde listings hiç dokunulmamıştı.
+  if (guncel.status === 'cancelled' && guncel.cancel_type === 'anlasma') {
+    // Eşleşme bozuldu ama iş hâlâ geçerli — ilan tekrar canlıya döner ki
+    // başka bir nakliyeci talep edebilsin.
+    await svc.from('listings').update({ status: 'active' }).eq('id', deal.listing_id);
+  }
+  // cancel_type === 'is' için EK İŞLEM YOK: listings zaten passive, işin
+  // kendisi bittiği için canlıya dönmemesi doğru — "İş iptal ise ilan
+  // yayından kalkar" isteğinin karşılığı zaten bu (bir daha active olmaz).
 
   if (guncel.status === 'completed') {
     // Panelin "Tamamla" düğmesiyle tutarlı kalsın.
