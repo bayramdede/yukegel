@@ -40,6 +40,10 @@ export interface IlanLimitAyar {
   gunluk: number;
 }
 
+let cachedLimits: IlanLimitAyar | null = null;
+let limitsCacheTime = 0;
+const LIMITS_TTL = 60_000;
+
 /**
  * Tavanları `system_config.rate_limit.spam_threshold`'tan okur.
  *
@@ -55,6 +59,11 @@ export interface IlanLimitAyar {
  * where category='rate_limit' and key='spam_threshold';`
  */
 export async function ilanLimitOku(): Promise<IlanLimitAyar> {
+  const now = Date.now();
+  if (cachedLimits && (now - limitsCacheTime < LIMITS_TTL)) {
+    return cachedLimits;
+  }
+
   try {
     const svc = getServiceSupabase();
     const { data } = await svc
@@ -67,8 +76,12 @@ export async function ilanLimitOku(): Promise<IlanLimitAyar> {
     const v = (data?.value ?? {}) as Record<string, unknown>;
     const saatlik = pozitifTamSayi(v.max_listings_per_hour, FALLBACK_SAATLIK);
     const gunluk = pozitifTamSayi(v.max_listings_per_day, FALLBACK_GUNLUK);
+    
     // Günlük < saatlik anlamsız (admin yanlış girmiş olabilir) — saatliğe çek.
-    return { saatlik, gunluk: Math.max(saatlik, gunluk) };
+    const res = { saatlik, gunluk: Math.max(saatlik, gunluk) };
+    cachedLimits = res;
+    limitsCacheTime = Date.now();
+    return res;
   } catch {
     return { saatlik: FALLBACK_SAATLIK, gunluk: FALLBACK_GUNLUK };
   }

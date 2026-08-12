@@ -513,6 +513,7 @@ export async function ilanYaz(
       // `stop_order` fonksiyon içinde `with ordinality` ile üretiliyor;
       // araç adedi tüm duraklara aynı yazılıyor (mevcut davranış korundu).
       arac_adet: aracAdet,
+      dedup_hash: dedupHash,
     },
     // ⚠️ `province_id` ve `district_official` BURADAN gitmezse RPC v3 metinden
     // türetir (id) veya NULL bırakır (official) — sessizce. Derleyici bu jsonb
@@ -561,20 +562,8 @@ export async function ilanYaz(
   // alınmak sayacı geri vermez, aksi hâlde tavan "yayına çıkan ilan tavanı" olurdu.
   ilanTavanIsle(userId, tavan);
 
-  // Mükerrer hash'ini yaz — `ilan_olustur()` RPC'si bu kolonu bilmiyor
-  // (parse-listing Edge Function ile paylaşıldığı için genişletilmedi), ayrı
-  // bir UPDATE ile yazılıyor. Bir sonraki ilanın mükerrer kontrolü bunu okur.
-  // ⚠️ Hata olsa bile ilan yazıldı; hash yazılamazsa bir sonraki mükerrer
-  // yakalanmaz ama ilan kaybolmaz — o yüzden hata akışı DURDURMUYOR, yalnız iz.
-  const { error: hashError } = await svc
-    .from('listings')
-    .update({ dedup_hash: dedupHash })
-    .eq('id', listing.id);
-  if (hashError) {
-    structuredLog('WARN', 'db-transaction', 'dedup_hash yazılamadı', {
-      user_id: userId, listing_id: listing.id, error_message: hashError.message,
-    });
-  }
+  // (Mükerrer hash'i V5 ile doğrudan ilan_olustur() RPC'sine eklendi,
+  // ekstra round-trip engellenmek üzere atomik INSERT olarak birleştirildi.)
 
   // ── V3: moderasyon kararı ─────────────────────────────────────────────────
   // Eşikler `system_config`'ten; `/api/ilan/duzelt` ile BİREBİR aynı mantık.

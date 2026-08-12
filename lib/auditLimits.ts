@@ -15,12 +15,21 @@ const FALLBACK_AUTO_PUBLISH_MAX = 31;
 const FALLBACK_REJECT_MIN = 71;
 const FALLBACK_AI_QUOTA_DEFAULT = 5;
 
+let cachedThresholds: AuditThresholds | null = null;
+let thresholdsCacheTime = 0;
+const THRESHOLDS_TTL = 60_000;
+
 /**
  * Audit skoru eşiklerini system_config tablosundan okur.
  * Bağımlı: /api/ilan/duzelt — re-scan sonrası moderation_status kararı bu eşiklere göre verilir.
  * Trigger içindeki fonksiyon (audit_listing_fn) ayrıca aynı değerleri okur (DB tarafında).
  */
 export async function getAuditThresholds(): Promise<AuditThresholds> {
+  const now = Date.now();
+  if (cachedThresholds && (now - thresholdsCacheTime < THRESHOLDS_TTL)) {
+    return cachedThresholds;
+  }
+
   try {
     const svc = getServiceSupabase();
     const { data } = await svc
@@ -35,7 +44,10 @@ export async function getAuditThresholds(): Promise<AuditThresholds> {
     const autoPublishScoreMax = toInt(map.auto_publish_score_max, FALLBACK_AUTO_PUBLISH_MAX);
     const rejectScoreMin = toInt(map.reject_score_min, FALLBACK_REJECT_MIN);
 
-    return { autoPublishScoreMax, rejectScoreMin };
+    const thresholds = { autoPublishScoreMax, rejectScoreMin };
+    cachedThresholds = thresholds;
+    thresholdsCacheTime = Date.now();
+    return thresholds;
   } catch {
     return { autoPublishScoreMax: FALLBACK_AUTO_PUBLISH_MAX, rejectScoreMin: FALLBACK_REJECT_MIN };
   }
