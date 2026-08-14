@@ -543,7 +543,7 @@ function IlanlarSekmesi({ ilanlar: ilk, userId, anlasmalar }: { ilanlar: any[]; 
                                 </button>
                               : <button onClick={() => seferAc(ilan.id)}
                                   style={{ padding: '5px 10px', borderRadius: 5, border: `1px solid ${C.greenBg}`, background: C.greenDark, color: C.green, fontSize: '0.78rem', cursor: 'pointer', fontWeight: 600 }}>
-                                  🚚 Sefer Ekle
+                                  🔑 Plaka Ata
                                 </button>
                           )}
                           {silOnay === ilan.id ? (
@@ -575,26 +575,44 @@ function IlanlarSekmesi({ ilanlar: ilk, userId, anlasmalar }: { ilanlar: any[]; 
                         <td colSpan={6} style={{ padding: '0 12px 16px', background: '#0a0d11' }}>
                           <div style={{ border: `1px solid ${C.greenBg}`, borderRadius: 8, padding: 16, background: C.greenDark }}>
                             <div style={{ color: C.green, fontWeight: 700, fontSize: '0.85rem', marginBottom: 12 }}>
-                              🚚 Sefer Ekle — {kalkisAd}
+                              🔑 Plaka Ata — {kalkisAd}
                             </div>
-                            {/* Kayıtlı araçlar */}
-                            {kayitliAraclar.length > 0 && (
-                              <div style={{ marginBottom: 10 }}>
-                                <div style={{ color: C.dim, fontSize: '0.7rem', fontWeight: 600, marginBottom: 5 }}>Kayıtlı Araçlar</div>
-                                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                            {/* Plaka — EN ÜSTTE. Kayıtlı araçla eşleşirse diğer alanlar otomatik dolar. */}
+                            <div style={{ marginBottom: 10 }}>
+                              <label style={lbl}>Plaka</label>
+                              <input
+                                value={seferPlaka}
+                                onChange={e => {
+                                  const v = e.target.value.toUpperCase().replace(/\s/g, '');
+                                  setSeferPlaka(v);
+                                  const eslesme = kayitliAraclar.find((a: any) => a.plate === v);
+                                  if (eslesme) {
+                                    setSeferSofor(eslesme.driver_name || '');
+                                  }
+                                }}
+                                placeholder="34ABC123"
+                                style={{ ...inp, textTransform: 'uppercase' as const, fontWeight: 700, letterSpacing: '0.08em', fontSize: '1rem' }}
+                              />
+                              {/* Kayıtlı araçlar — plaka listesi */}
+                              {kayitliAraclar.length > 0 && (
+                                <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' as const, marginTop: 6 }}>
                                   {kayitliAraclar.map((a: any, i: number) => (
                                     <button key={i} type="button"
                                       onClick={() => { setSeferPlaka(a.plate); setSeferSofor(a.driver_name || ''); }}
-                                      style={{ background: seferPlaka === a.plate ? C.blueBg : C.surface, border: `1px solid ${seferPlaka === a.plate ? C.blue : C.border}`, color: seferPlaka === a.plate ? C.blue : C.muted, borderRadius: 6, padding: '3px 9px', fontSize: '0.73rem', fontWeight: 700, cursor: 'pointer', letterSpacing: '0.04em' }}>
-                                      {a.plate}{a.driver_name ? ` · ${a.driver_name}` : ''}
+                                      style={{ background: seferPlaka === a.plate ? C.blueBg : C.surface, border: `1px solid ${seferPlaka === a.plate ? C.blue : C.border}`, color: seferPlaka === a.plate ? C.blue : C.muted, borderRadius: 5, padding: '2px 8px', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer', letterSpacing: '0.04em' }}>
+                                      {a.plate}
                                     </button>
                                   ))}
                                 </div>
-                              </div>
-                            )}
+                              )}
+                            </div>
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
                               <div>
-                                <label style={lbl}>Nakliyeci Adı / Firma</label>
+                                <label style={lbl}>Şoför Adı <span style={{ color: C.dim, fontWeight: 400 }}>(opsiyonel)</span></label>
+                                <input value={seferSofor} onChange={e => setSeferSofor(e.target.value)} placeholder="Şoför Ahmet" style={inp} />
+                              </div>
+                              <div>
+                                <label style={lbl}>Nakliyeci / Firma <span style={{ color: C.dim, fontWeight: 400 }}>(opsiyonel)</span></label>
                                 <input value={seferNakliyeAd} onChange={e => setSeferNakliyeAd(e.target.value)} placeholder="Ali Veli Nakliyat" style={inp} />
                               </div>
                               <div>
@@ -602,18 +620,10 @@ function IlanlarSekmesi({ ilanlar: ilk, userId, anlasmalar }: { ilanlar: any[]; 
                                 <input value={seferNakliyeTel} onChange={e => setSeferNakliyeTel(e.target.value)} placeholder="0532 000 00 00" style={inp} />
                               </div>
                               <div>
-                                <label style={lbl}>Plaka <span style={{ color: C.dim, fontWeight: 400 }}>(opsiyonel)</span></label>
-                                <input value={seferPlaka} onChange={e => setSeferPlaka(e.target.value.toUpperCase())} placeholder="34 ABC 123" style={{ ...inp, textTransform: 'uppercase' as const, fontWeight: 700, letterSpacing: '0.05em' }} />
-                              </div>
-                              <div>
-                                <label style={lbl}>Şoför Adı <span style={{ color: C.dim, fontWeight: 400 }}>(opsiyonel)</span></label>
-                                <input value={seferSofor} onChange={e => setSeferSofor(e.target.value)} placeholder="Şoför Ahmet" style={inp} />
-                              </div>
-                              <div>
                                 <label style={lbl}>Anlaşma Fiyatı <span style={{ color: C.dim, fontWeight: 400 }}>(₺)</span></label>
                                 <input value={seferFiyat} onChange={e => setSeferFiyat(e.target.value)} placeholder={ilan.price_offer ? String(ilan.price_offer) : 'opsiyonel'} style={inp} />
                               </div>
-                              <div>
+                              <div style={{ gridColumn: '1 / -1' }}>
                                 <label style={lbl}>Not <span style={{ color: C.dim, fontWeight: 400 }}>(opsiyonel)</span></label>
                                 <input value={seferNot} onChange={e => setSeferNot(e.target.value)} placeholder="Kırmızı TIR, öğle kalkış" style={inp} />
                               </div>
@@ -628,7 +638,7 @@ function IlanlarSekmesi({ ilanlar: ilk, userId, anlasmalar }: { ilanlar: any[]; 
                               <div style={{ display: 'flex', gap: 8 }}>
                                 <button onClick={() => seferKaydet(ilan.id, ilan.price_offer)} disabled={seferYukleniyor}
                                   style={{ padding: '8px 18px', borderRadius: 6, border: 'none', background: '#22c55e', color: '#000', fontWeight: 800, fontSize: '0.85rem', cursor: 'pointer' }}>
-                                  {seferYukleniyor ? 'Kaydediliyor...' : '🚚 Seferi Başlat'}
+                                  {seferYukleniyor ? 'Kaydediliyor...' : '🔑 Plaka Ata'}
                                 </button>
                                 <button onClick={() => setSeferEkleId(null)}
                                   style={{ padding: '8px 14px', borderRadius: 6, border: `1px solid ${C.border}`, background: 'none', color: C.muted, fontSize: '0.82rem', cursor: 'pointer' }}>
