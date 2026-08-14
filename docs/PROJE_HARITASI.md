@@ -1,6 +1,26 @@
 # Yükegel — Proje Haritası
 > **Kullanım:** Her sohbet başında sadece bu dosyayı oku. Kaynak dosyaları sadece o dosyada değişiklik yapacaksan oku.  
 >
+> 📋 **14 AĞU 2026 — PANEL "İLANLARIM": DURUM AYRIMI + VARSAYILAN FİLTRE + MOBİL
+> UYUM.** `app/panel/PanelClient.tsx`. **(1)** "Pasif" tek durum altında iki
+> farklı şeyi karıştırıyordu: kullanıcının bilinçli kapattığı ilan ile plaka
+> atanıp (`seferKaydet`/deal `onayla` sonrası `status='passive'`) süreci devam
+> eden ilan aynı görünüyordu. Yeni `durumGenislet()` — `mesgulIlanlar` (matched/
+> in_transit deal'i olan ilan id'leri, zaten "Sefer Ekle" butonunu gizlemek için
+> hesaplanıyordu) ile `passive` ilanları ikiye ayırıyor: **"Aktif (Plaka
+> Aranmadı)"** (`active`, değişmedi, sadece etiket netleşti) ve **"Devam
+> Ediyor"** (`in_progress`, yeni — mavi rozet). ⚠️ **Yalnız GÖRÜNÜM/filtre
+> katmanı** — `listings.status` DB'de hâlâ `'passive'`, `durumHesapla()`
+> DEĞİŞMEDİ. **(2)** Varsayılan `statusFiltre` artık `'hepsi'` değil `'active'`
+> — panele girince önce iş bekleyen ilanlar görünüyor. **(3)** Mobil uyum:
+> header/tab bar dar ekranda `.panel-tabs` yatay kaydırmaya geçiyor (wrap değil
+> — 4 sekme alt alta kırılırsa dağılır); `.ilan-tablo` klasik "responsive
+> table" deseniyle (`thead` gizlenir, her `<td data-label>` kart satırına
+> döner) ≤680px'te kart görünümüne geçiyor — masaüstünde hiçbir fark yok, yapı
+> DEĞİŞMEDİ, yalnız CSS (`app/admin/radar/analitik/AnalitikClient.tsx`'teki
+> `<style>{`@media...`}</style>` deseniyle aynı). `tsc`/`eslint`/`next build`
+> temiz (eslint hata sayısı değişmeden 34 — hepsi ön-var, `<a>`/effect uyarısı).
+>
 > 📞 **14 AĞU 2026 — ANLAŞMALARIM'A ARAMA BUTONU + NAKLİYECİ TELEFON ONAYI.**
 > `deals.carrier_phone_consent` (bool, NOT NULL DEFAULT false) eklendi —
 > migration `deals_carrier_phone_consent`. Nakliyeci "Bu İşi Al" formunda

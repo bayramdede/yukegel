@@ -56,9 +56,21 @@ export default function PanelClient({ userId, userEmail, profil, ilanlar, aracla
 
   return (
     <div style={{ minHeight: '100vh', background: C.bg, fontFamily: "'IBM Plex Sans', system-ui, sans-serif" }}>
+      {/* 14 Ağu 2026 — mobil uyum: header/tab bar dar ekranda sıkışıyordu.
+          `panel-tabs` mobilde yatay kaydırmaya geçiyor (wrap yerine — 4 sekme
+          alt alta kırılırsa görünüm dağılır), padding'ler daralıyor. */}
+      <style>{`
+        @media (max-width: 640px) {
+          .panel-nav-inner { padding: 0 14px !important; }
+          .panel-container { padding: 14px !important; }
+          .panel-tabs { width: 100% !important; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+          .panel-tabs::-webkit-scrollbar { display: none; }
+          .panel-tab-btn { flex-shrink: 0; white-space: nowrap; }
+        }
+      `}</style>
       {/* ── Header ── */}
       <nav style={{ background: C.surface, borderBottom: `1px solid ${C.border}`, position: 'sticky', top: 0, zIndex: 50 }}>
-        <div style={{ maxWidth: 1024, margin: '0 auto', padding: '0 24px', height: 56, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div className="panel-nav-inner" style={{ maxWidth: 1024, margin: '0 auto', padding: '0 24px', height: 56, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <a href="/" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 8 }}>
             <img src="/logo.svg" alt="Yükegel" style={{ width: 28, height: 28 }} />
             <span style={{ fontWeight: 800, fontSize: '1.1rem' }}>
@@ -75,7 +87,7 @@ export default function PanelClient({ userId, userEmail, profil, ilanlar, aracla
         </div>
       </nav>
 
-      <div style={{ maxWidth: 1024, margin: '0 auto', padding: '24px' }}>
+      <div className="panel-container" style={{ maxWidth: 1024, margin: '0 auto', padding: '24px' }}>
         {/* ── Karşılama + Nakliyeci CTA ── */}
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, marginBottom: 24, flexWrap: 'wrap' }}>
           <div>
@@ -98,14 +110,14 @@ export default function PanelClient({ userId, userEmail, profil, ilanlar, aracla
         </div>
 
         {/* ── Tab Bar ── */}
-        <div style={{ display: 'flex', gap: 4, background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: 4, marginBottom: 24, width: 'fit-content' }}>
+        <div className="panel-tabs" style={{ display: 'flex', gap: 4, background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: 4, marginBottom: 24, width: 'fit-content' }}>
           {([
             { id: 'ilanlarim', label: '📋 İlanlarım', count: ilanlar.length },
             { id: 'araclarim', label: '🚛 Araçlarım', count: araclar.length },
             { id: 'anlasmalarim', label: '🤝 Anlaşmalarım', count: aktifAnlasma },
             { id: 'profilim', label: '👤 Profilim' },
           ] as { id: Tab; label: string; count?: number }[]).map(t => (
-            <button key={t.id} onClick={() => setSekme(t.id)}
+            <button key={t.id} className="panel-tab-btn" onClick={() => setSekme(t.id)}
               style={{ padding: '7px 20px', borderRadius: 7, border: 'none', cursor: 'pointer', fontWeight: sekme === t.id ? 700 : 500, fontSize: '0.85rem', background: sekme === t.id ? C.green : 'none', color: sekme === t.id ? '#000' : C.muted, display: 'flex', alignItems: 'center', gap: 6 }}>
               {t.label}
               {t.count !== undefined && (
@@ -129,13 +141,15 @@ export default function PanelClient({ userId, userEmail, profil, ilanlar, aracla
 // ═══════════════════════════════════════════════════════════════════
 // İLANLAR SEKMESİ
 // ═══════════════════════════════════════════════════════════════════
-type StatusFiltre = 'hepsi' | 'active' | 'passive' | 'completed' | 'pending' | 'rejected' | 'correction_needed';
+type StatusFiltre = 'hepsi' | 'active' | 'in_progress' | 'passive' | 'completed' | 'pending' | 'rejected' | 'correction_needed';
 
 function IlanlarSekmesi({ ilanlar: ilk, userId, anlasmalar }: { ilanlar: any[]; userId: string; anlasmalar: any[] }) {
   const [ilanlar, setIlanlar] = useState(ilk);
   const [yukleniyor, setYukleniyor] = useState<string | null>(null);
   const [silOnay, setSilOnay] = useState<string | null>(null);
-  const [statusFiltre, setStatusFiltre] = useState<StatusFiltre>('hepsi');
+  // 14 Ağu 2026 — varsayılan "Aktif (Plaka Aranmadı)"; kullanıcı panele girince
+  // önce iş bekleyen ilanlarını görsün, "Tümü" ile karışık liste değil.
+  const [statusFiltre, setStatusFiltre] = useState<StatusFiltre>('active');
   const [kopyalandi, setKopyalandi] = useState(false);
   const [publicUrl, setPublicUrl] = useState('');
 
@@ -292,19 +306,31 @@ function IlanlarSekmesi({ ilanlar: ilk, userId, anlasmalar }: { ilanlar: any[]; 
     return i.status;
   }
 
+  // 14 Ağu 2026 — "Pasif" tek durum altında iki farklı şeyi karıştırıyordu:
+  // kullanıcının bilinçli kapattığı ilan ile plaka atanıp (`seferKaydet`/`onayla`
+  // sonrası `status='passive'`) süreci devam eden ilan aynı görünüyordu.
+  // `mesgulIlanlar` (matched/in_transit anlaşması olan ilan id'leri) zaten
+  // "Sefer Ekle" butonunu gizlemek için hesaplanıyordu — aynı set burada da
+  // ayrım için kullanılıyor. Yalnız GÖRÜNÜM/filtre katmanı; `listings.status`
+  // DB'de hâlâ 'passive' — durumHesapla() değişmiyor.
+  function durumGenislet(durum: string, ilanId: string, mesgul: Set<string>): string {
+    return durum === 'passive' && mesgul.has(ilanId) ? 'in_progress' : durum;
+  }
+
   const sayilar: Record<StatusFiltre, number> = useMemo(() => ({
     hepsi: ilanlar.length,
-    active: ilanlar.filter(i => durumHesapla(i) === 'active').length,
-    passive: ilanlar.filter(i => durumHesapla(i) === 'passive').length,
+    active: ilanlar.filter(i => durumGenislet(durumHesapla(i), i.id, mesgulIlanlar) === 'active').length,
+    in_progress: ilanlar.filter(i => durumGenislet(durumHesapla(i), i.id, mesgulIlanlar) === 'in_progress').length,
+    passive: ilanlar.filter(i => durumGenislet(durumHesapla(i), i.id, mesgulIlanlar) === 'passive').length,
     completed: ilanlar.filter(i => durumHesapla(i) === 'completed').length,
     pending: ilanlar.filter(i => durumHesapla(i) === 'pending').length,
     rejected: ilanlar.filter(i => durumHesapla(i) === 'rejected').length,
     correction_needed: ilanlar.filter(i => durumHesapla(i) === 'correction_needed').length,
-  }), [ilanlar]);
+  }), [ilanlar, mesgulIlanlar]);
 
   const filtreli = useMemo(() => {
     return ilanlar.filter(i => {
-      const durum = durumHesapla(i);
+      const durum = durumGenislet(durumHesapla(i), i.id, mesgulIlanlar);
       if (statusFiltre !== 'hepsi' && durum !== statusFiltre) return false;
 
       const stops = (i.listing_stops || []).sort((a: any, b: any) => a.stop_order - b.stop_order);
@@ -321,7 +347,7 @@ function IlanlarSekmesi({ ilanlar: ilk, userId, anlasmalar }: { ilanlar: any[]; 
 
       return true;
     });
-  }, [ilanlar, statusFiltre, aramaKalkis, aramaVaris, aramaAracTipi, aramaTarihten, aramaTarihe]);
+  }, [ilanlar, statusFiltre, aramaKalkis, aramaVaris, aramaAracTipi, aramaTarihten, aramaTarihe, mesgulIlanlar]);
 
   const aktifFiltreSayisi = [aramaKalkis, aramaVaris, aramaAracTipi, aramaTarihten, aramaTarihe].filter(Boolean).length;
 
@@ -333,16 +359,32 @@ function IlanlarSekmesi({ ilanlar: ilk, userId, anlasmalar }: { ilanlar: any[]; 
   const th: React.CSSProperties = { padding: '10px 12px', textAlign: 'left', color: C.muted, fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', borderBottom: `1px solid ${C.border}`, whiteSpace: 'nowrap' };
   const td: React.CSSProperties = { padding: '12px', borderBottom: `1px solid #21262d`, verticalAlign: 'middle', fontSize: '0.85rem' };
 
-  const statusSirasi: StatusFiltre[] = ['hepsi', 'correction_needed', 'active', 'pending', 'passive', 'completed', 'rejected'];
+  const statusSirasi: StatusFiltre[] = ['hepsi', 'correction_needed', 'active', 'in_progress', 'pending', 'passive', 'completed', 'rejected'];
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* 14 Ağu 2026 — mobil uyum: klasik <table> dar ekranda okunmuyordu.
+          `ilan-tablo` altında `thead` gizlenip her `<td>` `data-label` ile
+          kart satırına dönüşüyor (klasik "responsive table" deseni — yapı
+          DEĞİŞMİYOR, yalnız CSS; masaüstünde hiçbir fark yok). */}
+      <style>{`
+        @media (max-width: 680px) {
+          .ilan-tablo thead { display: none; }
+          .ilan-tablo, .ilan-tablo tbody, .ilan-tablo tr { display: block; width: 100%; }
+          .ilan-tablo tr { border: 1px solid ${C.border}; border-radius: 10px; margin-bottom: 12px; }
+          .ilan-tablo td { display: block; border-bottom: none !important; padding: 8px 12px; }
+          .ilan-tablo td[data-label] { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+          .ilan-tablo td[data-label]::before { content: attr(data-label); color: ${C.muted}; font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; flex-shrink: 0; padding-top: 2px; }
+          .ilan-tablo td[data-label="İşlemler"] { flex-direction: column; align-items: stretch; }
+          .ilan-tablo td[data-label="İşlemler"]::before { display: none; }
+        }
+      `}</style>
 
       {/* ── Paylaşım Bandı ── */}
       <div style={{ background: C.surface, border: `1px solid ${C.greenBg}`, borderRadius: 10, padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
-        <div>
+        <div style={{ minWidth: 0 }}>
           <div style={{ color: C.green, fontWeight: 700, fontSize: '0.88rem', marginBottom: 2 }}>📤 İlan listeni paylaş</div>
-          <div style={{ color: C.dim, fontSize: '0.75rem', fontFamily: 'monospace' }}>{publicUrl || `yukegel.com/u/${userId}`}</div>
+          <div style={{ color: C.dim, fontSize: '0.75rem', fontFamily: 'monospace', wordBreak: 'break-all' as const }}>{publicUrl || `yukegel.com/u/${userId}`}</div>
         </div>
         <button onClick={linkKopyala}
           style={{ background: kopyalandi ? C.greenBg : C.green, color: '#000', fontWeight: 700, fontSize: '0.82rem', padding: '7px 16px', borderRadius: 6, border: 'none', cursor: 'pointer' }}>
@@ -421,7 +463,7 @@ function IlanlarSekmesi({ ilanlar: ilk, userId, anlasmalar }: { ilanlar: any[]; 
       ) : (
         <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden' }}>
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <table className="ilan-tablo" style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr>
                   <th style={th}>Başlık</th>
@@ -439,7 +481,7 @@ function IlanlarSekmesi({ ilanlar: ilk, userId, anlasmalar }: { ilanlar: any[]; 
                   const kalkisAd = ilAdi(ilan.origin_province_id) ?? '';
                   const baslik = `${kalkisAd}${sonDurak ? ` → ${ilAdi(sonDurak.province_id) ?? ''}` : ''}`;
                   const isYuk = ilan.listing_type === 'yuk';
-                  const durum = durumHesapla(ilan);
+                  const durum = durumGenislet(durumHesapla(ilan), ilan.id, mesgulIlanlar);
                   const tamamlandi = durum === 'completed';
                   const isAktif = durum === 'active';
                   const isPending = durum === 'pending';
@@ -455,7 +497,7 @@ function IlanlarSekmesi({ ilanlar: ilk, userId, anlasmalar }: { ilanlar: any[]; 
                   return (
                     <React.Fragment key={ilan.id}>
                     <tr style={{ opacity: ['passive', 'rejected', 'correction_needed'].includes(durum) ? 0.75 : 1, background: durum === 'correction_needed' ? '#12100a' : undefined }}>
-                      <td style={td}>
+                      <td style={td} data-label="Başlık">
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                           <span style={{ background: isYuk ? C.redBg : C.greenBg, color: isYuk ? '#fca5a5' : '#86efac', fontSize: '0.65rem', fontWeight: 700, padding: '2px 6px', borderRadius: 3, flexShrink: 0 }}>
                             {isYuk ? 'YÜK' : 'ARAÇ'}
@@ -466,24 +508,25 @@ function IlanlarSekmesi({ ilanlar: ilk, userId, anlasmalar }: { ilanlar: any[]; 
                           #{ilan.id.slice(0, 8)} · {new Date(ilan.created_at).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })}
                         </div>
                       </td>
-                      <td style={td}>
+                      <td style={td} data-label="Fiyat">
                         {ilan.price_offer
                           ? <span style={{ color: C.green, fontWeight: 700 }}>₺{Number(ilan.price_offer).toLocaleString('tr-TR')}</span>
                           : <span style={{ color: C.dim }}>—</span>}
                       </td>
-                      <td style={td}>
+                      <td style={td} data-label="Konum">
                         <div style={{ color: C.text }}>{kalkisAd}</div>
                         {ilan.origin_district && <div style={{ color: C.muted, fontSize: '0.78rem' }}>{ilan.origin_district}</div>}
                       </td>
-                      <td style={td}>
+                      <td style={td} data-label="Tarih">
                         {ilan.available_date
                           ? <span style={{ color: C.muted, fontSize: '0.82rem' }}>{new Date(ilan.available_date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })}</span>
                           : <span style={{ color: C.dim }}>—</span>}
                       </td>
-                      <td style={td}>
+                      <td style={td} data-label="Durum">
                         <DurumBadge durum={durum} />
                         {isRejected && <div style={{ color: C.dim, fontSize: '0.7rem', marginTop: 3 }}>Mod. reddetti</div>}
                         {isPending && <div style={{ color: C.dim, fontSize: '0.7rem', marginTop: 3 }}>İnceleniyor</div>}
+                        {durum === 'in_progress' && <div style={{ color: C.dim, fontSize: '0.7rem', marginTop: 3 }}>Plaka atandı, sefer sürüyor</div>}
                         {durum === 'correction_needed' && (() => {
                           const logs = ilan.internal_audit_logs;
                           const sebep   = logs?.correction_reason;
@@ -497,7 +540,7 @@ function IlanlarSekmesi({ ilanlar: ilk, userId, anlasmalar }: { ilanlar: any[]; 
                           );
                         })()}
                       </td>
-                      <td style={{ ...td, textAlign: 'right' as const }}>
+                      <td style={{ ...td, textAlign: 'right' as const }} data-label="İşlemler">
                         <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
                           <a href={`/ilan/${ilan.id}`}
                             style={{ padding: '5px 10px', borderRadius: 5, border: `1px solid ${C.border}`, color: C.muted, fontSize: '0.78rem', textDecoration: 'none', fontWeight: 500 }}>
@@ -846,7 +889,7 @@ function IlanlarSekmesi({ ilanlar: ilk, userId, anlasmalar }: { ilanlar: any[]; 
 
 function durumLabel(s: string): string {
   const map: Record<string, string> = {
-    hepsi: 'Tümü', active: 'Aktif', passive: 'Pasif', completed: 'Tamamlanan',
+    hepsi: 'Tümü', active: 'Aktif (Plaka Aranmadı)', in_progress: 'Devam Ediyor', passive: 'Pasif', completed: 'Tamamlanan',
     pending: 'Onay Bekleyen', rejected: 'Reddedilen', correction_needed: '⚠️ Düzeltme Gerekiyor',
   };
   return map[s] || s;
@@ -855,6 +898,7 @@ function durumLabel(s: string): string {
 function durumRenk(s: string): { bg: string; color: string } {
   const map: Record<string, { bg: string; color: string }> = {
     active:             { bg: '#0d2b1a', color: C.green },
+    in_progress:        { bg: C.blueBg, color: C.blue },
     passive:            { bg: '#1f2937', color: C.muted },
     completed:          { bg: C.greenBg, color: '#86efac' },
     pending:            { bg: '#2d1a00', color: C.amber },
