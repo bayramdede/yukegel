@@ -469,9 +469,12 @@ function IlanlarSekmesi({ ilanlar: ilk, userId, anlasmalar }: { ilanlar: any[]; 
                   <th style={th}>Başlık</th>
                   <th style={th}>Fiyat</th>
                   <th style={th}>Konum</th>
+                  <th style={th}>Araç Tipi</th>
                   <th style={th}>Tarih</th>
                   <th style={th}>Durum</th>
                   <th style={{ ...th, textAlign: 'right' as const }}>İşlemler</th>
+                  {/* 14 Ağu 2026 — kolon eklendi (Araç Tipi = kasa tipi); aşağıdaki
+                      `colSpan={6}` form satırları `colSpan={7}`e çıkarıldı, atlanmasın. */}
                 </tr>
               </thead>
               <tbody>
@@ -514,8 +517,19 @@ function IlanlarSekmesi({ ilanlar: ilk, userId, anlasmalar }: { ilanlar: any[]; 
                           : <span style={{ color: C.dim }}>—</span>}
                       </td>
                       <td style={td} data-label="Konum">
-                        <div style={{ color: C.text }}>{kalkisAd}</div>
-                        {ilan.origin_district && <div style={{ color: C.muted, fontSize: '0.78rem' }}>{ilan.origin_district}</div>}
+                        {/* 14 Ağu 2026 — yalnız çıkış görünüyordu; artık varış (son
+                            durak) da yazıyor. Çıkış tek satır (`listings.origin_*`),
+                            varış `listing_stops`'un SON durağı — bkz. dosya başındaki
+                            "Çıkış tek, varış çok" notu. */}
+                        <div style={{ color: C.text }}>
+                          {kalkisAd}{ilan.origin_district ? ` (${ilan.origin_district})` : ''}
+                          {sonDurak && <> {'→'} {ilAdi(sonDurak.province_id) ?? ''}{sonDurak.district ? ` (${sonDurak.district})` : ''}</>}
+                        </div>
+                      </td>
+                      <td style={td} data-label="Araç Tipi">
+                        {(ilan.body_type && ilan.body_type.length > 0)
+                          ? <span style={{ color: C.text, fontSize: '0.82rem' }}>{ilan.body_type.join(', ')}</span>
+                          : <span style={{ color: C.dim }}>—</span>}
                       </td>
                       <td style={td} data-label="Tarih">
                         {ilan.available_date
@@ -615,7 +629,7 @@ function IlanlarSekmesi({ ilanlar: ilk, userId, anlasmalar }: { ilanlar: any[]; 
                     {/* ── Sefer Ekle formu — harici nakliyeci ile sefer oluştur ── */}
                     {seferEkleId === ilan.id && (
                       <tr>
-                        <td colSpan={6} style={{ padding: '0 12px 16px', background: '#0a0d11' }}>
+                        <td colSpan={7} style={{ padding: '0 12px 16px', background: '#0a0d11' }}>
                           <div style={{ border: `1px solid ${C.greenBg}`, borderRadius: 8, padding: 16, background: C.greenDark }}>
                             <div style={{ color: C.green, fontWeight: 700, fontSize: '0.85rem', marginBottom: 12 }}>
                               🔑 Plaka Ata — {kalkisAd}
@@ -700,7 +714,7 @@ function IlanlarSekmesi({ ilanlar: ilk, userId, anlasmalar }: { ilanlar: any[]; 
                       const baslikRenk = duzeltmeModu ? '#fbbf24' : C.text;
                       return (
                       <tr>
-                        <td colSpan={6} style={{ padding: '0 12px 16px', background: '#0a0d11' }}>
+                        <td colSpan={7} style={{ padding: '0 12px 16px', background: '#0a0d11' }}>
                           <div style={{ border: `1px solid ${cerceve}`, borderRadius: 8, padding: 16, background: zemin }}>
                             <div style={{ color: baslikRenk, fontWeight: 700, fontSize: '0.85rem', marginBottom: 12 }}>
                               ✏️ {duzeltmeModu ? 'İlanı Düzelt' : 'İlanı Düzenle'} — {kalkisAd} → {ilAdi((ilan.listing_stops||[])[0]?.province_id) ?? ''}
