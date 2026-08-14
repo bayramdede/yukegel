@@ -22,12 +22,14 @@
 > çıkışı gösteriyordu; artık `Çıkış (il, ilçe) → Varış (il, ilçe)` — varış
 > `listing_stops`'un SON durağından (`sonDurak`, zaten Başlık'ta kullanılıyordu),
 > "çıkış tek, varış çok" kuralına uygun. **(5)** Yeni "Araç Tipi" kolonu eklendi
-> — içeriği `vehicle_type` DEĞİL **`body_type`** (kasa tipi: Tenteli/Açık Kasa/
-> Kapalı Kasa/Frigorifik/Damperli/Lowbed/Liftli/Silo), bilinçli tercih (kullanıcı
-> talebi). Kolon eklenince "Sefer Ekle"/"Düzelt" form satırlarının `colSpan={6}`
-> değeri `{7}`ye çıkarıldı — unutulursa tablo hizası kayar. `tsc`/`eslint`/
-> `next build` temiz (eslint hata sayısı değişmeden 34 — hepsi ön-var, `<a>`/
-> effect uyarısı).
+> — asıl içerik `vehicle_type` (TIR/Kamyon/...), yanında parantez içinde
+> `body_type` (üst yapı/kasa tipi: Tenteli/Açık Kasa/Kapalı Kasa/Frigorifik/
+> Damperli/Lowbed/Liftli/Silo) — `düzelt` formundaki "Araç Tipi" + "Üst Yapı"
+> etiketleriyle birebir aynı iki ayrı alan (ilk sürümde yalnız `body_type`
+> gösteriliyordu, kullanıcı isteğiyle düzeltildi). Kolon eklenince "Sefer Ekle"/
+> "Düzelt" form satırlarının `colSpan={6}` değeri `{7}`ye çıkarıldı — unutulursa
+> tablo hizası kayar. `tsc`/`eslint`/`next build` temiz (eslint hata sayısı
+> değişmeden 34 — hepsi ön-var, `<a>`/effect uyarısı).
 >
 > 📞 **14 AĞU 2026 — ANLAŞMALARIM'A ARAMA BUTONU + NAKLİYECİ TELEFON ONAYI.**
 > `deals.carrier_phone_consent` (bool, NOT NULL DEFAULT false) eklendi —

@@ -527,8 +527,17 @@ function IlanlarSekmesi({ ilanlar: ilk, userId, anlasmalar }: { ilanlar: any[]; 
                         </div>
                       </td>
                       <td style={td} data-label="Araç Tipi">
-                        {(ilan.body_type && ilan.body_type.length > 0)
-                          ? <span style={{ color: C.text, fontSize: '0.82rem' }}>{ilan.body_type.join(', ')}</span>
+                        {/* 14 Ağu 2026 — asıl `vehicle_type` (TIR/Kamyon/...), yanında
+                            parantez içinde `body_type` (üst yapı/kasa tipi: Tenteli/
+                            Açık Kasa/...) — ikisi ayrı alan, `düzelt` formundaki
+                            "Araç Tipi" + "Üst Yapı" etiketleriyle birebir aynı. */}
+                        {(ilan.vehicle_type && ilan.vehicle_type.length > 0)
+                          ? <span style={{ color: C.text, fontSize: '0.82rem' }}>
+                              {ilan.vehicle_type.join(', ')}
+                              {ilan.body_type && ilan.body_type.length > 0 && (
+                                <span style={{ color: C.muted }}> ({ilan.body_type.join(', ')})</span>
+                              )}
+                            </span>
                           : <span style={{ color: C.dim }}>—</span>}
                       </td>
                       <td style={td} data-label="Tarih">
