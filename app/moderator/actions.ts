@@ -472,6 +472,174 @@ export async function mukerrerExcelOnayla(stagingId: string): Promise<ModSonuc<{
   return { ok: true, veri: { id: sonuc.id } }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// TELEFON BAZLI MÜKERRER İLAN GRUPLAR (14 Ağu 2026)
+// ═══════════════════════════════════════════════════════════════════════════
+// WhatsApp kaynaklı ilanların büyük çoğunluğunda `dedup_hash` yok (o sistem
+// yalnız `ilanYaz()` üzerinden oluşturulan ilanları kapsar). Telefon + kalkış
+// ili aynı olan birden fazla aktif ilan → gerçek mükerrer. Moderatör ilanları
+// tek tek veya toplu arşivleyerek temizler.
+
+export interface MukerrerIlanKart {
+  id: string;
+  createdAt: string;
+  priceOffer: string | null;
+  status: string;
+  moderationStatus: string;
+  notes: string | null;
+}
+
+export interface MukerrerIlanGrubu {
+  /** Son 4 hane — KVKK gereği tam numara burada açıklanmaz */
+  telefonSon4: string;
+  telefonHam: string;     // servis rolüyle gelir, yalnız moderatöre
+  ilId: number;
+  ilAdi: string;
+  adet: number;
+  ilanlar: MukerrerIlanKart[];
+}
+
+/** Telefon+il bazında birden fazla aktif ilan olan grupları döner. */
+export async function mukerrerGrupListe(
+  limit = 30
+): Promise<ModSonuc<{ gruplar: MukerrerIlanGrubu[]; toplamGrup: number }>> {
+  const yetki = await requireStaff()
+  if (!yetki.ok) return { ok: false, hata: yetki.error }
+
+  const service = getServiceSupabase()
+
+  // Adım 1: Gruplama — phone+province ile birden fazla aktif ilan
+  const { data: gruplar, error: grpHata } = await service
+    .from('listings')
+    .select('contact_phone, origin_province_id')
+    .not('contact_phone', 'is', null)
+    .eq('status', 'active')
+    .in('moderation_status', ['approved', 'auto_published'])
+    .is('completed_at', null)
+
+  if (grpHata) {
+    structuredLog('ERROR', 'moderator-actions', 'Mükerrer grup listesi okunamadı', {
+      user_id: yetki.user.id, supabase_error: grpHata.message,
+    })
+    return { ok: false, hata: 'Grup listesi yüklenemedi.' }
+  }
+
+  // JS'te gruplama (HAVING COUNT>1 PostgREST ile doğrudan yapılamıyor)
+  const sayac: Record<string, { telefon: string; ilId: number; ids: string[] }> = {}
+  // ids için ikinci sorgu lazım — önce anahtar kümesini bul, sonra ilanları çek
+  const anahtarSayisi: Record<string, number> = {}
+  for (const r of (gruplar ?? [])) {
+    if (!r.contact_phone || !r.origin_province_id) continue
+    const k = `${r.contact_phone}|${r.origin_province_id}`
+    anahtarSayisi[k] = (anahtarSayisi[k] ?? 0) + 1
+  }
+
+  const cokluAnahtarlar = Object.entries(anahtarSayisi)
+    .filter(([, n]) => n > 1)
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, limit)
+
+  if (cokluAnahtarlar.length === 0) {
+    return { ok: true, veri: { gruplar: [], toplamGrup: 0 } }
+  }
+
+  // Adım 2: Her grubun ilanlarını çek
+  const telefons = [...new Set(cokluAnahtarlar.map(([k]) => k.split('|')[0]))]
+  const iller = [...new Set(cokluAnahtarlar.map(([k]) => Number(k.split('|')[1])))]
+
+  const { data: ilanVerisi, error: ilanHata } = await service
+    .from('listings')
+    .select('id, contact_phone, origin_province_id, created_at, price_offer, status, moderation_status, notes')
+    .in('contact_phone', telefons)
+    .in('origin_province_id', iller)
+    .eq('status', 'active')
+    .in('moderation_status', ['approved', 'auto_published'])
+    .is('completed_at', null)
+    .order('created_at', { ascending: false })
+
+  if (ilanHata) {
+    structuredLog('ERROR', 'moderator-actions', 'Mükerrer ilan detayları okunamadı', {
+      user_id: yetki.user.id, supabase_error: ilanHata.message,
+    })
+    return { ok: false, hata: 'İlan detayları yüklenemedi.' }
+  }
+
+  // Gruplara dağıt
+  const grupMap: Record<string, MukerrerIlanKart[]> = {}
+  for (const ilan of (ilanVerisi ?? [])) {
+    const k = `${ilan.contact_phone}|${ilan.origin_province_id}`
+    if (!cokluAnahtarlar.some(([key]) => key === k)) continue
+    if (!grupMap[k]) grupMap[k] = []
+    grupMap[k].push({
+      id: ilan.id,
+      createdAt: ilan.created_at,
+      priceOffer: ilan.price_offer != null ? String(ilan.price_offer) : null,
+      status: ilan.status,
+      moderationStatus: ilan.moderation_status,
+      notes: ilan.notes ?? null,
+    })
+  }
+
+  const { ilAdi: ilAdiFn } = await import('../../lib/lokasyon')
+
+  const sonuc: MukerrerIlanGrubu[] = cokluAnahtarlar
+    .map(([k, n]) => {
+      const [tel, ilIdStr] = k.split('|')
+      const ilId = Number(ilIdStr)
+      const ilanlar = grupMap[k] ?? []
+      if (ilanlar.length < 2) return null
+      return {
+        telefonSon4: tel.slice(-4),
+        telefonHam: tel,
+        ilId,
+        ilAdi: ilAdiFn(ilId) ?? `İl ${ilId}`,
+        adet: ilanlar.length,
+        ilanlar,
+      } satisfies MukerrerIlanGrubu
+    })
+    .filter((g): g is MukerrerIlanGrubu => g !== null)
+
+  structuredLog('INFO', 'moderator-actions', 'Mükerrer grup listesi görüntülendi', {
+    user_id: yetki.user.id, grupSayisi: sonuc.length,
+  })
+
+  return {
+    ok: true,
+    veri: {
+      gruplar: sonuc,
+      toplamGrup: Object.keys(anahtarSayisi).filter(k => anahtarSayisi[k] > 1).length,
+    },
+  }
+}
+
+/** Tekil bir ilanı arşivler (mükerrer olduğu teyit edilmiş). */
+export async function mukerrerIlanArsivle(ilanId: string): Promise<ModSonuc> {
+  const yetki = await requireStaff()
+  if (!yetki.ok) return { ok: false, hata: yetki.error }
+
+  if (typeof ilanId !== 'string' || ilanId.length === 0)
+    return { ok: false, hata: 'Geçersiz ilan ID.' }
+
+  const service = getServiceSupabase()
+  const { error } = await service
+    .from('listings')
+    .update({ moderation_status: 'archived', status: 'passive' })
+    .eq('id', ilanId)
+
+  if (error) {
+    structuredLog('ERROR', 'moderator-actions', 'Mükerrer ilan arşivlenemedi', {
+      user_id: yetki.user.id, listing_id: ilanId, supabase_error: error.message,
+    })
+    return { ok: false, hata: 'Arşivleme başarısız.' }
+  }
+
+  structuredLog('INFO', 'moderator-actions', 'Mükerrer ilan arşivlendi', {
+    user_id: yetki.user.id, role: yetki.user.role, listing_id: ilanId,
+  })
+
+  return { ok: true, veri: undefined }
+}
+
 /** Mükerrer grubu REDDET — gerçekten aynı ilan, yazılmayacak. */
 export async function mukerrerExcelReddet(stagingId: string): Promise<ModSonuc> {
   const yetki = await requireStaff()

@@ -4,7 +4,8 @@ import { createClient } from '../../lib/supabase';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ilanTelefonlariGetir, ilanTelefonGuncelle, ilanAuditGetir, moderatorIlanOlustur,
-  mukerrerExcelListe, mukerrerExcelOnayla, mukerrerExcelReddet, type MukerrerStagingKaydi } from './actions';
+  mukerrerExcelListe, mukerrerExcelOnayla, mukerrerExcelReddet, type MukerrerStagingKaydi,
+  mukerrerGrupListe, mukerrerIlanArsivle, type MukerrerIlanGrubu } from './actions';
 // ⚠️ `ILLER` = `IL_ADLARI_ALFABETIK`. Buradaki il filtresi Dalga 5'ten sonra
 //    `ilAdi(id) === filtreKalkis` diye TAM EŞİTLİK karşılaştırıyor; `ilAdi()`
 //    `locations.json`'dan okuyor. Dropdown eskiden AYRI bir elle yazılmış
@@ -128,8 +129,8 @@ function KullaniciKart({ kullanici, onAskiya, onFiltrele }: {
   );
 }
 
-// Filtre tipi — 'riskli' Sprint 3 ile eklendi
-type FiltreTip = 'pending' | 'approved' | 'rejected' | 'passive' | 'hepsi' | 'no_lane' | 'arsiv' | 'riskli' | 'mukerrer';
+// Filtre tipi — 'riskli' Sprint 3, 'mukerrer_ilan' 14 Ağu 2026 eklendi
+type FiltreTip = 'pending' | 'approved' | 'rejected' | 'passive' | 'hepsi' | 'no_lane' | 'arsiv' | 'riskli' | 'mukerrer' | 'mukerrer_ilan';
 
 export default function Moderator() {
   const [ilanlar, setIlanlar] = useState<any[]>([]);
@@ -140,6 +141,9 @@ export default function Moderator() {
   // (grant revoke + RLS), o yüzden liste/onay/ret server action üzerinden.
   const [mukerrerListesi, setMukerrerListesi] = useState<MukerrerStagingKaydi[]>([]);
   const [mukerrerIslem, setMukerrerIslem] = useState<string>('');
+  // 14 Ağu 2026 — Telefon bazlı mükerrer ilan grupları
+  const [mukerrerIlanGruplar, setMukerrerIlanGruplar] = useState<MukerrerIlanGrubu[]>([]);
+  const [mukerrerIlanIslem, setMukerrerIlanIslem] = useState<string>('');
   const [islem, setIslem] = useState<string>('');
   const [duzenleId, setDuzenleId] = useState<string>('');
   // 8 Ağu 2026 (pratiklik) — "Çözümsüz" (no_lane) manuel ilan girişi eskiden
@@ -238,19 +242,21 @@ export default function Moderator() {
 
   async function getIstatistik() {
     const bugun = new Date(); bugun.setHours(0, 0, 0, 0);
-    const [{ count: pending }, { count: bugunGelen }, { count: bugunOnaylanan }, { count: cozumsuz }, { count: riskli }, mukerrerRes] = await Promise.all([
+    const [{ count: pending }, { count: bugunGelen }, { count: bugunOnaylanan }, { count: cozumsuz }, { count: riskli }, mukerrerRes, mukerrerIlanRes] = await Promise.all([
       supabase.from('listings').select('*', { count: 'exact', head: true }).eq('moderation_status', 'pending'),
       supabase.from('listings').select('*', { count: 'exact', head: true }).gte('created_at', bugun.toISOString()),
       supabase.from('listings').select('*', { count: 'exact', head: true }).eq('moderation_status', 'approved').gte('reviewed_at', bugun.toISOString()),
       supabase.from('raw_posts').select('*', { count: 'exact', head: true }).eq('processing_status', 'no_lane'),
       // Sprint 3: riskli ilan sayısı (audit_score > 30, archived değil)
       supabase.from('listings').select('*', { count: 'exact', head: true }).gt('audit_score', 30).neq('moderation_status', 'archived'),
-      // 11 Ağu 2026 — Excel mükerrer bekleyen sayısı. `excel_dedup_staging`
-      // istemciye kapalı, server action ile (bekleyenleri döner, uzunluğu sayı).
+      // 11 Ağu 2026 — Excel mükerrer bekleyen sayısı.
       mukerrerExcelListe(),
+      // 14 Ağu 2026 — Telefon bazlı mükerrer grup sayısı.
+      mukerrerGrupListe(200),
     ]);
     const mukerrer = mukerrerRes.ok ? mukerrerRes.veri.length : 0;
-    setIstatistik({ pending, bugunGelen, bugunOnaylanan, cozumsuz, riskli, mukerrer });
+    const mukerrerIlan = mukerrerIlanRes.ok ? mukerrerIlanRes.veri.toplamGrup : 0;
+    setIstatistik({ pending, bugunGelen, bugunOnaylanan, cozumsuz, riskli, mukerrer, mukerrerIlan });
   }
 
   async function getIlanlar() {
@@ -265,6 +271,12 @@ export default function Moderator() {
     if (filtre === 'mukerrer') {
       const res = await mukerrerExcelListe();
       setMukerrerListesi(res.ok ? res.veri : []);
+      setIlanlar([]); setYukleniyor(false); return;
+    }
+
+    if (filtre === 'mukerrer_ilan') {
+      const res = await mukerrerGrupListe();
+      setMukerrerIlanGruplar(res.ok ? res.veri.gruplar : []);
       setIlanlar([]); setYukleniyor(false); return;
     }
 
@@ -1099,24 +1111,25 @@ export default function Moderator() {
                 )}
               </div>
             )}
-            {/* Tüm tab butonları — Sprint 3: riskli eklendi */}
-            {(['pending', 'approved', 'rejected', 'passive', 'hepsi', 'no_lane', 'mukerrer', 'arsiv', 'riskli'] as const).map(f => (
+            {/* Tüm tab butonları — Sprint 3: riskli, 14 Ağu: mukerrer_ilan eklendi */}
+            {(['pending', 'approved', 'rejected', 'passive', 'hepsi', 'no_lane', 'mukerrer', 'mukerrer_ilan', 'arsiv', 'riskli'] as const).map(f => (
               <button key={f} onClick={() => { setFiltre(f); setSonraBak(new Set()); filtreTemizle(); setSelectedIds(new Set()); setLastClickedIdx(null); }}
                 style={{
                   padding: '5px 12px', borderRadius: 6, border: '1px solid',
-                  borderColor: filtre === f ? (f === 'arsiv' ? '#854d0e' : f === 'riskli' ? '#7f1d1d' : f === 'mukerrer' ? '#1e3a5f' : '#22c55e') : '#30363d',
-                  background: filtre === f ? (f === 'arsiv' ? '#2a1d00' : f === 'riskli' ? '#2a0d0d' : f === 'mukerrer' ? '#0d1b2a' : '#14532d') : '#0d1117',
-                  color: filtre === f ? (f === 'arsiv' ? '#fbbf24' : f === 'riskli' ? '#f87171' : f === 'mukerrer' ? '#60a5fa' : '#22c55e') : '#8b949e',
+                  borderColor: filtre === f ? (f === 'arsiv' ? '#854d0e' : f === 'riskli' ? '#7f1d1d' : (f === 'mukerrer' || f === 'mukerrer_ilan') ? '#1e3a5f' : '#22c55e') : '#30363d',
+                  background: filtre === f ? (f === 'arsiv' ? '#2a1d00' : f === 'riskli' ? '#2a0d0d' : (f === 'mukerrer' || f === 'mukerrer_ilan') ? '#0d1b2a' : '#14532d') : '#0d1117',
+                  color: filtre === f ? (f === 'arsiv' ? '#fbbf24' : f === 'riskli' ? '#f87171' : (f === 'mukerrer' || f === 'mukerrer_ilan') ? '#60a5fa' : '#22c55e') : '#8b949e',
                   fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer',
                 }}>
-                {f === 'pending' ? '⏳ Bekleyenler'
-                  : f === 'approved' ? '✅ Onaylananlar'
-                  : f === 'rejected' ? '❌ Reddedilenler'
-                  : f === 'passive'  ? '💤 Pasifler'
-                  : f === 'no_lane'  ? '🔍 Çözümsüz'
-                  : f === 'mukerrer' ? `🔁 Mükerrer Excel${istatistik?.mukerrer ? ` (${istatistik.mukerrer})` : ''}`
-                  : f === 'arsiv'    ? '🗄️ Arşiv'
-                  : f === 'riskli'   ? `🔴 Riskli${istatistik?.riskli ? ` (${istatistik.riskli})` : ''}`
+                {f === 'pending'       ? '⏳ Bekleyenler'
+                  : f === 'approved'  ? '✅ Onaylananlar'
+                  : f === 'rejected'  ? '❌ Reddedilenler'
+                  : f === 'passive'   ? '💤 Pasifler'
+                  : f === 'no_lane'   ? '🔍 Çözümsüz'
+                  : f === 'mukerrer'  ? `🔁 Mükerrer Excel${istatistik?.mukerrer ? ` (${istatistik.mukerrer})` : ''}`
+                  : f === 'mukerrer_ilan' ? `🔁 Mükerrer İlan${istatistik?.mukerrerIlan ? ` (${istatistik.mukerrerIlan})` : ''}`
+                  : f === 'arsiv'     ? '🗄️ Arşiv'
+                  : f === 'riskli'    ? `🔴 Riskli${istatistik?.riskli ? ` (${istatistik.riskli})` : ''}`
                   : '📋 Hepsi'}
               </button>
             ))}
@@ -1263,6 +1276,106 @@ export default function Moderator() {
                   }} style={{ padding: '6px 14px', borderRadius: 6, border: 'none', background: '#450a0a', color: '#f87171', fontWeight: 700, fontSize: '0.82rem', cursor: 'pointer', opacity: mukerrerIslem === kayit.id ? 0.5 : 1 }}>
                     ❌ Gerçekten Mükerrer
                   </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : filtre === 'mukerrer_ilan' ? (
+          /* ── Mükerrer İlan tab (14 Ağu 2026) ──
+             Aynı telefon + kalkış ili kombinasyonundan birden fazla aktif ilan.
+             Moderatör her ilanı tek tek veya grubu toplu arşivleyebilir.
+             Aksiyon: `mukerrerIlanArsivle` (server action, service role). */
+          <div style={{ display: 'grid', gap: 16 }}>
+            {mukerrerIlanGruplar.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '60px 0', color: '#4b5563' }}>
+                <div style={{ fontSize: '2rem', marginBottom: 8 }}>✅</div>
+                <div>Telefon bazlı mükerrer ilan grubu yok</div>
+              </div>
+            ) : mukerrerIlanGruplar.map(grup => (
+              <div key={`${grup.telefonHam}|${grup.ilId}`}
+                style={{ background: '#161b22', border: '1px solid #30363d', borderRadius: 8, padding: '14px 16px' }}>
+                {/* Grup başlığı */}
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 12 }}>
+                  <span style={{ background: '#0d1b2a', color: '#60a5fa', fontSize: '0.68rem', fontWeight: 700, padding: '2px 8px', borderRadius: 4 }}>
+                    🔁 Mükerrer İlan
+                  </span>
+                  <span style={{ color: '#e2e8f0', fontWeight: 700, fontSize: '0.85rem' }}>
+                    📍 {grup.ilAdi}
+                  </span>
+                  <span style={{ color: '#9ca3af', fontSize: '0.76rem' }}>
+                    📞 ···{grup.telefonSon4} · {grup.adet} ilan
+                  </span>
+                  <button
+                    disabled={mukerrerIlanIslem.startsWith(`${grup.telefonHam}|${grup.ilId}`)}
+                    onClick={async () => {
+                      // En yeni hariç tümünü arşivle
+                      const eskiler = [...grup.ilanlar].sort(
+                        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+                      ).slice(1);
+                      setMukerrerIlanIslem(`${grup.telefonHam}|${grup.ilId}_toplu`);
+                      const hatalar: string[] = [];
+                      for (const ilan of eskiler) {
+                        const res = await mukerrerIlanArsivle(ilan.id);
+                        if (!res.ok) hatalar.push(ilan.id);
+                      }
+                      setMukerrerIlanIslem('');
+                      if (hatalar.length > 0) { alert(`${hatalar.length} ilan arşivlenemedi.`); }
+                      // Arşivlenen ilanları gruptan çıkar; 1 kalırsa grubu kaldır
+                      const arsivlenenIds = new Set(eskiler.filter((_, i) => !hatalar.includes(eskiler[i].id)).map(i => i.id));
+                      setMukerrerIlanGruplar(prev => prev
+                        .map(g => g.telefonHam === grup.telefonHam && g.ilId === grup.ilId
+                          ? { ...g, ilanlar: g.ilanlar.filter(il => !arsivlenenIds.has(il.id)) }
+                          : g)
+                        .filter(g => g.ilanlar.length > 1));
+                    }}
+                    style={{ marginLeft: 'auto', padding: '4px 12px', borderRadius: 6, border: 'none', background: '#450a0a', color: '#f87171', fontWeight: 700, fontSize: '0.75rem', cursor: 'pointer', opacity: mukerrerIlanIslem.startsWith(`${grup.telefonHam}|${grup.ilId}`) ? 0.5 : 1 }}>
+                    {mukerrerIlanIslem === `${grup.telefonHam}|${grup.ilId}_toplu` ? '...' : '🗑 Tümünü Arşivle (En Yenisi Hariç)'}
+                  </button>
+                </div>
+                {/* İlan listesi */}
+                <div style={{ display: 'grid', gap: 6 }}>
+                  {[...grup.ilanlar].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).map((ilan, idx) => (
+                    <div key={ilan.id} style={{ background: '#0d1117', borderRadius: 6, border: `1px solid ${idx === 0 ? '#166534' : '#1f2937'}`, padding: '8px 12px', display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+                      {idx === 0 && (
+                        <span style={{ background: '#14532d', color: '#4ade80', fontSize: '0.65rem', fontWeight: 700, padding: '1px 6px', borderRadius: 3, flexShrink: 0 }}>EN YENİ</span>
+                      )}
+                      <span style={{ color: '#9ca3af', fontSize: '0.75rem', flexShrink: 0 }}>
+                        {new Date(ilan.createdAt).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      </span>
+                      {ilan.priceOffer && (
+                        <span style={{ color: '#34d399', fontSize: '0.78rem', fontWeight: 600, flexShrink: 0 }}>
+                          ₺{Number(ilan.priceOffer).toLocaleString('tr-TR')}
+                        </span>
+                      )}
+                      {ilan.notes && (
+                        <span style={{ color: '#6b7280', fontSize: '0.72rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, minWidth: 0 }}>
+                          {ilan.notes.slice(0, 80)}
+                        </span>
+                      )}
+                      <span style={{ marginLeft: 'auto', display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
+                        <a href={`/ilan/${ilan.id}`} target="_blank" rel="noopener noreferrer"
+                          style={{ color: '#60a5fa', fontSize: '0.72rem', textDecoration: 'underline' }}>
+                          Gör ↗
+                        </a>
+                        <button
+                          disabled={mukerrerIlanIslem === ilan.id}
+                          onClick={async () => {
+                            setMukerrerIlanIslem(ilan.id);
+                            const res = await mukerrerIlanArsivle(ilan.id);
+                            setMukerrerIlanIslem('');
+                            if (!res.ok) { alert('Arşivlenemedi: ' + res.hata); return; }
+                            setMukerrerIlanGruplar(prev => prev
+                              .map(g => g.telefonHam === grup.telefonHam && g.ilId === grup.ilId
+                                ? { ...g, ilanlar: g.ilanlar.filter(il => il.id !== ilan.id) }
+                                : g)
+                              .filter(g => g.ilanlar.length > 1));
+                          }}
+                          style={{ padding: '3px 10px', borderRadius: 5, border: 'none', background: mukerrerIlanIslem === ilan.id ? '#374151' : '#450a0a', color: '#f87171', fontWeight: 700, fontSize: '0.72rem', cursor: mukerrerIlanIslem === ilan.id ? 'not-allowed' : 'pointer' }}>
+                          {mukerrerIlanIslem === ilan.id ? '...' : 'Arşivle'}
+                        </button>
+                      </span>
+                    </div>
+                  ))}
                 </div>
               </div>
             ))}
