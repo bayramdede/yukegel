@@ -1,6 +1,23 @@
 # Yükegel — Proje Haritası
 > **Kullanım:** Her sohbet başında sadece bu dosyayı oku. Kaynak dosyaları sadece o dosyada değişiklik yapacaksan oku.  
 >
+> 📞 **14 AĞU 2026 — ANLAŞMALARIM'A ARAMA BUTONU + NAKLİYECİ TELEFON ONAYI.**
+> `deals.carrier_phone_consent` (bool, NOT NULL DEFAULT false) eklendi —
+> migration `deals_carrier_phone_consent`. Nakliyeci "Bu İşi Al" formunda
+> "Telefon numaram ilan sahibiyle paylaşılsın" kutusunu işaretlerse bu alan `true`
+> olarak kaydediliyor (`Aksiyonlar.tsx` → `POST /api/deals`). Panel
+> `AnlasmalarSekmesi.tsx`'te **eşleşmiş/yoldaki/tamamlanmış** deal'lerde karşı
+> tarafın adının yanında **📞 Ara** butonu görünüyor: nakliyeci ise ilan
+> sahibinin `contact_phone`'u (zaten yarı-kamuya açık), ilan sahibi ise
+> nakliyecinin `users.phone`'u **yalnız `carrier_phone_consent=true` ise**.
+> Telefon damıtması sunucuda (`panel/page.tsx`) yapılıyor — istemciye ham
+> `users.phone` gitmez, yalnız görünmesi gereken durumda ve consent varsa
+> `carrier_phone` / `shipper_phone` alanı dolu geliyor. Carrier onay vermemişse
+> panelde "Telefon numaranızı talep sırasında paylaşmadınız" notu gösteriliyor.
+> ⚠️ `/api/ilan/[id]/telefon` eşleşme bakmadan numara vermeye DEVAM EDİYOR
+> (bkz. `docs/YAPILACAKLAR.md` md.1) — bu madde YALNIZ panel arama butonuydu.
+>
+
 > 🤝 **10 AĞU 2026 — GÜVENLİ ETKİLEŞİM MODÜLÜ, FAZ 1 CANLIDA.**
 > `docs/GuvenEtkilesim.docx` PRD'si kod gerçeğine oturtuldu. Yeni tablolar:
 > **`deals`** (Taşıma Kaydı: matched→in_transit→completed, ödeme vadesi alanları,

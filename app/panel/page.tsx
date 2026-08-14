@@ -75,12 +75,12 @@ export default async function Panel() {
       .select(`id, listing_id, shipper_id, carrier_id, status, matched_at, transit_at,
         completed_declared_by, completed_declared_at, completed_at,
         payment_terms_days, payment_maturity_date, review_deadline,
-        agreed_price, note,
+        agreed_price, note, carrier_phone_consent,
         cancelled_at, cancelled_by, cancel_type, cancel_reason, created_at,
-        listing:listings!deals_listing_id_fkey ( id, listing_type, origin_province_id, price_offer,
+        listing:listings!deals_listing_id_fkey ( id, listing_type, origin_province_id, price_offer, contact_phone,
           listing_stops ( province_id, stop_order ) ),
-        shipper:users!deals_shipper_id_fkey ( display_name ),
-        carrier:users!deals_carrier_id_fkey ( display_name )`)
+        shipper:users!deals_shipper_id_fkey ( display_name, phone ),
+        carrier:users!deals_carrier_id_fkey ( display_name, phone )`)
       .or(`shipper_id.eq.${user.id},carrier_id.eq.${user.id}`)
       .order('created_at', { ascending: false })
       .limit(200),
@@ -92,6 +92,23 @@ export default async function Panel() {
       .eq('reviewer_id', user.id),
   ]);
 
+  // Telefon numaralarını yalnız eşleşmiş/yoldaki/tamamlanmış deal'lerde göster.
+  // Ham `phone` sunucu tarafında damıtılıyor — istemciye ham users.phone gitmez.
+  const TELEFON_GORUNEN = new Set(['matched', 'in_transit', 'completed']);
+  const anlasmalarTemiz = (anlasmalar || []).map((d: any) => {
+    const gorunsun = TELEFON_GORUNEN.has(d.status);
+    return {
+      ...d,
+      // Nakliyecinin telefonu: yalnız onay verdiyse ve deal aktifse
+      carrier_phone: gorunsun && d.carrier_phone_consent ? (d.carrier?.phone ?? null) : null,
+      // İlan sahibinin telefonu: listing'deki contact_phone (zaten yarı-kamuya açık)
+      shipper_phone: gorunsun ? (d.listing?.contact_phone ?? d.shipper?.phone ?? null) : null,
+      // Ham phone alanlarını istemciye gönderme
+      shipper: d.shipper ? { display_name: d.shipper.display_name } : null,
+      carrier: d.carrier ? { display_name: d.carrier.display_name } : null,
+    };
+  });
+
   return (
     <PanelClient
       userId={user.id}
@@ -99,7 +116,7 @@ export default async function Panel() {
       profil={profil}
       ilanlar={ilanlar || []}
       araclar={araclar || []}
-      anlasmalar={anlasmalar || []}
+      anlasmalar={anlasmalarTemiz}
       yorumlarim={yorumlarim || []}
     />
   );

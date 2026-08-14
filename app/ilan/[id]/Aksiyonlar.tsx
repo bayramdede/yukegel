@@ -46,6 +46,7 @@ export default function Aksiyonlar({
   const [fiyat, setFiyat] = useState('');
   const [not, setNot] = useState('');
   const [vade, setVade] = useState('');
+  const [telefonPaylas, setTelefonPaylas] = useState(false);
   const [anlasYukleniyor, setAnlasYukleniyor] = useState(false);
   const [anlasSonuc, setAnlasSonuc] = useState<{ ok: boolean; mesaj: string } | null>(null);
 
@@ -69,6 +70,7 @@ export default function Aksiyonlar({
         body: JSON.stringify({
           listing_id: ilanId,
           agreed_price: fiyatSayi,
+          carrier_phone_consent: telefonPaylas,
           ...(not.trim() ? { note: not.trim() } : {}),
           ...(Number.isInteger(vadeSayi) ? { payment_terms_days: vadeSayi } : {}),
         }),
@@ -202,6 +204,15 @@ export default function Aksiyonlar({
             <input type="number" min={0} max={180} value={vade}
               onChange={e => setVade(e.target.value)} placeholder="Örn. 30"
               style={{ width: 160, background: '#161b22', color: '#e2e8f0', border: '1px solid #374151', borderRadius: 6, padding: '8px 12px', fontSize: '0.85rem', outline: 'none', boxSizing: 'border-box' as const }} />
+          </div>
+          <div style={{ marginBottom: 14 }}>
+            <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer' }}>
+              <input type="checkbox" checked={telefonPaylas} onChange={e => setTelefonPaylas(e.target.checked)}
+                style={{ marginTop: 3, flexShrink: 0, accentColor: '#22c55e' }} />
+              <span style={{ color: '#9ca3af', fontSize: '0.82rem', lineHeight: 1.5 }}>
+                Telefon numaram ilan sahibiyle paylaşılsın — anlaşma onaylanırsa ilan sahibi sizi arayabilir.
+              </span>
+            </label>
           </div>
           {anlasSonuc && !anlasSonuc.ok && (
             <div style={{ color: '#f87171', fontSize: '0.82rem', marginBottom: 12 }}>⚠️ {anlasSonuc.mesaj}</div>

@@ -21,6 +21,21 @@
 ---
 ---
 
+> ## ✅ 12 AĞU 2026 — EXCEL TOPLU YÜKLEMEDE 60S VERCEL TIMEOUT ÇÖZÜMÜ
+>
+> Excel toplu ilan yüklemelerinde Vercel'in 60 saniyelik sunucu süresi aşılıyordu.
+> İnceleme sonucu, sonradan eklenen `dedup_hash` mantığının her ilan (ve grup) 
+> için 2 fazladan DB round-trip oluşturması (config okuma ve ayrı update) nedeniyle olduğu anlaşıldı.
+> Sıralı işlenen (sequential) 50 gruplu bir Excel'de bu yük sınırları zorladı.
+> 
+> **Yapılanlar:**
+> - `lib/auditLimits.ts` ve `lib/ilan-limit.ts` dosyalarındaki global config sorgularına 60 saniyelik (`60_000` ms) bellek içi TTL önbellekleme eklendi.
+> - `docs/20260812_ilan_olustur_v5_dedup.sql` oluşturularak `ilan_olustur` RPC fonksiyonu `dedup_hash` kolonu alacak şekilde güncellendi.
+> - `lib/ilan-yaz.ts` içinde ilan eklendikten sonra çalıştırılan `.update({ dedup_hash: dedupHash })` ifadesi kaldırılarak doğrudan atomik INSERT RPC payload'una eklendi (fazladan round-trip tamamen engellendi).
+>
+> **Doğrulama:**
+> TypeScript `npx tsc --noEmit` sandbox bypass ile başarılı oldu. Kodlar deploy edildi ve SQL fonksiyonu Supabase üzerinden başarıyla çalıştırıldı.
+
 > ## ✅ 11 AĞU 2026 — İKİNCİ BİR JS/POSTGRES SAPMASI: `\b` TÜRKÇE HARFLERİ TANIMIYORDU, GERÇEK BİR YORUM SESSİZCE GİZLENDİ
 >
 > Bayram'ın "karşılıklı iş alıp onay verdim, yorum yaptık, kontrol et" isteği

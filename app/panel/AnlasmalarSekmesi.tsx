@@ -293,6 +293,9 @@ function AnlasmaKarti({
   const karsiTarafId: string | null = isShipper ? deal.carrier_id : deal.shipper_id;
   const karsiTaraf = isShipper ? deal.carrier?.display_name : deal.shipper?.display_name;
   const karsiRozet = karsiTarafId ? rozetler[karsiTarafId] : undefined;
+  // Telefon: server tarafından yalnız eşleşmiş deal'lerde ve onay verilmişse gönderilir
+  const karsiTelefonHam: string | null = isShipper ? deal.carrier_phone : deal.shipper_phone;
+  const karsiTelefon = karsiTelefonHam?.replace(/\D/g, '') || null;
 
   const ilan = deal.listing;
   const kalkis = ilan ? (ilAdi(ilan.origin_province_id) ?? '') : '';
@@ -331,9 +334,18 @@ function AnlasmaKarti({
                   {karsiTaraf} ↗
                 </a>
                 {karsiRozet && <ProfilRozeti ortalama={karsiRozet.ortalama} sayi={karsiRozet.sayi} />}
+                {karsiTelefon && (
+                  <a href={`tel:${karsiTelefon.startsWith('90') ? `+${karsiTelefon}` : `+90${karsiTelefon.replace(/^0/, '')}`}`}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 3, background: '#0d2b1a', border: '1px solid #166534', color: '#4ade80', fontSize: '0.7rem', fontWeight: 700, padding: '2px 8px', borderRadius: 10, textDecoration: 'none', whiteSpace: 'nowrap' as const }}>
+                    📞 Ara
+                  </a>
+                )}
               </>
             )}
             {ilan?.id && <> · <a href={`/ilan/${ilan.id}`} style={{ color: C.dim }}>İlanı gör</a></>}
+            {isCarrier && !deal.carrier_phone_consent && ['matched', 'in_transit'].includes(deal.status) && (
+              <span style={{ color: C.dim, fontSize: '0.68rem' }}>· Telefon numaranızı talep sırasında paylaşmadınız</span>
+            )}
           </div>
         </div>
         <div style={{ color: C.dim, fontSize: '0.72rem', textAlign: 'right' as const }}>

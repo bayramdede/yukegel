@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await ssr.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Giriş gerekli' }, { status: 401 });
 
-  const { listing_id, payment_terms_days, agreed_price, note } = await req.json().catch(() => ({}));
+  const { listing_id, payment_terms_days, agreed_price, note, carrier_phone_consent } = await req.json().catch(() => ({}));
   if (!listing_id) return NextResponse.json({ error: 'listing_id gerekli' }, { status: 400 });
 
   // Anlaşılan fiyat — 11 Ağu 2026, talep ekranına eklendi. ZORUNLU: taraflar
@@ -86,6 +86,7 @@ export async function POST(req: NextRequest) {
       payment_terms_days: vade,
       agreed_price: fiyat,
       note: notMetni,
+      carrier_phone_consent: carrier_phone_consent === true,
     })
     .select('id, status, agreed_price, note, created_at')
     .single();
