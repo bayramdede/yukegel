@@ -93,6 +93,12 @@ export interface IlanYazGirdi {
   utsyapi?: string[];
   arac_adet?: number;
   /**
+   * Excel'den gelen sefer numarası — dedup_hash'e katılır (dolu ise).
+   * Farklı sefer nolu aynı içerikli ilanlar mükerrer SAYILMAZ.
+   * Form/WhatsApp akışında bu alan YOK, hash bunlara duyarlı değil.
+   */
+  seferNo?: string;
+  /**
    * B3 — araç ilanında ilanı veren SPESİFİK aracın id'si (`vehicles.id`).
    * ⚠️ İstemciden gelir ama SORGUSUZ YAZILMAZ: `ilanYaz()` aracın gerçekten
    * bu kullanıcıya ait ve aktif olduğunu doğrular, değilse sessizce düşürür.
@@ -404,6 +410,7 @@ export async function ilanYaz(
     toplamTon: duraklar.reduce((t, d) => t + (d.ton ?? 0), 0),
     toplamPalet: duraklar.reduce((t, d) => t + (d.palet ?? 0), 0),
     tarih,
+    seferNo: girdi.seferNo,
   });
 
   if (KANAL_POLITIKA[kaynak].mukerrerKontrol && !secenek.dedupAtla) {

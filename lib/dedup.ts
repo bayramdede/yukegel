@@ -55,6 +55,12 @@ export interface DedupGirdi {
   toplamPalet: number;
   /** `YYYY-MM-DD`. */
   tarih: string;
+  /**
+   * Excel'den gelen sefer numarası (opsiyonel). Dolu ve boşluk değilse hash'e
+   * katılır: aynı içerikli ama farklı sefer numaralı satırlar FARKLI sayılır.
+   * Form/WhatsApp akışında bu alan YOK — hash bunlara duyarlı değil.
+   */
+  seferNo?: string;
 }
 
 /** Türkçe-farkında küçük harfe çevirip boşlukları normalize eder — `ilKey()`
@@ -91,5 +97,11 @@ export function dedupHashHesapla(g: DedupGirdi): string {
     String(Math.round(g.toplamPalet || 0)),
     g.tarih,
   ];
+  // Sefer numarası: yalnız dolu ve boşluk olmayan bir değer hash'e eklenir.
+  // Boş/undefined → eklenmez, DB'deki mevcut hash'ler geçerliliğini korur.
+  // Farklı sefer nolu aynı içerik = farklı hash = mükerrer SAYILMAZ.
+  const seferNoTemiz = (g.seferNo ?? '').trim();
+  if (seferNoTemiz) parcalar.push(seferNoTemiz);
+
   return createHash('sha256').update(parcalar.join('|')).digest('hex');
 }

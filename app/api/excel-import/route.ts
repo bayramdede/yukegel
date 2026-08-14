@@ -211,6 +211,10 @@ export async function POST(request: NextRequest) {
       utsyapi: [utsCoz(String(ilk?.ustYapi ?? ''))].filter((u): u is string => Boolean(u)),
       arac_adet: 1,
       duraklar,
+      // Sefer numarası → dedup_hash'e katılır; farklı sefer nolu aynı güzergah
+      // mükerrer sayılmaz. Boşsa (`__${i}` satır-index anahtarından gelen)
+      // hash'e eklenmez — sefer nosuz ilanlar hâlâ birbiriyle çakışabilir.
+      seferNo: seferNo || undefined,
     };
 
     const sonuc = await ilanYaz(user.id, ilanGirdi, 'excel');
