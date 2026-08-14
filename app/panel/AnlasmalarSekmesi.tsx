@@ -91,6 +91,12 @@ function tarihFmt(iso: string | null | undefined): string {
   return new Date(iso).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
+function telefonFmt(digits: string): string {
+  const onlu = digits.length > 10 ? digits.slice(-10) : digits.replace(/^0/, '');
+  if (onlu.length === 10) return `0${onlu.slice(0, 3)} ${onlu.slice(3, 6)} ${onlu.slice(6, 8)} ${onlu.slice(8, 10)}`;
+  return digits;
+}
+
 function DurumBadge({ durum }: { durum: string }) {
   const r = DURUM_RENK[durum] || DURUM_RENK.hepsi;
   return <span style={{ background: r.bg, color: r.color, fontSize: '0.72rem', fontWeight: 700, padding: '3px 8px', borderRadius: 4 }}>{DURUM_LABEL[durum] || durum}</span>;
@@ -336,9 +342,12 @@ function AnlasmaKarti({
                 {karsiRozet && <ProfilRozeti ortalama={karsiRozet.ortalama} sayi={karsiRozet.sayi} />}
                 {karsiTelefon && (
                   <a href={`tel:${karsiTelefon.startsWith('90') ? `+${karsiTelefon}` : `+90${karsiTelefon.replace(/^0/, '')}`}`}
-                    style={{ display: 'inline-flex', alignItems: 'center', gap: 3, background: '#0d2b1a', border: '1px solid #166534', color: '#4ade80', fontSize: '0.7rem', fontWeight: 700, padding: '2px 8px', borderRadius: 10, textDecoration: 'none', whiteSpace: 'nowrap' as const }}>
-                    📞 Ara
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: '#0d2b1a', border: '1px solid #166534', color: '#4ade80', fontSize: '0.7rem', fontWeight: 700, padding: '2px 10px', borderRadius: 10, textDecoration: 'none', whiteSpace: 'nowrap' as const }}>
+                    📞 {telefonFmt(karsiTelefon)}
                   </a>
+                )}
+                {isShipper && !karsiTelefon && !deal.carrier_phone_consent && ['matched', 'in_transit', 'completed'].includes(deal.status) && (
+                  <span style={{ color: C.dim, fontSize: '0.68rem' }}>· Bu nakliyeci telefon numarasını paylaşmadı</span>
                 )}
               </>
             )}
