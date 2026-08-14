@@ -715,7 +715,15 @@ export default async function IlanDetay({ params }: { params: Promise<{ id: stri
 
         {/* İletişim */}
         <div style={{ background: '#161b22', border: '1px solid #166534', borderRadius: 12, padding: 24 }}>
-          <div style={{ fontSize: '0.72rem', color: '#8b949e', fontWeight: 700, letterSpacing: '0.08em', marginBottom: 16 }}>İLETİŞİM</div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+            <div style={{ fontSize: '0.72rem', color: '#8b949e', fontWeight: 700, letterSpacing: '0.08em' }}>İLETİŞİM</div>
+            {ilan.user_id && (
+              <a href={`/u/${ilan.user_id}`}
+                style={{ color: '#22c55e', fontSize: '0.75rem', fontWeight: 600, textDecoration: 'none' }}>
+                Tüm ilanları gör →
+              </a>
+            )}
+          </div>
           {user && profilTamamlandi ? (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
               <div style={{ color: '#e2e8f0', fontSize: '1.1rem', fontWeight: 700 }}>📞 {ilan.contact_phone}</div>

@@ -239,6 +239,51 @@ beslemesi son günlerde ilan üretmemiş görünüyor — ana sayfa akışı ona
 
 ---
 
+## ⏳ 7 — Test kapsamı eksikleri (14 Ağu 2026 analizinde bulundu)
+
+18 `test:*` script'i var ama hepsi elle (`npx tsx`) çalıştırılıyor, framework/CI
+yok. Aşağıdakiler mevcut testlerin KAPSAMADIĞI, henüz bir bekçisi olmayan
+alanlar. ⚠️ OTP kaba kuvvet açığı ve `anon`/`authenticated` GRANT taraması
+BURADA TEKRARLANMADI — ikisi zaten madde 3'te; oradaki düzeltmeler bittiğinde
+regresyon testi de bu maddeye eklenmeli.
+
+- **`app/api/auth/*` (9 route) hiçbirinde test:* yok** — `giris`, `otp`, `merge`,
+  `hesap-eslesme`, `switch-account`, `telefon-degistir`, `tekil-kontrol`, `log`,
+  `dogrulama-tekrar`. En kritik güvenlik yüzeyi ve en az korunan yer.
+- **Admin/moderatör route'ları (11+ route) test edilmiyor** — `admin/crm`,
+  `admin/crm/[id]`, `admin/crm/[id]/analiz`, `admin/guvenlik`, `admin/kullanici`,
+  `admin/learn-aliases`, `admin/link-havuzu`, `admin/poi-import`, `admin/radar`,
+  `admin/radar/analitik`, `admin/reprocess-no-lane`, `admin/resolve-url`,
+  `moderator/arsiv`, `moderator/kullanici-ara`, `moderator/kullanici-askiya`.
+  Rol/yetki kontrolü kırılırsa (ör. `role=admin|moderator` bypass) hiçbir test
+  yakalamaz.
+- **`proxy.ts` (210 satır, kimlik uzlaştırma) hiç test edilmiyor.** §8'de
+  tarif edilen çok kimlikli senaryolar (Google/e-posta vs telefon OTP ayrı
+  `auth.users` satırı, self-heal merge, 4 telefon formatı denemesi,
+  `merged_into` yönlendirmesi) yalnız elle doğrulanmış; en kırılgan mantık
+  burada ama regresyon bekçisi yok.
+- **`excel-import` route'unun test:* script'i yok.** #47'de kolon kayması
+  bugu bu route'un komşusunda çıkmıştı (`TopluYukle.tsx`); `preview`/`commit`
+  akışı, `MAX_SATIR=300`/`MAX_ILAN=50` sınırları ve oturumdan `userId` alma
+  hiç sınanmıyor.
+- **`listings/ara` ve `listings/yakin` test edilmiyor.** Ana sayfa il
+  filtresi ve "Yakınımdaki Yükler" — yüksek trafikli, `ara`'nın tanınmayan
+  il için 400 dönmesi gibi kenar durumları hiç kilitlenmemiş.
+- **CI / deploy öncesi zorunlu test yok.** 18 `test:*` script'in hiçbiri
+  otomatik tetiklenmiyor; git geçmişi sık "elle deploy" gösteriyor — bir
+  regresyon fark edilmeden canlıya çıkabilir. En azından DB'ye yazmayan hızlı
+  altküme (`lokasyon`, `districts`, `alias`, `clean`, `seo`, `jsonld`)
+  push/deploy öncesi otomatik çalışmalı.
+- **Tarayıcı seviyeli duman testi yok.** Playwright `devDependencies`'te kurulu
+  ama yalnız `test-toplu-duzenle.mts` içinde tek seferlik kullanılmış, kalıcı
+  bir suite yok. 10 Ağu'daki TDZ çökmesi (`PanelClient.tsx` ↔
+  `AnlasmalarSekmesi.tsx` dairesel import, bkz. `docs/PROJE_HARITASI.md` §9)
+  `tsc`/`eslint`/`next build` temiz geçtiği hâlde yalnız gerçek tarayıcıda
+  patlamıştı — kalıcı bir smoke suite (`/panel`, `/moderator`, `/`,
+  `/ilan/[id]` yükle + konsol hatası yok) bu sınıf bug'ı ucuza yakalar.
+
+---
+
 ## 📌 Bilinçli kapatılan, yeniden açılmayacak maddeler
 
 Bunlar "unutuldu" değil, **karar**. Biri "bu neden düzeltilmemiş?" diye sorarsa
