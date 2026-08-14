@@ -141,6 +141,7 @@ export default function AnlasmalarSekmesi({ anlasmalar: ilk, yorumlarim: ilkYoru
   const [yorumAcikId, setYorumAcikId] = useState<string | null>(null);
   const [durumFiltre, setDurumFiltre] = useState<DurumFiltre>('hepsi');
   const [rozetler, setRozetler] = useState<Record<string, { ortalama: number; sayi: number }>>({});
+  const [aracAtaAcikId, setAracAtaAcikId] = useState<string | null>(null);
 
   // Karşı tarafların profil rozetleri — tek toplu sorguda. RLS zaten yalnız
   // yayınlanmış+gizlenmemiş satırları döndürür (`reviews_yayinlanan_herkese`),
@@ -180,13 +181,13 @@ export default function AnlasmalarSekmesi({ anlasmalar: ilk, yorumlarim: ilkYoru
     setOnayBekleyen(null); setOnayNeden(''); setDigerMetin(''); setCancelType('');
   }
 
-  async function aksiyon(id: string, action: string, cancel_reason?: string, cancel_type?: 'anlasma' | 'is') {
+  async function aksiyon(id: string, action: string, cancel_reason?: string, cancel_type?: 'anlasma' | 'is', extraData?: Record<string, unknown>) {
     setYukleniyor(id + '_' + action);
     try {
       const res = await fetch(`/api/deals/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action, ...(cancel_reason ? { cancel_reason } : {}), ...(cancel_type ? { cancel_type } : {}) }),
+        body: JSON.stringify({ action, ...(cancel_reason ? { cancel_reason } : {}), ...(cancel_type ? { cancel_type } : {}), ...extraData }),
       });
       const d = await res.json();
       if (res.ok) {
@@ -265,6 +266,8 @@ export default function AnlasmalarSekmesi({ anlasmalar: ilk, yorumlarim: ilkYoru
               mevcutYorum={yorumlarim.find(r => r.deal_id === deal.id) || null}
               onYorumGonderildi={yorumEkle}
               rozetler={rozetler}
+              aracAtaAcik={aracAtaAcikId === deal.id}
+              setAracAtaAcik={(acik: boolean) => setAracAtaAcikId(acik ? deal.id : null)}
             />
           ))}
         </div>
@@ -281,9 +284,10 @@ function AnlasmaKarti({
   onayBekleyen, setOnayBekleyen, onayTemizle, onayNeden, setOnayNeden,
   digerMetin, setDigerMetin, cancelType, setCancelType,
   yorumAcik, setYorumAcik, mevcutYorum, onYorumGonderildi, rozetler,
+  aracAtaAcik, setAracAtaAcik,
 }: {
   deal: any; userId: string; yukleniyor: string | null; hata?: string;
-  onAksiyon: (id: string, action: string, cancel_reason?: string, cancel_type?: 'anlasma' | 'is') => void;
+  onAksiyon: (id: string, action: string, cancel_reason?: string, cancel_type?: 'anlasma' | 'is', extraData?: Record<string, unknown>) => void;
   onayBekleyen: { id: string; action: 'reddet' | 'iptal' } | null;
   setOnayBekleyen: (v: { id: string; action: 'reddet' | 'iptal' } | null) => void;
   onayTemizle: () => void;
@@ -293,6 +297,7 @@ function AnlasmaKarti({
   yorumAcik: boolean; setYorumAcik: (v: boolean) => void;
   mevcutYorum: any; onYorumGonderildi: (r: any) => void;
   rozetler: Record<string, { ortalama: number; sayi: number }>;
+  aracAtaAcik: boolean; setAracAtaAcik: (v: boolean) => void;
 }) {
   const isShipper = deal.shipper_id === userId;
   const isCarrier = deal.carrier_id === userId;
@@ -367,6 +372,16 @@ function AnlasmaKarti({
           kutuda: rakam, not, vade. Onaylama/reddetme kararı bu kutuya bakarak
           verilir — sunucu doğrulaması `agreed_price`'ı zaten zorunlu kılıyor,
           eski kayıtlarda (migration öncesi) yalnız yoksa satır basılmaz. */}
+      {/* Atanan araç bilgisi — yola çıktı anında doldurulur. */}
+      {deal.vehicle_plate && (
+        <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, padding: '8px 12px', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' as const }}>
+          <span style={{ color: C.dim, fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase' as const }}>Araç</span>
+          <span style={{ color: C.text, fontWeight: 700, fontSize: '0.85rem', letterSpacing: '0.05em' }}>🚗 {deal.vehicle_plate}</span>
+          {deal.driver_name && <span style={{ color: C.muted, fontSize: '0.82rem' }}>· {deal.driver_name}</span>}
+          {deal.dispatch_notes && <span style={{ color: C.dim, fontSize: '0.78rem' }}>· {deal.dispatch_notes}</span>}
+        </div>
+      )}
+
       {(deal.agreed_price !== null && deal.agreed_price !== undefined
         || deal.note
         || (deal.payment_terms_days !== null && deal.payment_terms_days !== undefined)) && (
@@ -428,32 +443,42 @@ function AnlasmaKarti({
 
       {/* ── matched / in_transit ── */}
       {(deal.status === 'matched' || deal.status === 'in_transit') && (
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+        <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 8 }}>
           {deal.status === 'matched' && isCarrier && (
-            <button onClick={() => onAksiyon(deal.id, 'yola_cikti')} disabled={!!yukleniyor} style={btn('secondary')}>
-              {isYukluyor('yola_cikti') ? '...' : '🚚 Yola Çıktı'}
+            aracAtaAcik
+              ? <AracAtaFormu
+                  yukleniyor={isYukluyor('yola_cikti')}
+                  onGonder={(data) => { onAksiyon(deal.id, 'yola_cikti', undefined, undefined, data); setAracAtaAcik(false); }}
+                  onVazgec={() => setAracAtaAcik(false)}
+                />
+              : <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' as const, alignItems: 'center' }}>
+                  <button onClick={() => setAracAtaAcik(true)} disabled={!!yukleniyor} style={btn('secondary')}>
+                    {isYukluyor('yola_cikti') ? '...' : '🚚 Yola Çıktı'}
+                  </button>
+                </div>
+          )}
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' as const, alignItems: 'center' }}>
+            {!deal.completed_declared_by && (
+              <button onClick={() => onAksiyon(deal.id, 'tamamla')} disabled={!!yukleniyor}
+                style={{ ...btn('secondary'), border: `1px solid ${C.greenBg}`, color: C.green }}>
+                {isYukluyor('tamamla') ? '...' : '✅ İşi Tamamla'}
+              </button>
+            )}
+            {benDeclared && (
+              <span style={{ color: C.amber, fontSize: '0.8rem' }}>
+                Tamamlandı beyanınız alındı — karşı tarafın onayı bekleniyor.
+              </span>
+            )}
+            {digerDeclared && (
+              <button onClick={() => onAksiyon(deal.id, 'tamamla')} disabled={!!yukleniyor} style={btn('primary')}>
+                {isYukluyor('tamamla') ? '...' : '✅ Onayla ve Tamamla'}
+              </button>
+            )}
+            <button onClick={() => setOnayBekleyen({ id: deal.id, action: 'iptal' })} disabled={!!yukleniyor}
+              style={{ ...btn('ghost'), color: C.red }}>
+              İptal Et
             </button>
-          )}
-          {!deal.completed_declared_by && (
-            <button onClick={() => onAksiyon(deal.id, 'tamamla')} disabled={!!yukleniyor}
-              style={{ ...btn('secondary'), border: `1px solid ${C.greenBg}`, color: C.green }}>
-              {isYukluyor('tamamla') ? '...' : '✅ İşi Tamamla'}
-            </button>
-          )}
-          {benDeclared && (
-            <span style={{ color: C.amber, fontSize: '0.8rem' }}>
-              Tamamlandı beyanınız alındı — karşı tarafın onayı bekleniyor.
-            </span>
-          )}
-          {digerDeclared && (
-            <button onClick={() => onAksiyon(deal.id, 'tamamla')} disabled={!!yukleniyor} style={btn('primary')}>
-              {isYukluyor('tamamla') ? '...' : '✅ Onayla ve Tamamla'}
-            </button>
-          )}
-          <button onClick={() => setOnayBekleyen({ id: deal.id, action: 'iptal' })} disabled={!!yukleniyor}
-            style={{ ...btn('ghost'), color: C.red }}>
-            İptal Et
-          </button>
+          </div>
         </div>
       )}
 
@@ -562,6 +587,111 @@ function AnlasmaKarti({
           {deal.cancel_reason && <div style={{ marginTop: 2 }}>Neden: {deal.cancel_reason}</div>}
         </div>
       )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// ARAÇ ATA FORMU — "Yola Çıktı" anında plaka + şoför girişi.
+// Kayıtlı araçlar Supabase'den RLS altında çekilir (carrier_vehicles).
+// ═══════════════════════════════════════════════════════════════════
+interface KayitliArac {
+  id: string;
+  plate: string;
+  driver_name: string | null;
+  vehicle_type: string | null;
+  notes: string | null;
+  last_used_at: string;
+}
+
+function AracAtaFormu({
+  yukleniyor, onGonder, onVazgec,
+}: {
+  yukleniyor: boolean;
+  onGonder: (data: { vehicle_plate?: string; driver_name?: string; dispatch_notes?: string }) => void;
+  onVazgec: () => void;
+}) {
+  const [plaka, setPlaka] = useState('');
+  const [sofor, setSofor] = useState('');
+  const [not, setNot] = useState('');
+  const [kayitliAraclar, setKayitliAraclar] = useState<KayitliArac[]>([]);
+  const [yuklendimi, setYuklendimi] = useState(false);
+
+  useEffect(() => {
+    supabase
+      .from('carrier_vehicles')
+      .select('id, plate, driver_name, vehicle_type, notes, last_used_at')
+      .order('last_used_at', { ascending: false })
+      .limit(20)
+      .then((res: any) => {
+        setKayitliAraclar(res.data || []);
+        setYuklendimi(true);
+      });
+  }, []);
+
+  function seçArac(arac: KayitliArac) {
+    setPlaka(arac.plate);
+    setSofor(arac.driver_name || '');
+    setNot(arac.notes || '');
+  }
+
+  function gonder() {
+    const plakaTemiz = plaka.trim().toUpperCase().replace(/\s/g, '');
+    onGonder({
+      ...(plakaTemiz ? { vehicle_plate: plakaTemiz } : {}),
+      ...(sofor.trim() ? { driver_name: sofor.trim() } : {}),
+      ...(not.trim() ? { dispatch_notes: not.trim() } : {}),
+    });
+  }
+
+  return (
+    <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, padding: 14, display: 'flex', flexDirection: 'column' as const, gap: 10 }}>
+      <div style={{ color: C.text, fontSize: '0.82rem', fontWeight: 700 }}>🚚 Araç Bilgisi Gir</div>
+
+      {/* Kayıtlı araçlar — hızlı seçim */}
+      {yuklendimi && kayitliAraclar.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 4 }}>
+          <div style={{ color: C.dim, fontSize: '0.7rem', fontWeight: 600 }}>Kayıtlı Araçlar</div>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' as const }}>
+            {kayitliAraclar.map(a => (
+              <button key={a.id} type="button"
+                onClick={() => seçArac(a)}
+                style={{ background: plaka === a.plate ? C.blueBg : C.surface, border: `1px solid ${plaka === a.plate ? C.blue : C.border}`, color: plaka === a.plate ? C.blue : C.muted, borderRadius: 6, padding: '4px 10px', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', letterSpacing: '0.04em' }}>
+                {a.plate}{a.driver_name ? ` · ${a.driver_name}` : ''}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' as const }}>
+        <div style={{ flex: '1 1 120px' }}>
+          <label style={{ ...lbl, marginBottom: 4 }}>Plaka</label>
+          <input value={plaka} onChange={e => setPlaka(e.target.value.toUpperCase())}
+            placeholder="34 ABC 123"
+            style={{ ...inp, textTransform: 'uppercase' as const, letterSpacing: '0.06em', fontWeight: 700 }} />
+        </div>
+        <div style={{ flex: '2 1 180px' }}>
+          <label style={{ ...lbl, marginBottom: 4 }}>Şoför Adı <span style={{ color: C.dim, fontWeight: 400 }}>(opsiyonel)</span></label>
+          <input value={sofor} onChange={e => setSofor(e.target.value)}
+            placeholder="Ali Veli"
+            style={inp} />
+        </div>
+      </div>
+      <div>
+        <label style={{ ...lbl, marginBottom: 4 }}>Not <span style={{ color: C.dim, fontWeight: 400 }}>(opsiyonel)</span></label>
+        <input value={not} onChange={e => setNot(e.target.value)}
+          placeholder="Örn: Kırmızı TIR, öğleden sonra kalkış"
+          style={inp} />
+      </div>
+
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button onClick={gonder} disabled={yukleniyor}
+          style={{ ...btn('secondary'), color: C.green, border: `1px solid ${C.greenBg}` }}>
+          {yukleniyor ? '...' : '🚚 Yola Çıkart'}
+        </button>
+        <button onClick={onVazgec} style={btn('ghost')}>Vazgeç</button>
+      </div>
     </div>
   );
 }

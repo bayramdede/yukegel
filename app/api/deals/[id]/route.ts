@@ -47,7 +47,7 @@ export async function PATCH(
   const { data: { user } } = await ssr.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Giriş gerekli' }, { status: 401 });
 
-  const { action, cancel_reason, cancel_type } = await req.json().catch(() => ({}));
+  const { action, cancel_reason, cancel_type, vehicle_plate, driver_name, dispatch_notes } = await req.json().catch(() => ({}));
   const svc = getServiceSupabase();
 
   const { data: deal } = await svc
@@ -93,7 +93,22 @@ export async function PATCH(
       if (deal.status !== 'matched') {
         return NextResponse.json({ error: 'Yalnız mühürlenmiş kayıt yola çıkabilir.' }, { status: 409 });
       }
-      yama = { status: 'in_transit', transit_at: simdi };
+      const plaka = typeof vehicle_plate === 'string' ? vehicle_plate.trim().toUpperCase().replace(/\s/g, '').slice(0, 15) : null;
+      const sofor = typeof driver_name === 'string' ? driver_name.trim().slice(0, 100) : null;
+      const dispatchNot = typeof dispatch_notes === 'string' ? dispatch_notes.trim().slice(0, 500) : null;
+      // Plaka varsa kayıtlı araçlara ekle / güncelle (son kullanım tarihi yenile).
+      if (plaka) {
+        await svc.from('carrier_vehicles').upsert(
+          { user_id: user.id, plate: plaka, driver_name: sofor, last_used_at: simdi },
+          { onConflict: 'user_id,plate' }
+        );
+      }
+      yama = {
+        status: 'in_transit', transit_at: simdi,
+        ...(plaka ? { vehicle_plate: plaka } : {}),
+        ...(sofor ? { driver_name: sofor } : {}),
+        ...(dispatchNot ? { dispatch_notes: dispatchNot } : {}),
+      };
       break;
     }
 
@@ -175,7 +190,8 @@ export async function PATCH(
     //    anda "tamamla" derse ikisi de "beyan" yazıp onay adımı atlanabilirdi.
     .eq('status', deal.status)
     .select(`id, status, matched_at, transit_at, completed_declared_by, completed_at,
-      review_deadline, payment_maturity_date, cancelled_at, cancel_type, cancel_reason`)
+      review_deadline, payment_maturity_date, cancelled_at, cancel_type, cancel_reason,
+      vehicle_plate, driver_name, dispatch_notes`)
     .maybeSingle();
 
   if (error) {
