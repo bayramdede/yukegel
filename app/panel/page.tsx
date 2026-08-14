@@ -77,6 +77,8 @@ export default async function Panel() {
         payment_terms_days, payment_maturity_date, review_deadline,
         agreed_price, note, carrier_phone_consent,
         vehicle_plate, driver_name, dispatch_notes,
+        external_carrier_name, external_carrier_phone,
+        shipment_stage, assigned_at, loaded_at, on_road_at, delivered_at,
         cancelled_at, cancelled_by, cancel_type, cancel_reason, created_at,
         listing:listings!deals_listing_id_fkey ( id, listing_type, origin_province_id, price_offer, contact_phone,
           listing_stops ( province_id, stop_order ) ),

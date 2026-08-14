@@ -372,8 +372,18 @@ function AnlasmaKarti({
           kutuda: rakam, not, vade. Onaylama/reddetme kararı bu kutuya bakarak
           verilir — sunucu doğrulaması `agreed_price`'ı zaten zorunlu kılıyor,
           eski kayıtlarda (migration öncesi) yalnız yoksa satır basılmaz. */}
-      {/* Atanan araç bilgisi — yola çıktı anında doldurulur. */}
-      {deal.vehicle_plate && (
+      {/* Sevkiyat aşaması — ilan sahibi (shipper) takip eder.
+          Harici deal veya Yükegel deal fark etmez: shipper aşamayı ilerletir. */}
+      {isShipper && ['matched', 'in_transit', 'completed'].includes(deal.status) && (
+        <SevkiyatTakip
+          deal={deal}
+          onAksiyon={onAksiyon}
+          yukleniyor={yukleniyor}
+        />
+      )}
+
+      {/* Araç bilgisi — nakliyeci tarafından girilmişse (in_transit/completed) */}
+      {!isShipper && deal.vehicle_plate && (
         <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, padding: '8px 12px', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' as const }}>
           <span style={{ color: C.dim, fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase' as const }}>Araç</span>
           <span style={{ color: C.text, fontWeight: 700, fontSize: '0.85rem', letterSpacing: '0.05em' }}>🚗 {deal.vehicle_plate}</span>
@@ -586,6 +596,152 @@ function AnlasmaKarti({
           {deal.cancel_type === 'is' && <div style={{ marginTop: 2 }}>📦 İş iptali — ilan yayından kalktı.</div>}
           {deal.cancel_reason && <div style={{ marginTop: 2 }}>Neden: {deal.cancel_reason}</div>}
         </div>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// SEVKİYAT TAKİP — ilan sahibinin aşama ilerletme paneli.
+// Harici nakliyeciler (carrier_id=null) + Yükegel eşleşmeleri için çalışır.
+// ═══════════════════════════════════════════════════════════════════
+const ASAMALAR = [
+  { key: 'assigned', label: 'Plaka Atandı',    icon: '🔑' },
+  { key: 'loaded',   label: 'Araç Yüklendi',   icon: '📦' },
+  { key: 'on_road',  label: 'Yolda',            icon: '🚚' },
+  { key: 'delivered',label: 'Teslim Edildi',    icon: '✅' },
+] as const;
+type Asama = typeof ASAMALAR[number]['key'];
+
+function SevkiyatTakip({ deal, onAksiyon, yukleniyor }: {
+  deal: any;
+  onAksiyon: (id: string, action: string, cancel_reason?: string, cancel_type?: 'anlasma' | 'is', extraData?: Record<string, unknown>) => void;
+  yukleniyor: string | null;
+}) {
+  const mevcutIdx = ASAMALAR.findIndex(a => a.key === deal.shipment_stage);
+  const [formAcik, setFormAcik] = useState(false);
+  const [plaka, setPlaka] = useState(deal.vehicle_plate || '');
+  const [sofor, setSofor] = useState(deal.driver_name || '');
+  const [hariciAd, setHariciAd] = useState(deal.external_carrier_name || '');
+  const [hariciTel, setHariciTel] = useState(deal.external_carrier_phone || '');
+  const [dispatchNot, setDispatchNot] = useState(deal.dispatch_notes || '');
+  const [kayitliAraclar, setKayitliAraclar] = useState<{ plate: string; driver_name: string | null }[]>([]);
+
+  const sonrakiIdx = mevcutIdx + 1;
+  const sonraki = ASAMALAR[sonrakiIdx] as typeof ASAMALAR[number] | undefined;
+  const tamamlandi = deal.status === 'completed';
+
+  // Plaka atama formunu ilk açışta kayıtlı araçları çek.
+  function formAc() {
+    setFormAcik(true);
+    supabase.from('carrier_vehicles').select('plate, driver_name').order('last_used_at', { ascending: false }).limit(10)
+      .then((r: any) => setKayitliAraclar(r.data || []));
+  }
+
+  function ilerle(asama: Asama, extraData?: Record<string, unknown>) {
+    onAksiyon(deal.id, 'stage_ilerle', undefined, undefined, { stage: asama, ...extraData });
+    setFormAcik(false);
+  }
+
+  const isYukluyor = (_asama: string) => yukleniyor === `${deal.id}_stage_ilerle`;
+
+  return (
+    <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, padding: '10px 14px', display: 'flex', flexDirection: 'column' as const, gap: 10 }}>
+      {/* Aşama göstergesi */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 0 }}>
+        {ASAMALAR.map((a, i) => {
+          const tamamdi = i <= mevcutIdx;
+          const simdiki = i === mevcutIdx;
+          return (
+            <React.Fragment key={a.key}>
+              <div style={{ display: 'flex', flexDirection: 'column' as const, alignItems: 'center', gap: 3, flex: 1 }}>
+                <div style={{
+                  width: 30, height: 30, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  background: tamamdi ? (simdiki ? C.greenBg : '#166534') : C.surface,
+                  border: `2px solid ${tamamdi ? '#22c55e' : C.border}`,
+                  fontSize: '0.85rem',
+                }}>
+                  {tamamdi ? (simdiki ? a.icon : '✓') : <span style={{ color: C.dim, fontSize: '0.7rem' }}>{i + 1}</span>}
+                </div>
+                <span style={{ fontSize: '0.62rem', color: tamamdi ? C.green : C.dim, fontWeight: simdiki ? 700 : 400, textAlign: 'center' as const, lineHeight: 1.2 }}>{a.label}</span>
+              </div>
+              {i < ASAMALAR.length - 1 && (
+                <div style={{ height: 2, flex: 0.3, background: i < mevcutIdx ? '#22c55e' : C.border, marginBottom: 18, marginTop: 0 }} />
+              )}
+            </React.Fragment>
+          );
+        })}
+      </div>
+
+      {/* Atanmış araç/nakliyeci bilgisi */}
+      {(deal.vehicle_plate || deal.external_carrier_name) && (
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' as const, alignItems: 'center', fontSize: '0.78rem' }}>
+          {deal.external_carrier_name && <span style={{ color: C.muted }}>🏢 {deal.external_carrier_name}</span>}
+          {deal.external_carrier_phone && <span style={{ color: C.dim }}>· {deal.external_carrier_phone}</span>}
+          {deal.vehicle_plate && <span style={{ color: C.text, fontWeight: 700, letterSpacing: '0.05em' }}>🚗 {deal.vehicle_plate}</span>}
+          {deal.driver_name && <span style={{ color: C.muted }}>· {deal.driver_name}</span>}
+          {deal.dispatch_notes && <span style={{ color: C.dim }}>· {deal.dispatch_notes}</span>}
+        </div>
+      )}
+
+      {/* Sonraki aşama butonu */}
+      {!tamamlandi && sonraki && (
+        sonraki.key === 'assigned' && formAcik ? (
+          <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 8 }}>
+            {/* Kayıtlı araçlar */}
+            {kayitliAraclar.length > 0 && (
+              <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' as const }}>
+                {kayitliAraclar.map((a, i) => (
+                  <button key={i} type="button" onClick={() => { setPlaka(a.plate); setSofor(a.driver_name || ''); }}
+                    style={{ background: plaka === a.plate ? C.blueBg : C.surface, border: `1px solid ${plaka === a.plate ? C.blue : C.border}`, color: plaka === a.plate ? C.blue : C.muted, borderRadius: 5, padding: '3px 8px', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer', letterSpacing: '0.04em' }}>
+                    {a.plate}{a.driver_name ? ` · ${a.driver_name}` : ''}
+                  </button>
+                ))}
+              </div>
+            )}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              <div>
+                <label style={lbl}>Nakliyeci / Firma</label>
+                <input value={hariciAd} onChange={e => setHariciAd(e.target.value)} placeholder="Ali Veli Nakliyat" style={inp} />
+              </div>
+              <div>
+                <label style={lbl}>Telefon <span style={{ color: C.dim, fontWeight: 400 }}>(opsiyonel)</span></label>
+                <input value={hariciTel} onChange={e => setHariciTel(e.target.value)} placeholder="0532 000 00 00" style={inp} />
+              </div>
+              <div>
+                <label style={lbl}>Plaka</label>
+                <input value={plaka} onChange={e => setPlaka(e.target.value.toUpperCase())} placeholder="34 ABC 123" style={{ ...inp, textTransform: 'uppercase' as const, fontWeight: 700, letterSpacing: '0.05em' }} />
+              </div>
+              <div>
+                <label style={lbl}>Şoför <span style={{ color: C.dim, fontWeight: 400 }}>(opsiyonel)</span></label>
+                <input value={sofor} onChange={e => setSofor(e.target.value)} placeholder="Şoför Ahmet" style={inp} />
+              </div>
+            </div>
+            <input value={dispatchNot} onChange={e => setDispatchNot(e.target.value)} placeholder="Not (opsiyonel)" style={inp} />
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button
+                onClick={() => ilerle('assigned', { vehicle_plate: plaka.trim(), driver_name: sofor.trim() || undefined, external_carrier_name: hariciAd.trim() || undefined, external_carrier_phone: hariciTel.trim() || undefined, dispatch_notes: dispatchNot.trim() || undefined })}
+                disabled={(!plaka.trim() && !hariciAd.trim()) || !!yukleniyor}
+                style={{ ...btn('secondary'), color: C.green, border: `1px solid ${C.greenBg}`, opacity: (!plaka.trim() && !hariciAd.trim()) ? 0.5 : 1 }}>
+                {isYukluyor('assigned') ? '...' : '🔑 Plakayı Ata'}
+              </button>
+              <button onClick={() => setFormAcik(false)} style={btn('ghost')}>Vazgeç</button>
+            </div>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              onClick={() => sonraki.key === 'assigned' ? formAc() : ilerle(sonraki.key)}
+              disabled={!!yukleniyor}
+              style={{ ...btn('secondary'), fontSize: '0.78rem' }}>
+              {isYukluyor('') ? '...' : `${sonraki.icon} ${sonraki.label}`}
+            </button>
+          </div>
+        )
+      )}
+
+      {tamamlandi && deal.shipment_stage === 'delivered' && (
+        <div style={{ color: C.green, fontSize: '0.8rem', fontWeight: 600 }}>✅ Teslim edildi — sefer tamamlandı.</div>
       )}
     </div>
   );

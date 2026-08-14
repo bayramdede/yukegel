@@ -20,7 +20,10 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await ssr.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Giriş gerekli' }, { status: 401 });
 
-  const { listing_id, payment_terms_days, agreed_price, note, carrier_phone_consent } = await req.json().catch(() => ({}));
+  const {
+    listing_id, payment_terms_days, agreed_price, note, carrier_phone_consent,
+    external_carrier_name, external_carrier_phone, vehicle_plate, driver_name,
+  } = await req.json().catch(() => ({}));
   if (!listing_id) return NextResponse.json({ error: 'listing_id gerekli' }, { status: 400 });
 
   // Anlaşılan fiyat — 11 Ağu 2026, talep ekranına eklendi. ZORUNLU: taraflar
@@ -30,6 +33,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Anlaşılan fiyat gerekli (geçerli bir tutar girin).' }, { status: 400 });
   }
   const notMetni = typeof note === 'string' && note.trim() !== '' ? note.trim().slice(0, 1000) : null;
+  const vade = Number.isInteger(payment_terms_days)
+    && payment_terms_days >= 0 && payment_terms_days <= 180
+      ? payment_terms_days : null;
 
   const svc = getServiceSupabase();
 
@@ -49,8 +55,51 @@ export async function POST(req: NextRequest) {
       error: 'Bu ilan bir Yükegel hesabına bağlı değil. Sahibi ilanı sahiplenmeden anlaşma başlatılamaz.',
     }, { status: 409 });
   }
+  // Kendi ilanına talep gönderemez — AMA harici nakliyeci ekleyebilir.
   if (ilan.user_id === user.id) {
-    return NextResponse.json({ error: 'Kendi ilanınıza talep gönderemezsiniz.' }, { status: 400 });
+    const hariciAd = typeof external_carrier_name === 'string' ? external_carrier_name.trim().slice(0, 200) : null;
+    const hariciTel = typeof external_carrier_phone === 'string' ? external_carrier_phone.trim().replace(/\s/g, '').slice(0, 20) : null;
+    const plaka = typeof vehicle_plate === 'string' ? vehicle_plate.trim().toUpperCase().replace(/\s/g, '').slice(0, 15) : null;
+    const sofor = typeof driver_name === 'string' ? driver_name.trim().slice(0, 100) : null;
+
+    if (!hariciAd && !plaka) {
+      return NextResponse.json({ error: 'Kendi ilanınıza talep gönderemezsiniz. Harici nakliyeci eklemek için nakliyeci adı veya plaka girin.' }, { status: 400 });
+    }
+
+    // Zaten aktif bir harici sefer var mı?
+    const { data: mevcutHarici } = await svc.from('deals')
+      .select('id').eq('listing_id', listing_id).is('carrier_id', null)
+      .not('status', 'in', '("cancelled")').maybeSingle();
+    if (mevcutHarici) {
+      return NextResponse.json({ error: 'Bu ilan için zaten aktif bir sefer kaydı var.' }, { status: 409 });
+    }
+
+    const { data: hariciDeal, error: hariciErr } = await svc.from('deals').insert({
+      listing_id,
+      shipper_id: user.id,
+      carrier_id: null,
+      status: 'matched',
+      matched_at: new Date().toISOString(),
+      agreed_price: fiyat,
+      payment_terms_days: vade,
+      note: notMetni,
+      carrier_phone_consent: false,
+      external_carrier_name: hariciAd,
+      external_carrier_phone: hariciTel,
+      vehicle_plate: plaka,
+      driver_name: sofor,
+    }).select('id, status, agreed_price, note, created_at, external_carrier_name, external_carrier_phone, vehicle_plate, driver_name').single();
+
+    if (hariciErr) {
+      structuredLog('ERROR', 'db-transaction', 'Harici sefer oluşturulamadı', { supabase_error: hariciErr.message, listing_id, user_id: user.id });
+      return NextResponse.json({ error: 'Sefer kaydedilemedi.' }, { status: 500 });
+    }
+
+    // İlan pasife al — yük sevkiyata girdi.
+    await svc.from('listings').update({ status: 'passive' }).eq('id', listing_id);
+
+    structuredLog('INFO', 'db-transaction', 'Harici sefer oluşturuldu', { deal_id: hariciDeal.id, listing_id, user_id: user.id });
+    return NextResponse.json({ success: true, deal: hariciDeal, harici: true });
   }
   if (ilan.completed_at) {
     return NextResponse.json({ error: 'Bu ilan tamamlanmış.' }, { status: 409 });
@@ -71,10 +120,6 @@ export async function POST(req: NextRequest) {
   if (mevcutAnlasma) {
     return NextResponse.json({ error: 'Bu yük için anlaşma çoktan yapılmış.' }, { status: 409 });
   }
-
-  const vade = Number.isInteger(payment_terms_days)
-    && payment_terms_days >= 0 && payment_terms_days <= 180
-      ? payment_terms_days : null;
 
   const { data: deal, error } = await svc
     .from('deals')

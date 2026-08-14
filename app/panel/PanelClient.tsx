@@ -117,7 +117,7 @@ export default function PanelClient({ userId, userEmail, profil, ilanlar, aracla
           ))}
         </div>
 
-        {sekme === 'ilanlarim' && <IlanlarSekmesi ilanlar={ilanlar} userId={userId} />}
+        {sekme === 'ilanlarim' && <IlanlarSekmesi ilanlar={ilanlar} userId={userId} anlasmalar={anlasmalar} />}
         {sekme === 'araclarim' && <AraclarSekmesi araclar={araclar} userId={userId} />}
         {sekme === 'anlasmalarim' && <AnlasmalarSekmesi anlasmalar={anlasmalar} yorumlarim={yorumlarim} userId={userId} />}
         {sekme === 'profilim' && <ProfilSekmesi profil={profil} userEmail={userEmail} userId={userId} />}
@@ -131,13 +131,70 @@ export default function PanelClient({ userId, userEmail, profil, ilanlar, aracla
 // ═══════════════════════════════════════════════════════════════════
 type StatusFiltre = 'hepsi' | 'active' | 'passive' | 'completed' | 'pending' | 'rejected' | 'correction_needed';
 
-function IlanlarSekmesi({ ilanlar: ilk, userId }: { ilanlar: any[]; userId: string }) {
+function IlanlarSekmesi({ ilanlar: ilk, userId, anlasmalar }: { ilanlar: any[]; userId: string; anlasmalar: any[] }) {
   const [ilanlar, setIlanlar] = useState(ilk);
   const [yukleniyor, setYukleniyor] = useState<string | null>(null);
   const [silOnay, setSilOnay] = useState<string | null>(null);
   const [statusFiltre, setStatusFiltre] = useState<StatusFiltre>('hepsi');
   const [kopyalandi, setKopyalandi] = useState(false);
   const [publicUrl, setPublicUrl] = useState('');
+
+  // Aktif seferi olan ilanlar (matched / in_transit) — "Sefer Ekle" butonunu gizlemek için.
+  const mesgulIlanlar = useMemo(() =>
+    new Set(anlasmalar.filter(d => ['matched', 'in_transit'].includes(d.status)).map((d: any) => d.listing_id)),
+  [anlasmalar]);
+
+  // Harici sefer ekleme formu
+  const [seferEkleId, setSeferEkleId] = useState<string | null>(null);
+  const [seferNakliyeAd, setSeferNakliyeAd] = useState('');
+  const [seferNakliyeTel, setSeferNakliyeTel] = useState('');
+  const [seferPlaka, setSeferPlaka] = useState('');
+  const [seferSofor, setSeferSofor] = useState('');
+  const [seferFiyat, setSeferFiyat] = useState('');
+  const [seferNot, setSeferNot] = useState('');
+  const [seferYukleniyor, setSeferYukleniyor] = useState(false);
+  const [seferSonuc, setSeferSonuc] = useState<{ ok: boolean; mesaj: string } | null>(null);
+  const [kayitliAraclar, setKayitliAraclar] = useState<{ plate: string; driver_name: string | null }[]>([]);
+
+  function seferAc(ilanId: string) {
+    setSeferEkleId(ilanId);
+    setSeferNakliyeAd(''); setSeferNakliyeTel(''); setSeferPlaka(''); setSeferSofor('');
+    setSeferFiyat(''); setSeferNot(''); setSeferSonuc(null);
+    // Kayıtlı araçları çek
+    supabase.from('carrier_vehicles').select('plate, driver_name').order('last_used_at', { ascending: false }).limit(10)
+      .then((r: any) => setKayitliAraclar(r.data || []));
+  }
+
+  async function seferKaydet(ilanId: string, ilanFiyat: number | null) {
+    const fiyatSayi = Number(seferFiyat.replace(/\./g, '').replace(',', '.'));
+    const fiyatGonderilecek = Number.isFinite(fiyatSayi) && fiyatSayi > 0 ? fiyatSayi : ilanFiyat;
+    if (!seferNakliyeAd.trim() && !seferPlaka.trim()) {
+      setSeferSonuc({ ok: false, mesaj: 'Nakliyeci adı veya plaka girin.' });
+      return;
+    }
+    setSeferYukleniyor(true); setSeferSonuc(null);
+    const res = await fetch('/api/deals', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        listing_id: ilanId,
+        agreed_price: fiyatGonderilecek,
+        note: seferNot.trim() || undefined,
+        external_carrier_name: seferNakliyeAd.trim() || undefined,
+        external_carrier_phone: seferNakliyeTel.trim() || undefined,
+        vehicle_plate: seferPlaka.trim() || undefined,
+        driver_name: seferSofor.trim() || undefined,
+      }),
+    });
+    const d = await res.json();
+    if (res.ok) {
+      setSeferSonuc({ ok: true, mesaj: 'Sefer oluşturuldu! Anlaşmalarım sekmesinden takip edebilirsiniz.' });
+      ilanGuncelle(ilanId, { status: 'passive' });
+    } else {
+      setSeferSonuc({ ok: false, mesaj: d.error || 'Sefer oluşturulamadı.' });
+    }
+    setSeferYukleniyor(false);
+  }
 
   // Düzeltme/düzenleme formu state'leri
   // 8 Ağu 2026 — bu form eskiden YALNIZ `correction_needed` ilanlar için açılıyordu.
@@ -477,6 +534,18 @@ function IlanlarSekmesi({ ilanlar: ilk, userId }: { ilanlar: any[]; userId: stri
                               {tamamlandi ? '↩ Geri Al' : '✅ Tamamla'}
                             </button>
                           )}
+                          {/* Sefer Ekle — yalnız aktif yük ilanlarında, henüz aktif deal yoksa */}
+                          {isAktif && isYuk && !mesgulIlanlar.has(ilan.id) && (
+                            seferEkleId === ilan.id
+                              ? <button onClick={() => setSeferEkleId(null)}
+                                  style={{ padding: '5px 10px', borderRadius: 5, border: `1px solid ${C.blue}`, background: C.blueBg, color: C.blue, fontSize: '0.78rem', cursor: 'pointer', fontWeight: 600 }}>
+                                  ✕ Kapat
+                                </button>
+                              : <button onClick={() => seferAc(ilan.id)}
+                                  style={{ padding: '5px 10px', borderRadius: 5, border: `1px solid ${C.greenBg}`, background: C.greenDark, color: C.green, fontSize: '0.78rem', cursor: 'pointer', fontWeight: 600 }}>
+                                  🚚 Sefer Ekle
+                                </button>
+                          )}
                           {silOnay === ilan.id ? (
                             <div style={{ display: 'flex', gap: 4 }}>
                               <button onClick={() => sil(ilan.id)} disabled={!!yukleniyor}
@@ -500,6 +569,77 @@ function IlanlarSekmesi({ ilanlar: ilk, userId }: { ilanlar: any[]; userId: stri
                     {/* Düzenleme formu — bu ilan seçiliyse.
                         `correction_needed` ise amber (aksiyon bekleniyor),
                         normal düzenlemede nötr çerçeve. */}
+                    {/* ── Sefer Ekle formu — harici nakliyeci ile sefer oluştur ── */}
+                    {seferEkleId === ilan.id && (
+                      <tr>
+                        <td colSpan={6} style={{ padding: '0 12px 16px', background: '#0a0d11' }}>
+                          <div style={{ border: `1px solid ${C.greenBg}`, borderRadius: 8, padding: 16, background: C.greenDark }}>
+                            <div style={{ color: C.green, fontWeight: 700, fontSize: '0.85rem', marginBottom: 12 }}>
+                              🚚 Sefer Ekle — {kalkisAd}
+                            </div>
+                            {/* Kayıtlı araçlar */}
+                            {kayitliAraclar.length > 0 && (
+                              <div style={{ marginBottom: 10 }}>
+                                <div style={{ color: C.dim, fontSize: '0.7rem', fontWeight: 600, marginBottom: 5 }}>Kayıtlı Araçlar</div>
+                                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                                  {kayitliAraclar.map((a: any, i: number) => (
+                                    <button key={i} type="button"
+                                      onClick={() => { setSeferPlaka(a.plate); setSeferSofor(a.driver_name || ''); }}
+                                      style={{ background: seferPlaka === a.plate ? C.blueBg : C.surface, border: `1px solid ${seferPlaka === a.plate ? C.blue : C.border}`, color: seferPlaka === a.plate ? C.blue : C.muted, borderRadius: 6, padding: '3px 9px', fontSize: '0.73rem', fontWeight: 700, cursor: 'pointer', letterSpacing: '0.04em' }}>
+                                      {a.plate}{a.driver_name ? ` · ${a.driver_name}` : ''}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+                              <div>
+                                <label style={lbl}>Nakliyeci Adı / Firma</label>
+                                <input value={seferNakliyeAd} onChange={e => setSeferNakliyeAd(e.target.value)} placeholder="Ali Veli Nakliyat" style={inp} />
+                              </div>
+                              <div>
+                                <label style={lbl}>Nakliyeci Telefonu <span style={{ color: C.dim, fontWeight: 400 }}>(opsiyonel)</span></label>
+                                <input value={seferNakliyeTel} onChange={e => setSeferNakliyeTel(e.target.value)} placeholder="0532 000 00 00" style={inp} />
+                              </div>
+                              <div>
+                                <label style={lbl}>Plaka <span style={{ color: C.dim, fontWeight: 400 }}>(opsiyonel)</span></label>
+                                <input value={seferPlaka} onChange={e => setSeferPlaka(e.target.value.toUpperCase())} placeholder="34 ABC 123" style={{ ...inp, textTransform: 'uppercase' as const, fontWeight: 700, letterSpacing: '0.05em' }} />
+                              </div>
+                              <div>
+                                <label style={lbl}>Şoför Adı <span style={{ color: C.dim, fontWeight: 400 }}>(opsiyonel)</span></label>
+                                <input value={seferSofor} onChange={e => setSeferSofor(e.target.value)} placeholder="Şoför Ahmet" style={inp} />
+                              </div>
+                              <div>
+                                <label style={lbl}>Anlaşma Fiyatı <span style={{ color: C.dim, fontWeight: 400 }}>(₺)</span></label>
+                                <input value={seferFiyat} onChange={e => setSeferFiyat(e.target.value)} placeholder={ilan.price_offer ? String(ilan.price_offer) : 'opsiyonel'} style={inp} />
+                              </div>
+                              <div>
+                                <label style={lbl}>Not <span style={{ color: C.dim, fontWeight: 400 }}>(opsiyonel)</span></label>
+                                <input value={seferNot} onChange={e => setSeferNot(e.target.value)} placeholder="Kırmızı TIR, öğle kalkış" style={inp} />
+                              </div>
+                            </div>
+                            {seferSonuc && (
+                              <div style={{ padding: '8px 12px', borderRadius: 6, background: seferSonuc.ok ? C.greenDark : '#2d0a0a', border: `1px solid ${seferSonuc.ok ? C.greenBg : '#7f1d1d'}`, color: seferSonuc.ok ? C.green : '#f87171', fontSize: '0.82rem', marginBottom: 10 }}>
+                                {seferSonuc.mesaj}
+                                {seferSonuc.ok && <> <a href="/panel?sekme=anlasmalarim" style={{ color: C.green, fontWeight: 700 }}>Anlaşmalarım →</a></>}
+                              </div>
+                            )}
+                            {!seferSonuc?.ok && (
+                              <div style={{ display: 'flex', gap: 8 }}>
+                                <button onClick={() => seferKaydet(ilan.id, ilan.price_offer)} disabled={seferYukleniyor}
+                                  style={{ padding: '8px 18px', borderRadius: 6, border: 'none', background: '#22c55e', color: '#000', fontWeight: 800, fontSize: '0.85rem', cursor: 'pointer' }}>
+                                  {seferYukleniyor ? 'Kaydediliyor...' : '🚚 Seferi Başlat'}
+                                </button>
+                                <button onClick={() => setSeferEkleId(null)}
+                                  style={{ padding: '8px 14px', borderRadius: 6, border: `1px solid ${C.border}`, background: 'none', color: C.muted, fontSize: '0.82rem', cursor: 'pointer' }}>
+                                  Vazgeç
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
                     {duzeltId === ilan.id && (() => {
                       const duzeltmeModu = durum === 'correction_needed';
                       const cerceve = duzeltmeModu ? '#854d0e' : C.border;

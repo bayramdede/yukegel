@@ -47,12 +47,16 @@ export async function PATCH(
   const { data: { user } } = await ssr.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Giriş gerekli' }, { status: 401 });
 
-  const { action, cancel_reason, cancel_type, vehicle_plate, driver_name, dispatch_notes } = await req.json().catch(() => ({}));
+  const {
+    action, cancel_reason, cancel_type,
+    vehicle_plate, driver_name, dispatch_notes,
+    stage, external_carrier_name, external_carrier_phone,
+  } = await req.json().catch(() => ({}));
   const svc = getServiceSupabase();
 
   const { data: deal } = await svc
     .from('deals')
-    .select('id, listing_id, shipper_id, carrier_id, status, completed_declared_by, payment_terms_days')
+    .select('id, listing_id, shipper_id, carrier_id, status, completed_declared_by, payment_terms_days, shipment_stage')
     .eq('id', id)
     .maybeSingle();
 
@@ -178,6 +182,79 @@ export async function PATCH(
       break;
     }
 
+    // ── Sevkiyat aşama ilerlemesi — YALNIZ ilan sahibi (shipper) yönetir.
+    // Sistem dışı nakliyeciler için de kullanılır (carrier_id IS NULL).
+    case 'stage_ilerle': {
+      if (!isShipper) {
+        return NextResponse.json({ error: 'Sevkiyat takibi yalnız ilan sahibi tarafından yapılabilir.' }, { status: 403 });
+      }
+      if (!['matched', 'in_transit'].includes(deal.status)) {
+        return NextResponse.json({ error: 'Sevkiyat takibi yalnız aktif anlaşmalarda yapılabilir.' }, { status: 409 });
+      }
+      const ASAMALAR = ['assigned', 'loaded', 'on_road', 'delivered'] as const;
+      type Asama = typeof ASAMALAR[number];
+      if (!ASAMALAR.includes(stage as Asama)) {
+        return NextResponse.json({ error: 'Geçersiz aşama.' }, { status: 400 });
+      }
+      const oncekiIdx = ASAMALAR.indexOf((deal.shipment_stage ?? '') as Asama);
+      const yeniIdx = ASAMALAR.indexOf(stage as Asama);
+      if (yeniIdx <= oncekiIdx) {
+        return NextResponse.json({ error: 'Önceki bir aşamaya geçilemez.' }, { status: 409 });
+      }
+
+      const plaka = typeof vehicle_plate === 'string' ? vehicle_plate.trim().toUpperCase().replace(/\s/g, '').slice(0, 15) : null;
+      const sofor = typeof driver_name === 'string' ? driver_name.trim().slice(0, 100) : null;
+      const dispatchNot = typeof dispatch_notes === 'string' ? dispatch_notes.trim().slice(0, 500) : null;
+      const hariciAd = typeof external_carrier_name === 'string' ? external_carrier_name.trim().slice(0, 200) : null;
+      const hariciTel = typeof external_carrier_phone === 'string' ? external_carrier_phone.trim().replace(/\s/g, '').slice(0, 20) : null;
+
+      const ASAMA_TIMESTAMP: Record<string, string> = {
+        assigned: 'assigned_at', loaded: 'loaded_at', on_road: 'on_road_at', delivered: 'delivered_at',
+      };
+
+      // 'assigned': araç/nakliyeci bilgisi + statüyü in_transit'e taşı.
+      // Plakayı carrier_vehicles'a da kaydet — harici nakliyeciler için de
+      // tekrar kullanılabilsin. (Sadece plaka girdiyse; harici ad yoksa.)
+      if (stage === 'assigned' && plaka) {
+        await svc.from('carrier_vehicles').upsert(
+          { user_id: user.id, plate: plaka, driver_name: sofor, last_used_at: simdi },
+          { onConflict: 'user_id,plate' }
+        );
+      }
+
+      const isExternalDeal = !deal.carrier_id;
+
+      yama = {
+        shipment_stage: stage,
+        [ASAMA_TIMESTAMP[stage]]: simdi,
+        ...(stage === 'assigned' ? {
+          // Statü değişimi: matched → in_transit
+          ...(deal.status === 'matched' ? { status: 'in_transit', transit_at: simdi } : {}),
+          ...(plaka ? { vehicle_plate: plaka } : {}),
+          ...(sofor ? { driver_name: sofor } : {}),
+          ...(dispatchNot ? { dispatch_notes: dispatchNot } : {}),
+          ...(hariciAd ? { external_carrier_name: hariciAd } : {}),
+          ...(hariciTel ? { external_carrier_phone: hariciTel } : {}),
+        } : {}),
+        // 'delivered' = teslim edildi. Harici deal'de tek taraf yeter → hemen completed.
+        // Yükegel deal'de shipper'ın tamamla beyanı sayılır (carrier henüz yapmadıysa
+        // yarı-tamamlanmış; yapmışsa bu ikinci onay → completed).
+        ...(stage === 'delivered' ? {
+          completed_declared_by: user.id,
+          completed_declared_at: simdi,
+          ...(isExternalDeal || deal.completed_declared_by ? {
+            status: 'completed',
+            completed_at: simdi,
+            review_deadline: new Date(Date.now() + KOR_PENCERE_GUN * 86400_000).toISOString(),
+            ...(deal.payment_terms_days !== null && deal.payment_terms_days !== undefined
+              ? { payment_maturity_date: new Date(Date.now() + deal.payment_terms_days * 86400_000).toISOString().slice(0, 10) }
+              : {}),
+          } : {}),
+        } : {}),
+      };
+      break;
+    }
+
     default:
       return NextResponse.json({ error: 'Geçersiz action' }, { status: 400 });
   }
@@ -191,7 +268,9 @@ export async function PATCH(
     .eq('status', deal.status)
     .select(`id, status, matched_at, transit_at, completed_declared_by, completed_at,
       review_deadline, payment_maturity_date, cancelled_at, cancel_type, cancel_reason,
-      vehicle_plate, driver_name, dispatch_notes`)
+      vehicle_plate, driver_name, dispatch_notes,
+      shipment_stage, assigned_at, loaded_at, on_road_at, delivered_at,
+      external_carrier_name, external_carrier_phone`)
     .maybeSingle();
 
   if (error) {
