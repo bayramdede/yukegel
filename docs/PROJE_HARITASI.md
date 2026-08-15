@@ -1,6 +1,19 @@
 # Yükegel — Proje Haritası
 > **Kullanım:** Her sohbet başında sadece bu dosyayı oku. Kaynak dosyaları sadece o dosyada değişiklik yapacaksan oku.  
 >
+> 📋 **15 AĞU 2026 — PANEL "İLANLARIM": "KONUM" → "ROTA", TAM GÜZERGÂH.**
+> `app/panel/PanelClient.tsx`. Bir önceki güne ait (4) maddesinin düzeltmesi:
+> `Çıkış → SON durak` yalnız iki noktayı gösteriyordu, aradaki teslim
+> noktalarını (varsa) atlıyordu — canlı örnek: "Tekirdağ (Muratlı) → Afyonkarahisar
+> (Susuz)" aslında Afyon'da bitmeyen, sonrasında en az bir durağı daha olan bir
+> güzergâhtı. Artık `stops` dizisindeki **her** durak sırayla listeleniyor
+> (`[çıkış, ...stops].map(...)` — `sonDurak` yalnız Başlık kolonundaki kısa
+> özet için kalmaya devam ediyor, "çıkış tek, varış çok" kuralı hâlâ geçerli).
+> Kolon başlığı da "Konum"dan **"Rota"**ya çevrildi. `tsc`/`eslint`/`next build`
+> temiz (eslint hata sayısı değişmeden 34 — yeni satırdaki `stops.map()`
+> parametresi baştan `any` DEĞİL, `stops` zaten `any[]` olduğu için ek tip
+> anotasyonu gerekmedi).
+
 > 📋 **14 AĞU 2026 — PANEL "İLANLARIM": DURUM AYRIMI + VARSAYILAN FİLTRE + MOBİL
 > UYUM.** `app/panel/PanelClient.tsx`. **(1)** "Pasif" tek durum altında iki
 > farklı şeyi karıştırıyordu: kullanıcının bilinçli kapattığı ilan ile plaka

@@ -468,7 +468,7 @@ function IlanlarSekmesi({ ilanlar: ilk, userId, anlasmalar }: { ilanlar: any[]; 
                 <tr>
                   <th style={th}>Başlık</th>
                   <th style={th}>Fiyat</th>
-                  <th style={th}>Konum</th>
+                  <th style={th}>Rota</th>
                   <th style={th}>Araç Tipi</th>
                   <th style={th}>Tarih</th>
                   <th style={th}>Durum</th>
@@ -516,14 +516,24 @@ function IlanlarSekmesi({ ilanlar: ilk, userId, anlasmalar }: { ilanlar: any[]; 
                           ? <span style={{ color: C.green, fontWeight: 700 }}>₺{Number(ilan.price_offer).toLocaleString('tr-TR')}</span>
                           : <span style={{ color: C.dim }}>—</span>}
                       </td>
-                      <td style={td} data-label="Konum">
-                        {/* 14 Ağu 2026 — yalnız çıkış görünüyordu; artık varış (son
-                            durak) da yazıyor. Çıkış tek satır (`listings.origin_*`),
-                            varış `listing_stops`'un SON durağı — bkz. dosya başındaki
-                            "Çıkış tek, varış çok" notu. */}
-                        <div style={{ color: C.text }}>
-                          {kalkisAd}{ilan.origin_district ? ` (${ilan.origin_district})` : ''}
-                          {sonDurak && <> {'→'} {ilAdi(sonDurak.province_id) ?? ''}{sonDurak.district ? ` (${sonDurak.district})` : ''}</>}
+                      <td style={td} data-label="Rota">
+                        {/* 15 Ağu 2026 — önce yalnız çıkış, sonra çıkış→SON durak
+                            gösteriliyordu; ara teslim noktaları (varsa) hiç
+                            görünmüyordu. Artık `stops` içindeki HER durak sırayla
+                            listeleniyor — "çıkış tek, varış çok" kuralına göre
+                            çıkış `listings.origin_*`'tan, güzergâhın geri kalanı
+                            `listing_stops`'un tamamından (yalnız son durağından
+                            DEĞİL). */}
+                        <div style={{ display: 'flex', flexWrap: 'wrap' as const, alignItems: 'center', gap: 4, color: C.text, fontSize: '0.85rem' }}>
+                          {[
+                            { il: kalkisAd, ilce: ilan.origin_district },
+                            ...stops.map((s) => ({ il: ilAdi(s.province_id) ?? '', ilce: s.district })),
+                          ].map((nokta, i, arr) => (
+                            <React.Fragment key={i}>
+                              <span>{nokta.il}{nokta.ilce ? ` (${nokta.ilce})` : ''}</span>
+                              {i < arr.length - 1 && <span style={{ color: C.dim }}>→</span>}
+                            </React.Fragment>
+                          ))}
                         </div>
                       </td>
                       <td style={td} data-label="Araç Tipi">
