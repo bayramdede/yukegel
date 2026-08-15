@@ -74,12 +74,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Bu ilan için zaten aktif bir sefer kaydı var.' }, { status: 409 });
     }
 
+    const simdi = new Date().toISOString();
     const { data: hariciDeal, error: hariciErr } = await svc.from('deals').insert({
       listing_id,
       shipper_id: user.id,
       carrier_id: null,
       status: 'matched',
-      matched_at: new Date().toISOString(),
+      matched_at: simdi,
       agreed_price: fiyat,
       payment_terms_days: vade,
       note: notMetni,
@@ -88,6 +89,13 @@ export async function POST(req: NextRequest) {
       external_carrier_phone: hariciTel,
       vehicle_plate: plaka,
       driver_name: sofor,
+      // 15 Ağu 2026 — "Plaka Ata" burada plakayı ZATEN alıyor; sevkiyat
+      // takibi (`SevkiyatTakip`, Anlaşmalarım) `shipment_stage` boşsa 1.
+      // aşamayı ("Plaka Atandı") tekrar tekrar doldurulmuş bir formla
+      // istiyordu — aynı bilgiyi iki kez girdirmek yerine plaka varsa
+      // 'assigned' aşaması burada baştan işaretleniyor; bir sonraki
+      // aşama doğrudan "Araç Yüklendi" olarak açılır.
+      ...(plaka ? { shipment_stage: 'assigned', assigned_at: simdi } : {}),
     }).select('id, status, agreed_price, note, created_at, external_carrier_name, external_carrier_phone, vehicle_plate, driver_name').single();
 
     if (hariciErr) {

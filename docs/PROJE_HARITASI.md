@@ -1,6 +1,17 @@
 # Yükegel — Proje Haritası
 > **Kullanım:** Her sohbet başında sadece bu dosyayı oku. Kaynak dosyaları sadece o dosyada değişiklik yapacaksan oku.  
 >
+> 🚚 **15 AĞU 2026 — "PLAKA ATA" ARTIK SEVKİYAT TAKİBİNİ 1. AŞAMADAN BAŞLATIYOR.**
+> Bir önceki maddenin yan bulgusu — Bayram sordu: "Araç yüklendi/yolda/teslim
+> edildi süreçleri nereden yönetilecek?" Cevap `SevkiyatTakip`
+> (`AnlasmalarSekmesi.tsx`, yalnız shipper görür) idi ama "Plaka Ata"yla
+> oluşan harici sefer `shipment_stage`'i hiç yazmıyordu — kullanıcı Plaka
+> Ata'da plakayı ZATEN girmişken, Anlaşmalarım'a gidince takip "Plaka Atandı"yı
+> tekrar dolu bir formla yeniden istiyordu (aynı bilgi iki kez). `app/api/deals/route.ts`
+> harici sefer INSERT'i artık plaka varsa `shipment_stage:'assigned'` +
+> `assigned_at`'i baştan yazıyor — takip doğrudan "Araç Yüklendi" adımından
+> açılıyor. `tsc`/`eslint`/`next build` temiz.
+
 > 🤝 **15 AĞU 2026 — DEALS: PLAKA HAFIZASI + TEK TARAFLI TAMAMLAMA + ESKİ
 > "TAMAMLA" TOGGLE'I GİZLENDİ (3 Bayram bulgusu).**
 > **(1) Plaka hafızası.** `carrier_vehicles` vardı ama en sık kullanılan yazma
