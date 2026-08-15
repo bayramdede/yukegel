@@ -32,10 +32,15 @@ interface Props {
   userId: string;
 }
 
-type DurumFiltre = 'hepsi' | 'requested' | 'matched' | 'in_transit' | 'completed' | 'cancelled';
+// 15 Ağu 2026 — `devam_ediyor` DB'de bir `status` DEĞİL, görünüm katmanında
+// requested+matched+in_transit'i birleştiren BİLEŞİK bir filtre (bkz.
+// `filtreli` hesaplaması). Varsayılan sekme buraya açılıyor — kullanıcı
+// panele girince önce iş bekleyen/süren anlaşmalarını görsün.
+type DurumFiltre = 'hepsi' | 'devam_ediyor' | 'requested' | 'matched' | 'in_transit' | 'completed' | 'cancelled';
 
 const DURUM_LABEL: Record<string, string> = {
   hepsi: 'Tümü',
+  devam_ediyor: '🔄 Devam Edenler',
   requested: '⏳ Talep Bekliyor',
   matched: '🤝 Mühürlendi',
   in_transit: '🚚 Yolda',
@@ -45,6 +50,7 @@ const DURUM_LABEL: Record<string, string> = {
 
 const DURUM_RENK: Record<string, { bg: string; color: string }> = {
   hepsi: { bg: C.surface, color: C.muted },
+  devam_ediyor: { bg: C.blueBg, color: C.blue },
   requested: { bg: '#2d1a00', color: C.amber },
   matched: { bg: C.blueBg, color: C.blue },
   in_transit: { bg: C.blueBg, color: C.blue },
@@ -52,7 +58,9 @@ const DURUM_RENK: Record<string, { bg: string; color: string }> = {
   cancelled: { bg: '#2d0a0a', color: C.red },
 };
 
-const DURUM_SIRASI: DurumFiltre[] = ['hepsi', 'requested', 'matched', 'in_transit', 'completed', 'cancelled'];
+const DURUM_SIRASI: DurumFiltre[] = ['hepsi', 'devam_ediyor', 'requested', 'matched', 'in_transit', 'completed', 'cancelled'];
+// `devam_ediyor` bileşiğinin karşılığı olan gerçek statüler.
+const DEVAM_EDEN_STATULER = ['requested', 'matched', 'in_transit'];
 
 // 11 Ağu 2026 — mühürlenmiş (matched/in_transit) bir kaydı iptal ederken
 // ZORUNLU tür seçimi. Sunucudaki (`app/api/deals/[id]/route.ts`) `cancel_type`
@@ -97,6 +105,13 @@ function telefonFmt(digits: string): string {
   return digits;
 }
 
+// 15 Ağu 2026 — telefon arama kutusu formatsız girilebilsin diye ("0532...",
+// "+90532...", boşluklu/boşluksuz) hem arama hem hedef değer rakama indirgenip
+// karşılaştırılıyor.
+function sadeceRakam(s: string | null | undefined): string {
+  return (s || '').replace(/\D/g, '');
+}
+
 function DurumBadge({ durum }: { durum: string }) {
   const r = DURUM_RENK[durum] || DURUM_RENK.hepsi;
   return <span style={{ background: r.bg, color: r.color, fontSize: '0.72rem', fontWeight: 700, padding: '3px 8px', borderRadius: 4 }}>{DURUM_LABEL[durum] || durum}</span>;
@@ -139,9 +154,17 @@ export default function AnlasmalarSekmesi({ anlasmalar: ilk, yorumlarim: ilkYoru
   const [digerMetin, setDigerMetin] = useState('');
   const [cancelType, setCancelType] = useState<'anlasma' | 'is' | ''>('');
   const [yorumAcikId, setYorumAcikId] = useState<string | null>(null);
-  const [durumFiltre, setDurumFiltre] = useState<DurumFiltre>('hepsi');
+  // 15 Ağu 2026 — varsayılan "Tümü" değil "Devam Edenler" (bkz. panel
+  // İlanlarım'daki aynı kararın gerekçesi: `PanelClient.tsx`).
+  const [durumFiltre, setDurumFiltre] = useState<DurumFiltre>('devam_ediyor');
   const [rozetler, setRozetler] = useState<Record<string, { ortalama: number; sayi: number }>>({});
   const [aracAtaAcikId, setAracAtaAcikId] = useState<string | null>(null);
+
+  // Arama/filtre — İlanlarım sekmesindeki "🔍 Filtrele" paneliyle aynı desen.
+  const [aramaPlaka, setAramaPlaka] = useState('');
+  const [aramaTelefon, setAramaTelefon] = useState('');
+  const [aramaIsim, setAramaIsim] = useState('');
+  const [filtrePanelAcik, setFiltrePanelAcik] = useState(false);
 
   // Karşı tarafların profil rozetleri — tek toplu sorguda. RLS zaten yalnız
   // yayınlanmış+gizlenmemiş satırları döndürür (`reviews_yayinlanan_herkese`),
@@ -212,6 +235,7 @@ export default function AnlasmalarSekmesi({ anlasmalar: ilk, yorumlarim: ilkYoru
 
   const sayilar: Record<DurumFiltre, number> = {
     hepsi: anlasmalar.length,
+    devam_ediyor: anlasmalar.filter(d => DEVAM_EDEN_STATULER.includes(d.status)).length,
     requested: anlasmalar.filter(d => d.status === 'requested').length,
     matched: anlasmalar.filter(d => d.status === 'matched').length,
     in_transit: anlasmalar.filter(d => d.status === 'in_transit').length,
@@ -219,18 +243,82 @@ export default function AnlasmalarSekmesi({ anlasmalar: ilk, yorumlarim: ilkYoru
     cancelled: anlasmalar.filter(d => d.status === 'cancelled').length,
   };
 
-  const filtreli = durumFiltre === 'hepsi' ? anlasmalar : anlasmalar.filter(d => d.status === durumFiltre);
+  const aktifFiltreSayisi = [aramaPlaka, aramaTelefon, aramaIsim].filter(Boolean).length;
+  function filtreTemizle() {
+    setAramaPlaka(''); setAramaTelefon(''); setAramaIsim('');
+  }
+
+  const filtreli = anlasmalar.filter(d => {
+    if (durumFiltre === 'devam_ediyor' ? !DEVAM_EDEN_STATULER.includes(d.status)
+      : durumFiltre !== 'hepsi' && d.status !== durumFiltre) return false;
+
+    // Plaka — normalize edilmiş (büyük harf, boşluksuz) kısmi eşleşme.
+    if (aramaPlaka && !(d.vehicle_plate || '').toUpperCase().replace(/\s/g, '')
+      .includes(aramaPlaka.toUpperCase().replace(/\s/g, ''))) return false;
+
+    // Telefon — hem karşı tarafın (görünürse) hem harici nakliyecinin
+    // numarası aranıyor; format farkı önemsiz, ikisi de rakama indirgeniyor.
+    if (aramaTelefon) {
+      const hedefRakam = sadeceRakam(aramaTelefon);
+      const adaylar = [d.carrier_phone, d.shipper_phone, d.external_carrier_phone];
+      if (!adaylar.some((t: string | null) => t && sadeceRakam(t).includes(hedefRakam))) return false;
+    }
+
+    // İsim — karşı tarafın adı (Yükegel kullanıcısıysa `display_name`, harici
+    // nakliyeciyse `external_carrier_name`) + şoför adı.
+    if (aramaIsim) {
+      const isimler = [d.shipper?.display_name, d.carrier?.display_name, d.external_carrier_name, d.driver_name]
+        .filter(Boolean).join(' ').toLowerCase();
+      if (!isimler.includes(aramaIsim.toLowerCase())) return false;
+    }
+
+    return true;
+  });
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-        {DURUM_SIRASI.filter(s => s === 'hepsi' || sayilar[s] > 0).map(s => (
-          <button key={s} onClick={() => setDurumFiltre(s)}
-            style={{ padding: '5px 12px', borderRadius: 6, border: `1px solid ${durumFiltre === s ? DURUM_RENK[s].color : C.border}`, background: durumFiltre === s ? DURUM_RENK[s].bg : 'none', color: durumFiltre === s ? DURUM_RENK[s].color : C.muted, fontSize: '0.78rem', fontWeight: durumFiltre === s ? 700 : 400, cursor: 'pointer' }}>
-            {DURUM_LABEL[s]} <span style={{ opacity: 0.65 }}>{sayilar[s]}</span>
-          </button>
-        ))}
+      {/* ── Üst Bar: Durum Filtresi + Arama Butonu — İlanlarım'daki (`PanelClient.tsx`
+          `IlanlarSekmesi`) aynı desen. ── */}
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+          {DURUM_SIRASI.filter(s => s === 'hepsi' || s === 'devam_ediyor' || sayilar[s] > 0).map(s => (
+            <button key={s} onClick={() => setDurumFiltre(s)}
+              style={{ padding: '5px 12px', borderRadius: 6, border: `1px solid ${durumFiltre === s ? DURUM_RENK[s].color : C.border}`, background: durumFiltre === s ? DURUM_RENK[s].bg : 'none', color: durumFiltre === s ? DURUM_RENK[s].color : C.muted, fontSize: '0.78rem', fontWeight: durumFiltre === s ? 700 : 400, cursor: 'pointer' }}>
+              {DURUM_LABEL[s]} <span style={{ opacity: 0.65 }}>{sayilar[s]}</span>
+            </button>
+          ))}
+        </div>
+        <button onClick={() => setFiltrePanelAcik(p => !p)}
+          style={{ padding: '6px 14px', borderRadius: 6, border: `1px solid ${aktifFiltreSayisi > 0 ? C.amber : C.border}`, background: aktifFiltreSayisi > 0 ? C.amberBg : 'none', color: aktifFiltreSayisi > 0 ? C.amber : C.muted, fontSize: '0.82rem', cursor: 'pointer', fontWeight: aktifFiltreSayisi > 0 ? 700 : 400, display: 'flex', alignItems: 'center', gap: 6 }}>
+          🔍 Filtrele {aktifFiltreSayisi > 0 && <span style={{ background: C.amber, color: '#000', borderRadius: '50%', width: 16, height: 16, fontSize: '0.65rem', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800 }}>{aktifFiltreSayisi}</span>}
+        </button>
       </div>
+
+      {/* ── Filtre Paneli — Plaka / Telefon / İsim ── */}
+      {filtrePanelAcik && (
+        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 12 }}>
+            <div>
+              <label style={lbl}>Plaka</label>
+              <input value={aramaPlaka} onChange={e => setAramaPlaka(e.target.value)} placeholder="34ABC123" style={{ ...inp, textTransform: 'uppercase' as const }} />
+            </div>
+            <div>
+              <label style={lbl}>Telefon</label>
+              <input value={aramaTelefon} onChange={e => setAramaTelefon(e.target.value)} placeholder="0532..." style={inp} />
+            </div>
+            <div>
+              <label style={lbl}>İsim / Firma</label>
+              <input value={aramaIsim} onChange={e => setAramaIsim(e.target.value)} placeholder="Ali Veli Nakliyat..." style={inp} />
+            </div>
+          </div>
+          {aktifFiltreSayisi > 0 && (
+            <button onClick={filtreTemizle}
+              style={{ alignSelf: 'flex-start', padding: '5px 12px', borderRadius: 6, border: `1px solid ${C.border}`, background: 'none', color: C.muted, fontSize: '0.78rem', cursor: 'pointer' }}>
+              × Filtreleri Temizle
+            </button>
+          )}
+        </div>
+      )}
 
       {filtreli.length === 0 ? (
         <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: 40, textAlign: 'center', color: C.dim }}>

@@ -1,6 +1,21 @@
 # Yükegel — Proje Haritası
 > **Kullanım:** Her sohbet başında sadece bu dosyayı oku. Kaynak dosyaları sadece o dosyada değişiklik yapacaksan oku.  
 >
+> 🔍 **15 AĞU 2026 — ANLAŞMALARIM: VARSAYILAN "DEVAM EDENLER" + PLAKA/TELEFON/
+> İSİM ARAMASI.** `app/panel/AnlasmalarSekmesi.tsx`. İlanlarım'daki aynı iki
+> kararın (14 Ağu) Anlaşmalarım karşılığı. **(1)** `devam_ediyor` DB'de bir
+> `status` DEĞİL — `requested`+`matched`+`in_transit`'i birleştiren, yalnız
+> görünüm katmanında var olan bileşik bir filtre (`DEVAM_EDEN_STATULER`);
+> varsayılan sekme artık buraya açılıyor (önceden "Tümü"). **(2)** İlanlarım'
+> daki "🔍 Filtrele" paneliyle birebir aynı desende yeni arama: **Plaka**
+> (büyük harf+boşluksuz normalize edilip karşılaştırılıyor), **Telefon**
+> (`carrier_phone`/`shipper_phone`/`external_carrier_phone` — üçü de rakama
+> indirgenip aranıyor, format farketmez), **İsim/Firma**
+> (`shipper.display_name`/`carrier.display_name`/`external_carrier_name`/
+> `driver_name` birleşiminde arıyor). Hepsi İSTEMCİ TARAFI filtre — sunucuya
+> ekstra istek atmıyor, `app/panel/page.tsx`'in zaten çektiği alanların
+> üzerinde çalışıyor. `tsc`/`eslint`/`next build` temiz (hata sayısı sabit 19).
+
 > ⚡ **15 AĞU 2026 — "PANEL YAVAŞ" İNCELEMESİ: KÖK NEDEN VERİ, AMA BULUNAN
 > GERÇEK İSRAFLAR DA DÜZELTİLDİ.**
 > Bayram'ın hesabı `listings` içinde **206 satır** (187'si pasif test verisi,
