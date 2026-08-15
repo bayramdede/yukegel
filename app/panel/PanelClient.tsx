@@ -1,8 +1,13 @@
 'use client';
 import React, { useState, useMemo, useEffect } from 'react';
+import dynamic from 'next/dynamic';
 import { createClient } from '../../lib/supabase';
 import { ilAdi } from '../../lib/lokasyon';
-import AnlasmalarSekmesi from './AnlasmalarSekmesi';
+// 15 Ağu 2026 — "paneli hızlandır": Anlaşmalarım (`AnlasmalarSekmesi.tsx`,
+// ~950 satır) artık ayrı bir JS parçası olarak GEÇ yükleniyor. Önceden bu
+// dosya PanelClient'ın ana bundle'ına gömülüydü — İlanlarım (varsayılan
+// sekme) açan herkes onu da indirip parse ediyordu, hiç açmasa bile.
+const AnlasmalarSekmesi = dynamic(() => import('./AnlasmalarSekmesi'));
 // 🚨 `C`/`inp`/`lbl`/`btn` BURADA TANIMLANMIYOR — `panelStil.ts`'ten geliyor.
 // SAKIN buraya geri taşıma: `AnlasmalarSekmesi.tsx` da bunları kullanıyor;
 // bu dosyadan tanımlayıp export edersen ve o da bunu import ederse dairesel
@@ -14,6 +19,12 @@ const supabase = createClient();
 
 const ARAC_TIPLERI = ['TIR', 'Kırkayak', 'Kamyon', 'Kamyonet', 'Panelvan'];
 const UTSYAPI = ['Tenteli', 'Açık Kasa', 'Kapalı Kasa', 'Frigorifik', 'Damperli', 'Lowbed', 'Liftli', 'Silo'];
+
+// İlanlarım tablosunun th/td stilleri — önceden `IlanlarSekmesi` içinde
+// tanımlıydı, her render'da yeniden allocate ediliyordu (200+ satırlık
+// tabloda anlamsız GC baskısı). Sabit değer, modül kapsamına taşındı.
+const th: React.CSSProperties = { padding: '10px 12px', textAlign: 'left', color: C.muted, fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', borderBottom: `1px solid ${C.border}`, whiteSpace: 'nowrap' };
+const td: React.CSSProperties = { padding: '12px', borderBottom: `1px solid #21262d`, verticalAlign: 'middle', fontSize: '0.85rem' };
 
 type Tab = 'ilanlarim' | 'araclarim' | 'anlasmalarim' | 'profilim';
 
@@ -359,9 +370,6 @@ function IlanlarSekmesi({ ilanlar: ilk, userId, anlasmalar }: { ilanlar: any[]; 
     setAramaKalkis(''); setAramaVaris(''); setAramaAracTipi('');
     setAramaTarihten(''); setAramaTarihe('');
   }
-
-  const th: React.CSSProperties = { padding: '10px 12px', textAlign: 'left', color: C.muted, fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', borderBottom: `1px solid ${C.border}`, whiteSpace: 'nowrap' };
-  const td: React.CSSProperties = { padding: '12px', borderBottom: `1px solid #21262d`, verticalAlign: 'middle', fontSize: '0.85rem' };
 
   const statusSirasi: StatusFiltre[] = ['hepsi', 'correction_needed', 'active', 'in_progress', 'pending', 'passive', 'completed', 'rejected'];
 

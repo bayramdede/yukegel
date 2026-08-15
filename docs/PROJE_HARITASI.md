@@ -1,6 +1,45 @@
 # Yükegel — Proje Haritası
 > **Kullanım:** Her sohbet başında sadece bu dosyayı oku. Kaynak dosyaları sadece o dosyada değişiklik yapacaksan oku.  
 >
+> ⚡ **15 AĞU 2026 — "PANEL YAVAŞ" İNCELEMESİ: KÖK NEDEN VERİ, AMA BULUNAN
+> GERÇEK İSRAFLAR DA DÜZELTİLDİ.**
+> Bayram'ın hesabı `listings` içinde **206 satır** (187'si pasif test verisi,
+> ≥1 gün önce oluşturulmuş) — DB'deki başka HER kullanıcı yalnız **1** satır.
+> Ölçüldü: ısınmış (buffer cache sıcak) `listings.user_id` sorgusu **0,45 ms**
+> (8 Ağu'daki indeks düzeltmesi hâlâ geçerli); soğukken 104 ms — bu "sıcak
+> ölçüm yanıltıcı" tuzağının (8 Ağu radar notu) aynısı. **Yani DB katmanı
+> yavaş değil; asıl israf her `/panel` isteğinde 206 ilan + 369 durağın TAMAMI
+> SSR'de çekilip istemciye gönderilmesiydi** (varsayılan filtre yalnız 19
+> "aktif" satırı gösteriyor — geri kalan 187 satır ilk boyamada hiç
+> görünmeden indiriliyordu). Bulunan somut israflar (kod tarafı, GENEL —
+> yalnız Bayram'ı değil herkesi ilgilendiriyor):
+> - `app/panel/page.tsx` `listings` select'i `expires_at`/`contact_phone`,
+>   `listing_stops` select'i `id`/`cargo_type`/`weight_ton`/`pallet_count`/
+>   `vehicle_count` çekiyordu — `PanelClient.tsx`de (grep ile doğrulandı) BU
+>   ALANLARIN HİÇBİRİ okunmuyor. Kaldırıldı.
+> - `reviews.reviewer_id` (`/panel`'in "bu deal'i değerlendirdim mi?" sorgusu)
+>   hiçbir indeksin önde gelen kolonu değildi (yalnız `reviews_tekil
+>   (deal_id, reviewer_id)` — ikinci sırada). Tablo 3 satır olduğu için şu an
+>   etkisiz ama 8 Ağu dersinin (".eq('user_id',…) sorgulanan her kolon
+>   indeksli olmalı") aynı deliği — `reviews_reviewer_idx` eklendi
+>   (`docs/20260815_reviews_reviewer_idx.sql`).
+> - `app/panel/PanelClient.tsx`: İlanlarım tablosunun `th`/`td` stil
+>   nesneleri `IlanlarSekmesi` içinde tanımlıydı — her render'da yeniden
+>   allocate ediliyordu (200+ satırlık tabloda gereksiz GC baskısı). Modül
+>   kapsamına taşındı, sabit referans.
+> - `AnlasmalarSekmesi.tsx` (~950 satır) artık `next/dynamic` ile GEÇ
+>   yükleniyor — önceden `PanelClient`in (varsayılan sekme İlanlarım) ana
+>   JS paketine gömülüydü, o sekmeyi hiç açmayan kullanıcı bile indirip
+>   parse ediyordu.
+> **YAPILMADI, BİLEREK:** Bayram'ın 187 pasif test ilanını silmek/arşivlemek
+> — üretim verisi, onay almadan silinmez. Panel ölçülebilir şekilde
+> yavaşlamaya devam ederse (ör. yüzlerce gerçek ilanı olan bir kullanıcı
+> çıkarsa) asıl çözüm SSR'de tam satırları YALNIZ varsayılan filtreye
+> (aktif) göre çekip "Tümü"/"Pasif" gibi diğer sekmeleri istemci tarafında
+> talep üzerine (lazy) yüklemek — bu turda YAPILMADI çünkü mevcut veri
+> ölçeğinde (Bayram hariç herkes 1 ilan) haklı çıkaramıyor, riski faydasından
+> büyük. `tsc`/`eslint`/`next build` temiz.
+
 > 🚚 **15 AĞU 2026 — "PLAKA ATA" ARTIK SEVKİYAT TAKİBİNİ 1. AŞAMADAN BAŞLATIYOR.**
 > Bir önceki maddenin yan bulgusu — Bayram sordu: "Araç yüklendi/yolda/teslim
 > edildi süreçleri nereden yönetilecek?" Cevap `SevkiyatTakip`

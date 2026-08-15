@@ -55,11 +55,17 @@ export default async function Panel() {
       //    olmasalar form onları hep `false` görür ve KAYDEDERKEN kullanıcının
       //    gerçek değerini sessizce ezerdi (moderatör panelindeki `user_id`
       //    eksikliğiyle aynı hata sınıfı).
+      // 15 Ağu 2026 — "paneli hızlandır": `expires_at`/`contact_phone`
+      // (listings) ve `id`/`cargo_type`/`weight_ton`/`pallet_count`/
+      // `vehicle_count` (listing_stops) `PanelClient.tsx`de HİÇ okunmuyordu
+      // (grep ile doğrulandı) — Bayram'ın test hesabında 206 ilan × 369 durak
+      // için her istekte boşuna taşınıyordu. Yeni bir alan PanelClient'a
+      // eklenirse buraya da eklenmeli, yoksa `undefined` gelir.
       .select(`id, listing_type, origin_province_id, origin_district, status, moderation_status, created_at,
-        expires_at, price_offer, price_negotiable, completed_at, vehicle_type, body_type,
-        available_date, date_flexible, notes, contact_phone,
+        price_offer, price_negotiable, completed_at, vehicle_type, body_type,
+        available_date, date_flexible, notes,
         internal_audit_logs,
-        listing_stops ( id, stop_order, province_id, district, cargo_type, weight_ton, pallet_count, vehicle_count )`)
+        listing_stops ( stop_order, province_id, district )`)
       .eq('user_id', user.id)
       .order('created_at', { ascending: false }),
     svc.from('vehicles')
