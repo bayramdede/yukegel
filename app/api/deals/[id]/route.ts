@@ -18,7 +18,10 @@ const KOR_PENCERE_GUN = 14;
  *    kendi kaydını `matched` yapabilse ilan verenin onayı anlamsızlaşır.
  *      onayla / reddet : YALNIZ shipper (ilan veren)
  *      yola_cikti      : YALNIZ carrier (yükü o taşıyor)
- *      tamamla         : İKİ TARAF (biri beyan eder, diğeri onaylar)
+ *      tamamla         : shipper TEK BAŞINA tamamlar (15 Ağu 2026 — Bayram:
+ *                        "işin sahibi tamamlandı diyorsa karşı taraftan onay
+ *                        bekleme"); carrier'ın beyanı hâlâ tek başına
+ *                        YETERSİZ, shipper onayı gerekir.
  *      iptal           : İKİ TARAF (tamamlanmadan önce) — AMA `cancel_type:'is'`
  *                        (yükün kendisi iptal) YALNIZ shipper; nakliyeci yalnız
  *                        `'anlasma'` (eşleşme bozuldu) seçebilir, bkz. 11 Ağu notu.
@@ -56,7 +59,7 @@ export async function PATCH(
 
   const { data: deal } = await svc
     .from('deals')
-    .select('id, listing_id, shipper_id, carrier_id, status, completed_declared_by, payment_terms_days, shipment_stage')
+    .select('id, listing_id, shipper_id, carrier_id, status, completed_declared_by, completed_declared_at, payment_terms_days, shipment_stage')
     .eq('id', id)
     .maybeSingle();
 
@@ -116,34 +119,51 @@ export async function PATCH(
       break;
     }
 
-    // ── Tamamlama: BEYAN + KARŞI ONAY (PRD md.2) ─────────────────────────
+    // ── Tamamlama ──────────────────────────────────────────────────────
+    // 15 Ağu 2026 — Bayram: "işin sahibi tamamlandı diyorsa karşı taraftan
+    // onay bekleme." İlan sahibi (shipper) işin gerçek muhatabı ve ödemeyi
+    // yapan taraf; kararını TEK BAŞINA verebilir, artık beklemiyor. Nakliyeci
+    // beyanı hâlâ tek başına YETERLİ DEĞİL — bir nakliyeci "işi bitirdim"
+    // deyip inceleme/ödeme sürecini tek taraflı tetikleyemesin diye şipperın
+    // onayını bekliyor (eski PRD md.2 "beyan + karşı onay" YALNIZ bu yönde
+    // korundu).
     case 'tamamla': {
       if (!['matched', 'in_transit'].includes(deal.status)) {
         return NextResponse.json({ error: 'Bu kayıt tamamlanabilir durumda değil.' }, { status: 409 });
       }
+      const vade = deal.payment_terms_days;
+      const tamamlamaAlanlari = {
+        status: 'completed' as const,
+        completed_at: simdi,
+        review_deadline: new Date(Date.now() + KOR_PENCERE_GUN * 86400_000).toISOString(),
+        ...(vade !== null && vade !== undefined
+          ? { payment_maturity_date: new Date(Date.now() + vade * 86400_000).toISOString().slice(0, 10) }
+          : {}),
+      };
+      if (isShipper) {
+        // Nakliyeci daha önce beyan ettiyse o ilk beyan zamanı korunur;
+        // etmediyse beyan eden taraf da shipper'ın kendisi sayılır.
+        yama = {
+          ...tamamlamaAlanlari,
+          completed_declared_by: deal.completed_declared_by ?? user.id,
+          completed_declared_at: deal.completed_declared_at ?? simdi,
+        };
+        break;
+      }
+      // Nakliyeci: yalnız beyan edebilir, ilan sahibinin onayı gerekiyor.
       if (!deal.completed_declared_by) {
-        // 1. adım: beyan. Durum DEĞİŞMİYOR — karşı taraf onaylayana kadar iş bitmedi.
         yama = { completed_declared_by: user.id, completed_declared_at: simdi };
         break;
       }
       // 🚨 Aynı kişi iki kez basarak tek taraflı tamamlayamaz.
       if (deal.completed_declared_by === user.id) {
         return NextResponse.json({
-          error: 'Tamamlandı beyanınız alındı; karşı tarafın onayı bekleniyor.',
+          error: 'Tamamlandı beyanınız alındı; ilan sahibinin onayı bekleniyor.',
         }, { status: 409 });
       }
-      // 2. adım: karşı onay → mühürlenir, sayaçlar başlar.
-      const vade = deal.payment_terms_days;
-      yama = {
-        status: 'completed',
-        completed_at: simdi,
-        // Çift kör pencere
-        review_deadline: new Date(Date.now() + KOR_PENCERE_GUN * 86400_000).toISOString(),
-        // Ödeme vadesi: PRD "completed_at + N gün"
-        ...(vade !== null && vade !== undefined
-          ? { payment_maturity_date: new Date(Date.now() + vade * 86400_000).toISOString().slice(0, 10) }
-          : {}),
-      };
+      // Bu satıra normalde erişilmez artık (shipper her zaman yukarıda tek
+      // başına tamamlıyor) — yalnız güvenlik ağı olarak bırakıldı.
+      yama = tamamlamaAlanlari;
       break;
     }
 
@@ -214,10 +234,13 @@ export async function PATCH(
 
       // 'assigned': araç/nakliyeci bilgisi + statüyü in_transit'e taşı.
       // Plakayı carrier_vehicles'a da kaydet — harici nakliyeciler için de
-      // tekrar kullanılabilsin. (Sadece plaka girdiyse; harici ad yoksa.)
+      // tekrar kullanılabilsin. (Sadece plaka girdiyse.)
+      // 15 Ağu 2026 — nakliyeci adı/telefonu da kaydediliyor (`carrier_name`/
+      // `carrier_phone` kolonları eklendi); önceden yalnız şoför adı
+      // hatırlanıyordu, aynı plaka yeniden girildiğinde firma bilgisi kaybolurdu.
       if (stage === 'assigned' && plaka) {
         await svc.from('carrier_vehicles').upsert(
-          { user_id: user.id, plate: plaka, driver_name: sofor, last_used_at: simdi },
+          { user_id: user.id, plate: plaka, driver_name: sofor, carrier_name: hariciAd, carrier_phone: hariciTel, last_used_at: simdi },
           { onConflict: 'user_id,plate' }
         );
       }

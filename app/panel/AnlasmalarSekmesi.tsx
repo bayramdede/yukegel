@@ -625,7 +625,10 @@ function SevkiyatTakip({ deal, onAksiyon, yukleniyor }: {
   const [hariciAd, setHariciAd] = useState(deal.external_carrier_name || '');
   const [hariciTel, setHariciTel] = useState(deal.external_carrier_phone || '');
   const [dispatchNot, setDispatchNot] = useState(deal.dispatch_notes || '');
-  const [kayitliAraclar, setKayitliAraclar] = useState<{ plate: string; driver_name: string | null }[]>([]);
+  // 15 Ağu 2026 — `carrier_name`/`carrier_phone` eklendi (bkz.
+  // `docs/20260815_carrier_vehicles_carrier_contact.sql`) — aynı plaka
+  // yeniden seçilince artık nakliyeci firma adı/telefonu da geliyor.
+  const [kayitliAraclar, setKayitliAraclar] = useState<{ plate: string; driver_name: string | null; carrier_name: string | null; carrier_phone: string | null }[]>([]);
 
   const sonrakiIdx = mevcutIdx + 1;
   const sonraki = ASAMALAR[sonrakiIdx] as typeof ASAMALAR[number] | undefined;
@@ -634,7 +637,7 @@ function SevkiyatTakip({ deal, onAksiyon, yukleniyor }: {
   // Plaka atama formunu ilk açışta kayıtlı araçları çek.
   function formAc() {
     setFormAcik(true);
-    supabase.from('carrier_vehicles').select('plate, driver_name').order('last_used_at', { ascending: false }).limit(10)
+    supabase.from('carrier_vehicles').select('plate, driver_name, carrier_name, carrier_phone').order('last_used_at', { ascending: false }).limit(10)
       .then((r: any) => setKayitliAraclar(r.data || []));
   }
 
@@ -692,7 +695,7 @@ function SevkiyatTakip({ deal, onAksiyon, yukleniyor }: {
             {kayitliAraclar.length > 0 && (
               <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' as const }}>
                 {kayitliAraclar.map((a, i) => (
-                  <button key={i} type="button" onClick={() => { setPlaka(a.plate); setSofor(a.driver_name || ''); }}
+                  <button key={i} type="button" onClick={() => { setPlaka(a.plate); setSofor(a.driver_name || ''); setHariciAd(a.carrier_name || ''); setHariciTel(a.carrier_phone || ''); }}
                     style={{ background: plaka === a.plate ? C.blueBg : C.surface, border: `1px solid ${plaka === a.plate ? C.blue : C.border}`, color: plaka === a.plate ? C.blue : C.muted, borderRadius: 5, padding: '3px 8px', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer', letterSpacing: '0.04em' }}>
                     {a.plate}{a.driver_name ? ` · ${a.driver_name}` : ''}
                   </button>
@@ -710,7 +713,18 @@ function SevkiyatTakip({ deal, onAksiyon, yukleniyor }: {
               </div>
               <div>
                 <label style={lbl}>Plaka</label>
-                <input value={plaka} onChange={e => setPlaka(e.target.value.toUpperCase())} placeholder="34 ABC 123" style={{ ...inp, textTransform: 'uppercase' as const, fontWeight: 700, letterSpacing: '0.05em' }} />
+                <input value={plaka} onChange={e => {
+                  const v = e.target.value.toUpperCase().replace(/\s/g, '');
+                  setPlaka(v);
+                  // 15 Ağu 2026 — hızlı seçim butonuna basmadan, plakayı elle
+                  // yeniden yazınca da kayıtlı bilgiler otomatik dolsun.
+                  const eslesme = kayitliAraclar.find(a => a.plate === v);
+                  if (eslesme) {
+                    setSofor(eslesme.driver_name || '');
+                    setHariciAd(eslesme.carrier_name || '');
+                    setHariciTel(eslesme.carrier_phone || '');
+                  }
+                }} placeholder="34 ABC 123" style={{ ...inp, textTransform: 'uppercase' as const, fontWeight: 700, letterSpacing: '0.05em' }} />
               </div>
               <div>
                 <label style={lbl}>Şoför <span style={{ color: C.dim, fontWeight: 400 }}>(opsiyonel)</span></label>

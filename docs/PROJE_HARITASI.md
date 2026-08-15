@@ -1,6 +1,44 @@
 # Yükegel — Proje Haritası
 > **Kullanım:** Her sohbet başında sadece bu dosyayı oku. Kaynak dosyaları sadece o dosyada değişiklik yapacaksan oku.  
 >
+> 🤝 **15 AĞU 2026 — DEALS: PLAKA HAFIZASI + TEK TARAFLI TAMAMLAMA + ESKİ
+> "TAMAMLA" TOGGLE'I GİZLENDİ (3 Bayram bulgusu).**
+> **(1) Plaka hafızası.** `carrier_vehicles` vardı ama en sık kullanılan yazma
+> yolu — "Plaka Ata" (panel İlanlarım → `POST /api/deals` harici sefer dalı) —
+> bu tabloya HİÇ yazmıyordu, yalnız `deals`e yazıyordu (`stage_ilerle`/
+> `yola_cikti` dalları yazıyordu ama onlar Anlaşmalarım'daki farklı bir akış).
+> Ayrıca tabloda nakliyeci firma adı/telefonu için kolon yoktu, yalnız
+> plaka+şoför. Migration `docs/20260815_carrier_vehicles_carrier_contact.sql`
+> — `carrier_name`/`carrier_phone` eklendi (canlıda uygulandı, geriye dönük
+> doldurma 0 satır etkiledi — tek mevcut satırın eşleşen `deals` kaydı yoktu).
+> Kod: `app/api/deals/route.ts` harici sefer dalına eksik `carrier_vehicles`
+> upsert'i eklendi; `app/api/deals/[id]/route.ts` `stage_ilerle` 'assigned'
+> upsert'i `carrier_name`/`carrier_phone`'u da yazıyor artık; her iki panel
+> formu (`PanelClient.tsx` seferAc, `AnlasmalarSekmesi.tsx` SevkiyatTakip) bu
+> kolonları çekip plaka eşleşince otomatik dolduruyor — hem hızlı seçim
+> butonlarında hem plakayı ELLE yeniden yazınca (önceden yalnız buton
+> tıklaması dolduruyordu, retip etmek doldurmuyordu).
+> **(2) Tek taraflı tamamlama.** `PATCH /api/deals/[id]` `tamamla` eskiden
+> HERKESTE "beyan + karşı onay" istiyordu (GuvenEtkilesim PRD md.2). Artık
+> **yalnız shipper (ilan sahibi) yönünde** kaldırıldı — Bayram: "işin sahibi
+> tamamlandı diyorsa karşı taraftan onay bekleme." shipper `tamamla` derse
+> anında `completed` olur (nakliyeci önce beyan ettiyse o ilk beyan zamanı
+> korunur). Nakliyeci beyanı hâlâ TEK BAŞINA yetersiz — shipper onayı
+> gerekiyor (tek taraflı "işi bitirdim" deyip inceleme/ödeme sürecini
+> tetikleyememesi için, bilinçli asimetri).
+> **(3) Eski "Tamamla" toggle'ı — aşama aşama süreci GÖRÜNMEZ kılıyordu.**
+> Doğru süreç zaten vardı: `SevkiyatTakip` (Plaka Atandı→Yüklendi→Yolda→
+> Teslim Edildi, `AnlasmalarSekmesi.tsx`), AMA panel İlanlarım'daki eski
+> `✅ Tamamla` butonu (`listings.completed_at`'i doğrudan değiştiren, deals'tan
+> tamamen bağımsız bir mekanizma) aktif bir sefer varken bile görünmeye devam
+> ediyordu — kullanıcı hiç Anlaşmalarım'a gitmeden "Tamamla"ya basıp deals
+> akışını bypass edebiliyor, aşama aşama süreci hiç görmüyordu. `durum ===
+> 'in_progress'` (bkz. 14 Ağu `durumGenislet`) iken hem bu buton hem
+> "Aktif Yap"/"Pasif Yap" gizlendi, yerine **"🤝 Anlaşmalarım'da yönet"**
+> linki (`/panel?sekme=anlasmalarim`, zaten beyaz listeli derin bağlantı)
+> geldi. `tsc`/`eslint`/`next build` temiz (dört dosyada toplam hata sayısı
+> sabit — `PanelClient.tsx` 34, diğer üçü birlikte 19, hepsi ön-var).
+
 > 📋 **15 AĞU 2026 — PANEL "İLANLARIM": "KONUM" → "ROTA", TAM GÜZERGÂH.**
 > `app/panel/PanelClient.tsx`. Bir önceki güne ait (4) maddesinin düzeltmesi:
 > `Çıkış → SON durak` yalnız iki noktayı gösteriyordu, aradaki teslim

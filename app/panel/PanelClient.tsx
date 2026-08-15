@@ -168,14 +168,18 @@ function IlanlarSekmesi({ ilanlar: ilk, userId, anlasmalar }: { ilanlar: any[]; 
   const [seferNot, setSeferNot] = useState('');
   const [seferYukleniyor, setSeferYukleniyor] = useState(false);
   const [seferSonuc, setSeferSonuc] = useState<{ ok: boolean; mesaj: string } | null>(null);
-  const [kayitliAraclar, setKayitliAraclar] = useState<{ plate: string; driver_name: string | null }[]>([]);
+  // 15 Ağu 2026 — `carrier_name`/`carrier_phone` eklendi (bkz.
+  // `docs/20260815_carrier_vehicles_carrier_contact.sql`); önceden yalnız
+  // şoför adı hatırlanıyordu, aynı plaka yeniden girildiğinde nakliyeci
+  // firma adı/telefonu her seferinde yeniden yazılması gerekiyordu.
+  const [kayitliAraclar, setKayitliAraclar] = useState<{ plate: string; driver_name: string | null; carrier_name: string | null; carrier_phone: string | null }[]>([]);
 
   function seferAc(ilanId: string) {
     setSeferEkleId(ilanId);
     setSeferNakliyeAd(''); setSeferNakliyeTel(''); setSeferPlaka(''); setSeferSofor('');
     setSeferFiyat(''); setSeferNot(''); setSeferSonuc(null);
     // Kayıtlı araçları çek
-    supabase.from('carrier_vehicles').select('plate, driver_name').order('last_used_at', { ascending: false }).limit(10)
+    supabase.from('carrier_vehicles').select('plate, driver_name, carrier_name, carrier_phone').order('last_used_at', { ascending: false }).limit(10)
       .then((r: any) => setKayitliAraclar(r.data || []));
   }
 
@@ -591,24 +595,42 @@ function IlanlarSekmesi({ ilanlar: ilk, userId, anlasmalar }: { ilanlar: any[]; 
                               {durum === 'correction_needed' ? '✏️ İlanı Düzelt' : '✏️ Düzenle'}
                             </button>
                           )}
-                          {isEditable && !tamamlandi && (
-                            isAktif ? (
-                              <button onClick={() => pasifYap(ilan.id)} disabled={!!yukleniyor}
-                                style={{ padding: '5px 10px', borderRadius: 5, border: `1px solid ${C.border}`, background: 'none', color: C.muted, fontSize: '0.78rem', cursor: 'pointer' }}>
-                                {yukleniyor === ilan.id + '_pasif' ? '...' : 'Pasif Yap'}
-                              </button>
-                            ) : (
-                              <button onClick={() => aktifYap(ilan.id)} disabled={!!yukleniyor}
-                                style={{ padding: '5px 10px', borderRadius: 5, border: `1px solid ${C.greenBg}`, background: C.greenDark, color: C.green, fontSize: '0.78rem', cursor: 'pointer', fontWeight: 600 }}>
-                                {yukleniyor === ilan.id + '_aktif' ? '...' : 'Aktif Yap'}
-                              </button>
-                            )
-                          )}
-                          {isEditable && (
-                            <button onClick={() => tamamlandiToggle(ilan)} disabled={!!yukleniyor}
-                              style={{ padding: '5px 10px', borderRadius: 5, border: `1px solid ${tamamlandi ? C.border : C.greenBg}`, background: tamamlandi ? 'none' : C.greenDark, color: tamamlandi ? C.dim : C.green, fontSize: '0.78rem', cursor: 'pointer', fontWeight: 600 }}>
-                              {tamamlandi ? '↩ Geri Al' : '✅ Tamamla'}
-                            </button>
+                          {/* 15 Ağu 2026 — `in_progress` (plaka atanmış, sefer sürüyor)
+                              iken eski "Tamamla"/"Aktif-Pasif Yap" butonları
+                              GİZLENDİ. Onlar `listings.status`/`completed_at`'i
+                              doğrudan değiştiriyordu — deals akışını (aşama aşama
+                              takip + shipper'ın tek başına tamamlaması, bkz.
+                              `app/api/deals/[id]/route.ts`) TAMAMEN bypass edip
+                              çakışan bir "tamamlandı" kaydı üretebiliyordu, üstelik
+                              kullanıcı aşama aşama süreci hiç görmüyordu (Bayram
+                              bulgusu). Artık tek yol Anlaşmalarım'a yönlendirmek. */}
+                          {durum === 'in_progress' ? (
+                            <a href="/panel?sekme=anlasmalarim"
+                              style={{ padding: '5px 10px', borderRadius: 5, border: `1px solid ${C.blue}`, background: C.blueBg, color: C.blue, fontSize: '0.78rem', textDecoration: 'none', fontWeight: 600 }}>
+                              🤝 Anlaşmalarım&apos;da yönet
+                            </a>
+                          ) : (
+                            <>
+                              {isEditable && !tamamlandi && (
+                                isAktif ? (
+                                  <button onClick={() => pasifYap(ilan.id)} disabled={!!yukleniyor}
+                                    style={{ padding: '5px 10px', borderRadius: 5, border: `1px solid ${C.border}`, background: 'none', color: C.muted, fontSize: '0.78rem', cursor: 'pointer' }}>
+                                    {yukleniyor === ilan.id + '_pasif' ? '...' : 'Pasif Yap'}
+                                  </button>
+                                ) : (
+                                  <button onClick={() => aktifYap(ilan.id)} disabled={!!yukleniyor}
+                                    style={{ padding: '5px 10px', borderRadius: 5, border: `1px solid ${C.greenBg}`, background: C.greenDark, color: C.green, fontSize: '0.78rem', cursor: 'pointer', fontWeight: 600 }}>
+                                    {yukleniyor === ilan.id + '_aktif' ? '...' : 'Aktif Yap'}
+                                  </button>
+                                )
+                              )}
+                              {isEditable && (
+                                <button onClick={() => tamamlandiToggle(ilan)} disabled={!!yukleniyor}
+                                  style={{ padding: '5px 10px', borderRadius: 5, border: `1px solid ${tamamlandi ? C.border : C.greenBg}`, background: tamamlandi ? 'none' : C.greenDark, color: tamamlandi ? C.dim : C.green, fontSize: '0.78rem', cursor: 'pointer', fontWeight: 600 }}>
+                                  {tamamlandi ? '↩ Geri Al' : '✅ Tamamla'}
+                                </button>
+                              )}
+                            </>
                           )}
                           {/* Sefer Ekle — yalnız aktif yük ilanlarında, henüz aktif deal yoksa */}
                           {isAktif && isYuk && !mesgulIlanlar.has(ilan.id) && (
@@ -662,8 +684,12 @@ function IlanlarSekmesi({ ilanlar: ilk, userId, anlasmalar }: { ilanlar: any[]; 
                                   const v = e.target.value.toUpperCase().replace(/\s/g, '');
                                   setSeferPlaka(v);
                                   const eslesme = kayitliAraclar.find((a: any) => a.plate === v);
+                                  // 15 Ağu 2026 — önceden yalnız şoför adı doluyordu;
+                                  // artık nakliyeci adı/telefonu da geliyor.
                                   if (eslesme) {
                                     setSeferSofor(eslesme.driver_name || '');
+                                    setSeferNakliyeAd(eslesme.carrier_name || '');
+                                    setSeferNakliyeTel(eslesme.carrier_phone || '');
                                   }
                                 }}
                                 placeholder="34ABC123"
@@ -674,7 +700,7 @@ function IlanlarSekmesi({ ilanlar: ilk, userId, anlasmalar }: { ilanlar: any[]; 
                                 <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' as const, marginTop: 6 }}>
                                   {kayitliAraclar.map((a: any, i: number) => (
                                     <button key={i} type="button"
-                                      onClick={() => { setSeferPlaka(a.plate); setSeferSofor(a.driver_name || ''); }}
+                                      onClick={() => { setSeferPlaka(a.plate); setSeferSofor(a.driver_name || ''); setSeferNakliyeAd(a.carrier_name || ''); setSeferNakliyeTel(a.carrier_phone || ''); }}
                                       style={{ background: seferPlaka === a.plate ? C.blueBg : C.surface, border: `1px solid ${seferPlaka === a.plate ? C.blue : C.border}`, color: seferPlaka === a.plate ? C.blue : C.muted, borderRadius: 5, padding: '2px 8px', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer', letterSpacing: '0.04em' }}>
                                       {a.plate}
                                     </button>

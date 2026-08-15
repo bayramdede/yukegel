@@ -95,6 +95,19 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Sefer kaydedilemedi.' }, { status: 500 });
     }
 
+    // 15 Ağu 2026 — BUG: bu dal `carrier_vehicles`e hiç yazmıyordu, "aynı
+    // plakayı başka bir işte yeniden yazınca önceki bilgiler gelmiyor"
+    // şikâyetinin kök nedeni buydu (`stage_ilerle`/`yola_cikti` yazıyordu,
+    // asıl kullanılan "Plaka Ata" burası yazmıyordu). `carrier_vehicles.plate`
+    // NOT NULL + `unique(user_id, plate)` olduğu için yalnız plaka VARSA
+    // yazılır — yoksa aynı plaka bir dahaki sefere hızlı seçimde çıkar.
+    if (plaka) {
+      await svc.from('carrier_vehicles').upsert(
+        { user_id: user.id, plate: plaka, driver_name: sofor, carrier_name: hariciAd, carrier_phone: hariciTel, last_used_at: new Date().toISOString() },
+        { onConflict: 'user_id,plate' }
+      );
+    }
+
     // İlan pasife al — yük sevkiyata girdi.
     await svc.from('listings').update({ status: 'passive' }).eq('id', listing_id);
 
