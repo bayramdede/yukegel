@@ -32,6 +32,13 @@ import { istekIp, kotaDene } from '../../../../../lib/kota'
  */
 const OTP_BEKLEME_MS = 60_000
 const otpSonGonderim = new Map<string, number>()
+// 17 Ağu 2026 — docs/YAPILACAKLAR.md md.3: gönderim (`adim:'gonder'`) kotalıydı
+// (yukarıdaki `otpSonGonderim` + IP kotası), `verifyOtp`in KENDİSİ ('dogrula')
+// hiçbir sunucu sayacından geçmiyordu — ilan id'sini bilen biri sınırsız kod
+// deneyebilirdi. İlan başına VE IP başına iki katman (aynı desen: `otp-ip-numara`).
+const DOGRULAMA_DENEME_LIMIT = 5
+const DOGRULAMA_IP_LIMIT = 20
+const DOGRULAMA_PENCERE_MS = 10 * 60 * 1000
 
 function beklemeKalan(anahtar: string): number {
   const simdi = Date.now()
@@ -155,6 +162,29 @@ export async function POST(
     }
     if (!kod || String(kod).length < 4) {
       return NextResponse.json({ error: 'Kod eksik' }, { status: 400 })
+    }
+
+    // Doğrulama denemesi kotası — `verifyOtp`den ÖNCE. Kod yanlış girilse
+    // bile deneme sayılır. İki katman: ilan başına + IP başına (bir saldırgan
+    // FARKLI ilan id'leri gezerek ilan-bazlı kotayı atlatamasın).
+    const ip = istekIp(request)
+    const ilanKota = kotaDene({
+      ad: 'sahiplen-dogrula-ilan', anahtar: id, limit: DOGRULAMA_DENEME_LIMIT, pencereMs: DOGRULAMA_PENCERE_MS,
+    })
+    if (!ilanKota.izinli) {
+      return NextResponse.json(
+        { error: 'Çok fazla hatalı kod denemesi. Yeni bir kod isteyin.', kalan: ilanKota.bekleSn },
+        { status: 429, headers: { 'Retry-After': String(ilanKota.bekleSn) } }
+      )
+    }
+    const ipKota2 = kotaDene({
+      ad: 'sahiplen-dogrula-ip', anahtar: ip, limit: DOGRULAMA_IP_LIMIT, pencereMs: DOGRULAMA_PENCERE_MS,
+    })
+    if (!ipKota2.izinli) {
+      return NextResponse.json(
+        { error: 'Çok fazla doğrulama denemesi. Bir süre sonra tekrar deneyin.', kalan: ipKota2.bekleSn },
+        { status: 429, headers: { 'Retry-After': String(ipKota2.bekleSn) } }
+      )
     }
 
     // SSR client ile doğrula → oturum cookie'si de set olur.

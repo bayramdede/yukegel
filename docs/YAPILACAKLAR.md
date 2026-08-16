@@ -200,10 +200,14 @@ Bunlar "yapılacak iş" değil, **doğrulanacak iddia**. Üçü de canlı trafik
 - **`/yol-rehberi` → "Yakınımdaki Yükler" duman testi** — konum izniyle sonuç
   veriyor mu, `dest_city` dolu mu (elle, tarayıcıda).
 
-📌 **Bir gözlem:** platformda şu an **1 aktif ilan** var. Bu bir bug değil
-(`expire-active-listings` 15 dakikada bir süresi geçeni düşürüyor) ama WhatsApp
-beslemesi son günlerde ilan üretmemiş görünüyor — ana sayfa akışı ona bağlı.
-Ölçüm yapacaksan önce beslemenin çalıştığını doğrula.
+📌 **17 Ağu 2026 güncellemesi:** 14-16 Ağu arası besleme ~48 saat tamamen
+durmuştu (`blockers.md`'ye düşmüştü — aktif ilan 0'a inmişti); 16 Ağu akşamı
+kendiliğinden/elle düzeldi, o günden **841** yeni ilan geldi, şu an **244**
+aktif ilan var (canlı DB'de doğrulandı). Blocker kapatıldı. ⚠️ Besleme
+**sessizce** durabiliyor — hiçbir hata/uyarı üretmedi, yalnız `created_at`
+dağılımına bakınca fark edildi. Kalıcı gözlem: ölçüm/lansman değerlendirmesi
+yapmadan önce beslemenin son 24-48 saati canlı mı diye bakmak ayrı bir adım
+olmalı.
 
 ---
 

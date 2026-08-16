@@ -27,6 +27,12 @@ import { structuredLog } from '../../../../lib/logger'
  */
 
 const NUMARA_BEKLEME_MS = 60_000
+// 17 Ağu 2026 — docs/YAPILACAKLAR.md md.3: gönderim (`adim:'gonder'`) kotalıydı,
+// `verifyOtp`in KENDİSİ hiçbir sunucu sayacından geçmiyordu. Oturum zaten
+// zorunlu olduğu için anahtar `user.id` — IP'den daha kesin (aynı NAT'ta
+// birden çok kullanıcı birbirini kilitlemez).
+const DOGRULAMA_DENEME_LIMIT = 5
+const DOGRULAMA_PENCERE_MS = 10 * 60 * 1000
 
 /** 05xx… / 5xx… / +905xx… → +905xxxxxxxxx. Geçersizse null. */
 function telefonNormalize(ham: unknown): string | null {
@@ -93,6 +99,19 @@ export async function POST(request: Request) {
       const telefon = telefonNormalize(govde?.telefon)
       const otp = typeof govde?.otp === 'string' ? govde.otp.trim() : ''
       if (!telefon || !otp) return NextResponse.json({ error: 'Eksik bilgi.' }, { status: 400 })
+
+      // Doğrulama denemesi kotası — `verifyOtp`den ÖNCE. Kod yanlış girilse
+      // bile deneme sayılır (fırsat tükendi); doğru girilse zaten akış biter.
+      const denemeKota = kotaDene({
+        ad: 'tel-degistir-dogrula', anahtar: user.id, limit: DOGRULAMA_DENEME_LIMIT, pencereMs: DOGRULAMA_PENCERE_MS,
+      })
+      if (!denemeKota.izinli) {
+        structuredLog('WARN', 'auth', 'Telefon değiştirme doğrulama kotası aşıldı', { ip, user_id: user.id })
+        return NextResponse.json(
+          { error: 'Çok fazla hatalı kod denemesi. Yeni bir kod isteyin.', bekle: denemeKota.bekleSn },
+          { status: 429, headers: { 'Retry-After': String(denemeKota.bekleSn) } }
+        )
+      }
 
       const { error } = await supabase.auth.verifyOtp({ phone: telefon, token: otp, type: 'phone_change' })
       if (error) {

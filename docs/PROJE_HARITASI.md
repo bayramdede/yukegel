@@ -1,6 +1,40 @@
 # Yükegel — Proje Haritası
 > **Kullanım:** Her sohbet başında sadece bu dosyayı oku. Kaynak dosyaları sadece o dosyada değişiklik yapacaksan oku.  
 >
+> 🔒 **17 AĞU 2026 — OTP DOĞRULAMA DENEMESİNE SUNUCU TARAFI HIZ SINIRI
+> (`docs/YAPILACAKLAR.md` md.3 KAPANDI — kısmi kapsamda, bilinçli).** Dört
+> `verifyOtp` çağrı noktası vardı, üçünün deneme sayısını hiçbir şey
+> sınırlamıyordu (yalnız SMS GÖNDERİMİ kotalıydı):
+> - **`app/giris/page.tsx`** (asıl giriş akışı, İSTEMCİDEN çağrılıyor) — en
+>   riskli olan bu. Akışın kendisi (merge/is_active/redirect mantığı)
+>   DOKUNULMADI — 8 Ağu'daki login kırılmasına yol açan büyük çaplı "akışı
+>   sunucuya taşı" refaktörü BİLEREK yapılmadı. Onun yerine yeni **`POST
+>   /api/auth/otp-deneme`** eklendi: Supabase'e hiç dokunmuyor, kodu
+>   doğrulamıyor — tek işi `verifyOtp` çağrılmadan HEMEN ÖNCE "deneme hakkın
+>   var mı?" diye sorulacak sunucu kapısı olmak (numara: 5/10dk, IP: 20/10dk,
+>   `lib/kota.ts`). 429 dönerse istemci `verifyOtp`'yi hiç çağırmaz.
+> - **`app/api/ilan/[id]/sahiplen/route.ts`** ve
+>   **`app/api/auth/telefon-degistir/route.ts`** zaten sunucuda çalışıyordu
+>   (risk daha düşüktü) — `verifyOtp`den hemen önce aynı `kotaDene` deseniyle
+>   deneme kotası eklendi (sahiplen: ilan id + IP; telefon-değiştir: `user.id`,
+>   oturum zorunlu olduğu için IP'den daha kesin).
+> - **`app/auth/devir/route.ts`** BİLEREK dışarıda bırakıldı — orada doğrulanan
+>   `hashed_token` uzun/rastgele bir değer (e-posta magic-link), 4-6 haneli
+>   tahmin edilebilir bir PIN değil; kaba kuvvet riski farklı sınıfta.
+> ⚠️ **SINIR (dürüst kayıt):** Bu, saldırganın Supabase'in kendi public
+> anon-key'li endpoint'ini DOĞRUDAN çağırmasını durduramaz — yalnız BİZİM
+> arayüzümüzden gelen deneme hızını sınırlar. Tam çözüm (Supabase'in kendi
+> rate-limit ayarlarını doğrulamak + gerekirse `verifyOtp`'yi de sunucuya
+> taşımak) ayrı, daha büyük bir tur. `lib/kota.ts`'in kendi sınırları da
+> geçerli: bellek içi, tek instance varsayımı, deploy sıfırlar.
+> **Yan bulgu (aynı taramada, ayrı konu):** `blockers.md`/`docs/YAPILACAKLAR.md`
+> içinde 16 Ağu'dan kalma, hiç commit'lenmemiş bir not vardı — "canlı ilan
+> besleme 48 saattir durmuş, aktif ilan 0". Canlı DB'de doğrulandı: **artık
+> geçerli değil**, 16 Ağu akşamı besleme kendiliğinden düzelmiş (841 yeni ilan,
+> şu an 244 aktif). Not güncellenip blocker kapatıldı — ama besleme hiçbir
+> hata/uyarı ÜRETMEDEN sessizce durabiliyor, kalıcı ders `docs/YAPILACAKLAR.md`
+> sonuna eklendi. `tsc`/`next build` temiz.
+
 > 🔍 **15 AĞU 2026 — ANLAŞMALARIM: VARSAYILAN "DEVAM EDENLER" + PLAKA/TELEFON/
 > İSİM ARAMASI.** `app/panel/AnlasmalarSekmesi.tsx`. İlanlarım'daki aynı iki
 > kararın (14 Ağu) Anlaşmalarım karşılığı. **(1)** `devam_ediyor` DB'de bir

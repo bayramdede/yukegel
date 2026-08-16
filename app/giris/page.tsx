@@ -378,6 +378,28 @@ function GirisIci() {
     e.preventDefault(); setYukleniyor(true); temizle();
     const temiz = telefon.replace(/\D/g, '');
     const fmt = temiz.startsWith('90') ? `+${temiz}` : temiz.startsWith('0') ? `+9${temiz}` : `+90${temiz}`;
+
+    // 17 Ağu 2026 — verifyOtp'den ÖNCE sunucu tarafı deneme kotası
+    // (docs/YAPILACAKLAR.md md.3). `/api/auth/otp` yalnız SMS gönderimini
+    // sınırlıyordu; kodu deneme hızını hiçbir şey kısıtlamıyordu. Bu adım
+    // verifyOtp'nin KENDİSİNİ sunucuya taşımıyor — akışın geri kalanı
+    // (merge/is_active/redirect) dokunulmadan kalıyor, yalnız önüne bir kapı
+    // eklendi. `otpGonder`deki `/api/auth/otp` fetch'iyle AYNI desen: fetch
+    // başarısız olursa (ağ hatası) fail-closed — kullanıcı engellenir, sessiz
+    // biçimde kotasız geçmesin diye.
+    const kotaRes = await fetch('/api/auth/otp-deneme', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ telefon }),
+    }).catch(() => null);
+    if (!kotaRes?.ok) {
+      const kotaJson = await kotaRes?.json().catch(() => null);
+      setHata(kotaJson?.error || 'Çok fazla deneme yapıldı. Bir süre sonra tekrar deneyin.');
+      authLog('otp_failed', 'otp', 'dogrulama_kotasi_asildi');
+      setYukleniyor(false);
+      return;
+    }
+
     const { data, error } = await supabase.auth.verifyOtp({ phone: fmt, token: otp, type: 'sms' });
     if (error) {
       setHata('Kod hatalı veya süresi dolmuş.');
