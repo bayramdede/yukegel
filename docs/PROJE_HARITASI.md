@@ -625,6 +625,12 @@
 > listede dursun"** dendi. Yani 6 Eylül'den önce silme **iki kez** teyitli:
 > kod-yazılı karar (yukarıda) + Bayram'ın bilerek onayı. 6 Eylül'den önce tekrar
 > "sil" istenirse bu not hatırlatılmalı; erken silmek tek geri dönüş yolunu kapatır.
+> ✅ **20 Ağu 2026 — SİLİNDİ.** Genel "geçici veri/tablo temizliği" isteği geldi;
+> bu not hatırlatılıp kilit tarihinin 17 gün erken aşılacağı açıkça soruldu,
+> Bayram **"evet, şimdi sil"** dedi. `dalga5_yedek_20260806` +
+> `dalga5_yedek_stops_20260806` (32 MB) kalıcı olarak silindi (bağımlılık
+> kontrolü temiz: hiçbir view/FK/kod referansı yoktu). Bu tablolar ARTIK YOK —
+> aşağıdaki BÖLÜM 6/7 anlatımı yalnız tarihsel kayıt.
 > 🔬 **BÖLÜM 6 sonuçları:** kalan metin kolonu 0 (tanık: iki `*_province_id` kolonu yerinde) ·
 > `pg_proc`'ta 21 eşleşme **tek tek gözle** okundu (runbook sınıflandırma regex'ini yasaklıyor —
 > 31 Tem'de o kestirme dört fonksiyonu yanlışlıkla temize çıkarmıştı), hepsi zararsız ·
@@ -1771,7 +1777,8 @@ origin_province_id (nullable FK → provinces.id) — 30 Tem 2026, backfill %100
 origin_district_official (nullable bool) — true=resmî ilçe, false=serbest giriş (İkitelli, İSTOÇ)
 
 🚫 origin_city — DÜŞTÜ (6 Ağu 2026, Dalga 5). Bu kolon ARTIK YOK.
-   Yedeği: public.dalga5_yedek_20260806 (234.840 satır, ≥6 Eyl 2026'ya kadar saklanır).
+   Yedeği public.dalga5_yedek_20260806 idi — 20 Ağu 2026'da Bayram onayıyla ERKEN
+   silindi (6 Eylül kilidi kaldırıldı; geçiş 14 gündür sorunsuzdu). Tablo ARTIK YOK.
    ⚠️ `origin_city` ADI KODDA HÂLÂ GEÇER ve bu DOĞRUDUR: `ilan_olustur` jsonb GİRDİ
       anahtarı, LLM JSON şema alanı ve bazı RPC'lerin `provinces.name as origin_city`
       ÇIKTI takma adı. Bunları "kalıntı" sanıp temizlemeye kalkma — ilan oluşturma kırılır.
@@ -1948,7 +1955,8 @@ district_official (nullable bool) — true=resmî ilçe, false=serbest giriş
 cargo_type, weight_ton, pallet_count, vehicle_count, notes
 
 🚫 city — DÜŞTÜ (6 Ağu 2026, Dalga 5). Bu kolon ARTIK YOK.
-   Yedeği: public.dalga5_yedek_stops_20260806 (245.086 satır, ≥6 Eyl 2026'ya kadar saklanır).
+   Yedeği public.dalga5_yedek_stops_20260806 idi — 20 Ağu 2026'da Bayram onayıyla
+   ERKEN silindi (bkz. yukarıdaki origin_city notu). Tablo ARTIK YOK.
    ⚠️ `city` ADI KODDA HÂLÂ GEÇER ve DOĞRUDUR: `ilan_olustur`ın `p_stops` jsonb GİRDİ
       anahtarı (`t.s->>'city'`) ve radar RPC'lerinin `p.name as city` ÇIKTI takma adı.
 ```
@@ -2180,8 +2188,9 @@ testi yorumdaki "lower()" yüzünden **yanlış pozitif** verir; davranışı da
 - **Adım 9 uygulandı** → `docs/20260730_alias_adim9_kopya_pasiflestir.sql`. **612 satır**
   `is_active=false` (silinmedi), **1270 aktif** kaldı. Ölçüm: 552 çatışan grup / 1164 satır,
   `norm_ayrisan_grup=0` ve `ilce_ayrisan_grup=0` → hiçbir grupta `normalized`/`district`
-  ayrışmadığı için pasifleştirme kayıpsız. Geri alma yedeği: **`public.aliases_adim9_yedek`**
-  (612 id + kazanan_id). Yedek tablosu bilerek DURUYOR.
+  ayrışmadığı için pasifleştirme kayıpsız. Geri alma yedeği **`public.aliases_adim9_yedek`**
+  (612 id + kazanan_id) idi — 20 Ağu 2026'da Bayram onayıyla silindi (genel geçici
+  tablo temizliği; Adım 9 haftalardır sorunsuz, geri alma ihtiyacı çıkmadı). Tablo ARTIK YOK.
   🔑 **Kazanan seçimi `ORDER BY id` (en küçük id).** Keyfi değil: `parse-listing/index.ts:44`
   alias'ları `.order('id',{ascending:true})` ile çekiyor, `findPlaces` `.find()` ile İLK
   eşleşmeyi alıyor (`:323`, `:337`) — yani en küçük id zaten kazanıyordu. `is_approved`/

@@ -213,21 +213,20 @@ olmalı.
 
 ## 👤 6 — Bayram'da (kod/SQL ile yapılamaz)
 
-- ⏳ **Sürekli Yük (Evergreen İlan) — kod tam, migration ÇALIŞTIRILMADI, canlıda hiç doğrulanmadı.**
-  Kaynak: `doc/SUREKLI_YUK_YAZILIMCI_TALIMATI.md`. Kod tarafı (form, İlanlarım
-  onay şeridi, claim dallanması, feed rozeti/sıralaması, `/admin/surekli-yukler`)
-  20 Ağu 2026'da tamamlandı, `tsc --noEmit` temiz. **AMA:**
-  1. `docs/20260820_surekli_yuk.sql` Supabase SQL Editor'da HENÜZ ÇALIŞTIRILMADI
-     (kolonlar, kısmi indeksler, `system_config` parametreleri, iki pg_cron job'ı).
-     Bu olmadan deploy edilirse Sürekli Yük işaretleyen her istek 42703 ile patlar
-     (bkz. `docs/PROJE_HARITASI.md` §9, "migration deploy'dan önce" notu).
-  2. Migration çalıştıktan sonra `docs/SUREKLI_YUK_YAZILIMCI_TALIMATI.md` §6'daki
-     10 kabul senaryosu canlıda/gerçek bir test hesabıyla hiç denenmedi (sandbox'ta
-     DB erişimi yok). Özellikle: aynı ilanı farklı günlerde aynı nakliyecinin
-     alması, 7+3 gün onay/grace döngüsü, kişi başı 3 ilan tavanı.
-  ✅ Alternatif: bu ortamda Supabase MCP aracı var — istenirse migration'ı ben de
-  uygulayabilirim, yalnız üretim şeması değişikliği olduğu için önce onay istedim
-  (bkz. sohbetin sonundaki soru).
+- ⏳ **Sürekli Yük (Evergreen İlan) — kod + migration deploy edildi, gerçek kullanımla hiç doğrulanmadı.**
+  Kaynak: `doc/SUREKLI_YUK_YAZILIMCI_TALIMATI.md`. 20 Ağu 2026: kod tarafı
+  (form, İlanlarım onay şeridi, claim dallanması, feed rozeti/sıralaması,
+  `/admin/surekli-yukler`) tamamlandı, `tsc --noEmit` temiz;
+  `docs/20260820_surekli_yuk.sql` Supabase MCP ile uygulandı ve doğrulandı
+  (kolonlar, GRANT'ler, dört `deals` indeksi, `system_config` 4 parametre,
+  iki pg_cron job'ı — hepsi canlı sorgularla teyit edildi); `npm run deploy`
+  ile `main`'e gönderildi. **Kalan:** `docs/SUREKLI_YUK_YAZILIMCI_TALIMATI.md`
+  §6'daki 10 kabul senaryosu GERÇEK bir kullanıcı/test hesabıyla hiç
+  denenmedi (bu oturumda tarayıcı/canlı kullanıcı erişimi yoktu). Özellikle:
+  ilan formunda checkbox'ın gerçekten göründüğü, aynı ilanı farklı günlerde
+  aynı nakliyecinin alabildiği, 7+3 gün onay/grace döngüsünün cron'da fiilen
+  çalıştığı (ilk çalışma 00:05'te), kişi başı 3 ilan tavanının doğru mesajla
+  reddettiği.
 - ⏳ **Search Console "Robots.txt ile engellendi" — SIRA ÖNEMLİ.**
   Asıl kök sebep 10 Ağu'da bulundu: `Disallow: /giris` ile `noindex` birbirini
   yok ediyordu (ayrıntı: `docs/ARSIV_YAPILACAKLAR.md`). Düzeltme kodda hazır.
@@ -248,13 +247,6 @@ olmalı.
   geçiş düzeltmenin ta kendisi.
   ⚠️ Rapordaki URL'lerin `/giris?redirect=…` olduğunu teyit et; başka bir yol
   çıkarsa ayrı bir bulgudur, haber ver.
-- 🔒 **6 EYLÜL 2026'DAN ÖNCE SİLİNMEYECEK — Dalga 5 yedek tabloları.**
-  `public.dalga5_yedek_20260806` (14 MB, 234.840 satır) ve
-  `public.dalga5_yedek_stops_20260806` (18 MB, 245.086 satır) — coğrafi geçişin
-  son geri dönüş yolu. 7 Ağu'da "geçiş bittiyse temizle" istendi, retention
-  hatırlatıldı, **Bayram: "Bekleyelim, listede dursun."** İki kez teyitli.
-  O tarihten sonra tek kontrol: geçen 30 günde bu tablolara bakan sorgu/rapor
-  oldu mu — olmadıysa temiz silinir.
 
 ---
 
