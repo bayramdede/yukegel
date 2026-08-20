@@ -185,6 +185,16 @@ export default function Moderator() {
 
   const [filtreTarihBaslangic, setFiltreTarihBaslangic] = useState('');
   const [filtreTarihBitis, setFiltreTarihBitis] = useState('');
+  // 20 Ağu 2026 — mobilde filtre satırı çok yer kaplıyordu; artık istenirse
+  // açılan bir panel (mobil CSS media query, masaüstünde her zaman açık).
+  const [filtrePanelAcik, setFiltrePanelAcik] = useState(false);
+  // Ham mesaj artık her zaman görünmüyor — kart başına açılıp kapanan kutucuk.
+  const [hamMesajAcik, setHamMesajAcik] = useState<Set<string>>(new Set());
+  const hamMesajToggle = (id: string) => setHamMesajAcik(prev => {
+    const yeni = new Set(prev);
+    if (yeni.has(id)) yeni.delete(id); else yeni.add(id);
+    return yeni;
+  });
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [lastClickedIdx, setLastClickedIdx] = useState<number | null>(null);
@@ -297,8 +307,12 @@ export default function Moderator() {
     // bileşenin her yerinde aynen görünür; çeviri gösterim anında `ilAdi()` ile.
     // 20 Ağu 2026 — `raw_text` artık raw_post_id'li satırlarda `listings`e
     // yazılmıyor (tekrar eden veri temizliği). `raw_posts` embed'i eklendi;
-    // düzleştirme aşağıdaki `setIlanlar` içinde yapılıyor, bu dosyanın geri
-    // kalanı (arama kutusu, hasSosyal, ham metin önizlemesi) DEĞİŞMEDİ.
+    // düzleştirme aşağıdaki `setIlanlar` içinde yapılıyor. 🚨 Embed önce
+    // sessizce BOŞ dönüyordu: `raw_posts` RLS AÇIK ama sıfır policy'si vardı
+    // (anon/authenticated için TÜM satırlar filtrelenir, GRANT var olsa bile) —
+    // "Staff okuyabilir" policy'si eklenip düzeltildi (bkz. PROJE_HARITASI).
+    // Ham metin artık kart üstünde HER ZAMAN açık değil — `hamMesajAcik`
+    // ile kart başına aç/kapa kutucuğu (arama kutusu davranışı değişmedi).
     let query = supabase.from('listings').select(`
       id, listing_type, origin_province_id, origin_district, price_offer,
       source, created_at, moderation_status, status, notes, trust_level,
@@ -1025,6 +1039,20 @@ export default function Moderator() {
         </div>
       )}
 
+      {/* 20 Ağu 2026 — mobilde filtre satırı çok yer kaplıyordu. Masaüstünde
+          davranış AYNI kalsın diye JS state ile değil, CSS media query ile
+          gizleniyor: `.mod-filtre-toggle` yalnız dar ekranda görünür,
+          `.mod-filtre-satiri` yalnız dar ekranda ve `.acik` yokken gizlenir. */}
+      <style>{`
+        .mod-filtre-toggle { display: none; }
+        .mod-filtre-satiri { display: flex; }
+        @media (max-width: 768px) {
+          .mod-filtre-toggle { display: block; }
+          .mod-filtre-satiri { display: none; }
+          .mod-filtre-satiri.acik { display: flex; }
+        }
+      `}</style>
+
       {/* NAV */}
       <nav style={{ background: '#161b22', borderBottom: '1px solid #30363d', position: 'sticky', top: 0, zIndex: 50 }}>
         <div style={{ maxWidth: 1400, margin: '0 auto', padding: '0 16px', height: 52, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -1151,8 +1179,13 @@ export default function Moderator() {
               {siralanmis.length} / {ilanlar.length} ilan
             </span>
           </div>
+          {/* Filtre paneli aç/kapa — yalnız mobilde görünür (bkz. yukarıdaki <style>) */}
+          <button onClick={() => setFiltrePanelAcik(v => !v)} className="mod-filtre-toggle"
+            style={{ width: '100%', padding: '6px 10px', borderRadius: 6, border: `1px solid ${aktifFiltre ? '#22c55e' : '#30363d'}`, background: '#0d1117', color: aktifFiltre ? '#22c55e' : '#8b949e', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer', marginBottom: 8 }}>
+            🔍 Filtreler{aktifFiltre ? ' (aktif)' : ''} {filtrePanelAcik ? '▲' : '▼'}
+          </button>
           {/* Filtre satırı */}
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+          <div className={`mod-filtre-satiri${filtrePanelAcik ? ' acik' : ''}`} style={{ gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
             <div style={{ position: 'relative', flex: '1', minWidth: 200 }}>
               <span style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', color: '#4b5563', fontSize: '0.85rem' }}>
                 {kullaniciAramaYukleniyor ? '⏳' : omnisearchTip(aramaMetni) ? '👤' : '🔍'}
@@ -1508,20 +1541,30 @@ export default function Moderator() {
                       <span style={{ background: '#450a0a', color: '#f87171', fontSize: '0.68rem', fontWeight: 700, padding: '2px 8px', borderRadius: 4 }}>👁 Shadow</span>
                     )}
                     <span style={{ color: '#4b5563', fontSize: '0.72rem' }}>{ilan.source} · {new Date(ilan.created_at).toLocaleDateString('tr-TR')} {new Date(ilan.created_at).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}</span>
+                    {/* 20 Ağu 2026 — ham mesaj artık her zaman açık değil, isteğe
+                        bağlı kutucuk. Bkz. aşağıdaki `hamMesajAcik` bloğu. */}
+                    {hasSosyal && (
+                      <button onClick={() => hamMesajToggle(ilan.id)}
+                        style={{ background: hamMesajAcik.has(ilan.id) ? '#1e3a5f' : 'none', border: '1px solid #30363d', color: '#60a5fa', fontSize: '0.68rem', fontWeight: 700, padding: '2px 8px', borderRadius: 4, cursor: 'pointer' }}>
+                        {ilan.source === 'whatsapp' ? '📱' : '👥'} Ham Mesaj {hamMesajAcik.has(ilan.id) ? '▲' : '▼'}
+                      </button>
+                    )}
                     <span style={{ color: '#4b5563', fontSize: '0.68rem', marginLeft: 'auto', fontFamily: 'monospace' }}>#{ilan.id.substring(0, 8)}</span>
                   </div>
+
+                  {/* Ham mesaj kutucuğu — yalnız butona basılınca açılır */}
+                  {hasSosyal && hamMesajAcik.has(ilan.id) && (
+                    <div style={{ background: '#0d1117', borderRadius: 6, padding: 12, border: '1px solid #1f2937', overflow: 'hidden', marginBottom: 12 }}>
+                      <div style={{ color: '#8b949e', fontSize: '0.68rem', fontWeight: 700, marginBottom: 6, letterSpacing: '0.05em' }}>{ilan.source === 'whatsapp' ? '📱 WHATSAPP' : '👥 FACEBOOK'}</div>
+                      <div style={{ color: '#94a3b8', fontSize: '0.78rem', lineHeight: 1.6, whiteSpace: 'pre-wrap', maxHeight: 300, overflowY: 'auto', overflowX: 'hidden', wordBreak: 'break-word' }}>{ilan.raw_text}</div>
+                    </div>
+                  )}
 
                   {/* Sprint 3: Audit bilgi bloğu — riskli tab veya score > 0 olan her ilanda */}
                   {(filtre === 'riskli' || auditScore > 0) && AuditBilgi({ ilan })}
 
                   {/* İçerik */}
-                  <div style={{ display: 'grid', gridTemplateColumns: hasSosyal ? '1fr 1fr' : '1fr', gap: 16, marginBottom: 12 }}>
-                    {hasSosyal && (
-                      <div style={{ background: '#0d1117', borderRadius: 6, padding: 12, border: '1px solid #1f2937', overflow: 'hidden' }}>
-                        <div style={{ color: '#8b949e', fontSize: '0.68rem', fontWeight: 700, marginBottom: 6, letterSpacing: '0.05em' }}>{ilan.source === 'whatsapp' ? '📱 WHATSAPP' : '👥 FACEBOOK'}</div>
-                        <div style={{ color: '#94a3b8', fontSize: '0.78rem', lineHeight: 1.6, whiteSpace: 'pre-wrap', maxHeight: 300, overflowY: 'auto', overflowX: 'hidden', wordBreak: 'break-word' }}>{ilan.raw_text}</div>
-                      </div>
-                    )}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 16, marginBottom: 12 }}>
                     <div>
                       {duzenleniyor ? (
                         EditForm({})

@@ -2136,6 +2136,25 @@ Yazma tarafı: `supabase/functions/parse-listing/index.ts` (v93) +
 trigger fonksiyonu (`CREATE OR REPLACE`) ve veri güncellendi, doğrudan
 Supabase MCP ile.
 
+🚨 **DÜZELTME (aynı gün, birkaç saat sonra) — `begin/rollback` testi YETERSİZDİ,
+gerçek kullanıcı raporuyla bulundu:** trigger testi service-role bağlamında
+çalıştığı için RLS'i hiç görmedi. Gerçekte `public.raw_posts` üzerinde
+**RLS AÇIK ama SIFIR policy vardı** — Postgres'te bu, tablo-geneli GRANT
+SELECT olsa bile `anon`/`authenticated` için TÜM satırları sessizce boş
+döndürür. Etkilenen: moderatör sayfasının hem "Çözümsüz" (no_lane) sekmesi
+(bu bug'dan ÖNCE de vardı, bu oturumda dokunulmamış bir kod yolu — yani
+muhtemelen HAFTALARDIR sessizce boştu) HEM DE yukarıdaki `raw_posts` embed
+fallback'i. `service_role` (edge function, trigger, RPC'ler) BYPASSRLS
+olduğu için hiç etkilenmedi — yalnız tarayıcıdan (authenticated) okuyan iki
+yer kördü. Düzeltme: `"Staff okuyabilir"` SELECT policy'si (`role IN
+('admin','moderator')`, `proxy.ts`'teki KORUNMALI kontrolüyle aynı kural) —
+`listings`teki `USING (true)` kadar açık DEĞİL, çünkü `raw_posts` moderasyon
+ÖNCESİ ham veri (telefon dahil), `listings` gibi kamuya açık değil.
+📌 **Ders: bir okuma yolunu `begin/rollback` ile test etmek yalnız
+YAZMA/skor mantığını doğrular — anon-key/PostgREST katmanındaki RLS'i
+DOĞRULAMAZ.** İkisi ayrı katman, ayrı ayrı test edilmeli (`pg_policy`yi de
+oku, yalnız trigger'ı değil).
+
 #### `raw_posts` — süpürücü kolonları (5 Ağu 2026, #76)
 ```
 parse_attempts        smallint not null default 0   -- süpürücünün kaç kez tetiklediği
