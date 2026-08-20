@@ -213,16 +213,19 @@ olmalı.
 
 ## 👤 6 — Bayram'da (kod/SQL ile yapılamaz)
 
-- ⏳ **`listings.raw_text`/`raw_posts.raw_text` tekrarı temizliği — kod+trigger+edge fn deploy edildi, canlı WhatsApp trafiğiyle hiç doğrulanmadı.**
-  20 Ağu 2026: `audit_listing_fn` trigger'ı `begin/rollback` içinde test edildi
-  (aynı skor: 70) ama bu SİMÜLASYON — gerçek bir WhatsApp mesajının pipeline'dan
-  geçip `parse-listing` v93 ile ilan oluşturması hiç izlenmedi. **Bir sonraki
-  gerçek mesaj geldiğinde (birkaç saat içinde olmalı) kontrol et:** `/moderator`
-  → yeni gelen bir whatsapp ilanının ham metin önizlemesi (sağ panel) DOLU
-  görünüyor mu (boşsa fallback join kırılmış demektir)? `audit_score` makul mü
-  (aniden 0'a düşmüşse trigger fallback'i çalışmıyor, güvenlik taraması kör)?
-  Sorun varsa `docs/PROJE_HARITASI.md` → "`listings.raw_text` ↔ `raw_posts.raw_text`
-  — TEKRAR TEMİZLENDİ" notuna bak, `audit_listing_fn`i `pg_proc`tan tekrar oku.
+- ⏳ **`listings.raw_text`/`raw_posts.raw_text` tekrarı temizliği — bir bug bulundu+düzeltildi, tam doğrulama hâlâ eksik.**
+  20 Ağu 2026: Bayram "ham mesaj gözükmüyor" diye bildirdi — sebep bulundu:
+  `raw_posts` üzerinde RLS AÇIK ama SIFIR policy vardı (anon/authenticated
+  için tüm satırlar sessizce boş dönüyordu, muhtemelen HAFTALARDIR — "Çözümsüz"
+  sekmesi de aynı sebepten etkileniyordu). `"Staff okuyabilir"` policy'si
+  eklendi. `audit_listing_fn` trigger'ı SECURITY DEFINER olduğu için bu RLS
+  açığından hiç etkilenmedi (yalnız tarayıcı okumaları koru); yine de
+  `begin/rollback` testi RLS katmanını hiç görmediği için **canlı bir
+  WhatsApp mesajıyla uçtan uca hâlâ doğrulanmadı**. Aynı zamanda moderatör
+  ekranında ham mesaj artık her zaman açık değil, kart üstünde "📱 Ham Mesaj ▼"
+  butonuyla açılıyor; mobilde filtre satırı da "🔍 Filtreler ▼" ile aç/kapa.
+  **Kontrol et:** `/moderator` → yeni bir whatsapp ilanında "Ham Mesaj"
+  butonuna bas, metin DOLU geliyor mu? Mobilde filtre butonu bekleneni yapıyor mu?
 - ⏳ **Sürekli Yük (Evergreen İlan) — kod + migration deploy edildi, gerçek kullanımla hiç doğrulanmadı.**
   Kaynak: `doc/SUREKLI_YUK_YAZILIMCI_TALIMATI.md`. 20 Ağu 2026: kod tarafı
   (form, İlanlarım onay şeridi, claim dallanması, feed rozeti/sıralaması,
