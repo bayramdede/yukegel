@@ -16,6 +16,7 @@
 
 import { getServiceSupabase } from './auth';
 import { getAuditThresholds } from './auditLimits';
+import { getConfigs } from './config';
 import { structuredLog } from './logger';
 import { ARAC_TIPI_SETI, UTSYAPI_SETI } from './ilan-sabitler';
 import { ilanLimitOku, ilanTavanBak, ilanTavanIsle, type IlanLimitAyar } from './ilan-limit';
@@ -108,6 +109,12 @@ export interface IlanYazGirdi {
   duraklar: DurakGirdi[];
   raw_text?: string;
   ai_parsed?: boolean;
+  /**
+   * Sürekli Yük (Evergreen İlan) — 20 Ağu 2026, `docs/SUREKLI_YUK_YAZILIMCI_TALIMATI.md`.
+   * İşaretlenirse `recurring_until` ZORUNLU (gelecekte + tavan `recurring_max_days`).
+   */
+  is_recurring?: boolean;
+  recurring_until?: string | null;
 }
 
 /**
@@ -359,6 +366,42 @@ export async function ilanYaz(
   if (!tarih) return { ok: false, hata: 'Geçerli bir tarih seçin.' };
   if (tarih < bugunISO()) return { ok: false, hata: 'Geçmiş bir tarih seçilemez.' };
 
+  // ── Sürekli Yük (20 Ağu 2026) ────────────────────────────────────────────
+  // Talimat §4.1: `is_recurring=true` ise `recurring_until` ZORUNLU, gelecekte
+  // ve tavanı aşamaz; kişi başı aktif sürekli yük sayısı sınırlı. Bedava
+  // (senkron olmayan ama DB'ye dokunan tek/hafif) kontroller V6 tavan
+  // sorgusundan ÖNCE — geçersiz bir sürekli yük isteği için ilan tavanı
+  // sorgusu bile atılmasın.
+  const isRecurring = Boolean(girdi.is_recurring);
+  let recurringUntil: string | null = null;
+  if (isRecurring) {
+    if (typeof girdi.recurring_until !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(girdi.recurring_until)) {
+      return { ok: false, hata: 'Sürekli Yük için bitiş tarihi seçin.' };
+    }
+    recurringUntil = girdi.recurring_until;
+    if (recurringUntil <= tarih) {
+      return { ok: false, hata: 'Sürekli Yük bitiş tarihi, yükleme tarihinden sonra olmalı.' };
+    }
+    const cfg = await getConfigs(
+      ['recurring_max_days', 'max_recurring_per_user'],
+      { recurring_max_days: '365', max_recurring_per_user: '3' },
+    );
+    const maxGun = parseInt(cfg.recurring_max_days, 10) || 365;
+    const tavanTarih = new Date(Date.now() + 3 * 60 * 60 * 1000 + maxGun * 86400_000).toISOString().split('T')[0];
+    if (recurringUntil > tavanTarih) {
+      return { ok: false, hata: `Sürekli Yük bitiş tarihi en fazla ${maxGun} gün ileri olabilir.` };
+    }
+    const maxAktif = parseInt(cfg.max_recurring_per_user, 10) || 3;
+    const { count: aktifSayisi } = await svc
+      .from('listings')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .eq('is_recurring', true);
+    if ((aktifSayisi ?? 0) >= maxAktif) {
+      return { ok: false, hata: `En fazla ${maxAktif} aktif Sürekli Yük ilanınız olabilir. Yeni birini açmadan önce mevcut birini durdurun.` };
+    }
+  }
+
   // Beyaz liste: listede olmayan değer sessizce DÜŞER. Eskiden V6 mükerrer
   // bloğundan SONRAYDI; hash'e girdikleri için (11 Ağu 2026) buraya, tavan/
   // mükerrer kontrolünden ÖNCEYE taşındı.
@@ -561,6 +604,24 @@ export async function ilanYaz(
         ? 'İlan kaydedilemedi: sunucu güncellemesi eksik. Lütfen yöneticiye bildirin.'
         : 'İlan kaydedilemedi. Lütfen tekrar deneyin.',
     };
+  }
+
+  // Sürekli Yük alanları `ilan_olustur()` RPC gövdesinde YOK (RPC imzasını
+  // genişletmek yerine — bkz. dosya başı kuralı: RPC migration'dan önce
+  // gelmeli, oysa bu alan seti moderasyon akışından bağımsız — ayrı bir
+  // UPDATE ile yazılıyor). Satır zaten oluştuğu için burada başarısız olsa
+  // bile ilan YAYINDA kalır, yalnız sürekli yük işaretlemesi eksik kalır —
+  // kullanıcı İlanlarım'dan tekrar işaretleyebilir.
+  if (isRecurring) {
+    const { error: recurringErr } = await svc
+      .from('listings')
+      .update({ is_recurring: true, recurring_until: recurringUntil, recurring_confirmed_at: new Date().toISOString() })
+      .eq('id', listing.id);
+    if (recurringErr) {
+      structuredLog('ERROR', 'db-transaction', 'Sürekli Yük işaretlemesi yazılamadı', {
+        user_id: userId, listing_id: listing.id, error_message: recurringErr.message,
+      });
+    }
   }
 
   // ✅ Satır oluştu = tavan tüketildi. Bellek sayacı BURADA işlenir, `ilanTavanBak`

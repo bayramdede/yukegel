@@ -53,11 +53,15 @@ export const ILAN_LIMITI = 200;
  *    yazmayı bıraksa — yeni ilanlar okuma yolları dönene kadar boş şehir
  *    gösterirdi. Okuyucu önce dönerse böyle bir ara pencere hiç oluşmaz.
  */
+// 20 Ağu 2026 — `is_recurring` eklendi (Sürekli Yük rozeti + sıralama).
+// Sıralamayı kullanan üç yer (`app/page.tsx`, `HomeClient.tsx`,
+// `app/api/listings/ara`) `.order('is_recurring', {ascending:false})`ı
+// BİRİNCİL anahtar olarak kullanıyor — bkz. `ilanNormalize` altındaki not.
 export const ILAN_SELECT = `
   id, listing_type, origin_province_id, origin_district,
   price_offer, source, created_at,
   trust_level, user_id, vehicle_type, body_type,
-  available_date, date_flexible,
+  available_date, date_flexible, is_recurring,
   listing_stops ( listing_id, stop_order, province_id, district, vehicle_count, cargo_type, weight_ton, pallet_count )
 `;
 
@@ -117,6 +121,15 @@ export function ilanNormalize(ilan: any, rozet?: RozetBilgi | null) {
     dogrulanmamis: !ilan.user_id || ilan.trust_level === 'social',
     yeniUye: rozet ? uyeYeniMi(rozet.created_at) : false,
     user_id: ilan.user_id,
+    /**
+     * Sürekli Yük rozeti (20 Ağu 2026). Sıralamayı da bu alan belirliyor —
+     * bkz. `docs/20260820_surekli_yuk.sql` §8 notu: `updated_at`'i birincil
+     * sıralama anahtarı yapmak normal ilanları da "son düzenlenen üste"
+     * mantığına çevirirdi (regresyon). Bunun yerine sürekli yükler her zaman
+     * ayrı bir blok olarak normal ilanların ÜSTÜNDE görünür; blok İÇİNDE ve
+     * normal ilanlar ARASINDA sıralama yine `created_at DESC`.
+     */
+    surekliYuk: ilan.is_recurring === true,
   };
 }
 

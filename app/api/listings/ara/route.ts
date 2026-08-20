@@ -119,6 +119,8 @@ export async function GET(req: NextRequest) {
     .in('moderation_status', ['approved', 'auto_published'])
     .eq('is_shadow_banned', false)
     .eq('status', 'active')
+    // 20 Ağu 2026 — Sürekli Yük bloğu ana sayfayla aynı sırayı korusun.
+    .order('is_recurring', { ascending: false })
     .order('created_at', { ascending: false })
     .limit(ILAN_LIMITI);
 

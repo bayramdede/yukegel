@@ -61,9 +61,13 @@ export default async function Panel() {
       // (grep ile doğrulandı) — Bayram'ın test hesabında 206 ilan × 369 durak
       // için her istekte boşuna taşınıyordu. Yeni bir alan PanelClient'a
       // eklenirse buraya da eklenmeli, yoksa `undefined` gelir.
+      // 20 Ağu 2026 — `is_recurring`/`recurring_until`/`recurring_confirmed_at`
+      // eklendi (Sürekli Yük). Yeni bir alan eklenince buraya da eklenmezse
+      // PanelClient'ta `undefined` gelir — bkz. 15 Ağu notu birkaç satır yukarıda.
       .select(`id, listing_type, origin_province_id, origin_district, status, moderation_status, created_at,
         price_offer, price_negotiable, completed_at, vehicle_type, body_type,
         available_date, date_flexible, notes,
+        is_recurring, recurring_until, recurring_confirmed_at,
         internal_audit_logs,
         listing_stops ( stop_order, province_id, district )`)
       .eq('user_id', user.id)

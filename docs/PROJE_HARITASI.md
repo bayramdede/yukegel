@@ -1775,7 +1775,21 @@ origin_district_official (nullable bool) — true=resmî ilçe, false=serbest gi
    ⚠️ `origin_city` ADI KODDA HÂLÂ GEÇER ve bu DOĞRUDUR: `ilan_olustur` jsonb GİRDİ
       anahtarı, LLM JSON şema alanı ve bazı RPC'lerin `provinces.name as origin_city`
       ÇIKTI takma adı. Bunları "kalıntı" sanıp temizlemeye kalkma — ilan oluşturma kırılır.
+
+is_recurring boolean NOT NULL DEFAULT false — Sürekli Yük (20 Ağu 2026, bkz.
+   docs/SUREKLI_YUK_YAZILIMCI_TALIMATI.md + docs/20260820_surekli_yuk.sql).
+recurring_until date NULL — bitiş tarihi, tavan `system_config.recurring_max_days` (365).
+recurring_confirmed_at timestamptz NULL — son "hâlâ var mı?" onayı; `ilan_olustur()`
+   RPC'sinin DIŞINDA, `ilanYaz()`'ın ayrı bir UPDATE'iyle yazılır (RPC imzası
+   genişletilmedi — bkz. `lib/ilan-yaz.ts` "Sürekli Yük alanları" yorumu).
 ```
+> 🔁 **Sürekli Yük — `listings.status` KURALI:** bir ilan `is_recurring=true`
+> olduğu sürece `status` yalnız ŞUNLAR tarafından değiştirilir: kullanıcının
+> kendisi (aç/kapat), moderatör (`/admin/surekli-yukler`) ve `recurring-refresh`
+> cron'u (süre/onay/grace). **Claim akışı (`/api/deals`, `/api/deals/[id]`)
+> ARTIK DOKUNMAZ** — normal ilanda "onayla"/harici sefer `status='passive'`
+> yaparken, `is_recurring_deal=true` olan kayıtlarda o satır BİLEREK atlanıyor.
+> Yeni bir "ilanı pasife al" yolu eklersen aynı korumayı unutma.
 > 🗺️ **İL ARTIK YALNIZ ID (Dalga 1→5 tamam, `docs/COGRAFI_GECIS.md`).** Çift yazım dönemi
 > **bitti**; `lib/lokasyon.ts::ilCiftYazim()` çağrısı artık gerekmiyor. Okuma yollarının
 > hepsi (`HomeClient` varış filtresi, radar RPC'leri) `province_id` üzerinden çalışıyor.
@@ -1783,6 +1797,26 @@ origin_district_official (nullable bool) — true=resmî ilçe, false=serbest gi
 > yazımlı **22.474 ilan** ana sayfa filtresinde görünmez kalmıştı — geçişin asıl sebebi buydu.
 > 🚨 Yeni iki kolona GRANT **elle verildi** (migration Adım 4) — L1e sonrası her yeni kolon
 > `anon`/`authenticated` için yetkisiz doğuyor.
+
+### `deals` — Sürekli Yük kolonları (20 Ağu 2026)
+```
+is_recurring_deal boolean NOT NULL DEFAULT false — claim anında ilan is_recurring ise true
+deal_date         date NULL — is_recurring_deal=true iken claim'in "ait olduğu gün" (bugün)
+```
+> Tam `deals` şema dokümantasyonu burada YOK (bkz. `app/api/deals/route.ts` ve
+> `app/api/deals/[id]/route.ts` başlıklarındaki uzun yorumlar — asıl kaynak
+> onlar). Bu iki kolon SADECE Sürekli Yük için var:
+> - Normal ilanda üç kısmi UNIQUE indeks ilan başına TEK aktif anlaşma zorluyor
+>   (`deals_tek_aktif_anlasma`, `deals_tekil`, `deals_harici_tekil`) — hepsi
+>   `is_recurring_deal = false` şartıyla daraltıldı.
+> - Sürekli yükte tekillik GÜNE göre: `deals_recurring_gun_tekil`
+>   (nakliyeci kolu) + `deals_recurring_harici_gun_tekil` (harici/Plaka Ata
+>   kolu). Aynı gün aynı nakliyeci/harici sefer ikinci kez giremez, ertesi gün
+>   serbest.
+> - `deal_date` claim/talep anında `bugunISO()` ile yazılır (TR saatine göre,
+>   `lib/ilan-yaz.ts::bugunISO()` ile AYNI fonksiyon — `app/api/deals/route.ts`
+>   import ediyor).
+> Migration: `docs/20260820_surekli_yuk.sql`.
 
 ### `districts` — 973 ilçe (4 Ağu 2026, CANLI)
 ```
@@ -2521,8 +2555,11 @@ aynı `normalized`+`district`'e** çözülüyor. Ek olarak 303 mesajda (3 gerçe
 | `/api/listings/yakin` | Yakınımdaki Yükler: lat/lng → en yakın il (offline haversine) → o ildeki aktif ilanlar (GET) |
 | `/api/listings/ara` | **Ana sayfa il filtresi (GET, Dalga 3).** `?kalkis=<plaka>&varis=<plaka>&tip=yuk\|arac`. Service role; `origin_province_id` / `listing_stops.province_id` tamsayı eşitliği. En az bir il zorunlu (yoksa 400) — filtresiz liste zaten SSR'den geliyor. Tanınmayan il → **400**, sessiz "tüm iller" değil. Yanıt rozetleri de içerir (ikinci istek yok). |
 | `/api/deals` | 🤝 Güvenli Etkileşim (Faz 1-2). `POST` — nakliyeci talep oluşturur (`status='requested'`); `shipper_id` İSTEMCİDEN DEĞİL `listings.user_id`'den. **`agreed_price` ZORUNLU** (11 Ağu 2026 eklendi — sayı, >0, ≤100M; yoksa/geçersizse 400), `note` opsiyonel (≤1000 karakter). `GET` — oturum sahibinin taraf olduğu kayıtlar (`?rol=shipper\|carrier`). Ekran: `/ilan/[id]` "Bu İşi Al" (POST) + panel "Anlaşmalarım" (GET — SSR'de doğrudan `page.tsx`'ten, bu route'u ÇAĞIRMIYOR, aynı sorgu deseni JOIN'li tekrarlanıyor). |
-| `/api/deals/[id]` | 🤝 `PATCH { action }` — durum geçişleri (`onayla`/`reddet`/`yola_cikti`/`tamamla`/`iptal`). 🚨 Yetki tablosu route içinde: onayla/reddet YALNIZ shipper, yola_cikti YALNIZ carrier, tamamla/iptal İKİ TARAF. `tamamla` iki adımlı (beyan + karşı onay, `completed_declared_by`). `onayla` yan etkisi: `listings.status='passive'` + rakip talepler otomatik `cancelled`. **11 Ağu 2026** — `iptal`, ZATEN mühürlenmiş (`matched`/`in_transit`) bir kaydı iptal ederken `cancel_type: 'anlasma'\|'is'` İSTER (yoksa 400): `anlasma` → `listings` geri `active`, `is` → `passive` kalır. `'requested'` iptali/reddi bunu istemez (listings hiç dokunulmamıştı). |
+| `/api/deals/[id]` | 🤝 `PATCH { action }` — durum geçişleri (`onayla`/`reddet`/`yola_cikti`/`tamamla`/`iptal`). 🚨 Yetki tablosu route içinde: onayla/reddet YALNIZ shipper, yola_cikti YALNIZ carrier, tamamla/iptal İKİ TARAF. `tamamla` iki adımlı (beyan + karşı onay, `completed_declared_by`). `onayla` yan etkisi: `listings.status='passive'` + rakip talepler otomatik `cancelled`. **11 Ağu 2026** — `iptal`, ZATEN mühürlenmiş (`matched`/`in_transit`) bir kaydı iptal ederken `cancel_type: 'anlasma'\|'is'` İSTER (yoksa 400): `anlasma` → `listings` geri `active`, `is` → `passive` kalır. `'requested'` iptali/reddi bunu istemez (listings hiç dokunulmamıştı). **20 Ağu 2026** — `deal.is_recurring_deal=true` ise bu route'taki DÖRT `listings` yan etkisinin (onayla/iptal-anlaşma/completed) HİÇBİRİ çalışmaz; `deals` GÜNE göre ilerler, `listings.status` sabit kalır (bkz. §3 `deals` — Sürekli Yük kolonları). |
 | `/api/reviews` | 🤝 `POST` — çift kör değerlendirme (`deal_id, rating, sub_ratings?, comment?`). `published_at` BİLEREK yazılmıyor — yayınlama DB trigger'ında (`reviews_ciftli_yayinla`). İhlalli yorum kullanıcıya hata GÖSTERMEZ, `is_hidden=true` ile sessizce moderatör kuyruğuna düşer (PRD md.5). Ekran: panel "Anlaşmalarım" → tamamlanmış anlaşmada "⭐ Değerlendirme Yaz". |
+| `/api/listings/[id]/surekli-onay` | 🔁 Sürekli Yük (20 Ağu 2026). `POST { action: 'onayla'\|'durdur' }`, YALNIZ ilan sahibi. `onayla` → `recurring_confirmed_at=now()` (+ grace sonrası pasifse ve moderasyon hâlâ yayında sayılıyorsa `status='active'` geri açar). `durdur` → `is_recurring=false`, `status`a DOKUNMAZ (ilan sıradan bir ilana döner, normal 48h expire akışına girer). Ekran: `/panel` İlanlarım — bağlamsal onay şeridi. |
+| `/api/admin/surekli-yukler` | 🔁 Moderatör ekranı (GET, `requireAdmin`). Tüm `is_recurring=true` ilanları + sahip bilgisi + bugünkü (`deal_date=bugün`) temas sayısı. `?durum=active\|passive` filtre. |
+| `/api/admin/surekli-yukler/[id]` | 🔁 `PATCH { action: 'sonlandir'\|'duraklat'\|'aktiflestir'\|'tarih_duzenle', recurring_until? }` (`requireAdmin`). `sonlandir` kalıcı (`is_recurring=false`); `duraklat`/`aktiflestir` yalnız `status` değiştirir, `is_recurring` KORUNUR. Ekran: `/admin/surekli-yukler`. |
 
 ---
 
@@ -2941,6 +2978,8 @@ Açık rotalar: /giris, /auth/, /profil-tamamla, /nasil-calisir, /hakkimizda,
 - 🚨 **Auth hata dallarında Türkçe METNE göre dallanma** (29 Tem 2026, `SPRINT_01` A5). Metin değişince dal sessizce ölür. Sunucu makine okunur `kod` dönmeli (`eposta_dogrulanmamis` | `kimlik_hatali`), istemci ona baksın. Hesap sayımı endişesi yok: GoTrue password grant'ta şifre, `Email not confirmed` kontrolünden **önce** doğrulanıyor.
 - 🚨 **`resend()` / `signUp()` çağrısında `emailRedirectTo` VERİLMEZSE** Supabase kendi "Site URL" ayarına düşer; kullanıcı `/auth/callback` yerine ana sayfaya çıkar, oturum takası **hiç yapılmaz** ve "linke tıkladım ama giremiyorum" der (29 Tem 2026, `SPRINT_01` A6). Değer `NEXT_PUBLIC_SITE_URL`'den gelmeli — **`request.url` kullanma**, Vercel'de proxy arkasındaki iç adres olabilir.
 - ⚠️ **E-posta gönderen uç noktalar hesap sayımına (enumeration) kapalı olmalı** (29 Tem 2026, `SPRINT_01` A6). `/api/auth/dogrulama-tekrar` adres kayıtlı olsun olmasın **aynı yanıtı** döner; sebep yalnız loga yazılır. Kotalar hata yolunda da işlenir — buradaki "hata"ların çoğu "böyle adres yok / zaten doğrulanmış", yani saldırganın aradığı bilgi; saymazsak o yol bedava olur. (`otp/route.ts`'ten bilinçli ayrılık: orada hata = sağlayıcı arızası, sayaç işlenmeden 502 döner.)
+- 🚨 **Feed'i "son değişen üste" mantığına çevirmek regresyondur — Sürekli Yük'ü ayrı BLOK yap** (20 Ağu 2026). `recurring-refresh` cron'u her gece sürekli yüklerin `updated_at`/`available_date`'ini tazeliyor; sıralamayı buna göre `updated_at DESC` yapmak cazip görünür ama **normal** ilanları da etkiler — ufak bir fiyat düzeltmesi haftalar önceki bir ilanı tepeye fırlatır. Gerçek çözüm: `.order('is_recurring', {ascending:false}).order('created_at', {ascending:false})` — sürekli yükler HER ZAMAN ayrı bir blok olarak üstte, blok içinde/dışında sıralama `created_at DESC` (mevcut davranış birebir korunur). Üç sorgu ucu var (`app/page.tsx`, `HomeClient.tsx`, `app/api/listings/ara`) — biri unutulursa o yol sessizce eski sıraya döner. İndeks: `idx_listings_active_feed (moderation_status, is_recurring DESC, created_at DESC)`.
+- 🚨 **Sürekli Yük migration'ı (`docs/20260820_surekli_yuk.sql`) DEPLOY'DAN ÖNCE elle çalıştırılmalı.** Kod `listings.is_recurring`/`recurring_until`/`recurring_confirmed_at` ve `deals.is_recurring_deal`/`deal_date` kolonlarının VAR OLDUĞUNU varsayıyor (`lib/ilan-yaz.ts`, `/api/deals/*`, `/api/ilan/duzelt`, `/api/listings/[id]/surekli-onay`, `/api/admin/surekli-yukler*`). Migration çalışmadan deploy edilirse bu yollar 42703 ile patlar — `ilan_olustur()` RPC'sinin kendisi DEĞİŞMEDİ (bilerek; bkz. `lib/ilan-yaz.ts` yorumu), yalnız RPC sonrası ayrı bir `UPDATE` bu kolonlara yazıyor, o yüzden hata yalnız Sürekli Yük işaretlenince görünür — normal ilan akışı migration'sız da (yanlışlıkla) çalışıyormuş gibi görünebilir, YANILTICI, migration'ı atlamayın.
 
 ---
 

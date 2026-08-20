@@ -213,6 +213,21 @@ olmalı.
 
 ## 👤 6 — Bayram'da (kod/SQL ile yapılamaz)
 
+- ⏳ **Sürekli Yük (Evergreen İlan) — kod tam, migration ÇALIŞTIRILMADI, canlıda hiç doğrulanmadı.**
+  Kaynak: `doc/SUREKLI_YUK_YAZILIMCI_TALIMATI.md`. Kod tarafı (form, İlanlarım
+  onay şeridi, claim dallanması, feed rozeti/sıralaması, `/admin/surekli-yukler`)
+  20 Ağu 2026'da tamamlandı, `tsc --noEmit` temiz. **AMA:**
+  1. `docs/20260820_surekli_yuk.sql` Supabase SQL Editor'da HENÜZ ÇALIŞTIRILMADI
+     (kolonlar, kısmi indeksler, `system_config` parametreleri, iki pg_cron job'ı).
+     Bu olmadan deploy edilirse Sürekli Yük işaretleyen her istek 42703 ile patlar
+     (bkz. `docs/PROJE_HARITASI.md` §9, "migration deploy'dan önce" notu).
+  2. Migration çalıştıktan sonra `docs/SUREKLI_YUK_YAZILIMCI_TALIMATI.md` §6'daki
+     10 kabul senaryosu canlıda/gerçek bir test hesabıyla hiç denenmedi (sandbox'ta
+     DB erişimi yok). Özellikle: aynı ilanı farklı günlerde aynı nakliyecinin
+     alması, 7+3 gün onay/grace döngüsü, kişi başı 3 ilan tavanı.
+  ✅ Alternatif: bu ortamda Supabase MCP aracı var — istenirse migration'ı ben de
+  uygulayabilirim, yalnız üretim şeması değişikliği olduğu için önce onay istedim
+  (bkz. sohbetin sonundaki soru).
 - ⏳ **Search Console "Robots.txt ile engellendi" — SIRA ÖNEMLİ.**
   Asıl kök sebep 10 Ağu'da bulundu: `Disallow: /giris` ile `noindex` birbirini
   yok ediyordu (ayrıntı: `docs/ARSIV_YAPILACAKLAR.md`). Düzeltme kodda hazır.

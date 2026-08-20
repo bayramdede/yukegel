@@ -57,6 +57,9 @@ async function fetchInitialIlanlar() {
       .in('moderation_status', ['approved', 'auto_published'])
       .eq('is_shadow_banned', false)
       .eq('status', 'active')
+      // 20 Ağu 2026 — Sürekli Yük her sabah bloğun tepesinde kalsın; blok
+      // içi/dışı sıralama `created_at DESC`, mevcut davranış değişmiyor.
+      .order('is_recurring', { ascending: false })
       .order('created_at', { ascending: false })
       .limit(ILAN_LIMITI);
 

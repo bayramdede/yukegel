@@ -73,6 +73,13 @@ const KARTLAR = [
     aciklama: 'Kullanıcıların eklediği park, yemek, tamirci gibi konumları onayla veya reddet.',
     aktif: true,
   },
+  {
+    yol: '/admin/surekli-yukler',
+    ikon: '🔁',
+    baslik: 'Sürekli Yükler',
+    aciklama: 'Her gün otomatik yenilenen ilanlar. Sonlandır, duraklat, bitiş tarihi düzenle.',
+    aktif: true,
+  },
 ];
 
 export default async function AdminAna() {

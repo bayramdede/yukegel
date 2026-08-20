@@ -237,6 +237,9 @@ function IlanlarSekmesi({ ilanlar: ilk, userId, anlasmalar }: { ilanlar: any[]; 
   const [duzeltPazarlik, setDuzeltPazarlik] = useState(false);
   const [duzeltTarih, setDuzeltTarih] = useState('');
   const [duzeltTarihEsnek, setDuzeltTarihEsnek] = useState(false);
+  // Sürekli Yük (20 Ağu 2026)
+  const [duzeltIsRecurring, setDuzeltIsRecurring] = useState(false);
+  const [duzeltRecurringUntil, setDuzeltRecurringUntil] = useState('');
   const [duzeltYukleniyor, setDuzeltYukleniyor] = useState(false);
   const [duzeltSonuc, setDuzeltSonuc] = useState<{ ok: boolean; mesaj: string; firedRules?: any[] } | null>(null);
 
@@ -250,6 +253,8 @@ function IlanlarSekmesi({ ilanlar: ilk, userId, anlasmalar }: { ilanlar: any[]; 
     setDuzeltPazarlik(ilan.price_negotiable === true);
     setDuzeltTarih(ilan.available_date || '');
     setDuzeltTarihEsnek(ilan.date_flexible === true);
+    setDuzeltIsRecurring(ilan.is_recurring === true);
+    setDuzeltRecurringUntil(ilan.recurring_until || '');
     setDuzeltSonuc(null);
   }
 
@@ -286,6 +291,30 @@ function IlanlarSekmesi({ ilanlar: ilk, userId, anlasmalar }: { ilanlar: any[]; 
     setYukleniyor(id + '_aktif');
     await supabase.from('listings').update({ status: 'active' }).eq('id', id);
     ilanGuncelle(id, { status: 'active' });
+    setYukleniyor(null);
+  }
+
+  /**
+   * Sürekli Yük "hâlâ var mı?" onay/durdur (20 Ağu 2026).
+   * `/api/listings/[id]/surekli-onay` — service-role, sahiplik kontrollü.
+   * Doğrudan `supabase.from('listings').update()` DEĞİL: onay zamanı ve
+   * grace sonrası yeniden aktifleştirme mantığı sunucuda (bkz. route dosyası).
+   */
+  async function surekliOnayIslem(id: string, action: 'onayla' | 'durdur') {
+    setYukleniyor(id + '_surekli');
+    try {
+      const res = await fetch(`/api/listings/${id}/surekli-onay`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action }),
+      });
+      const d = await res.json();
+      if (res.ok) {
+        ilanGuncelle(id, action === 'onayla'
+          ? { recurring_confirmed_at: d.recurring_confirmed_at, ...(d.status ? { status: d.status } : {}) }
+          : { is_recurring: false, recurring_until: null });
+      }
+    } catch { /* sessiz — kullanıcı tekrar deneyebilir */ }
     setYukleniyor(null);
   }
 
@@ -569,6 +598,7 @@ function IlanlarSekmesi({ ilanlar: ilk, userId, anlasmalar }: { ilanlar: any[]; 
                       </td>
                       <td style={td} data-label="Durum">
                         <DurumBadge durum={durum} />
+                        {ilan.is_recurring && <div style={{ marginTop: 3 }}><span style={{ background: '#14532d', color: '#4ade80', fontSize: '0.68rem', fontWeight: 700, padding: '1px 6px', borderRadius: 4 }}>🔁 Sürekli Yük</span></div>}
                         {isRejected && <div style={{ color: C.dim, fontSize: '0.7rem', marginTop: 3 }}>Mod. reddetti</div>}
                         {isPending && <div style={{ color: C.dim, fontSize: '0.7rem', marginTop: 3 }}>İnceleniyor</div>}
                         {durum === 'in_progress' && <div style={{ color: C.dim, fontSize: '0.7rem', marginTop: 3 }}>Plaka atandı, sefer sürüyor</div>}
@@ -672,6 +702,45 @@ function IlanlarSekmesi({ ilanlar: ilk, userId, anlasmalar }: { ilanlar: any[]; 
                         </div>
                       </td>
                     </tr>
+                    {/* Sürekli Yük — bağlamsal onay şeridi (20 Ağu 2026).
+                        Talimat §5.3: genel bildirim sistemi YOK, kullanıcı bunu
+                        yalnız İlanlarım'a geldiğinde görür. 7 gün eşiği burada
+                        SABİT — sunucudaki gerçek kaynak `system_config` (bkz.
+                        docs/20260820_surekli_yuk.sql); panel bu değeri ayrıca
+                        çekmiyor, uyuşmazsa yalnız görsel eşik birkaç saat kayar,
+                        gerçek pasife düşürme kararı `recurring-refresh` cron'unda. */}
+                    {ilan.is_recurring && (() => {
+                      const ONAY_GUN = 7, GRACE_GUN = 3;
+                      const sonOnay = ilan.recurring_confirmed_at ? new Date(ilan.recurring_confirmed_at) : null;
+                      const gecenGun = sonOnay ? (Date.now() - sonOnay.getTime()) / 86400_000 : Infinity;
+                      const graceGecti = gecenGun > ONAY_GUN + GRACE_GUN;
+                      const onayGerekli = gecenGun > ONAY_GUN;
+                      if (!onayGerekli) return null;
+                      const dururmusPasif = graceGecti && ilan.status === 'passive';
+                      return (
+                        <tr>
+                          <td colSpan={7} style={{ padding: '0 12px 12px', background: '#0a0d11' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10, border: `1px solid ${dururmusPasif ? '#7f1d1d' : '#854d0e'}`, background: dururmusPasif ? '#1a0808' : '#2a1d00', borderRadius: 8, padding: '10px 14px' }}>
+                            <span style={{ color: dururmusPasif ? '#fca5a5' : '#fbbf24', fontSize: '0.82rem', fontWeight: 600 }}>
+                              {dururmusPasif
+                                ? '⛔ Sürekli yükünüz onay verilmediği için durduruldu — devam etmek için onaylayın.'
+                                : '🔁 Bu yük hâlâ her gün var mı?'}
+                            </span>
+                              <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+                                <button disabled={yukleniyor === ilan.id + '_surekli'} onClick={() => surekliOnayIslem(ilan.id, 'onayla')}
+                                  style={{ background: C.green, color: '#000', border: 'none', borderRadius: 6, padding: '6px 14px', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', opacity: yukleniyor === ilan.id + '_surekli' ? 0.6 : 1 }}>
+                                  ✓ Evet, devam
+                                </button>
+                                <button disabled={yukleniyor === ilan.id + '_surekli'} onClick={() => surekliOnayIslem(ilan.id, 'durdur')}
+                                  style={{ background: 'none', border: `1px solid ${C.border}`, color: C.muted, borderRadius: 6, padding: '6px 14px', fontSize: '0.8rem', cursor: 'pointer' }}>
+                                  Durdur
+                                </button>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })()}
                     {/* Düzenleme formu — bu ilan seçiliyse.
                         `correction_needed` ise amber (aksiyon bekleniyor),
                         normal düzenlemede nötr çerçeve. */}
@@ -829,6 +898,26 @@ function IlanlarSekmesi({ ilanlar: ilk, userId, anlasmalar }: { ilanlar: any[]; 
                                 </label>
                               </div>
                             </div>
+                            {/* Sürekli Yük (20 Ağu 2026) — yalnız yük ilanında. */}
+                            {isYuk && (
+                              <div style={{ marginBottom: 14, padding: 12, borderRadius: 8, border: `1px solid ${duzeltIsRecurring ? C.green : C.border}`, background: duzeltIsRecurring ? C.greenDark : 'transparent' }}>
+                                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                                  <input type="checkbox" checked={duzeltIsRecurring}
+                                    onChange={e => { setDuzeltIsRecurring(e.target.checked); if (!e.target.checked) setDuzeltRecurringUntil(''); }} />
+                                  <span style={{ color: duzeltIsRecurring ? C.green : C.text, fontWeight: 700, fontSize: '0.85rem' }}>🔁 Bu her gün tekrarlayan bir yük (Sürekli Yük)</span>
+                                </label>
+                                <p style={{ color: C.muted, fontSize: '0.75rem', margin: '6px 0 0 26px' }}>
+                                  İlanınız her gün otomatik yenilenir ve listede kalır. Dilediğiniz zaman durdurabilirsiniz.
+                                </p>
+                                {duzeltIsRecurring && (
+                                  <div style={{ marginTop: 10, marginLeft: 26, maxWidth: 220 }}>
+                                    <label style={lbl}>Bitiş Tarihi</label>
+                                    <input type="date" min={duzeltTarih || undefined} value={duzeltRecurringUntil}
+                                      onChange={e => setDuzeltRecurringUntil(e.target.value)} style={inp} />
+                                  </div>
+                                )}
+                              </div>
+                            )}
                             {/* Not alanı */}
                             <div style={{ marginBottom: 10 }}>
                               <label style={lbl}>Not / Açıklama</label>
@@ -897,6 +986,10 @@ function IlanlarSekmesi({ ilanlar: ilk, userId, anlasmalar }: { ilanlar: any[]; 
                                       // "geçerli tarih seçin" hatası verirdi.
                                       ...(duzeltTarih ? { available_date: duzeltTarih } : {}),
                                       date_flexible: duzeltTarihEsnek,
+                                      ...(isYuk ? {
+                                        is_recurring: duzeltIsRecurring,
+                                        ...(duzeltIsRecurring ? { recurring_until: duzeltRecurringUntil } : {}),
+                                      } : {}),
                                     }),
                                   });
                                   const d = await res.json();

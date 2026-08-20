@@ -59,7 +59,7 @@ export async function PATCH(
 
   const { data: deal } = await svc
     .from('deals')
-    .select('id, listing_id, shipper_id, carrier_id, status, completed_declared_by, completed_declared_at, payment_terms_days, shipment_stage')
+    .select('id, listing_id, shipper_id, carrier_id, status, completed_declared_by, completed_declared_at, payment_terms_days, shipment_stage, is_recurring_deal, deal_date')
     .eq('id', id)
     .maybeSingle();
 
@@ -307,28 +307,37 @@ export async function PATCH(
   }
 
   // ── Mühürlenme yan etkileri ────────────────────────────────────────────
+  // 🚨 20 Ağu 2026 — Sürekli Yük: `deal.is_recurring_deal` ise `listings`e HİÇ
+  // DOKUNULMAZ (talimat §4.2: "listings.status DEĞİŞTİRİLMEZ"). İlan her gün
+  // yeniden claim edilebilmeli; aşağıdaki dört blok da bu yüzden korumalı.
   if (action === 'onayla') {
-    // Yük satıldı: ilan feed'den çıkar.
-    // ⚠️ `listings.status` alfabesinde 'matched' YOK ve eklenmedi: feed, panel
-    //    (`durumHesapla`), moderatör filtreleri ve indeksler 'active'/'passive'
-    //    varsayıyor. Yeni bir durum eklemek o beş yeri birden değiştirmek
-    //    demekti. Mühürlenmenin GERÇEĞİ `deals`te; `listings` yalnız yayından
-    //    çekiliyor. (Panelde "Pasif" yerine "Anlaşıldı" göstermek FAZ 3'te.)
-    await svc.from('listings').update({ status: 'passive' }).eq('id', deal.listing_id);
+    if (!deal.is_recurring_deal) {
+      // Yük satıldı: ilan feed'den çıkar.
+      // ⚠️ `listings.status` alfabesinde 'matched' YOK ve eklenmedi: feed, panel
+      //    (`durumHesapla`), moderatör filtreleri ve indeksler 'active'/'passive'
+      //    varsayıyor. Yeni bir durum eklemek o beş yeri birden değiştirmek
+      //    demekti. Mühürlenmenin GERÇEĞİ `deals`te; `listings` yalnız yayından
+      //    çekiliyor. (Panelde "Pasif" yerine "Anlaşıldı" göstermek FAZ 3'te.)
+      await svc.from('listings').update({ status: 'passive' }).eq('id', deal.listing_id);
+    }
 
     // Rakip talepler otomatik düşer — yoksa nakliyeciler yanıt bekleyip kalır.
-    await svc.from('deals')
+    // Sürekli yükte yalnız AYNI GÜNÜN rakip talepleri düşer; başka günlere ait
+    // (henüz oluşmamış ya da geçmiş) kayıtlara dokunulmaz.
+    let rakipQuery = svc.from('deals')
       .update({ status: 'cancelled', cancelled_at: simdi, cancel_reason: 'Yük başka nakliyeciyle anlaşıldı' })
       .eq('listing_id', deal.listing_id)
       .eq('status', 'requested')
       .neq('id', id);
+    if (deal.is_recurring_deal) rakipQuery = rakipQuery.eq('deal_date', deal.deal_date);
+    await rakipQuery;
   }
 
   // ── İptal yan etkisi: mühürlenmiş bir kayıt bozulduğunda ────────────────
   // 🚨 11 Ağu 2026'da düzeltilen bug — bkz. dosya başındaki not. Yalnız
   // GERÇEKTEN mühürlenmiş (listings'i passive yapmış) bir kayıt iptal
   // olduğunda çalışır; 'requested' iptalinde listings hiç dokunulmamıştı.
-  if (guncel.status === 'cancelled' && guncel.cancel_type === 'anlasma') {
+  if (!deal.is_recurring_deal && guncel.status === 'cancelled' && guncel.cancel_type === 'anlasma') {
     // Eşleşme bozuldu ama iş hâlâ geçerli — ilan tekrar canlıya döner ki
     // başka bir nakliyeci talep edebilsin.
     await svc.from('listings').update({ status: 'active' }).eq('id', deal.listing_id);
@@ -337,7 +346,7 @@ export async function PATCH(
   // kendisi bittiği için canlıya dönmemesi doğru — "İş iptal ise ilan
   // yayından kalkar" isteğinin karşılığı zaten bu (bir daha active olmaz).
 
-  if (guncel.status === 'completed') {
+  if (!deal.is_recurring_deal && guncel.status === 'completed') {
     // Panelin "Tamamla" düğmesiyle tutarlı kalsın.
     // ⚠️ `listings.completed_at` TEK TARAFLI bir alandı; artık iki taraflı
     //    mutabakattan da doluyor. İkisi ayrışmasın diye burada da yazılıyor.
@@ -345,6 +354,8 @@ export async function PATCH(
       .update({ completed_at: simdi, status: 'passive' })
       .eq('id', deal.listing_id);
   }
+  // Sürekli yükte `completed` yalnız BU GÜNÜN seferini kapatır; `listings`
+  // asla `completed_at` almaz — ertesi gün cron ilanı yine "bugün"e tazeler.
 
   structuredLog('INFO', 'db-transaction', 'Anlaşma durumu değişti', {
     deal_id: id, action, yeni_durum: guncel.status, user_id: user.id,

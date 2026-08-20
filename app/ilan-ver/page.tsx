@@ -102,6 +102,10 @@ export default function IlanVer() {
   const [kalkis_ilce, setKalkisIlce] = useState('');
   const [tarih, setTarih] = useState(bugun());
   const [tarih_esnek, setTarihEsnek] = useState(false);
+  // Sürekli Yük (20 Ağu 2026) — yalnız yük ilanında anlamlı (araç ilanı için
+  // spec kapsamına girmedi, bkz. docs/SUREKLI_YUK_YAZILIMCI_TALIMATI.md).
+  const [is_recurring, setIsRecurring] = useState(false);
+  const [recurring_until, setRecurringUntil] = useState('');
   const [genel_not, setGenelNot] = useState('');
   const [fiyat, setFiyat] = useState('');
   const [fiyat_pazarlik, setFiyatPazarlik] = useState(false);
@@ -219,6 +223,7 @@ export default function IlanVer() {
     if (!kalkis) return 'Kalkış ili zorunludur.';
     if (duraklar.some(d => !d.sehir)) return 'Tüm varış illeri doldurulmalıdır.';
     if (!tarih) return 'Tarih zorunludur.';
+    if (is_recurring && !recurring_until) return 'Sürekli Yük için bitiş tarihi seçin.';
     return null;
   };
 
@@ -231,6 +236,7 @@ export default function IlanVer() {
       const sonuc = await ilanKaydet({
         tip, kalkis, kalkis_ilce, tel, fiyat, fiyat_pazarlik, tarih, tarih_esnek,
         genel_not, arac_tipi, utsyapi, arac_adet, yuk_cinsi, duraklar,
+        ...(tip === 'yuk' && is_recurring ? { is_recurring: true, recurring_until } : {}),
         // B3 — seçilen araç ARTIK ilana bağlanıyor. Sunucu sahipliği doğruluyor.
         arac_id: secilenArac?.id ?? null,
         raw_text: aiHamMetin || undefined,
@@ -589,6 +595,25 @@ export default function IlanVer() {
                     </span>
                   </label>
                   <input value={yuk_cinsi} onChange={e => setYukCinsi(e.target.value)} placeholder="Seramik, tekstil, elektronik..." style={s.input} />
+                </div>
+                {/* Sürekli Yük (20 Ağu 2026) — her gün tekrar eden gerçek bir
+                    yük varsa ilan otomatik yenilenir. Kaynak: docs/SUREKLI_YUK_YAZILIMCI_TALIMATI.md */}
+                <div style={{ marginBottom: 16, padding: 12, borderRadius: 8, border: `1px solid ${is_recurring ? '#22c55e' : '#30363d'}`, background: is_recurring ? '#0d2818' : 'transparent' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                    <input type="checkbox" checked={is_recurring}
+                      onChange={e => { setIsRecurring(e.target.checked); if (!e.target.checked) setRecurringUntil(''); }} />
+                    <span style={{ color: is_recurring ? '#22c55e' : '#e2e8f0', fontWeight: 700, fontSize: '0.88rem' }}>🔁 Bu her gün tekrarlayan bir yük (Sürekli Yük)</span>
+                  </label>
+                  <p style={{ color: '#8b949e', fontSize: '0.78rem', margin: '6px 0 0 26px' }}>
+                    İlanınız her gün otomatik yenilenir ve listede kalır. Dilediğiniz zaman durdurabilirsiniz.
+                  </p>
+                  {is_recurring && (
+                    <div style={{ marginTop: 10, marginLeft: 26, maxWidth: 220 }}>
+                      <label style={s.label}>Bitiş Tarihi <span style={s.zorunlu}>*</span></label>
+                      <input type="date" min={tarih || bugun()} value={recurring_until}
+                        onChange={e => setRecurringUntil(e.target.value)} required={is_recurring} style={s.input} />
+                    </div>
+                  )}
                 </div>
               </>
             )}

@@ -355,6 +355,8 @@ function IlanKart({ ilan, kullanici }: { ilan: any; kullanici: any }) {
             </span>
             <span style={{ background: kaynak.bg, color: kaynak.color, fontSize: '0.7rem', fontWeight: 600, padding: '2px 8px', borderRadius: 4 }}>{kaynak.label}</span>
             {ilan.dogrulanmamis && <span style={{ background: '#1a1f2e', color: '#94a3b8', fontSize: '0.7rem', fontWeight: 600, padding: '2px 8px', borderRadius: 4 }}>🔗 Dış Kaynak İlanı</span>}
+            {/* Sürekli Yük (20 Ağu 2026) — `lib/ilan-liste.ts::ilanNormalize` alanı. */}
+            {ilan.surekliYuk && <span style={{ background: '#14532d', color: '#4ade80', fontSize: '0.7rem', fontWeight: 700, padding: '2px 8px', borderRadius: 4 }}>🔁 Sürekli Yük</span>}
             {/* 🚨 10 Ağu 2026 — "✅ Tel Doğrulandı" ROZETİ KALDIRILDI. SAKIN GERİ EKLEME.
                 `users.phone_verified` İSTEMCİDEN yazılabiliyor (PanelClient OTP akışı
                 PostgREST'e doğrudan yazıyor), yani kullanıcı rozeti kendine verebiliyordu.
@@ -698,6 +700,8 @@ export default function HomeClient({ initialIlanlar = [], totalCount = 0 }: { in
           .in('moderation_status', ['approved', 'auto_published'])
           .eq('is_shadow_banned', false)
           .eq('status', 'active')
+          // 20 Ağu 2026 — Sürekli Yük bloğu SSR (`app/page.tsx`) ile aynı sırayı korusun.
+          .order('is_recurring', { ascending: false })
           .order('created_at', { ascending: false })
           // SPRINT_01 L4 — eskiden burada elle yazılmış `30` vardı; SSR ise 200 çekiyordu.
           // "Tekrar dene"ye basan kullanıcının listesi sessizce 170 ilan eksiliyordu.
