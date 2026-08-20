@@ -213,6 +213,16 @@ olmalı.
 
 ## 👤 6 — Bayram'da (kod/SQL ile yapılamaz)
 
+- ⏳ **`listings.raw_text`/`raw_posts.raw_text` tekrarı temizliği — kod+trigger+edge fn deploy edildi, canlı WhatsApp trafiğiyle hiç doğrulanmadı.**
+  20 Ağu 2026: `audit_listing_fn` trigger'ı `begin/rollback` içinde test edildi
+  (aynı skor: 70) ama bu SİMÜLASYON — gerçek bir WhatsApp mesajının pipeline'dan
+  geçip `parse-listing` v93 ile ilan oluşturması hiç izlenmedi. **Bir sonraki
+  gerçek mesaj geldiğinde (birkaç saat içinde olmalı) kontrol et:** `/moderator`
+  → yeni gelen bir whatsapp ilanının ham metin önizlemesi (sağ panel) DOLU
+  görünüyor mu (boşsa fallback join kırılmış demektir)? `audit_score` makul mü
+  (aniden 0'a düşmüşse trigger fallback'i çalışmıyor, güvenlik taraması kör)?
+  Sorun varsa `docs/PROJE_HARITASI.md` → "`listings.raw_text` ↔ `raw_posts.raw_text`
+  — TEKRAR TEMİZLENDİ" notuna bak, `audit_listing_fn`i `pg_proc`tan tekrar oku.
 - ⏳ **Sürekli Yük (Evergreen İlan) — kod + migration deploy edildi, gerçek kullanımla hiç doğrulanmadı.**
   Kaynak: `doc/SUREKLI_YUK_YAZILIMCI_TALIMATI.md`. 20 Ağu 2026: kod tarafı
   (form, İlanlarım onay şeridi, claim dallanması, feed rozeti/sıralaması,
