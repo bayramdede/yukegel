@@ -146,7 +146,9 @@ async function handlePhoneHistory(
       // Bu uç noktanın TÜKETİCİSİ `app/admin/radar/RadarClient.tsx` — orada da
       // `HistoryListing` arayüzü ve rota satırı aynı anda değişti. İkisi ayrı
       // ayrı deploy edilemez.
-      'id, created_at, origin_province_id, raw_text, listing_type, moderation_status, status, vehicle_type, listing_stops(province_id, stop_order)'
+      // 20 Ağu 2026: raw_post_id'li satırlarda raw_text artık listings'e
+      // yazılmıyor — embed edip aşağıda düzleştiriyoruz.
+      'id, created_at, origin_province_id, raw_text, raw_post_id, raw_posts:raw_post_id ( raw_text ), listing_type, moderation_status, status, vehicle_type, listing_stops(province_id, stop_order)'
     )
     .or(`contact_phone.eq.${normalized},contact_phone.eq.${local}`)
     .order('created_at', { ascending: false })
@@ -156,7 +158,13 @@ async function handlePhoneHistory(
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ phone: normalized, listings: data ?? [] });
+  const listings = (data ?? []).map((l: any) => ({
+    ...l,
+    raw_text: l.raw_text ?? l.raw_posts?.raw_text ?? null,
+    raw_posts: undefined,
+  }));
+
+  return NextResponse.json({ phone: normalized, listings });
 }
 
 // ── Tip tanımı ─────────────────────────────────────────────────────────────

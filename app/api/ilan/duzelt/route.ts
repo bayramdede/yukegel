@@ -53,7 +53,10 @@ export async function POST(req: NextRequest) {
     // ── İlanı çek ve sahiplik kontrolü
     const { data: ilan, error: ilanErr } = await svc
       .from('listings')
-      .select('id, user_id, moderation_status, status, completed_at, is_shadow_banned, notes, raw_text, vehicle_type, body_type, price_offer, price_negotiable, available_date, date_flexible, is_recurring, recurring_until')
+      // 20 Ağu 2026 — `raw_text` artık raw_post_id'li satırlarda `listings`e
+      // yazılmıyor; `metniDenetle()` aşağıda (güvenlik taraması) ham metni
+      // GÖRMEZDEN gelmesin diye `raw_posts` embed'i eklendi.
+      .select('id, user_id, moderation_status, status, completed_at, is_shadow_banned, notes, raw_text, raw_post_id, raw_posts:raw_post_id ( raw_text ), vehicle_type, body_type, price_offer, price_negotiable, available_date, date_flexible, is_recurring, recurring_until')
       .eq('id', id)
       .single();
 
@@ -163,8 +166,11 @@ export async function POST(req: NextRequest) {
     const yeniNotes = (notes ?? ilan.notes ?? '').trim();
     // ⚠️ Ayrım ŞART: `applies_to='user_text'` kuralları (whatsapp) yalnız
     //    kullanıcının yazdığı nota uygulanır, ilanın kazındığı ham mesaja DEĞİL.
+    // `ilan.raw_text` boşsa (raw_post_id'li satır) embed edilen
+    // `raw_posts.raw_text`e düş — bkz. yukarıdaki select notu.
+    const kaynakMetin = ilan.raw_text ?? (ilan as any).raw_posts?.raw_text ?? null;
     const denetim = await metniDenetle(
-      { kullanici: yeniNotes, kaynakMetin: ilan.raw_text }, 'user_correction');
+      { kullanici: yeniNotes, kaynakMetin }, 'user_correction');
     const score = denetim.skor;
     const firedRules = denetim.atesLenen;
 

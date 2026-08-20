@@ -4,7 +4,7 @@ import { requireStaff, getServiceSupabase } from '../../lib/auth'
 import { structuredLog } from '../../lib/logger'
 import {
   ilanYaz, kisaMetin, sayiAralik, tamSayiAralik,
-  MAX_DURAK, MAX_TON, MAX_PALET, MAX_NOT, MAX_RAW_TEXT, MAX_ARAC_ADET,
+  MAX_DURAK, MAX_TON, MAX_PALET, MAX_NOT, MAX_ARAC_ADET,
   type IlanYazGirdi,
 } from '../../lib/ilan-yaz'
 import { ARAC_TIPI_SETI, UTSYAPI_SETI } from '../../lib/ilan-sabitler'
@@ -277,7 +277,10 @@ export async function moderatorIlanOlustur(
         // doğrulaması ve KVKK izi ile yazılıyor. Tek kapı kalsın.
         contact_phone: null,
         notes: kisaMetin(girdi?.notes, MAX_NOT),
-        raw_text: kisaMetin(girdi?.raw_text, MAX_RAW_TEXT),
+        // 20 Ağu 2026 — artık YAZILMIYOR. `rawPostId` bu fonksiyonda her zaman
+        // dolu (yukarıda UUID doğrulaması zorunlu); metin `raw_posts.raw_text`te
+        // tek kopya kalıyor (`audit_listing_fn` fallback'i uyguluyor).
+        raw_text: null,
         source: kaynak,
         // Moderatör zaten insan gözüyle baktı: doğrudan onaylı doğar.
         moderation_status: 'approved',

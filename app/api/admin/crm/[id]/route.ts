@@ -22,7 +22,10 @@ export async function GET(
     svc.from('listings')
       // Dalga 5: metin kolonu düştü. Tüketici `app/admin/crm/CrmClient.tsx`
       // (arayüz :38, gösterim :495) aynı anda çevrildi.
-      .select('id, origin_province_id, listing_type, moderation_status, status, created_at, notes, vehicle_type, raw_text')
+      // 20 Ağu 2026: `raw_text` artık raw_post_id'li satırlarda `listings`e
+      // yazılmıyor — embed edip aşağıda düzleştiriyoruz, `CrmClient.tsx`
+      // sözleşmesi (düz `raw_text: string|null`) DEĞİŞMEDİ.
+      .select('id, origin_province_id, listing_type, moderation_status, status, created_at, notes, vehicle_type, raw_text, raw_post_id, raw_posts:raw_post_id ( raw_text )')
       .eq('shadow_profile_id', id)
       .order('created_at', { ascending: false })
       .limit(200),
@@ -30,8 +33,14 @@ export async function GET(
 
   if (!profileRes.data) return NextResponse.json({ error: 'Bulunamadı' }, { status: 404 });
 
+  const listings = (listingsRes.data ?? []).map((l: any) => ({
+    ...l,
+    raw_text: l.raw_text ?? l.raw_posts?.raw_text ?? null,
+    raw_posts: undefined,
+  }));
+
   return NextResponse.json({
     profile: profileRes.data,
-    listings: listingsRes.data ?? [],
+    listings,
   });
 }

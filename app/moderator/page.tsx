@@ -295,10 +295,14 @@ export default function Moderator() {
     // Dalga 5 (3 Ağu 2026): metin kolonları düştü. Satırlar `ilanlar` state'ine
     // HAM giriyor, yani `origin_province_id` / `stops[].province_id` adları
     // bileşenin her yerinde aynen görünür; çeviri gösterim anında `ilAdi()` ile.
+    // 20 Ağu 2026 — `raw_text` artık raw_post_id'li satırlarda `listings`e
+    // yazılmıyor (tekrar eden veri temizliği). `raw_posts` embed'i eklendi;
+    // düzleştirme aşağıdaki `setIlanlar` içinde yapılıyor, bu dosyanın geri
+    // kalanı (arama kutusu, hasSosyal, ham metin önizlemesi) DEĞİŞMEDİ.
     let query = supabase.from('listings').select(`
       id, listing_type, origin_province_id, origin_district, price_offer,
       source, created_at, moderation_status, status, notes, trust_level,
-      raw_text, raw_post_id, vehicle_type, body_type, user_id,
+      raw_text, raw_post_id, raw_posts:raw_post_id ( raw_text ), vehicle_type, body_type, user_id,
       audit_score, is_shadow_banned,
       listing_stops ( id, stop_order, province_id, district, vehicle_count, cargo_type, weight_ton, pallet_count, notes )
     `).order('created_at', { ascending: false }).limit(200);
@@ -351,6 +355,9 @@ export default function Moderator() {
       ...i,
       contact_phone: telefonlar[i.id] ?? null,
       internal_audit_logs: auditLoglar[i.id] ?? null,
+      // raw_text boşsa (raw_post_id'li satır) embed edilen raw_posts'a düş.
+      raw_text: i.raw_text ?? i.raw_posts?.raw_text ?? null,
+      raw_posts: undefined,
     })));
     setYukleniyor(false);
   }

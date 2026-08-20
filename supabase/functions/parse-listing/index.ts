@@ -1251,7 +1251,14 @@ Deno.serve(async (req) => {
           status: 'passive',
           trust_level: 'social',
           raw_post_id: raw_post_id,
-          raw_text: rawPost.raw_text,
+          // 20 Ağu 2026 — artık BURAYA YAZILMIYOR. `raw_post_id` zaten dolu;
+          // metin `raw_posts.raw_text`te tek kopya olarak duruyor
+          // (`listings.raw_text` ile aynı içeriğin %99,97'si birebir aynıydı,
+          // 154 MB tekrar ölçüldü — bkz. `docs/PROJE_HARITASI.md`). Güvenlik
+          // taraması (`audit_listing_fn`) kör kalmasın diye trigger artık
+          // raw_post_id doluyken raw_posts'a fallback yapıyor — bu satırdan
+          // ÖNCE o trigger değişikliği canlıya çıkmış olmalı.
+          raw_text: null,
           notes: firstLane.raw_line,
           vehicle_type: firstLane.vehicle ? [firstLane.vehicle] : null,
           body_type: firstLane.body_type ? [firstLane.body_type] : null,

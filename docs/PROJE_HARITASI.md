@@ -2094,6 +2094,48 @@ ip, user_agent, created_at
 
 ### `raw_posts`, `aliases`, `vehicles`
 
+#### `listings.raw_text` ↔ `raw_posts.raw_text` — TEKRAR TEMİZLENDİ (20 Ağu 2026)
+`listings.raw_post_id` doluysa (whatsapp/facebook pipeline + moderatör manuel
+girişi) `listings.raw_text` **artık YAZILMIYOR** — ham metin yalnız
+`raw_posts.raw_text`te tutuluyor. Ölçüm: 296.305 satırın **%99,97'si**
+(296.225) ikisinde birebir aynıydı, 154 MB tekrar vardı; geçmiş veri boşaltıldı,
+raw_text toplam boyutu 557 byte'a düştü.
+
+🚨 **6 satır İSTİSNA — dokunulmadı ve dokunulmamalı:** `source='form'`,
+"Metinden İlan" (`app/ilan-ver/page.tsx` → `aiHamMetin`) ile serbest metin
+yapıştırılan ilanlar. Bunlarda `raw_post_id` HİÇ YOK, `listings.raw_text` TEK
+kopya. `lib/ilan-yaz.ts` (`ilanYaz()`) ve WhatsApp BOT direkt kanalı
+(`app/api/whatsapp/route.ts`, `raw_post_id` hiç set etmiyor) bu satırlarda
+raw_text yazmaya **devam ediyor** — bilerek, DEĞİŞMEDİ.
+
+🔒 **En kritik bağımlılık — `audit_listing_fn()` trigger'ı.** `listings`e her
+INSERT'te çalışan güvenlik/spam tarama trigger'ı (`safety_rules` regex'leri)
+`NEW.raw_text`i tarıyordu. Yazma tarafı durdurulduğunda bu tarama kör kalırdı;
+trigger artık `NEW.raw_text NULL VE NEW.raw_post_id dolu` ise `raw_posts`tan
+okuyor (fallback, `begin/rollback` içinde aynı skoru (70) ürettiği doğrulandı).
+**Yeni bir yazma yolu eklerken bu deseni unutma:** `raw_post_id` set edip
+`raw_text`i boş bırakan HER yol, o satırın güvenlik taramasının hâlâ çalıştığını
+`audit_listing_fn`in fallback'ine güvenerek varsayar — trigger değişmeden ASLA
+böyle bir yazma yolu ekleme.
+
+**Okuma tarafı** (~9 dosya) `raw_posts:raw_post_id ( raw_text )` PostgREST
+embed'i + `l.raw_text ?? l.raw_posts?.raw_text` düzleştirmesiyle güncellendi:
+`app/moderator/page.tsx`, `app/api/ilan/duzelt` (`metniDenetle` güvenlik
+taraması — burada da atlanmamalıydı), `app/api/admin/crm/[id]/route.ts`,
+`app/api/admin/crm/[id]/analiz/route.ts` (ayrıca `.not('raw_text','is',null)`
+filtresi `.or('raw_text.not.is.null,raw_post_id.not.is.null')`e çevrildi —
+eskisi artık boş dönerdi), `app/api/admin/radar/route.ts`.
+**Dokunulmadı** (kontrol edilip UNAFFECTED bulundu): `lib/auditLimits.ts`
+(`countAiListingsLast24h` yalnız `user_id`li satırları sayıyor, pipeline
+satırlarının `user_id`si hep NULL), `app/api/admin/learn-aliases/route.ts`
+(kendi `.not('raw_text',...)` filtresi yalnız `origin_province_id IS NULL`
+— yani pipeline DIŞI, form kaynaklı eski satırları hedefliyor).
+
+Yazma tarafı: `supabase/functions/parse-listing/index.ts` (v93) +
+`app/moderator/actions.ts`. Migration yok — kolon şeması değişmedi, yalnız
+trigger fonksiyonu (`CREATE OR REPLACE`) ve veri güncellendi, doğrudan
+Supabase MCP ile.
+
 #### `raw_posts` — süpürücü kolonları (5 Ağu 2026, #76)
 ```
 parse_attempts        smallint not null default 0   -- süpürücünün kaç kez tetiklediği
@@ -2988,6 +3030,7 @@ Açık rotalar: /giris, /auth/, /profil-tamamla, /nasil-calisir, /hakkimizda,
 - 🚨 **`resend()` / `signUp()` çağrısında `emailRedirectTo` VERİLMEZSE** Supabase kendi "Site URL" ayarına düşer; kullanıcı `/auth/callback` yerine ana sayfaya çıkar, oturum takası **hiç yapılmaz** ve "linke tıkladım ama giremiyorum" der (29 Tem 2026, `SPRINT_01` A6). Değer `NEXT_PUBLIC_SITE_URL`'den gelmeli — **`request.url` kullanma**, Vercel'de proxy arkasındaki iç adres olabilir.
 - ⚠️ **E-posta gönderen uç noktalar hesap sayımına (enumeration) kapalı olmalı** (29 Tem 2026, `SPRINT_01` A6). `/api/auth/dogrulama-tekrar` adres kayıtlı olsun olmasın **aynı yanıtı** döner; sebep yalnız loga yazılır. Kotalar hata yolunda da işlenir — buradaki "hata"ların çoğu "böyle adres yok / zaten doğrulanmış", yani saldırganın aradığı bilgi; saymazsak o yol bedava olur. (`otp/route.ts`'ten bilinçli ayrılık: orada hata = sağlayıcı arızası, sayaç işlenmeden 502 döner.)
 - 🚨 **Feed'i "son değişen üste" mantığına çevirmek regresyondur — Sürekli Yük'ü ayrı BLOK yap** (20 Ağu 2026). `recurring-refresh` cron'u her gece sürekli yüklerin `updated_at`/`available_date`'ini tazeliyor; sıralamayı buna göre `updated_at DESC` yapmak cazip görünür ama **normal** ilanları da etkiler — ufak bir fiyat düzeltmesi haftalar önceki bir ilanı tepeye fırlatır. Gerçek çözüm: `.order('is_recurring', {ascending:false}).order('created_at', {ascending:false})` — sürekli yükler HER ZAMAN ayrı bir blok olarak üstte, blok içinde/dışında sıralama `created_at DESC` (mevcut davranış birebir korunur). Üç sorgu ucu var (`app/page.tsx`, `HomeClient.tsx`, `app/api/listings/ara`) — biri unutulursa o yol sessizce eski sıraya döner. İndeks: `idx_listings_active_feed (moderation_status, is_recurring DESC, created_at DESC)`.
+- 🚨 **"Bu kolon tekrar ediyor, silelim" demeden önce ONU KİM OKUYOR diye sor — bir trigger okuyabilir.** (20 Ağu 2026, `listings.raw_text`/`raw_posts.raw_text` temizliği.) `grep` ile bulunan ~10 TS/TSX okuma noktasını düzeltmek yetmedi; asıl kör nokta hiçbir `.ts` dosyasında görünmeyen bir DB trigger'ıydı (`audit_listing_fn`, güvenlik/spam taraması) — `pg_proc`tan canlı kaynağı okumadan bu bağımlılık asla görünmezdi. **Kural: bir kolonu "artık yazma" kararı almadan önce yalnız uygulama kodunu değil, o tablodaki TRIGGER'LARIN (`pg_get_triggerdef`) ve RPC'lerin (`pg_proc.prosrc`) gerçek kaynağını da oku — dokümandan değil, canlıdan.** Ayrıca: büyük bir `UPDATE` (296K satır) MCP aracının istemci zaman aşımını (~90-120 sn) aşınca sunucu tarafında ARKA PLANDA ÇALIŞMAYA DEVAM ETTİ (transaction commit olmadan) — `pg_stat_activity`den doğrulanmadan tekrar denemek tehlikeliydi (üst üste iki UPDATE aynı satırları kilitleyebilirdi). Çözüm: `LIMIT`li küçük partiler (40K) halinde, her parti kendi transaction'ında — doğal olarak idempotent (`WHERE ... IS NOT NULL` her seferinde küçülen bir küme sorar), tek dev UPDATE yerine yeniden denemesi güvenli.
 - 🚨 **Sürekli Yük migration'ı (`docs/20260820_surekli_yuk.sql`) DEPLOY'DAN ÖNCE elle çalıştırılmalı.** Kod `listings.is_recurring`/`recurring_until`/`recurring_confirmed_at` ve `deals.is_recurring_deal`/`deal_date` kolonlarının VAR OLDUĞUNU varsayıyor (`lib/ilan-yaz.ts`, `/api/deals/*`, `/api/ilan/duzelt`, `/api/listings/[id]/surekli-onay`, `/api/admin/surekli-yukler*`). Migration çalışmadan deploy edilirse bu yollar 42703 ile patlar — `ilan_olustur()` RPC'sinin kendisi DEĞİŞMEDİ (bilerek; bkz. `lib/ilan-yaz.ts` yorumu), yalnız RPC sonrası ayrı bir `UPDATE` bu kolonlara yazıyor, o yüzden hata yalnız Sürekli Yük işaretlenince görünür — normal ilan akışı migration'sız da (yanlışlıkla) çalışıyormuş gibi görünebilir, YANILTICI, migration'ı atlamayın.
 
 ---

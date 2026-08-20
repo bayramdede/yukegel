@@ -90,9 +90,14 @@ export async function POST(
       // yalnızca `created_at` + `raw_text` okuyor; il alanı LLM prompt'una hiç
       // girmiyordu. Ölü select alanını id'ye çevirmek onu canlıymış gibi
       // gösterirdi.
-      .select('raw_text, created_at')
+      // 20 Ağu 2026 — `raw_text` artık `raw_post_id` bağlı satırlarda `listings`e
+      // YAZILMIYOR (tekrar eden veri temizliği, bkz. PROJE_HARITASI §9). Shadow
+      // profil ilanlarının NEREDEYSE HEPSİ pipeline kaynaklı (raw_post_id dolu),
+      // yani eski `.not('raw_text','is',null)` filtresi artık boş dönerdi.
+      // `raw_posts` embed'i + OR filtresi ikisini de kapsıyor.
+      .select('raw_text, raw_post_id, created_at, raw_posts:raw_post_id ( raw_text )')
       .eq('shadow_profile_id', id)
-      .not('raw_text', 'is', null)
+      .or('raw_text.not.is.null,raw_post_id.not.is.null')
       .order('created_at', { ascending: false })
       .limit(30);
 
@@ -106,9 +111,12 @@ export async function POST(
 
     // 2. Mesajları temizle ve birleştir
     const mesajlar = listings
-      .map((l, i) => {
+      .map((l: any, i) => {
         const t = new Date(l.created_at).toLocaleDateString('tr-TR');
-        return `[${i + 1}] ${t}: ${temizle(String(l.raw_text ?? ''))}`;
+        // `raw_text` boşsa (raw_post_id'li yeni satırlar) embed edilen
+        // `raw_posts.raw_text`e düş — bkz. yukarıdaki select notu.
+        const metin = l.raw_text ?? l.raw_posts?.raw_text ?? '';
+        return `[${i + 1}] ${t}: ${temizle(String(metin))}`;
       })
       .join('\n');
 
