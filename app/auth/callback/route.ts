@@ -2,7 +2,7 @@ import { createServerClient } from '@supabase/ssr'
 import { createClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
-import { structuredLog } from '../../../lib/logger'
+import { structuredLog, maskIp } from '../../../lib/logger'
 import { REDIRECT_COOKIE, guvenliRedirect } from '../../../lib/redirect'
 
 export async function GET(request: Request) {
@@ -51,6 +51,24 @@ export async function GET(request: Request) {
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.SUPABASE_SERVICE_ROLE_KEY!
       )
+
+      // 21 Ağu 2026 — Google OAuth girişleri `auth_events`e HİÇ YAZILMIYORDU
+      // (yalnız structuredLog/stdout'a düşüyordu, DB'de izi yoktu — OTP/e-posta
+      // girişleri `/api/auth/log` ile yazarken bu yol hiç çağrılmamıştı, çünkü
+      // istemci Google'dan döndüğünde bu route'a hiç uğramadan session'ı alıyor).
+      // Fire-and-forget: `.then()` bekletilmiyor, giriş akışını bloklamaz.
+      const xff = request.headers.get('x-forwarded-for')
+      const ipHam = xff ? xff.split(',')[0].trim() : request.headers.get('x-real-ip')
+      svc.from('auth_events').insert({
+        event: 'login_success',
+        method: 'google',
+        user_id: user.id,
+        ip_masked: ipHam ? maskIp(ipHam) : null,
+        user_agent: request.headers.get('user-agent')?.slice(0, 300) ?? null,
+      }).then(({ error }) => {
+        if (error) structuredLog('ERROR', 'auth', 'auth_events yazılamadı (google)', { supabase_error: error.message })
+      })
+
       // maybeSingle() — yeni kayıtta users tablosunda henüz satır olmayabilir
       const { data: profil } = await svc
         .from('users')

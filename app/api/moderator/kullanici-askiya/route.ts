@@ -20,6 +20,10 @@ export async function POST(request: NextRequest) {
 
     const svc = getServiceSupabase();
 
+    // 21 Ağu 2026 — `admin_actions` arşivi: eski değeri update'ten ÖNCE oku.
+    const { data: eskiSatir } = await svc
+      .from('users').select('is_active').eq('id', userId).maybeSingle();
+
     // 1. Kullanıcı hesabını pasifleştir
     await svc.from('users').update({ is_active: false }).eq('id', userId);
 
@@ -33,6 +37,15 @@ export async function POST(request: NextRequest) {
       })
       .eq('user_id', userId)
       .neq('status', 'completed');
+
+    const { error: logHata } = await svc.from('admin_actions').insert({
+      actor_id: user.id,
+      target_user_id: userId,
+      alan: 'is_active',
+      eski_deger: { is_active: (eskiSatir as { is_active: boolean | null } | null)?.is_active ?? null },
+      yeni_deger: { is_active: false, sebep: 'moderator_askiya' },
+    });
+    if (logHata) console.error('[admin_actions] yazılamadı (askiya):', logHata.message);
 
     return NextResponse.json({ success: true });
   } catch (e: any) {

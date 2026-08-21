@@ -2091,6 +2091,26 @@ ip, user_agent, created_at
   `login_failed` olayları bu tabloda birikir. "Şu IP'den 15 dakikada kaç hata?" sorgusu:
   `select ip_masked, count(*) from auth_events where event='login_failed'
    and created_at > now() - interval '15 min' group by 1 order by 2 desc;`
+- ✅ **21 Ağu 2026 — Google OAuth boşluğu kapatıldı** (`app/auth/callback/route.ts`).
+  Öncesinde bu tabloya yalnız OTP/e-posta `login_success` yazıyordu.
+
+### `search_queries`, `listing_views`, `admin_actions` — Log arşivi (21 Ağu 2026)
+```
+search_queries — user_id, kaynak('il_filtre'|'yakin_konum'), kalkis_il_id, varis_il_id,
+                 tip('yuk'|'arac'), sonuc_sayisi, ip_masked, created_at
+                 ⚠️ 'yakin_konum'da ham GPS (lat/lng) YAZILMAZ, yalnız çözümlenen il.
+listing_views  — listing_id, viewer_user_id, ip_masked, created_at
+                 ⚠️ bilinen arama-motoru/sosyal-önizleme botları route seviyesinde elenir.
+admin_actions  — actor_id, target_user_id, alan, eski_deger(jsonb), yeni_deger(jsonb), created_at
+```
+- Migration: `docs/20260821_kullanici_arsiv.sql` — RLS deseni `auth_events` ile birebir aynı
+  (yazma yalnız service-role, okuma yalnız admin/moderator).
+- Doldurulduğu yerler: `/api/listings/ara` + `/api/listings/yakin` (`after()` ile, aramanın
+  gecikmesine eklenmez) → `search_queries`; `/ilan/[id]` sayfası (`after()`) → `listing_views`;
+  `/api/admin/kullanici` PATCH + `/api/moderator/kullanici-askiya` → `admin_actions`.
+- Görüntüleme: `/admin/loglar` (dört sekme, kullanıcı adı/e-posta/telefonla filtre).
+- ⚠️ **Retention YOK** — bilinçli "süresiz sakla" tercihi (bkz. §9 "SON GİRİŞ SÜTUNU" notunun
+  devamı ve §7 "Log arşivi").
 
 ### `raw_posts`, `aliases`, `vehicles`
 
@@ -2631,6 +2651,14 @@ aynı `normalized`+`district`'e** çözülüyor. Ek olarak 303 mesajda (3 gerçe
 | `/api/admin/surekli-yukler` | 🔁 Moderatör ekranı (GET, `requireAdmin`). Tüm `is_recurring=true` ilanları + sahip bilgisi + bugünkü (`deal_date=bugün`) temas sayısı. `?durum=active\|passive` filtre. |
 | `/api/admin/surekli-yukler/[id]` | 🔁 `PATCH { action: 'sonlandir'\|'duraklat'\|'aktiflestir'\|'tarih_duzenle', recurring_until? }` (`requireAdmin`). `sonlandir` kalıcı (`is_recurring=false`); `duraklat`/`aktiflestir` yalnız `status` değiştirir, `is_recurring` KORUNUR. Ekran: `/admin/surekli-yukler`. |
 
+**21 Ağu 2026 — Log arşivi (`docs/20260821_kullanici_arsiv.sql`, `/admin/loglar`).** Dört log tablosu artık dolduruluyor, `admin/loglar` sayfasında tek yerde görünüyor:
+- `auth_events`'e artık **Google OAuth girişleri de yazılıyor** (`app/auth/callback/route.ts`) — daha önce yalnız OTP/e-posta yazıyordu (bkz. §9 "SON GİRİŞ SÜTUNU" notu).
+- `search_queries` — `/api/listings/ara` (kaynak=`il_filtre`) ve `/api/listings/yakin` (kaynak=`yakin_konum`, YALNIZ çözümlenen il yazılır, ham GPS asla). İkisi de `after()` (Next 16, bkz. AGENTS.md) içinde yazıyor — arama yanıtının gecikmesine hiç eklenmiyor.
+- `listing_views` — `/ilan/[id]` sayfa render'ından sonra `after()` ile. Bilinen arama-motoru/sosyal-önizleme botları (`BOT_UA_DESENI`) DB'ye hiç yazılmadan elenir.
+- `admin_actions` — `/api/admin/kullanici` PATCH ve `/api/moderator/kullanici-askiya` POST, eski/yeni değeri `jsonb` olarak kaydeder (kim, kimi, hangi alanı değiştirdi).
+- RLS deseni `auth_events` ile birebir aynı: yazma yalnız service-role, okuma yalnız admin/moderator.
+- ⚠️ **Retention kurulmadı.** `auth_events`'in kendi migration'ı "KVKK ölçülülük gereği 90 günden eskisi silinmeli" diyordu (hiç aktif edilmemiş bir cron önerisi). Bayram bu üç tablo için **süresiz sakla** dedi — bilinçli tercih, ama gelecekte biri retention/temizlik eklerse bu üçünü UNUTMASIN.
+
 ---
 
 ## 8. PROXY MANTIĞI
@@ -2689,6 +2717,12 @@ Açık rotalar: /giris, /auth/, /profil-tamamla, /nasil-calisir, /hakkimizda,
   doğrulanmamış — gizle" checkbox'ı var (işaretlenince bu satırlar tablodan
   çıkıyor, gerçek/aktif kullanıcı sayısı görünür hâle geliyor). `tsc --noEmit`
   temiz.
+  ✅ **21 Ağu 2026 — GOOGLE OAUTH BOŞLUĞU KAPATILDI.** Bu notta tespit edilen
+  "Google girişleri `auth_events`e hiç yazmıyor" boşluğu `/admin/loglar`
+  çalışmasıyla (bkz. §7 "Log arşivi") kapatıldı — artık Google ile giren
+  herkes de `login_success`/`method=google` olarak kaydediliyor. Kalan tek
+  sınır: hâlâ yalnız YENİ bir auth akışı yazıyor, sessiz token refresh yazmıyor
+  — "son giriş = son aktivite" varsayımı yine yapılmamalı.
 
 - 🚨 **DÜŞÜK GÜVENLİ AI-ALIAS, PASS 2'NİN "AYNI SATIRDA KAYNAK+HEDEF" KOLUNU
   KANDIRDI → SESSİZCE YANLIŞ VARIŞ** (21 Ağu 2026, `aliases` id 2705,

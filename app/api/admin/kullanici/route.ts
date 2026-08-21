@@ -2,8 +2,9 @@ import { NextResponse } from 'next/server'
 import { requireAdmin, getServiceSupabase } from '../../../../lib/auth'
 
 export async function PATCH(request: Request) {
+  let admin
   try {
-    await requireAdmin()
+    admin = await requireAdmin()
   } catch {
     return NextResponse.json({ error: 'Yetkisiz' }, { status: 401 })
   }
@@ -32,12 +33,30 @@ export async function PATCH(request: Request) {
 
   const service = getServiceSupabase()
 
+  // 21 Ağu 2026 — `admin_actions` arşivi: "eski değer" önce okunmalı, update
+  // sonrasında artık kaybolmuş olur. Bu satır zaten tek satır (`.eq('id', id)`)
+  // olduğu için maliyeti ihmal edilebilir düzeyde.
+  const { data: eskiSatir } = await service
+    .from('users')
+    .select(alan)
+    .eq('id', id)
+    .maybeSingle()
+
   const { error } = await service
     .from('users')
     .update({ [alan]: normalizedDeger })
     .eq('id', id)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  const { error: logHata } = await service.from('admin_actions').insert({
+    actor_id: admin.id,
+    target_user_id: id,
+    alan,
+    eski_deger: eskiSatir ? { [alan]: (eskiSatir as unknown as Record<string, unknown>)[alan] } : null,
+    yeni_deger: { [alan]: normalizedDeger },
+  })
+  if (logHata) console.error('[admin_actions] yazılamadı:', logHata.message)
 
   // Kullanıcı pasife alındıysa oturumunu anında sonlandır
   if (alan === 'is_active' && deger === false) {

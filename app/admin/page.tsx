@@ -80,6 +80,13 @@ const KARTLAR = [
     aciklama: 'Her gün otomatik yenilenen ilanlar. Sonlandır, duraklat, bitiş tarihi düzenle.',
     aktif: true,
   },
+  {
+    yol: '/admin/loglar',
+    ikon: '🗂️',
+    baslik: 'Log Arşivi',
+    aciklama: 'Giriş olayları, arama sorguları, ilan görüntülemeleri, admin/moderatör kullanıcı-yönetimi izi.',
+    aktif: true,
+  },
 ];
 
 export default async function AdminAna() {

@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { after } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { cookies } from 'next/headers';
+import { createServerClient } from '@supabase/ssr';
 import { ILAN_LIMITI, ILAN_SELECT, ilanNormalize, type RozetBilgi } from '../../../../lib/ilan-liste';
 import { ilId } from '../../../../lib/lokasyon';
+import { maskIp } from '../../../../lib/logger';
 
 export const runtime = 'nodejs';
 
@@ -43,6 +47,46 @@ const SVC_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SVC_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 const GECERLI_TIP = new Set(['yuk', 'arac']);
+
+// 21 Ağu 2026 — `search_queries` arşivi. `after()` içinde çalışır (Next 16,
+// bkz. AGENTS.md): yanıt kullanıcıya gittikten SONRA yazılır, aramanın
+// gecikmesine hiç eklenmez. Route Handler olduğu için `cookies()` `after`
+// callback'inin İÇİNDE okunabiliyor (Server Component'te bu yasak — orada
+// `after`dan ÖNCE okuyup değer olarak geçirmek gerekirdi).
+function loglaAramaSorgusu(
+  req: NextRequest,
+  svc: any,
+  bilgi: { kalkisId: number | null; varisId: number | null; tip: string | null; sonucSayisi: number }
+) {
+  after(async () => {
+    try {
+      const cookieStore = await cookies();
+      const authClient = createServerClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        { cookies: { getAll: () => cookieStore.getAll(), setAll: () => {} } }
+      );
+      const { data: { user } } = await authClient.auth.getUser();
+
+      const xff = req.headers.get('x-forwarded-for');
+      const ipHam = xff ? xff.split(',')[0].trim() : req.headers.get('x-real-ip');
+
+      const { error } = await svc.from('search_queries').insert({
+        user_id: user?.id ?? null,
+        kaynak: 'il_filtre',
+        kalkis_il_id: bilgi.kalkisId,
+        varis_il_id: bilgi.varisId,
+        tip: bilgi.tip,
+        sonuc_sayisi: bilgi.sonucSayisi,
+        ip_masked: ipHam ? maskIp(ipHam) : null,
+      });
+      if (error) console.error('[search_queries] yazılamadı:', error.message);
+    } catch (e) {
+      // Loglama ASLA aramayı etkilemesin — kullanıcı yanıtı zaten gitti.
+      console.error('[search_queries] beklenmeyen hata:', e instanceof Error ? e.message : e);
+    }
+  });
+}
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -108,6 +152,7 @@ export async function GET(req: NextRequest) {
     }
     idListesi = [...new Set((idData ?? []).map((r: any) => r.id as string))];
     if (idListesi.length === 0) {
+      loglaAramaSorgusu(req, svc, { kalkisId, varisId, tip: tipHam, sonucSayisi: 0 });
       return NextResponse.json({ success: true, data: [], total: 0, kirpildi: false });
     }
   }
@@ -133,6 +178,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
   if (!data || data.length === 0) {
+    loglaAramaSorgusu(req, svc, { kalkisId, varisId, tip: tipHam, sonucSayisi: 0 });
     return NextResponse.json({ success: true, data: [], total: 0, kirpildi: false });
   }
 
@@ -153,6 +199,8 @@ export async function GET(req: NextRequest) {
   const ilanlar = (data as any[]).map(ilan =>
     ilanNormalize(ilan, ilan.user_id ? rozetMap[ilan.user_id] : null)
   );
+
+  loglaAramaSorgusu(req, svc, { kalkisId, varisId, tip: tipHam, sonucSayisi: ilanlar.length });
 
   return NextResponse.json({
     success: true,

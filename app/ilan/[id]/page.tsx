@@ -2,16 +2,37 @@ import { cache } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { notFound } from 'next/navigation';
 import { Metadata } from 'next';
+import { after } from 'next/server';
 import Aksiyonlar from './Aksiyonlar';
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 import { createServerClient } from '@supabase/ssr';
 import { durakToplami } from '../../../lib/ilan-liste';
 import { ilAdi } from '../../../lib/lokasyon';
+import { maskIp } from '../../../lib/logger';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
+
+// 21 Ağu 2026 — `listing_views` arşivi. Bilinen arama-motoru/sosyal-önizleme
+// botları BURADA elenir, DB'ye hiç yazılmaz (aksi halde tablo Googlebot/
+// facebookexternalhit trafiğiyle dolar, "gerçek görüntüleme" sayısı yalan
+// söyler). Server Component olduğu için `headers()`/`cookies()` `after`
+// İÇİNDE okunamıyor (Next 16 kısıtı) — çağrı yerinde okunup değer geçiliyor.
+const BOT_UA_DESENI = /bot|crawl|spider|slurp|facebookexternalhit|whatsapp|telegrambot|discordbot|linkedinbot|twitterbot|semrushbot|ahrefsbot|mj12bot|dotbot|petalbot|yandexbot|applebot|adsbot|inspectiontool/i;
+
+function loglaIlanGoruntuleme(listingId: string, userId: string | null, userAgent: string | null, ipMasked: string | null) {
+  if (userAgent && BOT_UA_DESENI.test(userAgent)) return;
+  after(async () => {
+    const { error } = await supabase.from('listing_views').insert({
+      listing_id: listingId,
+      viewer_user_id: userId,
+      ip_masked: ipMasked,
+    });
+    if (error) console.error('[listing_views] yazılamadı:', error.message);
+  });
+}
 
 // 8 Ağu 2026 — tek kaynak; canonical/og:url artık yönlenmeyen host (bkz. lib/site.ts).
 import { SITE_URL } from '../../../lib/site';
@@ -228,12 +249,22 @@ export default async function IlanDetay({ params }: { params: Promise<{ id: stri
   // gidiş-gelişi DEĞİL, aynı isteğin önbelleğinden dönüyor. Ayrıca auth kontrolü
   // ilanı beklemeden AYNI ANDA başlıyor — ikisi de birbirinden bağımsız,
   // ardışık `await` iki ayrı ağ turu demekti.
-  const [ilan, { data: { user } }] = await Promise.all([
+  const [ilan, { data: { user } }, hdrs] = await Promise.all([
     getIlan(id),
     supabaseAuth.auth.getUser(),
+    headers(),
   ]);
 
   if (!ilan || ilan.moderation_status === 'rejected') return notFound();
+
+  // 21 Ağu 2026 — görüntüleme logu; `ilan`/`user` her ihtimalde burada hazır,
+  // aşağıdaki dallanmaların (watermark, sahiplik vb.) SONUCUNU beklemesine
+  // gerek yok. Bot filtresi fonksiyonun İÇİNDE.
+  {
+    const xff = hdrs.get('x-forwarded-for');
+    const ipHam = xff ? xff.split(',')[0].trim() : hdrs.get('x-real-ip');
+    loglaIlanGoruntuleme(id, user?.id ?? null, hdrs.get('user-agent'), ipHam ? maskIp(ipHam) : null);
+  }
 
   // 11 Ağu 2026 — "ilan canlıda mı?" TEK tanım. `app/panel/PanelClient.tsx`
   // içindeki `aktifIlan` hesabıyla BİREBİR aynı formül — ikisi ayrışırsa
