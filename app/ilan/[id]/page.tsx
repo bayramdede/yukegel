@@ -8,7 +8,6 @@ import { cookies, headers } from 'next/headers';
 import { createServerClient } from '@supabase/ssr';
 import { durakToplami } from '../../../lib/ilan-liste';
 import { ilAdi } from '../../../lib/lokasyon';
-import { maskIp } from '../../../lib/logger';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -22,13 +21,15 @@ const supabase = createClient(
 // İÇİNDE okunamıyor (Next 16 kısıtı) — çağrı yerinde okunup değer geçiliyor.
 const BOT_UA_DESENI = /bot|crawl|spider|slurp|facebookexternalhit|whatsapp|telegrambot|discordbot|linkedinbot|twitterbot|semrushbot|ahrefsbot|mj12bot|dotbot|petalbot|yandexbot|applebot|adsbot|inspectiontool/i;
 
-function loglaIlanGoruntuleme(listingId: string, userId: string | null, userAgent: string | null, ipMasked: string | null) {
+function loglaIlanGoruntuleme(listingId: string, userId: string | null, userAgent: string | null, ip: string | null) {
   if (userAgent && BOT_UA_DESENI.test(userAgent)) return;
   after(async () => {
+    // 21 Ağu 2026 — Bayram'ın bilinçli kararıyla HAM IP (bkz.
+    // docs/20260821b_ip_maskeleme_kaldir.sql).
     const { error } = await supabase.from('listing_views').insert({
       listing_id: listingId,
       viewer_user_id: userId,
-      ip_masked: ipMasked,
+      ip,
     });
     if (error) console.error('[listing_views] yazılamadı:', error.message);
   });
@@ -263,7 +264,7 @@ export default async function IlanDetay({ params }: { params: Promise<{ id: stri
   {
     const xff = hdrs.get('x-forwarded-for');
     const ipHam = xff ? xff.split(',')[0].trim() : hdrs.get('x-real-ip');
-    loglaIlanGoruntuleme(id, user?.id ?? null, hdrs.get('user-agent'), ipHam ? maskIp(ipHam) : null);
+    loglaIlanGoruntuleme(id, user?.id ?? null, hdrs.get('user-agent'), ipHam ?? null);
   }
 
   // 11 Ağu 2026 — "ilan canlıda mı?" TEK tanım. `app/panel/PanelClient.tsx`

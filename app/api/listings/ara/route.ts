@@ -5,7 +5,6 @@ import { cookies } from 'next/headers';
 import { createServerClient } from '@supabase/ssr';
 import { ILAN_LIMITI, ILAN_SELECT, ilanNormalize, type RozetBilgi } from '../../../../lib/ilan-liste';
 import { ilId } from '../../../../lib/lokasyon';
-import { maskIp } from '../../../../lib/logger';
 
 export const runtime = 'nodejs';
 
@@ -78,7 +77,9 @@ function loglaAramaSorgusu(
         varis_il_id: bilgi.varisId,
         tip: bilgi.tip,
         sonuc_sayisi: bilgi.sonucSayisi,
-        ip_masked: ipHam ? maskIp(ipHam) : null,
+        // 21 Ağu 2026 — Bayram'ın bilinçli kararıyla HAM IP (bkz.
+        // docs/20260821b_ip_maskeleme_kaldir.sql).
+        ip: ipHam,
       });
       if (error) console.error('[search_queries] yazılamadı:', error.message);
     } catch (e) {

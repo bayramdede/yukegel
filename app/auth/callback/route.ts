@@ -2,7 +2,7 @@ import { createServerClient } from '@supabase/ssr'
 import { createClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
-import { structuredLog, maskIp } from '../../../lib/logger'
+import { structuredLog } from '../../../lib/logger'
 import { REDIRECT_COOKIE, guvenliRedirect } from '../../../lib/redirect'
 
 export async function GET(request: Request) {
@@ -63,7 +63,9 @@ export async function GET(request: Request) {
         event: 'login_success',
         method: 'google',
         user_id: user.id,
-        ip_masked: ipHam ? maskIp(ipHam) : null,
+        // 21 Ağu 2026 — Bayram'ın bilinçli kararıyla HAM IP (bkz.
+        // docs/20260821b_ip_maskeleme_kaldir.sql).
+        ip: ipHam,
         user_agent: request.headers.get('user-agent')?.slice(0, 300) ?? null,
       }).then(({ error }) => {
         if (error) structuredLog('ERROR', 'auth', 'auth_events yazılamadı (google)', { supabase_error: error.message })

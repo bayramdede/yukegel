@@ -14,7 +14,10 @@ import { structuredLog, maskIp } from '../../../../lib/logger'
  *   - `user_id` gövdeden DEĞİL, SSR oturum cookie'sinden okunur
  *   - `event` / `method` beyaz listeye göre süzülür (uydurma değer tabloyu kirletemez)
  *   - `reason` 300 karakterde kesilir
- *   - telefon/e-posta/şifre asla yazılmaz; IP maskelenir (KVKK)
+ *   - telefon/e-posta/şifre asla yazılmaz
+ *   - IP 21 Ağu 2026'ya kadar maskeleniyordu (KVKK); Bayram'ın bilinçli
+ *     kararıyla artık HAM yazılıyor (bkz. docs/20260821b_ip_maskeleme_kaldir.sql).
+ *     Kota anahtarı (`kotaAsildi`) hâlâ maskeli IP kullanıyor — bu ayrı bir karar.
  *
  * Hata durumunda bile 204 döner: log yazımı kullanıcının giriş akışını ASLA bloklamamalı.
  * (Ama sunucu tarafında structuredLog'a WARN düşer, sessiz kalmaz.)
@@ -87,6 +90,9 @@ export async function POST(request: Request) {
     }
 
     const ipHam = ipAl(request)
+    // Kota anahtarı BİLEREK maskeli kalıyor — /24 alt ağını tek grup sayar,
+    // bir ISP'nin rotasyonlu IP havuzunu bölüp kota bypass etmeyi zorlaştırır.
+    // Bu, DB'ye YAZILAN IP'den (aşağıda `kayit.ip`) ayrı bir karar.
     const ipMasked = ipHam ? maskIp(ipHam) : null
 
     if (kotaAsildi(ipMasked ?? 'bilinmiyor')) {
@@ -108,7 +114,10 @@ export async function POST(request: Request) {
       method: GECERLI_METODLAR.has(method) ? method : 'bilinmiyor',
       reason: govde.reason ? String(govde.reason).slice(0, 300) : null,
       user_id: userId,
-      ip_masked: ipMasked,
+      // 21 Ağu 2026 — Bayram'ın bilinçli kararıyla artık HAM IP (bkz.
+      // docs/20260821b_ip_maskeleme_kaldir.sql). stdout'taki structuredLog
+      // hâlâ maskeli (aşağıda) — bu yalnız DB kolonu için geçerli.
+      ip: ipHam,
       user_agent: request.headers.get('user-agent')?.slice(0, 300) ?? null,
     }
 

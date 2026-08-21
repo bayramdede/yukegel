@@ -5,7 +5,6 @@ import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { enYakinIl } from '../../../../lib/il-koordinatlari';
 import { ilId } from '../../../../lib/lokasyon';
-import { maskIp } from '../../../../lib/logger';
 
 export const runtime = 'nodejs';
 
@@ -36,7 +35,9 @@ function loglaYakinSorgusu(req: NextRequest, ilId: number, sonucSayisi: number) 
         kaynak: 'yakin_konum',
         varis_il_id: ilId,
         sonuc_sayisi: sonucSayisi,
-        ip_masked: ipHam ? maskIp(ipHam) : null,
+        // 21 Ağu 2026 — Bayram'ın bilinçli kararıyla HAM IP (bkz.
+        // docs/20260821b_ip_maskeleme_kaldir.sql).
+        ip: ipHam,
       });
       if (error) console.error('[search_queries] yazılamadı (yakin):', error.message);
     } catch (e) {

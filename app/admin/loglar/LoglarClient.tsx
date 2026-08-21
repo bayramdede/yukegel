@@ -5,17 +5,17 @@ type Kullanici = { display_name: string | null; email: string | null; phone: str
 
 type AuthEvent = {
   id: number; event: string; method: string; reason: string | null;
-  user_id: string | null; ip_masked: string | null; user_agent: string | null;
+  user_id: string | null; ip: string | null; user_agent: string | null;
   created_at: string; kullanici: Kullanici;
 };
 type SearchQuery = {
   id: number; user_id: string | null; kaynak: string;
   kalkis_il_id: number | null; varis_il_id: number | null; tip: string | null;
-  sonuc_sayisi: number | null; ip_masked: string | null; created_at: string;
+  sonuc_sayisi: number | null; ip: string | null; created_at: string;
   kullanici: Kullanici; kalkis_il_adi: string | null; varis_il_adi: string | null;
 };
 type ListingView = {
-  id: number; listing_id: string; viewer_user_id: string | null; ip_masked: string | null;
+  id: number; listing_id: string; viewer_user_id: string | null; ip: string | null;
   created_at: string; kullanici: Kullanici;
   ilan: { origin_province_id: number | null; listing_type: string | null; il_adi: string | null } | null;
 };
@@ -143,7 +143,7 @@ export default function LoglarClient({
                   <td style={td}>{r.method}</td>
                   <td style={td}>{kullaniciEtiket(r.kullanici)}</td>
                   <td style={{ ...td, whiteSpace: 'normal', maxWidth: 260, color: '#8b949e' }}>{r.reason || '—'}</td>
-                  <td style={{ ...td, color: '#6b7280', fontFamily: 'monospace' }}>{r.ip_masked || '—'}</td>
+                  <td style={{ ...td, color: '#6b7280', fontFamily: 'monospace' }}>{r.ip || '—'}</td>
                 </tr>
               ))}
             </tbody>
@@ -169,7 +169,7 @@ export default function LoglarClient({
                   <td style={td}>{r.tip || <span style={{ color: '#374151' }}>—</span>}</td>
                   <td style={{ ...td, color: r.sonuc_sayisi === 0 ? '#fca5a5' : '#86efac', fontWeight: 600 }}>{r.sonuc_sayisi ?? '—'}</td>
                   <td style={td}>{kullaniciEtiket(r.kullanici)}</td>
-                  <td style={{ ...td, color: '#6b7280', fontFamily: 'monospace' }}>{r.ip_masked || '—'}</td>
+                  <td style={{ ...td, color: '#6b7280', fontFamily: 'monospace' }}>{r.ip || '—'}</td>
                 </tr>
               ))}
             </tbody>
@@ -193,7 +193,7 @@ export default function LoglarClient({
                     </a>
                   </td>
                   <td style={td}>{kullaniciEtiket(r.kullanici)}</td>
-                  <td style={{ ...td, color: '#6b7280', fontFamily: 'monospace' }}>{r.ip_masked || '—'}</td>
+                  <td style={{ ...td, color: '#6b7280', fontFamily: 'monospace' }}>{r.ip || '—'}</td>
                 </tr>
               ))}
             </tbody>

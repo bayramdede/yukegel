@@ -15,11 +15,11 @@ export default async function LoglarPage() {
   const svc = getServiceSupabase();
 
   const [authRes, searchRes, viewRes, actionRes] = await Promise.all([
-    svc.from('auth_events').select('id, event, method, reason, user_id, ip_masked, user_agent, created_at')
+    svc.from('auth_events').select('id, event, method, reason, user_id, ip, user_agent, created_at')
       .order('created_at', { ascending: false }).limit(SATIR_LIMIT),
-    svc.from('search_queries').select('id, user_id, kaynak, kalkis_il_id, varis_il_id, tip, sonuc_sayisi, ip_masked, created_at')
+    svc.from('search_queries').select('id, user_id, kaynak, kalkis_il_id, varis_il_id, tip, sonuc_sayisi, ip, created_at')
       .order('created_at', { ascending: false }).limit(SATIR_LIMIT),
-    svc.from('listing_views').select('id, listing_id, viewer_user_id, ip_masked, created_at')
+    svc.from('listing_views').select('id, listing_id, viewer_user_id, ip, created_at')
       .order('created_at', { ascending: false }).limit(SATIR_LIMIT),
     svc.from('admin_actions').select('id, actor_id, target_user_id, alan, eski_deger, yeni_deger, created_at')
       .order('created_at', { ascending: false }).limit(SATIR_LIMIT),

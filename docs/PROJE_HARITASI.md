@@ -2089,7 +2089,7 @@ ip, user_agent, created_at
 - ✅ Migration: `docs/20260728_auth_events.sql` çalıştırıldı (29 Tem 2026) — tablo canlıda.
 - 🔎 G1/G2 kotaları tetiklendiğinde `structuredLog('WARN','auth',…)` düşer; kalıcı iz için
   `login_failed` olayları bu tabloda birikir. "Şu IP'den 15 dakikada kaç hata?" sorgusu:
-  `select ip_masked, count(*) from auth_events where event='login_failed'
+  `select ip, count(*) from auth_events where event='login_failed'
    and created_at > now() - interval '15 min' group by 1 order by 2 desc;`
 - ✅ **21 Ağu 2026 — Google OAuth boşluğu kapatıldı** (`app/auth/callback/route.ts`).
   Öncesinde bu tabloya yalnız OTP/e-posta `login_success` yazıyordu.
@@ -2097,9 +2097,9 @@ ip, user_agent, created_at
 ### `search_queries`, `listing_views`, `admin_actions` — Log arşivi (21 Ağu 2026)
 ```
 search_queries — user_id, kaynak('il_filtre'|'yakin_konum'), kalkis_il_id, varis_il_id,
-                 tip('yuk'|'arac'), sonuc_sayisi, ip_masked, created_at
+                 tip('yuk'|'arac'), sonuc_sayisi, ip, created_at
                  ⚠️ 'yakin_konum'da ham GPS (lat/lng) YAZILMAZ, yalnız çözümlenen il.
-listing_views  — listing_id, viewer_user_id, ip_masked, created_at
+listing_views  — listing_id, viewer_user_id, ip, created_at
                  ⚠️ bilinen arama-motoru/sosyal-önizleme botları route seviyesinde elenir.
 admin_actions  — actor_id, target_user_id, alan, eski_deger(jsonb), yeni_deger(jsonb), created_at
 ```
@@ -2111,6 +2111,13 @@ admin_actions  — actor_id, target_user_id, alan, eski_deger(jsonb), yeni_deger
 - Görüntüleme: `/admin/loglar` (dört sekme, kullanıcı adı/e-posta/telefonla filtre).
 - ⚠️ **Retention YOK** — bilinçli "süresiz sakla" tercihi (bkz. §9 "SON GİRİŞ SÜTUNU" notunun
   devamı ve §7 "Log arşivi").
+- 🚨 **21 Ağu 2026 (aynı gün) — IP MASKELEME KALDIRILDI.** `docs/20260821b_ip_maskeleme_kaldir.sql`
+  ile `ip_masked` kolonu `ip`'ye çevrildi, artık **ham IP** yazılıyor (`auth_events` dahil üçünde
+  de). Bayram'ın bilinçli kararı — önceki karar KVKK ölçülülük gerekçesiyle maskelemeyi zorunlu
+  kılıyordu (bkz. `lib/logger.ts` başlığı, `docs/20260728_auth_events.sql`). `structuredLog`
+  (Vercel stdout logları) HÂLÂ maskeli — yalnız bu üç DB tablosu değişti. `/api/auth/log`'daki
+  kota anahtarı (`kotaAsildi`) da bilerek maskeli IP ile çalışmaya devam ediyor (alt ağ bazlı
+  gruplama, DB'ye yazılandan ayrı bir karar).
 
 ### `raw_posts`, `aliases`, `vehicles`
 
