@@ -37,6 +37,12 @@ export default function KullaniciTablosu({ kullanicilar: ilk, aiQuotaDefault }: 
   const [yukleniyor, setYukleniyor] = useState<Record<string, boolean>>({});
   const [hata, setHata] = useState<Record<string, string>>({});
   const [arama, setArama] = useState('');
+  const [sadeceDogrulanmis, setSadeceDogrulanmis] = useState(false);
+
+  // last_sign_in_at hiç yoksa: kod/OTP gönderilmiş ama hiç girilmemiş, yarım
+  // kalmış kayıt — bkz. docs/PROJE_HARITASI.md §9 "SON GİRİŞ SÜTUNU AKTİVİTE
+  // GÖSTERGESİ DEĞİL". Gerçek kullanıcı sayısını raporlarken bunları ayır.
+  const dogrulanmamisSayisi = liste.filter(u => !u.last_sign_in_at).length;
 
   async function kaydet(id: string, alan: string, deger: unknown) {
     setYukleniyor(p => ({ ...p, [`${id}_${alan}`]: true }));
@@ -51,6 +57,7 @@ export default function KullaniciTablosu({ kullanicilar: ilk, aiQuotaDefault }: 
   }
 
   const filtreli = liste.filter(u => {
+    if (sadeceDogrulanmis && !u.last_sign_in_at) return false;
     const q = arama.toLowerCase();
     return !q ||
       u.display_name?.toLowerCase().includes(q) ||
@@ -101,6 +108,23 @@ export default function KullaniciTablosu({ kullanicilar: ilk, aiQuotaDefault }: 
         <span style={{ marginLeft: 12, color: '#4b5563', fontSize: '0.78rem' }}>
           {filtreli.length} kullanıcı
         </span>
+        {dogrulanmamisSayisi > 0 && (
+          <label
+            title="Telefon/e-posta ile kod istenmiş ama hiç doğrulanmamış (hiç giriş yapılmamış) hesaplar — gerçek kullanıcı sayılmaz."
+            style={{
+              marginLeft: 14, color: '#c9a227', fontSize: '0.78rem', cursor: 'pointer',
+              display: 'inline-flex', alignItems: 'center', gap: 5, userSelect: 'none',
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={sadeceDogrulanmis}
+              onChange={e => setSadeceDogrulanmis(e.target.checked)}
+              style={{ cursor: 'pointer' }}
+            />
+            ⚠ {dogrulanmamisSayisi} hesap hiç doğrulanmamış — gizle
+          </label>
+        )}
       </div>
 
       <div style={{ overflowX: 'auto', borderRadius: 10, border: '1px solid #30363d' }}>
@@ -205,7 +229,16 @@ export default function KullaniciTablosu({ kullanicilar: ilk, aiQuotaDefault }: 
                     </div>
                     <div style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: 3 }}>
                       <span style={{ color: '#374151', fontSize: '0.68rem' }}>Giriş: </span>
-                      {tarihFormat(u.last_sign_in_at)}
+                      {u.last_sign_in_at ? (
+                        tarihFormat(u.last_sign_in_at)
+                      ) : (
+                        <span
+                          title="Kod/OTP istenmiş ama hiç girilmemiş — gerçek kullanıcı değil, yarım kalmış kayıt."
+                          style={{ color: '#c9a227', fontWeight: 600 }}
+                        >
+                          ⚠ Doğrulanmadı
+                        </span>
+                      )}
                     </div>
                   </td>
 

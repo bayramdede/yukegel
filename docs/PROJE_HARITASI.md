@@ -2655,6 +2655,41 @@ Açık rotalar: /giris, /auth/, /profil-tamamla, /nasil-calisir, /hakkimizda,
 
 ## 9. KURALLAR & TUZAKLAR
 
+- 🔎 **`/admin/kullanicilar` "SON GİRİŞ" SÜTUNU AKTİVİTE GÖSTERGESİ DEĞİL —
+  DAVRANIŞ, BUG DEĞİL** (21 Ağu 2026, `app/admin/kullanicilar/page.tsx`,
+  Bayram + Claude, DB sorgusuyla doğrulandı). Kullanıcı "kayıt tarihi ile son
+  giriş tarihi neredeyse hepsinde aynı" gözlemiyle sordu; kontrol: 135
+  kullanıcıdan 91'i (%67) `created_at`/`last_sign_in_at` farkı <1 dk, 16'sı
+  `last_sign_in_at IS NULL`. İki ayrı, birbirini güçlendiren sebep var:
+  (1) Giriş akışı SMS/e-posta **OTP** (`verifyOtp`) — Supabase'de OTP
+  doğrulaması AYNI ZAMANDA ilk oturum açma olayıdır, yani kayıt = ilk giriş;
+  bu beklenen davranış. (2) `@supabase/ssr` oturumu cookie'de KALICI —
+  `last_sign_in_at` yalnız YENİ bir auth akışında (OTP/magic-link/OAuth)
+  güncellenir, arka planda sessiz token refresh'te GÜNCELLENMEZ. Yani bir
+  kullanıcı kayıttan sonra günlerce siteye dönse bile oturumu hiç düşmediyse
+  bu sütun hâlâ kayıt gününü gösterir — **"son giriş" aslında "son kez giriş
+  EKRANINDAN geçtiği an"** demektir, "son aktivite" değil. Ayrıca "1 dk içi
+  eşleşen" 91 kullanıcının hiçbiri kayıttan >1 gün sonra ilan oluşturmamış
+  (`listings` ile çapraz kontrol edildi) — yani gerçekten tek seferlik
+  kullanıcılar da olabilir, ayırt etmenin yolu yok çünkü site salt-okur
+  gezinme (arama/görüntüleme) için DB'ye iz bırakmıyor.
+  **Ayrı ve gerçek bir bulgu:** `last_sign_in_at IS NULL` olan 16 hesap —
+  bunlar OTP **istendiği anda** (`shouldCreateUser` varsayılan davranışı)
+  `auth.users`'a yazılıyor, kodu hiç GİRMEDEN; `on_auth_user_created`
+  trigger'ı da aynı anda `public.users` satırını açıyor. Yani telefon/e-posta
+  yazıp kodu girmeden vazgeçen herkes admin panelde "kayıtlı kullanıcı" gibi
+  görünüyor (`phone_confirmed_at`/`email_confirmed_at` de NULL). Bu, gerçek
+  kullanıcı sayısını şişiriyor. **Kural: bu sütunları admin panelde
+  yorumlarken (a) "son giriş = son aktivite" varsayma, (b) kullanıcı
+  sayılarını raporlarken `last_sign_in_at IS NULL` (doğrulanmamış/yarım
+  kayıt) satırlarını ayrı say ya da filtrele.**
+  ✅ **21 Ağu 2026 — UI'YA YANSITILDI** (`KullaniciTablosu.tsx`). "Kayıt / Son
+  Giriş" hücresinde `last_sign_in_at` NULL ise artık tarih yerine
+  "⚠ Doğrulanmadı" rozeti basılıyor; arama kutusunun yanında "N hesap hiç
+  doğrulanmamış — gizle" checkbox'ı var (işaretlenince bu satırlar tablodan
+  çıkıyor, gerçek/aktif kullanıcı sayısı görünür hâle geliyor). `tsc --noEmit`
+  temiz.
+
 - 🚨 **DÜŞÜK GÜVENLİ AI-ALIAS, PASS 2'NİN "AYNI SATIRDA KAYNAK+HEDEF" KOLUNU
   KANDIRDI → SESSİZCE YANLIŞ VARIŞ** (21 Ağu 2026, `aliases` id 2705,
   `supabase/functions/parse-listing/index.ts:894-943`, Bayram + Claude).
