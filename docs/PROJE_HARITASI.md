@@ -2655,6 +2655,50 @@ Açık rotalar: /giris, /auth/, /profil-tamamla, /nasil-calisir, /hakkimizda,
 
 ## 9. KURALLAR & TUZAKLAR
 
+- 🚨 **DÜŞÜK GÜVENLİ AI-ALIAS, PASS 2'NİN "AYNI SATIRDA KAYNAK+HEDEF" KOLUNU
+  KANDIRDI → SESSİZCE YANLIŞ VARIŞ** (21 Ağu 2026, `aliases` id 2705,
+  `supabase/functions/parse-listing/index.ts:894-943`, Bayram + Claude).
+  `learn-aliases` "tepeören" kelimesini tek başına Kocaeli/Dilovası'na
+  öğretmişti (`created_by_ai:true`, `llm_confidence:72`, öncelik 50) — oysa bu
+  domende niteliksiz "Tepeören" neredeyse hep İstanbul/Tuzla'daki (ünlü TIR
+  parkı bölgesi) yeri işaret eder; Kocaeli'de aynı adı taşıyan bir köy VAR ama
+  nadir kullanılıyor. Sonuç: **"TUZLA TEPEÖRENDEN HEMEN YÜKLER"** gibi TEK
+  satırlık, tire/ok İÇERMEYEN köken satırları `findPlaces()`'ten İKİ isabet
+  döndürdü (Tuzla/90 + sahte Dilovası/50). Pass 2'nin "aynı satırda hem kaynak
+  hem hedef var" kolu (ör. "İKİTELLİ YÜKLEME HADIMKÖY" kalıbı için yazılmıştı)
+  bunu gerçek bir varış sandı, `Tuzla→Dilovası` sahte şeridini üretip
+  `blockOrigin`'i sıfırladı — bu da 2. satırdaki GERÇEK varışın
+  (`"ANKARA ŞAŞMAZ HEMEN İNDİRİR"`) hiç işlenmemesine yol açtı (blok zaten
+  "tek satırlık" sayılıp kapandığı için). En az Mayıs 2026'dan beri aynı
+  kalıptaki (~20+) "Tuzla Tepeören" ilanı bu şekilde yanlış varışla üretilmiş;
+  moderatörler hepsini elle `rejected`/`archived` ederek fark ettirmeden
+  temizlemiş — canlı/onaylı hiçbir ilan etkilenmemişti ama aynı hata sürekli
+  tekrar tekrar moderatör zamanı yakıyordu. Düzeltme: `aliases.id=2705`
+  `is_active=false` (tumAliaslar 60 sn TTL'de kendiliğinden düşer), etkilenen
+  tek `rejected` ilanın `listing_stops` kaydı Ankara'ya çevrildi.
+  **Kural: `learn-aliases`'ın ürettiği düşük-öncelikli (`priority<=50`),
+  `created_by_ai=true` alias'lar TEK BAŞINA bir yer adını, o adın en yaygın
+  (yüksek trafikli) anlamıyla ÇAKIŞTIĞI durumlarda kirletebilir — özellikle
+  Pass 2'nin "satırda 2. isabet = hedef" varsayımı düşük-öncelikli isabetleri
+  ELEMİYOR. Böyle bir alias'ı onaylarken/öğrenirken kelimenin domaindeki EN
+  YAYGIN kullanımıyla çakışıp çakışmadığı kontrol edilmeli; çakışıyorsa ya
+  reddedilmeli ya da yalnız daha spesifik bir bağlamda (bigram, "Kocaeli"
+  ile birlikte geçtiğinde) eşleşecek şekilde kısıtlanmalı.**
+  ✅ **21 Ağu 2026 — SINIF KAPATILDI (`lib/alias-normalize.ts::cakisanSehirBul` /
+  `yayginKelimeCakismasiUyarisi`).** Öneri onaylanmadan ÖNCE kaynak satırlarında
+  canlı `findPlaces()` ile "bu satır zaten başka, güçlü (öncelik≥70) bir şehirle
+  eşleşiyor mu?" sorusu soruluyor. `GET ?sekme=pending` (`learn-aliases/route.ts`)
+  her öneri için bunu önceden hesaplayıp `cakisma_uyarisi` alanıyla döndürüyor,
+  `OgrenmeMerkeziClient.tsx` kartta ⚠️ rozet basıyor. `PATCH action=approve`
+  aynı kontrolü İLK onayda tekrarlıyor ve `cakismayiKabulEt:true` gönderilmeden
+  **409** döner — blok değil, admin `confirm()` ile "yine de onayla" diyebiliyor
+  (iki gerçek yer aynı adı taşıyabilir — bu vakanın ta kendisi). Asıl kazanç:
+  `topluOnayla` (bulk approve) bu bayrağı hiç göndermediği için çakışan öneriler
+  bulk'ta OTOMATİK GEÇEMEZ, "başarısız" sayılıp bekleyende kalır. Doğrulama:
+  gerçek vaka ("tepeören"→Kocaeli, kaynakta "TUZLA TEPEÖRENDEN...") ve temiz bir
+  vaka ("gebze"→Kocaeli, çakışmasız) elle test edildi, ikisi de beklendiği gibi
+  sonuçlandı; `npm run test:alias` (29 kontrol) ve `tsc --noEmit` temiz kaldı.
+
 - 🚨 **MÜKERRER TESPİTİ: DAR ANAHTAR İKİ BUG DOĞURDU, SONUNDA BİRLEŞİK HASH'E
   GEÇİLDİ** (11 Ağu 2026, `lib/dedup.ts` + `lib/ilan-yaz.ts`, Bayram).
   Önce `mukerrerBul()` (artık SİLİNDİ) iki hata taşıyordu, ikisi de "dar bir

@@ -23,6 +23,11 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { ilId, ilceResmiMi, ilceHangiIllerde } from './lokasyon';
+// 21 Ağu 2026 — `yayginKelimeCakismasiUyarisi` bunları KULLANIR, DUPLİKE ETMEZ.
+// `findPlaces`/`trNorm` `parse-listing/index.ts`teki (Deno) canlı eşleştirme
+// mantığının BİREBİR aynısı — "bu alias onaylanırsa parser ne yapardı?" sorusunu
+// gerçek koddan sorabilmek için. Ayrıntı: aşağıdaki fonksiyonun başlığı.
+import { findPlaces, trNorm, type Alias as ParserAlias } from './lane-parser';
 
 /**
  * Karşılaştırma anahtarı: Türkçe/ASCII farkını yok sayan katlanmış form.
@@ -241,6 +246,7 @@ export type AliasSatiri = {
   district: string | null;
   is_active: boolean | null;
   is_approved: boolean | null;
+  priority: number | null;
 };
 
 // Gerçek istemci tipi kullanılıyor (yapısal taklit denendi, `from()` zinciri
@@ -272,7 +278,7 @@ export async function aliasSatirlariniYukle(svc: SupabaseBenzeri, type: string):
   for (let bas = 0; bas < TAVAN; bas += SAYFA) {
     const { data, error } = await svc
       .from('aliases')
-      .select('id, alias, normalized, district, is_active, is_approved')
+      .select('id, alias, normalized, district, is_active, is_approved, priority')
       .eq('type', type)
       .order('id', { ascending: true })
       .range(bas, bas + SAYFA - 1);
@@ -385,4 +391,121 @@ export async function aliasCakismaBul(
 export function baskinYazimaHizala(deger: string | null, mevcutDegerler: (string | null)[]): string | null {
   if (!deger) return deger;
   return baskinYazim(mevcutDegerler, deger) ?? deger;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// YAYGIN KELİME ÇAKIŞMASI DETEKTÖRÜ (21 Ağu 2026)
+//
+// 🚨 NEDEN VAR: `aliases id 2705` — "tepeören"'i tek başına Kocaeli/Dilovası'na
+// öğretmiş bir AI önerisi (öncelik=50, güven=72) — en az Mayıs 2026'dan beri
+// "TUZLA TEPEÖRENDEN HEMEN YÜKLER" gibi TEK satırlık, oksuz/tiresiz köken
+// satırlarında `findPlaces()`e İKİ isabet döndürüyordu (Tuzla/90 + Dilovası/50).
+// `parse-listing/index.ts:894-943`teki Pass 2 "aynı satırda kaynak+hedef" kolu
+// (ör. "İKİTELLİ YÜKLEME HADIMKÖY" kalıbı için yazılmıştı) bunu gerçek bir varış
+// sanıp `Tuzla→Dilovası` sahte şeridi üretti VE bloğu kapatıp asıl varışı
+// (`ANKARA ŞAŞMAZ...`) hiç işlemedi. ~20+ ilan bu şekilde doğdu; moderatörler
+// hepsini elle `rejected`/`archived` ederek fark ettirmeden temizledi — ama
+// aynı hata her seferinde moderatör zamanı yaktı. Ayrıntı: `docs/PROJE_HARITASI.md`
+// §9, "DÜŞÜK GÜVENLİ AI-ALIAS, PASS 2'Yİ KANDIRDI".
+//
+// İlk düzeltme (aliası `is_active=false` yapmak) SEMPTOMU giderdi. Bu fonksiyon
+// SINIFI kapatmaya çalışıyor: `learn-aliases`'ın ürettiği HER düşük-öncelikli
+// (`priority<=50`, yani her zaman AI önerisi — DB varsayılanı budur) aday için,
+// öğrenildiği kaynak satırların GERÇEKTEN bu deseni tetikleyip tetiklemeyeceğini
+// — "bu satır zaten BAŞKA, güçlü bir şehirle eşleşiyor mu?" — canlı `findPlaces()`
+// ile SORAR. Cevap evetse, onaylanan alias aynı Pass 2 kolunu aynı şekilde
+// kandırabilir demektir.
+//
+// ⚠️ BU DA BİR BLOK DEĞİL (route.ts'te 409 ile önce admine soruluyor, ama admin
+// `cakismayiKabulEt` ile YİNE DE onaylayabiliyor) — çünkü iki gerçek yer aynı
+// adı taşıyabilir (bu vakanın ta kendisi: Kocaeli'de GERÇEKTEN bir Tepeören köyü
+// var). Asıl kazanç: `topluOnayla` (bulk approve) bu bayrağı hiç göndermez, yani
+// çakışan öneriler bulk'ta OTOMATİK ONAYLANMAZ — "başarısız" sayılıp bekleyende
+// kalır, admin onları tek tek gözden geçirmek ZORUNDA kalır.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type YayginKelimeUyarisi = {
+  kod: 'ayni_satirda_farkli_sehir';
+  seviye: 'guclu';
+  cakisanSehir: string;
+  cakisanDistrict: string | null;
+  ornekSatir: string;
+  mesaj: string;
+};
+
+/** AI önerileri hep bu değerle doğar (DB kolon varsayılanı) — bkz. yorum yukarıda. */
+const YAYGIN_KELIME_ONCELIK_ESIGI = 50;
+/** Karşı taraf isabetinin "gürültü değil, gerçek bir şehir sinyali" sayılması için taban öncelik. */
+const CAKISAN_SEHIR_ONCELIK_ESIGI = 70;
+
+/**
+ * Saf fonksiyon — DB'ye gitmez, çağıran zaten yüklediği alias listesini geçer.
+ * `route.ts`teki `pending` sekmesi TÜM satırlar için TEK SEFERDE `aktifAliaslar`
+ * yükleyip bu fonksiyonu döngüde çağırır (N+1 sorgu YOK).
+ */
+export function cakisanSehirBul(
+  aday: { alias: string; normalized: string; priority?: number | null },
+  kaynakRawTextler: (string | null | undefined)[],
+  aktifAliaslar: ParserAlias[],
+): YayginKelimeUyarisi | null {
+  if ((aday.priority ?? YAYGIN_KELIME_ONCELIK_ESIGI) > YAYGIN_KELIME_ONCELIK_ESIGI) return null;
+  const adayKelime = trNorm(aday.alias);
+  const adayIl = trNorm(aday.normalized);
+  if (!adayKelime || !adayIl) return null;
+
+  for (const metin of kaynakRawTextler) {
+    for (const satir of (metin ?? '').split('\n')) {
+      // Kaba ön-filtre: aday kelime bu satırda hiç geçmiyorsa `findPlaces`i
+      // (bigram+unigram taraması) çağırmaya bile gerek yok.
+      if (!trNorm(satir).includes(adayKelime)) continue;
+      const isabetler = findPlaces(satir, aktifAliaslar);
+      const cakisan = isabetler.find(
+        h => trNorm(h.normalized) !== adayIl && h.priority >= CAKISAN_SEHIR_ONCELIK_ESIGI,
+      );
+      if (cakisan) {
+        return {
+          kod: 'ayni_satirda_farkli_sehir',
+          seviye: 'guclu',
+          cakisanSehir: cakisan.normalized,
+          cakisanDistrict: cakisan.district,
+          ornekSatir: satir.trim().substring(0, 160),
+          mesaj:
+            `"${aday.alias}" örnek kaynakta "${cakisan.normalized}${cakisan.district ? '/' + cakisan.district : ''}" ` +
+            `ile AYNI satırda geçiyor: "${satir.trim().substring(0, 120)}". Onaylanırsa parser'ın Pass 2 ` +
+            `"aynı satırda kaynak+hedef" kolu bu satırı ${cakisan.normalized}→${aday.normalized} gibi sahte bir ` +
+            `şerit sanabilir (21 Ağu 2026 "tepeören→Dilovası" vakasıyla aynı desen). Onaylamadan önce "${aday.alias}" ` +
+            `kelimesinin GERÇEKTEN "${aday.normalized}" mi yoksa "${cakisan.normalized}" mi olduğunu kontrol et.`,
+        };
+      }
+    }
+  }
+  return null;
+}
+
+/** Tek öneri için kolaylık sarmalayıcı — kendi `aktifAliaslar`ını yükler (PATCH approve yolu). */
+export async function yayginKelimeCakismasiUyarisi(
+  svc: SupabaseBenzeri,
+  aday: { alias: string; normalized: string; priority?: number | null },
+  kaynakRawTextler: (string | null | undefined)[],
+): Promise<YayginKelimeUyarisi | null> {
+  if ((aday.priority ?? YAYGIN_KELIME_ONCELIK_ESIGI) > YAYGIN_KELIME_ONCELIK_ESIGI) return null;
+  if (kaynakRawTextler.filter(Boolean).length === 0) return null;
+
+  const satirlar = await aliasSatirlariniYukle(svc, 'city');
+  const aktifAliaslar = aktifAliasListesi(satirlar);
+  return cakisanSehirBul(aday, kaynakRawTextler, aktifAliaslar);
+}
+
+/** `AliasSatiri[]` → `findPlaces()`in beklediği `Alias[]` biçimi (yalnız aktif+onaylı). */
+export function aktifAliasListesi(satirlar: AliasSatiri[]): ParserAlias[] {
+  return satirlar
+    .filter((s): s is AliasSatiri & { alias: string; normalized: string } =>
+      !!s.is_active && !!s.is_approved && !!s.alias && !!s.normalized)
+    .map(s => ({
+      type: 'city',
+      alias: s.alias,
+      normalized: s.normalized,
+      district: s.district,
+      priority: s.priority ?? 50,
+    }));
 }

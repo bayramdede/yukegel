@@ -40,15 +40,28 @@ interface NoLaneData {
   total: number;
 }
 
+// 21 Ağu 2026 — "tepeören→Dilovası" vakası (bkz. docs/PROJE_HARITASI.md §9).
+// `GET ?sekme=pending` artık her öneri için bunu ÖNCEDEN hesaplayıp gönderiyor.
+interface CakismaUyarisi {
+  kod: 'ayni_satirda_farkli_sehir';
+  seviye: 'guclu';
+  cakisanSehir: string;
+  cakisanDistrict: string | null;
+  ornekSatir: string;
+  mesaj: string;
+}
+
 interface PendingAlias {
   id: number;
   alias: string;
   normalized: string;
   district?: string | null;
   type: string;
+  priority?: number;
   llm_confidence: number;
   source_listing_ids: string[];
   created_at: string;
+  cakisma_uyarisi?: CakismaUyarisi | null;
 }
 
 const TIP_RENK: Record<string, string> = {
@@ -705,7 +718,13 @@ function OnaySekme() {
   };
 
   // ── Onayla / Reddet (düzeltme ile veya doğrudan) ──
-  const islemYap = async (id: number, action: 'approve' | 'reject') => {
+  // 🚨 21 Ağu 2026 — `action==='approve'` artık 409 dönebilir: sunucu
+  // "ayni_satirda_farkli_sehir" çakışması bulduysa `cakismayiKabulEt` bayrağı
+  // gönderilmeden onayı reddeder (bkz. route.ts). Burada admine uyarı metni
+  // `confirm()` ile gösterilip evet derse AYNI istek bayrakla tekrarlanır —
+  // bulk approve bu ikinci turu HİÇ yapmaz, o yüzden çakışanlar bulk'ta
+  // otomatik geçmez.
+  const islemYap = async (id: number, action: 'approve' | 'reject', cakismayiKabulEt = false) => {
     setIslem(String(id));
     try {
       const payload: Record<string, any> = { id, action };
@@ -714,10 +733,22 @@ function OnaySekme() {
         payload.normalized = duzVal.normalized;
         payload.district   = duzVal.altTip === 'ilce' ? duzVal.district : null;
       }
-      await fetch('/api/admin/learn-aliases', {
+      if (cakismayiKabulEt) payload.cakismayiKabulEt = true;
+      const res = await fetch('/api/admin/learn-aliases', {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
+      if (res.status === 409 && !cakismayiKabulEt) {
+        const json = await res.json().catch(() => null);
+        if (json?.gerekliAlan === 'cakismayiKabulEt') {
+          if (confirm(`${json.error}\n\nYine de onaylansın mı?`)) {
+            await islemYap(id, action, true);
+          }
+          return;
+        }
+        alert(json?.error ?? 'Onaylanamadı (çakışma).');
+        return;
+      }
       if (duzMod === id) setDuzMod(null);
       yukle();
     } finally { setIslem(null); }
@@ -743,7 +774,10 @@ function OnaySekme() {
       basarisiz += sonuclar.filter(ok => !ok).length;
     }
     setIslem(null);
-    if (basarisiz > 0) alert(`${basarisiz} öneri onaylanamadı (çakışma/hata) — liste yenilenince onlar hâlâ bekleyenlerde görünecek.`);
+    // 21 Ağu 2026 — bunların bir kısmı BİLEREK başarısız: "yaygın kelime çakışması"
+    // uyarısı olan öneriler toplu onayda `cakismayiKabulEt` göndermediğimiz için
+    // 409 döner ve bekleyende KALIR — otomatik onaylanmamaları amaçlanan davranış.
+    if (basarisiz > 0) alert(`${basarisiz} öneri onaylanamadı — bir kısmı çakışma uyarısı taşıyor olabilir (⚠️ rozetli kartlara bak), tek tek gözden geçir.`);
     yukle();
   };
 
@@ -874,7 +908,7 @@ function OnaySekme() {
       ) : (
         <div style={{ maxHeight: 580, overflowY: 'auto' }}>
           {pending.map(p => (
-            <div key={p.id} style={{ ...S.card(), border: '1px solid #f59e0b30' }}>
+            <div key={p.id} style={{ ...S.card(), border: p.cakisma_uyarisi ? '1px solid #f59e0b90' : '1px solid #f59e0b30' }}>
 
               {duzMod === p.id ? (
                 /* ── Düzenleme modu ── */
@@ -965,6 +999,22 @@ function OnaySekme() {
                         style={S.btn('#450a0a', '#f87171', islem === String(p.id))}>Reddet</button>
                     </div>
                   </div>
+
+                  {/* ── Çakışma uyarısı (21 Ağu 2026, "tepeören→Dilovası" vakası) ── */}
+                  {p.cakisma_uyarisi && (
+                    <div style={{
+                      marginTop: 10, background: '#3b1d0640', border: '1px solid #f59e0b60',
+                      borderRadius: 6, padding: '8px 10px', fontSize: '0.78rem', color: '#fbbf24', lineHeight: 1.5,
+                    }}>
+                      ⚠️ <b>Yaygın kelime çakışması:</b> "{p.alias}" örnek kaynakta{' '}
+                      <b>{p.cakisma_uyarisi.cakisanSehir}{p.cakisma_uyarisi.cakisanDistrict ? `/${p.cakisma_uyarisi.cakisanDistrict}` : ''}</b>{' '}
+                      ile AYNI satırda geçiyor — onaylanırsa parser sahte bir şerit üretebilir. "Onayla" ikinci bir
+                      onay isteyecek.
+                      <div style={{ marginTop: 4, color: '#c9d1d9', fontFamily: 'monospace', fontSize: '0.73rem' }}>
+                        {p.cakisma_uyarisi.ornekSatir}
+                      </div>
+                    </div>
+                  )}
 
                   {/* ── Kaynak satırlar ── */}
                   {kaynaklar[p.id] !== undefined && (

@@ -8,6 +8,11 @@ import {
   baskinYazimaHizala,
   aliasSatirlariniYukle,
   ilceIlUyarisi,
+  // 21 Ağu 2026 — "tepeören→Dilovası" vakasından sonra eklendi, bkz.
+  // `lib/alias-normalize.ts` başlığındaki gerekçe.
+  cakisanSehirBul,
+  yayginKelimeCakismasiUyarisi,
+  aktifAliasListesi,
 } from '../../../../lib/alias-normalize';
 // Dalga 5 — :454'teki `origin_city` predikatı `origin_province_id`'ye çevrildi.
 import { ilId } from '../../../../lib/lokasyon';
@@ -130,13 +135,47 @@ export async function GET(req: NextRequest) {
   if (sekme === 'pending') {
     const { data, error } = await svc
       .from('aliases')
-      .select('id, alias, normalized, district, type, llm_confidence, source_listing_ids, created_at')
+      .select('id, alias, normalized, district, type, priority, llm_confidence, source_listing_ids, created_at')
       .eq('created_by_ai', true)
       .eq('is_approved', false)
       .order('created_at', { ascending: false })
       .limit(limit);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    return NextResponse.json({ data: data ?? [] });
+
+    // 🚨 21 Ağu 2026 — "tepeören→Dilovası" vakası: liste ekrana gelmeden ÖNCE her
+    // öneri için "onaylanırsa Pass 2'yi kandırır mı?" sorusunu sorup rozet
+    // basıyoruz — admin "Onayla"ya basmadan önce görsün. N+1 sorgudan kaçınmak
+    // için `aktifAliaslar` ve kaynak `raw_posts` TEK SEFERDE yükleniyor, döngü
+    // yalnız bellek içi `cakisanSehirBul` (saf fonksiyon) çalıştırıyor.
+    const satir = (data ?? []) as any[];
+    let sonuc = satir;
+    if (satir.length > 0) {
+      const tumKaynakIdler = Array.from(
+        new Set(satir.flatMap(s => (Array.isArray(s.source_listing_ids) ? s.source_listing_ids : []))),
+      ).slice(0, 500);
+
+      const [{ data: kaynakSatirlar }, tumAktifAliaslar] = await Promise.all([
+        tumKaynakIdler.length > 0
+          ? svc.from('raw_posts').select('id, raw_text').in('id', tumKaynakIdler)
+          : Promise.resolve({ data: [] as any[] }),
+        aliasSatirlariniYukle(svc, 'city').then(aktifAliasListesi),
+      ]);
+      const rawTextMap = new Map<string, string | null>((kaynakSatirlar ?? []).map((r: any) => [r.id, r.raw_text]));
+
+      sonuc = satir.map(s => {
+        const kaynakMetinler = (Array.isArray(s.source_listing_ids) ? s.source_listing_ids : [])
+          .map((id: string) => rawTextMap.get(id))
+          .filter((t: string | null | undefined): t is string => !!t);
+        const cakisma_uyarisi = cakisanSehirBul(
+          { alias: s.alias, normalized: s.normalized, priority: s.priority },
+          kaynakMetinler,
+          tumAktifAliaslar,
+        );
+        return { ...s, cakisma_uyarisi };
+      });
+    }
+
+    return NextResponse.json({ data: sonuc });
   }
 
   // ── Sekme: source — raw_post id'leri için ham metni getir ──
@@ -557,7 +596,7 @@ export async function PATCH(req: NextRequest) {
     // kontrol sessizce atlanırdı.
     const { data: mevcutSatir } = await svc
       .from('aliases')
-      .select('type, normalized, district')
+      .select('type, normalized, district, alias, priority, created_by_ai, is_approved, source_listing_ids')
       .eq('id', id)
       .single();
 
@@ -569,6 +608,37 @@ export async function PATCH(req: NextRequest) {
         excludeId: id,
       });
       if (cakisma) return NextResponse.json({ error: cakisma.mesaj, conflict: cakisma }, { status: 409 });
+    }
+
+    // 🚨 21 Ağu 2026 — "tepeören→Dilovası" vakası: bu, İLK onaydır (zaten
+    // onaylıysa — admin sadece yazım düzeltiyorsa — tekrar sorma). Yalnız AI
+    // önerileri (`created_by_ai`) kontrol edilir; öncelik>50 olanlarda fonksiyon
+    // zaten `null` döner. `cakismayiKabulEt` GÖNDERİLMEDEN 409 döner — bu yüzden
+    // `topluOnayla` (bulk approve, bu bayrağı HİÇ göndermez) çakışan önerileri
+    // OTOMATİK ONAYLAYAMAZ, "başarısız" sayılıp bekleyende kalırlar. Tek tek
+    // onay ekranı uyarıyı gösterip admine "yine de onayla" seçeneği sunar.
+    if (mevcutSatir?.created_by_ai && !mevcutSatir?.is_approved && !updates.cakismayiKabulEt) {
+      const kaynakIdler: string[] = Array.isArray(mevcutSatir?.source_listing_ids) ? mevcutSatir.source_listing_ids : [];
+      let kaynakMetinler: (string | null)[] = [];
+      if (kaynakIdler.length > 0) {
+        const { data: kaynaklar } = await svc.from('raw_posts').select('raw_text').in('id', kaynakIdler);
+        kaynakMetinler = (kaynaklar ?? []).map((k: any) => k.raw_text);
+      }
+      const cakismaUyarisi = await yayginKelimeCakismasiUyarisi(
+        svc,
+        {
+          alias: alanlar.alias ?? mevcutSatir?.alias ?? '',
+          normalized: alanlar.normalized ?? mevcutSatir?.normalized ?? '',
+          priority: mevcutSatir?.priority,
+        },
+        kaynakMetinler,
+      );
+      if (cakismaUyarisi) {
+        return NextResponse.json(
+          { error: cakismaUyarisi.mesaj, cakisma_uyarisi: cakismaUyarisi, gerekliAlan: 'cakismayiKabulEt' },
+          { status: 409 },
+        );
+      }
     }
 
     const { error } = await svc.from('aliases').update(payload).eq('id', id);
