@@ -51,16 +51,32 @@ export default async function LoglarPage() {
     }
   }
 
-  // ── listing_views için ilan başlığı/rotası ──────────────────────────────
+  // ── listing_views için ilan özeti: "Tekirdağ → Ankara TIR (Tenteli)" ────
+  // 21 Ağu 2026 — sadece il/tip yetmiyordu, detaya girmeden ne olduğunu
+  // görmek için rota + araç/üstyapı da lazım. `vehicle_type`/`body_type`
+  // zaten Türkçe görüntü metni olarak saklanıyor (bkz. lib/ilan-sabitler.ts
+  // ARAC_TIPLERI/UTSYAPI) — ayrı bir etiket haritasına gerek yok.
   const listingIdSet = new Set(listingViews.map(r => r.listing_id).filter(Boolean));
-  const listingMap: Record<string, { origin_province_id: number | null; listing_type: string | null }> = {};
+  const listingMap: Record<string, {
+    origin_province_id: number | null; listing_type: string | null;
+    vehicle_type: string[] | null; body_type: string[] | null;
+    varis_il_id: number | null; ekstra_durak: number;
+  }> = {};
   if (listingIdSet.size > 0) {
     const { data: ilanlar } = await svc
       .from('listings')
-      .select('id, origin_province_id, listing_type')
+      .select('id, origin_province_id, listing_type, vehicle_type, body_type, listing_stops(province_id, stop_order)')
       .in('id', [...listingIdSet]);
-    for (const i of ilanlar ?? []) {
-      listingMap[i.id] = { origin_province_id: i.origin_province_id, listing_type: i.listing_type };
+    for (const i of (ilanlar ?? []) as any[]) {
+      const duraklar = ((i.listing_stops || []) as any[]).sort((a, b) => a.stop_order - b.stop_order);
+      listingMap[i.id] = {
+        origin_province_id: i.origin_province_id,
+        listing_type: i.listing_type,
+        vehicle_type: i.vehicle_type,
+        body_type: i.body_type,
+        varis_il_id: duraklar[0]?.province_id ?? null,
+        ekstra_durak: Math.max(0, duraklar.length - 1),
+      };
     }
   }
 
@@ -94,14 +110,21 @@ export default async function LoglarPage() {
             kalkis_il_adi: r.kalkis_il_id != null ? ilAdi(r.kalkis_il_id) : null,
             varis_il_adi: r.varis_il_id != null ? ilAdi(r.varis_il_id) : null,
           }))}
-          listingViews={listingViews.map(r => ({
-            ...r,
-            kullanici: r.viewer_user_id ? kullaniciMap[r.viewer_user_id] ?? null : null,
-            ilan: listingMap[r.listing_id] ? {
-              ...listingMap[r.listing_id],
-              il_adi: listingMap[r.listing_id].origin_province_id != null ? ilAdi(listingMap[r.listing_id].origin_province_id) : null,
-            } : null,
-          }))}
+          listingViews={listingViews.map(r => {
+            const l = listingMap[r.listing_id];
+            return {
+              ...r,
+              kullanici: r.viewer_user_id ? kullaniciMap[r.viewer_user_id] ?? null : null,
+              ilan: l ? {
+                listing_type: l.listing_type,
+                kalkis_il_adi: l.origin_province_id != null ? ilAdi(l.origin_province_id) : null,
+                varis_il_adi: l.varis_il_id != null ? ilAdi(l.varis_il_id) : null,
+                ekstra_durak: l.ekstra_durak,
+                vehicle_type: l.vehicle_type,
+                body_type: l.body_type,
+              } : null,
+            };
+          })}
           adminActions={adminActions.map(r => ({
             ...r,
             aktor: r.actor_id ? kullaniciMap[r.actor_id] ?? null : null,

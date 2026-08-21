@@ -17,8 +17,23 @@ type SearchQuery = {
 type ListingView = {
   id: number; listing_id: string; viewer_user_id: string | null; ip: string | null;
   created_at: string; kullanici: Kullanici;
-  ilan: { origin_province_id: number | null; listing_type: string | null; il_adi: string | null } | null;
+  ilan: {
+    listing_type: string | null;
+    kalkis_il_adi: string | null; varis_il_adi: string | null; ekstra_durak: number;
+    vehicle_type: string[] | null; body_type: string[] | null;
+  } | null;
 };
+
+// "Tekirdağ → Ankara +2 · TIR (Tenteli)" — detaya girmeden ilanı tanımaya yeter.
+function ilanOzeti(ilan: ListingView['ilan']): string {
+  if (!ilan) return '';
+  const rota = [ilan.kalkis_il_adi, ilan.varis_il_adi].filter(Boolean).join(' → ') || '—';
+  const durakEki = ilan.ekstra_durak > 0 ? ` +${ilan.ekstra_durak}` : '';
+  const arac = (ilan.vehicle_type ?? []).join('/');
+  const ustyapi = (ilan.body_type ?? []).length ? ` (${(ilan.body_type ?? []).join('/')})` : '';
+  const aracEki = arac ? ` · ${arac}${ustyapi}` : '';
+  return `${rota}${durakEki}${aracEki}`;
+}
 type AdminAction = {
   id: number; actor_id: string | null; target_user_id: string | null; alan: string;
   eski_deger: unknown; yeni_deger: unknown; created_at: string;
@@ -187,9 +202,18 @@ export default function LoglarClient({
               {viewFiltreli.map(r => (
                 <tr key={r.id}>
                   <td style={td}>{tarihFormat(r.created_at)}</td>
-                  <td style={td}>
+                  <td style={{ ...td, whiteSpace: 'normal', maxWidth: 320 }}>
+                    {r.ilan?.listing_type && (
+                      <span style={{
+                        background: r.ilan.listing_type === 'yuk' ? '#1e293b' : '#1c2d1e',
+                        color: r.ilan.listing_type === 'yuk' ? '#94a3b8' : '#86efac',
+                        fontSize: '0.65rem', fontWeight: 700, padding: '1px 5px', borderRadius: 4, marginRight: 6,
+                      }}>
+                        {r.ilan.listing_type === 'yuk' ? 'YÜK' : 'ARAÇ'}
+                      </span>
+                    )}
                     <a href={`/ilan/${r.listing_id}`} target="_blank" rel="noreferrer" style={{ color: '#93c5fd', textDecoration: 'none' }}>
-                      {r.ilan ? `${r.ilan.il_adi ?? '?'} · ${r.ilan.listing_type === 'yuk' ? 'Yük' : 'Araç'}` : r.listing_id.slice(0, 8) + '…'}
+                      {r.ilan ? ilanOzeti(r.ilan) : r.listing_id.slice(0, 8) + '…'}
                     </a>
                   </td>
                   <td style={td}>{kullaniciEtiket(r.kullanici)}</td>
