@@ -1,5 +1,5 @@
-import { requireAdmin, getServiceSupabase } from '../../../lib/auth';
-import { ilAdi } from '../../../lib/lokasyon';
+import { requireAdmin } from '../../../lib/auth';
+import { authEventsGetir, searchQueriesGetir, listingViewsGetir, adminActionsGetir } from '../../../lib/loglar';
 import LoglarClient from './LoglarClient';
 
 export const dynamic = 'force-dynamic';
@@ -10,75 +10,30 @@ const SATIR_LIMIT = 300;
 // Dört ayrı log tablosu (auth_events, search_queries, listing_views,
 // admin_actions) burada TEK sayfada birleştirilip görüntüleniyor. Detaylar
 // için docs/20260821_kullanici_arsiv.sql ve PROJE_HARITASI.md §9.
-export default async function LoglarPage() {
+//
+// 21 Ağu 2026 (aynı gün) — zaman filtresi + CSV export eklendi. `bas`/`son`
+// URL search param'ları (YYYY-MM-DD) — LoglarClient bunları `router.push` ile
+// değiştiriyor, Next.js bu sayfayı (RSC) YENİDEN ÇALIŞTIRIYOR ama tam sayfa
+// reload YAPMIYOR: LoglarClient unmount olmadığı için kendi `sekme` state'i
+// hayatta kalıyor. Veri çekme mantığı `lib/loglar.ts`'te — CSV export route'u
+// (`/api/admin/loglar/export`) AYNI fonksiyonları çağırıyor, ekranla export
+// birbirinden ayrışmasın diye.
+export default async function LoglarPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ bas?: string; son?: string }>;
+}) {
   const user = await requireAdmin();
-  const svc = getServiceSupabase();
+  const { bas, son } = await searchParams;
+  const basISO = bas ? `${bas}T00:00:00.000Z` : null;
+  const sonISO = son ? `${son}T23:59:59.999Z` : null;
 
-  const [authRes, searchRes, viewRes, actionRes] = await Promise.all([
-    svc.from('auth_events').select('id, event, method, reason, user_id, ip, user_agent, created_at')
-      .order('created_at', { ascending: false }).limit(SATIR_LIMIT),
-    svc.from('search_queries').select('id, user_id, kaynak, kalkis_il_id, varis_il_id, tip, sonuc_sayisi, ip, created_at')
-      .order('created_at', { ascending: false }).limit(SATIR_LIMIT),
-    svc.from('listing_views').select('id, listing_id, viewer_user_id, ip, created_at')
-      .order('created_at', { ascending: false }).limit(SATIR_LIMIT),
-    svc.from('admin_actions').select('id, actor_id, target_user_id, alan, eski_deger, yeni_deger, created_at')
-      .order('created_at', { ascending: false }).limit(SATIR_LIMIT),
+  const [authEvents, searchQueries, listingViews, adminActions] = await Promise.all([
+    authEventsGetir({ bas: basISO, son: sonISO, limit: SATIR_LIMIT }),
+    searchQueriesGetir({ bas: basISO, son: sonISO, limit: SATIR_LIMIT }),
+    listingViewsGetir({ bas: basISO, son: sonISO, limit: SATIR_LIMIT }),
+    adminActionsGetir({ bas: basISO, son: sonISO, limit: SATIR_LIMIT }),
   ]);
-
-  const authEvents = authRes.data ?? [];
-  const searchQueries = searchRes.data ?? [];
-  const listingViews = viewRes.data ?? [];
-  const adminActions = actionRes.data ?? [];
-
-  // ── Tüm satırlarda geçen user_id'leri TEK sorguda topla ────────────────
-  const userIdSet = new Set<string>();
-  for (const r of authEvents) if (r.user_id) userIdSet.add(r.user_id);
-  for (const r of searchQueries) if (r.user_id) userIdSet.add(r.user_id);
-  for (const r of listingViews) if (r.viewer_user_id) userIdSet.add(r.viewer_user_id);
-  for (const r of adminActions) {
-    if (r.actor_id) userIdSet.add(r.actor_id);
-    if (r.target_user_id) userIdSet.add(r.target_user_id);
-  }
-
-  const kullaniciMap: Record<string, { display_name: string | null; email: string | null; phone: string | null }> = {};
-  if (userIdSet.size > 0) {
-    const { data: kullanicilar } = await svc
-      .from('users')
-      .select('id, display_name, email, phone')
-      .in('id', [...userIdSet]);
-    for (const k of kullanicilar ?? []) {
-      kullaniciMap[k.id] = { display_name: k.display_name, email: k.email, phone: k.phone };
-    }
-  }
-
-  // ── listing_views için ilan özeti: "Tekirdağ → Ankara TIR (Tenteli)" ────
-  // 21 Ağu 2026 — sadece il/tip yetmiyordu, detaya girmeden ne olduğunu
-  // görmek için rota + araç/üstyapı da lazım. `vehicle_type`/`body_type`
-  // zaten Türkçe görüntü metni olarak saklanıyor (bkz. lib/ilan-sabitler.ts
-  // ARAC_TIPLERI/UTSYAPI) — ayrı bir etiket haritasına gerek yok.
-  const listingIdSet = new Set(listingViews.map(r => r.listing_id).filter(Boolean));
-  const listingMap: Record<string, {
-    origin_province_id: number | null; listing_type: string | null;
-    vehicle_type: string[] | null; body_type: string[] | null;
-    varis_il_id: number | null; ekstra_durak: number;
-  }> = {};
-  if (listingIdSet.size > 0) {
-    const { data: ilanlar } = await svc
-      .from('listings')
-      .select('id, origin_province_id, listing_type, vehicle_type, body_type, listing_stops(province_id, stop_order)')
-      .in('id', [...listingIdSet]);
-    for (const i of (ilanlar ?? []) as any[]) {
-      const duraklar = ((i.listing_stops || []) as any[]).sort((a, b) => a.stop_order - b.stop_order);
-      listingMap[i.id] = {
-        origin_province_id: i.origin_province_id,
-        listing_type: i.listing_type,
-        vehicle_type: i.vehicle_type,
-        body_type: i.body_type,
-        varis_il_id: duraklar[0]?.province_id ?? null,
-        ekstra_durak: Math.max(0, duraklar.length - 1),
-      };
-    }
-  }
 
   return (
     <div style={{ minHeight: '100vh', background: '#0d1117', fontFamily: "'IBM Plex Sans', system-ui, sans-serif" }}>
@@ -98,38 +53,18 @@ export default async function LoglarPage() {
           </h1>
           <div style={{ color: '#8b949e', fontSize: '0.85rem' }}>
             Giriş olayları, arama sorguları, ilan görüntülemeleri ve admin/moderatör kullanıcı-yönetimi işlemleri.
-            Her sekme en yeni {SATIR_LIMIT} kaydı gösterir.
+            Ekranda seçilen aralıkta en yeni {SATIR_LIMIT} kayıt gösterilir — daha fazlası için CSV&apos;ye aktarın.
           </div>
         </div>
 
         <LoglarClient
-          authEvents={authEvents.map(r => ({ ...r, kullanici: r.user_id ? kullaniciMap[r.user_id] ?? null : null }))}
-          searchQueries={searchQueries.map(r => ({
-            ...r,
-            kullanici: r.user_id ? kullaniciMap[r.user_id] ?? null : null,
-            kalkis_il_adi: r.kalkis_il_id != null ? ilAdi(r.kalkis_il_id) : null,
-            varis_il_adi: r.varis_il_id != null ? ilAdi(r.varis_il_id) : null,
-          }))}
-          listingViews={listingViews.map(r => {
-            const l = listingMap[r.listing_id];
-            return {
-              ...r,
-              kullanici: r.viewer_user_id ? kullaniciMap[r.viewer_user_id] ?? null : null,
-              ilan: l ? {
-                listing_type: l.listing_type,
-                kalkis_il_adi: l.origin_province_id != null ? ilAdi(l.origin_province_id) : null,
-                varis_il_adi: l.varis_il_id != null ? ilAdi(l.varis_il_id) : null,
-                ekstra_durak: l.ekstra_durak,
-                vehicle_type: l.vehicle_type,
-                body_type: l.body_type,
-              } : null,
-            };
-          })}
-          adminActions={adminActions.map(r => ({
-            ...r,
-            aktor: r.actor_id ? kullaniciMap[r.actor_id] ?? null : null,
-            hedef: r.target_user_id ? kullaniciMap[r.target_user_id] ?? null : null,
-          }))}
+          authEvents={authEvents}
+          searchQueries={searchQueries}
+          listingViews={listingViews}
+          adminActions={adminActions}
+          satirLimit={SATIR_LIMIT}
+          bas={bas ?? ''}
+          son={son ?? ''}
         />
       </main>
     </div>

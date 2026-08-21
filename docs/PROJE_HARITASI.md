@@ -2665,6 +2665,19 @@ aynı `normalized`+`district`'e** çözülüyor. Ek olarak 303 mesajda (3 gerçe
 - `admin_actions` — `/api/admin/kullanici` PATCH ve `/api/moderator/kullanici-askiya` POST, eski/yeni değeri `jsonb` olarak kaydeder (kim, kimi, hangi alanı değiştirdi).
 - RLS deseni `auth_events` ile birebir aynı: yazma yalnız service-role, okuma yalnız admin/moderator.
 - ⚠️ **Retention kurulmadı.** `auth_events`'in kendi migration'ı "KVKK ölçülülük gereği 90 günden eskisi silinmeli" diyordu (hiç aktif edilmemiş bir cron önerisi). Bayram bu üç tablo için **süresiz sakla** dedi — bilinçli tercih, ama gelecekte biri retention/temizlik eklerse bu üçünü UNUTMASIN.
+- ✅ **21 Ağu 2026 (aynı gün) — zaman filtresi + CSV export eklendi.** Veri çekme
+  `lib/loglar.ts`'e taşındı (4 fonksiyon: `authEventsGetir` vb., `{bas,son,limit}`
+  alıyor), formatlama/filtre saf fonksiyonları `lib/loglar-format.ts`'e (istemci
+  VE export route AYNI kodu kullanıyor, ekranla indirilen ayrışmasın diye).
+  `/admin/loglar?bas=YYYY-MM-DD&son=YYYY-MM-DD` — hazır aralık butonları
+  (Bugün/7 Gün/30 Gün/Tümü) + özel tarih girişi, `router.push` ile URL'i
+  değiştirip sayfayı (RSC) tam reload YAPMADAN yeniden çalıştırıyor
+  (`LoglarClient` unmount olmuyor, kendi `sekme` state'i hayatta kalıyor).
+  Ekran hâlâ 300 satırla sınırlı (performans); **`GET /api/admin/loglar/export`**
+  aynı filtrelerle (+ `q` kullanıcı arama metni) 5000'e kadar satır çekip
+  `;`-ayraçlı, UTF-8 BOM'lu CSV döner (TR Excel uyumu için). `requireAdmin()`
+  try/catch içinde (`/api/admin/kullanici` ile aynı desen — route handler'da
+  `redirect()` normal HTTP yönlendirmesi ÜRETMEZ, 401'e çeviriyoruz).
 
 ---
 

@@ -1,71 +1,10 @@
 'use client';
 import { useMemo, useState } from 'react';
-
-type Kullanici = { display_name: string | null; email: string | null; phone: string | null } | null;
-
-type AuthEvent = {
-  id: number; event: string; method: string; reason: string | null;
-  user_id: string | null; ip: string | null; user_agent: string | null;
-  created_at: string; kullanici: Kullanici;
-};
-type SearchQuery = {
-  id: number; user_id: string | null; kaynak: string;
-  kalkis_il_id: number | null; varis_il_id: number | null; tip: string | null;
-  sonuc_sayisi: number | null; ip: string | null; created_at: string;
-  kullanici: Kullanici; kalkis_il_adi: string | null; varis_il_adi: string | null;
-};
-type ListingView = {
-  id: number; listing_id: string; viewer_user_id: string | null; ip: string | null;
-  created_at: string; kullanici: Kullanici;
-  ilan: {
-    listing_type: string | null;
-    kalkis_il_adi: string | null; varis_il_adi: string | null; ekstra_durak: number;
-    vehicle_type: string[] | null; body_type: string[] | null;
-  } | null;
-};
-
-// "Tekirdağ → Ankara +2 · TIR (Tenteli)" — detaya girmeden ilanı tanımaya yeter.
-function ilanOzeti(ilan: ListingView['ilan']): string {
-  if (!ilan) return '';
-  const rota = [ilan.kalkis_il_adi, ilan.varis_il_adi].filter(Boolean).join(' → ') || '—';
-  const durakEki = ilan.ekstra_durak > 0 ? ` +${ilan.ekstra_durak}` : '';
-  const arac = (ilan.vehicle_type ?? []).join('/');
-  const ustyapi = (ilan.body_type ?? []).length ? ` (${(ilan.body_type ?? []).join('/')})` : '';
-  const aracEki = arac ? ` · ${arac}${ustyapi}` : '';
-  return `${rota}${durakEki}${aracEki}`;
-}
-type AdminAction = {
-  id: number; actor_id: string | null; target_user_id: string | null; alan: string;
-  eski_deger: unknown; yeni_deger: unknown; created_at: string;
-  aktor: Kullanici; hedef: Kullanici;
-};
-
-function tarihFormat(iso: string): string {
-  const d = new Date(iso);
-  return d.toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' })
-    + ' ' + d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-}
-
-function kullaniciEtiket(k: Kullanici): string {
-  if (!k) return '—';
-  return k.display_name || k.email || k.phone || '—';
-}
-
-function kullaniciAramayaUyar(k: Kullanici, q: string): boolean {
-  if (!q) return true;
-  const hedef = `${k?.display_name ?? ''} ${k?.email ?? ''} ${k?.phone ?? ''}`.toLowerCase();
-  return hedef.includes(q);
-}
-
-const SEKMELER = ['auth', 'search', 'view', 'admin'] as const;
-type Sekme = typeof SEKMELER[number];
-
-const SEKME_ETIKET: Record<Sekme, string> = {
-  auth: '🔐 Giriş Olayları',
-  search: '🔍 Arama Sorguları',
-  view: '👁️ İlan Görüntülemeleri',
-  admin: '🛠️ Admin/Mod İşlemleri',
-};
+import { useRouter } from 'next/navigation';
+import {
+  SEKMELER, SEKME_ETIKET, tarihFormat, kullaniciEtiket, kullaniciAramayaUyar, ilanOzeti,
+  type Sekme, type AuthEventSatir, type SearchQuerySatir, type ListingViewSatir, type AdminActionSatir,
+} from '../../../lib/loglar-format';
 
 const td: React.CSSProperties = {
   padding: '9px 12px', borderBottom: '1px solid #21262d', color: '#e2e8f0',
@@ -83,17 +22,56 @@ const EVENT_RENK: Record<string, string> = {
   cikis: '#6b7280',
 };
 
+// ── Tarih yardımcıları — LOKAL tarih (UTC değil), admin'in gördüğü "bugün"
+// tarayıcının saat dilimiyle eşleşsin diye.
+function ymd(d: Date): string {
+  const yil = d.getFullYear();
+  const ay = String(d.getMonth() + 1).padStart(2, '0');
+  const gun = String(d.getDate()).padStart(2, '0');
+  return `${yil}-${ay}-${gun}`;
+}
+function gunOnce(n: number): Date {
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  return d;
+}
+
+const HAZIR_ARALIKLAR: { etiket: string; bas: () => string; son: () => string }[] = [
+  { etiket: 'Bugün', bas: () => ymd(new Date()), son: () => ymd(new Date()) },
+  { etiket: 'Son 7 Gün', bas: () => ymd(gunOnce(6)), son: () => ymd(new Date()) },
+  { etiket: 'Son 30 Gün', bas: () => ymd(gunOnce(29)), son: () => ymd(new Date()) },
+  { etiket: 'Tümü', bas: () => '', son: () => '' },
+];
+
 export default function LoglarClient({
-  authEvents, searchQueries, listingViews, adminActions,
+  authEvents, searchQueries, listingViews, adminActions, satirLimit, bas, son,
 }: {
-  authEvents: AuthEvent[];
-  searchQueries: SearchQuery[];
-  listingViews: ListingView[];
-  adminActions: AdminAction[];
+  authEvents: AuthEventSatir[];
+  searchQueries: SearchQuerySatir[];
+  listingViews: ListingViewSatir[];
+  adminActions: AdminActionSatir[];
+  satirLimit: number;
+  bas: string;
+  son: string;
 }) {
+  const router = useRouter();
   const [sekme, setSekme] = useState<Sekme>('auth');
   const [arama, setArama] = useState('');
   const q = arama.trim().toLowerCase();
+
+  // Tarih girdileri: URL zaten kaynak — yerel state yalnız input'un ANLIK
+  // değerini tutuyor, "Uygula"ya kadar URL'e (dolayısıyla sunucu sorgusuna)
+  // dokunmuyor. Hazır aralık butonları direkt URL'i günceller.
+  const [basTaslak, setBasTaslak] = useState(bas);
+  const [sonTaslak, setSonTaslak] = useState(son);
+
+  function aralikUygula(yeniBas: string, yeniSon: string) {
+    const params = new URLSearchParams();
+    if (yeniBas) params.set('bas', yeniBas);
+    if (yeniSon) params.set('son', yeniSon);
+    const qs = params.toString();
+    router.push(qs ? `/admin/loglar?${qs}` : '/admin/loglar');
+  }
 
   const authFiltreli = useMemo(() => authEvents.filter(r => kullaniciAramayaUyar(r.kullanici, q)), [authEvents, q]);
   const searchFiltreli = useMemo(() => searchQueries.filter(r => kullaniciAramayaUyar(r.kullanici, q)), [searchQueries, q]);
@@ -107,6 +85,15 @@ export default function LoglarClient({
     auth: authFiltreli.length, search: searchFiltreli.length,
     view: viewFiltreli.length, admin: adminFiltreli.length,
   };
+  const yukluSayilar: Record<Sekme, number> = {
+    auth: authEvents.length, search: searchQueries.length,
+    view: listingViews.length, admin: adminActions.length,
+  };
+
+  const aktifHazirAralik = HAZIR_ARALIKLAR.find(h => h.bas() === bas && h.son() === son)?.etiket
+    ?? (!bas && !son ? 'Tümü' : null);
+
+  const exportHref = `/api/admin/loglar/export?sekme=${sekme}&bas=${encodeURIComponent(bas)}&son=${encodeURIComponent(son)}&q=${encodeURIComponent(arama.trim())}`;
 
   return (
     <div>
@@ -126,6 +113,62 @@ export default function LoglarClient({
             {SEKME_ETIKET[s]} <span style={{ opacity: 0.6 }}>({sayilar[s]})</span>
           </button>
         ))}
+      </div>
+
+      {/* ── Zaman filtresi ─────────────────────────────────────────────── */}
+      <div style={{
+        display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 12,
+        background: '#161b22', border: '1px solid #30363d', borderRadius: 8, padding: '10px 12px',
+      }}>
+        <span style={{ color: '#4b5563', fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          📅 Aralık:
+        </span>
+        {HAZIR_ARALIKLAR.map(h => (
+          <button
+            key={h.etiket}
+            onClick={() => { setBasTaslak(h.bas()); setSonTaslak(h.son()); aralikUygula(h.bas(), h.son()); }}
+            style={{
+              background: aktifHazirAralik === h.etiket ? '#1e3a5f' : '#0d1117',
+              color: aktifHazirAralik === h.etiket ? '#93c5fd' : '#8b949e',
+              border: `1px solid ${aktifHazirAralik === h.etiket ? '#3b82f6' : '#30363d'}`,
+              borderRadius: 6, padding: '5px 10px', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer',
+            }}
+          >
+            {h.etiket}
+          </button>
+        ))}
+        <span style={{ color: '#30363d' }}>|</span>
+        <input
+          type="date" value={basTaslak} onChange={e => setBasTaslak(e.target.value)}
+          style={{ background: '#0d1117', color: '#e2e8f0', border: '1px solid #30363d', borderRadius: 6, padding: '5px 8px', fontSize: '0.78rem' }}
+        />
+        <span style={{ color: '#4b5563', fontSize: '0.78rem' }}>—</span>
+        <input
+          type="date" value={sonTaslak} onChange={e => setSonTaslak(e.target.value)}
+          style={{ background: '#0d1117', color: '#e2e8f0', border: '1px solid #30363d', borderRadius: 6, padding: '5px 8px', fontSize: '0.78rem' }}
+        />
+        <button
+          onClick={() => aralikUygula(basTaslak, sonTaslak)}
+          style={{ background: '#22c55e', color: '#000', border: 'none', borderRadius: 6, padding: '5px 12px', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer' }}
+        >
+          Uygula
+        </button>
+        {(bas || son) && (
+          <span style={{ color: '#4b5563', fontSize: '0.75rem' }}>
+            {yukluSayilar[sekme]} kayıt yüklendi{yukluSayilar[sekme] >= satirLimit ? ` (tavan ${satirLimit} — daha fazlası için CSV'ye aktarın)` : ''}
+          </span>
+        )}
+
+        <a
+          href={exportHref}
+          style={{
+            marginLeft: 'auto', background: '#161b22', color: '#86efac',
+            border: '1px solid #22c55e', borderRadius: 6, padding: '5px 12px',
+            fontSize: '0.78rem', fontWeight: 700, textDecoration: 'none', whiteSpace: 'nowrap',
+          }}
+        >
+          ⬇️ CSV&apos;ye Aktar
+        </a>
       </div>
 
       <div style={{ marginBottom: 16 }}>
